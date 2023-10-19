@@ -1,0 +1,6 @@
+# Give a folder of smiles, xyz, or mol files as reactant
+# Note that a bimolecular reaction is recommended to use .xyz or .mol file
+input: xyz_test # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
+output: reaction_xyz # The output folder with reaction geometry for constructing reaction network.
+n_break: 2 # Indicate the number of breaking bonds
+n_form: 2 # Indicate the number of forming bonds

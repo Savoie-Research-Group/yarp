@@ -130,4 +130,4 @@ def yarpecule_hash(y):
     Any method affecting the `bond_mats` or `masses` attributes of the yarpecule instance should also recalculate this hash.  
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
-    return np.round(np.sum(y.bond_mats[0]*np.outer(y.atom_hashes,y.atom_hashes)),9)    
+    return np.round(np.sum(y.bond_mats[0]*np.outer(y.atom_hashes,y.atom_hashes)),8)    

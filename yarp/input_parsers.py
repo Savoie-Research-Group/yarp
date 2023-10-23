@@ -1,8 +1,6 @@
-from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType
+from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType,rdmolfiles
 import numpy as np
-
-
-def xyz_parse(xyz,read_types=False):
+def xyz_parse(xyz,read_types=False, multiple=False):
     """
     Simple wrapper function for grabbing the coordinates and elements from an xyz file.
     
@@ -27,6 +25,8 @@ def xyz_parse(xyz,read_types=False):
                  If the `read_types=True` option is supplied then an optional third list is returned. 
     """
     # Commands for reading only the coordinates and the elements
+    elements=[]
+    geo=[]
     if read_types is False:
         
         # Iterate over the remainder of contents and read the
@@ -37,7 +37,7 @@ def xyz_parse(xyz,read_types=False):
                 fields=lines.split()
 
                 # Parse header
-                if lc == 0:
+                if lc == 0 or (len(fields)==1 and fields[0].isdigit()):
                     if len(fields) < 1:
                         print("ERROR in xyz_parse: {} is missing atom number information".format(xyz))
                         quit()
@@ -55,24 +55,19 @@ def xyz_parse(xyz,read_types=False):
                         continue            
 
                     # Write geometry containing lines to variable
-                    if len(fields) > 3:
-
-                        # Consistency check
-                        if count == N_atoms:
-                            print("ERROR in xyz_parse: {} has more coordinates than indicated by the header.".format(xyz))
-                            quit()
-
+                    if len(fields) == 4:
                         # Parse commands
-                        else:
-                            Elements[count]=fields[0]
-                            Geometry[count,:]=np.array([float(fields[1]),float(fields[2]),float(fields[3])])
-                            count = count + 1
-
+                        Elements[count]=fields[0]
+                        Geometry[count,:]=np.array([float(fields[1]),float(fields[2]),float(fields[3])])
+                        count = count + 1
+                        if count==N_atoms:
+                            elements.append([Elements])
+                            geo.append([Geometry])
         # Consistency check
         if count != len(Elements):
             print("ERROR in xyz_parse: {} has less coordinates than indicated by the header.".format(xyz))
-
-        return Elements,Geometry
+        if multiple is True: return elements, geo
+        else: return Elements,Geometry
 
     # Commands for reading the atomtypes from the fourth column
     if read_types is True:
@@ -85,7 +80,7 @@ def xyz_parse(xyz,read_types=False):
                 fields=lines.split()
 
                 # Parse header
-                if lc == 0:
+                if lc == 0 or (len(fields)==1 and fields[0].isdigit()):
                     if len(fields) < 1:
                         print("ERROR in xyz_parse: {} is missing atom number information".format(xyz))
                         quit()
@@ -105,25 +100,21 @@ def xyz_parse(xyz,read_types=False):
 
                     # Write geometry containing lines to variable
                     if len(fields) > 3:
-
-                        # Consistency check
-                        if count == N_atoms:
-                            print("ERROR in xyz_parse: {} has more coordinates than indicated by the header.".format(xyz))
-                            quit()
-
-                        # Parse commands
-                        else:
-                            Elements[count]=fields[0]
-                            Geometry[count,:]=np.array([float(fields[1]),float(fields[2]),float(fields[3])])
-                            if len(fields) > 4:
-                                Atom_types[count] = fields[4]
-                            count = count + 1
+                        Elements[count]=fields[0]
+                        Geometry[count,:]=np.array([float(fields[1]),float(fields[2]),float(fields[3])])
+                        if len(fields) > 4:
+                            Atom_types[count] = fields[4]
+                        count = count + 1
+                        if count==N_atoms:
+                            elements.append([Elements])
+                            geo.append([Geometry])
 
         # Consistency check
         if count != len(Elements):
             print("ERROR in xyz_parse: {} has less coordinates than indicated by the header.".format(xyz))
 
-        return Elements,Geometry,Atom_types
+        if multiple is True: return elements, geo, Atom_types
+        else: return Elements,Geometry,Atom_types
 
 def xyz_q_parse(xyz):
     """
@@ -192,7 +183,39 @@ def xyz_from_smiles(smiles):
         adj_mat[i[0],i[1]] = 1
         adj_mat[i[1],i[0]] = 1        
     return elements,geo,adj_mat,q
-    
 
+def mol_parse(mol):
+    """
+    A simple wrapper for rdkit function to read a mol file.
+    
+    Parameters
+    ----------
+    mol: str
+         The mol file that is being to convert into a geometry, adjacency matrix, list of elements, and charge.
+
+    Returns
+    -------
+    (elements, geo, adj_mat, q): tuple
+                                 `elements` is a list with the element labels, `geo` is an nx3 numpy array holding the rdkit
+                                 generated geometry, `adj_mat` is an nxn array holding the adjacency matrix, `q` is an `int`
+                                 holding the charge (based on the sum of formal charges).
+    """
+    m=rdmolfiles.MolFromMolFile(mol)
+    N_atoms=len(m.GetAtoms())
+    elements=[]
+    geo=np.zeros((N_atoms, 3))
+    q=0
+    for i in range(N_atoms):
+        atom = m.GetAtomWithIdx(i)
+        elements += [atom.GetSymbol()]
+        coord = m.GetConformer().GetAtomPosition(i)
+        geo[i] = np.array([coord.x,coord.y,coord.z])
+        q += atom.GetFormalCharge()
+    # Generate adjacency matrix
+    adj_mat = np.zeros((N_atoms,N_atoms))        
+    for i in [ (_.GetBeginAtomIdx(),_.GetEndAtomIdx()) for _ in m.GetBonds()]:
+        adj_mat[i[0],i[1]] = 1
+        adj_mat[i[1],i[0]] = 1        
+    return elements,geo,adj_mat,q
 
     

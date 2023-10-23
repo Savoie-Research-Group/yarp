@@ -6,6 +6,10 @@ performs substructure matching on yarpecules.
 from collections import deque
 from itertools import combinations,combinations_with_replacement,permutations,product
 from yarp.taffi_functions import adjmat_to_adjlist
+from yarp.misc import prepare_list
+from yarp.properties import el_n_deficient,el_expand_octet
+from yarp.find_lewis import return_e
+import numpy as np
 
 valid_smiles_tokens = {'Br', 'C', 'Cl', 'H', 'B', 'N', 'O', 'P', 'S', 'F', 'I', 'b', 'c', 'n', 'o', 's', 'p', \
                        '(', ')', '[', ']', '=', '#', '%', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', \
@@ -202,7 +206,7 @@ def compare_paths_els(test_e_paths,e_paths):
     
 def smarts_to_paths(smarts): 
     """
-    This is a helper function for `smarts_match` that generates the `paths` (i.e., graphical walks) that are 
+    This is a helper function for `smarts_match()` that generates the `paths` (i.e., graphical walks) that are 
     consistent with the smarts subgraph and the element labels associated with the paths. `smarts_match` uses 
     this information to perform a comparison on a `yarpecule` object (specifically its adjacency_matrix and 
     elements). 
@@ -219,9 +223,9 @@ def smarts_to_paths(smarts):
     e_paths : list of lists
               Contains the same graphical walks as `paths` but converted into element labels. 
 
-    Notes
+    Note
     -----
-    The `smarts_match` algorithm tries to match the elements encountered along the walk first, before trying to 
+    The `smarts_match()` algorithm tries to match the elements encountered along the walk first, before trying to 
     match the topology (i.e., it is faster to rule out a match if there is a mismatch in the elements).
     """
     tokens = smarts_to_tokens(smarts)
@@ -364,8 +368,6 @@ def tokens_to_adjlist(tokens):
         last_token = token
     return adjacency_list,elements,bo_dict
 
-    
-    
 def pattern_to_path(pattern):
     """
     This is a helper function for adj_match that converts pattern matrices into a set of non-backtracking paths that are
@@ -409,8 +411,81 @@ def pattern_to_path(pattern):
         z += 1
     return final_paths
     
+def sieve_bmat_scores(yarpecules,thresh=0.0):
+    """
+    This is a helper function for filtering a list of yarpecules based on their lowest bond-electron matrix score
+    
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                list of yarpecules being filtered. 
+
+    thresh: float, default=0.0
+            yarpecules with bond-electron matrix scores less than or equal to this value will be returned.  
+
+    Returns
+    -------
+    yarpecules: list of yarpecules
+                The yarpecules that satisfy the threshold are returned as a list
+
+    Notes
+    -----
+    An empty list is returned if none of the supplied yarpecules satisfy the threshold.
+    """
+    return [ _ for _ in yarpecules if _.bond_mat_scores[0] <= thresh ]
+
+def sieve_valency_violations(yarpecules,inverse=False):
+    """
+    This is a helper function for filtering a list of yarpecules based on whether they have valency violations.
+    The violation is determined by the values in the `el_max_valence` dictionary from the `yarp.properties` module.
+    For example, a carbon with five electron centers would represent a valency violation.
+
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                list of yarpecules being filtered. 
+
+    inverse: bool, default=False
+             Default behavior will remove yarpecules with valency violations. If this option is set to `True` then
+             the function will remove yarpecules without valency violations. 
+
+    Returns
+    -------
+    yarpecules: list of yarpecules
+                The yarpecules that with (or without depending on `inverse` option) valency violations
+
+    Notes
+    -----
+    An empty list is returned if none of the supplied yarpecules satisfy the threshold.
+    """
+    yarpecules = prepare_list(yarpecules)
+    keep_ind = []
+    for count_y,y in enumerate(yarpecules):
+        violation = is_valency_violation(y)
+        if inverse and violation:
+            keep_ind += [count_y]
+        elif not violation:
+            keep_ind += [count_y]
+    return [ yarpecules[_] for _ in keep_ind ]
 
 
+def is_valency_violation(y):
+    """
+    Returns a bool based on whether there are any valency violations in the bond-electron matrix.
+    Implemented as a helper function for `seive_valency_violations`.
+
+    Parameters
+    ----------
+    y: yarpecule
+       The yarpecule that the user wants to test for valency violations
+
+    Returns
+    -------
+    violation: bool
+               Returns True is there is a valency violation.
+    """
+    return any([ True for count,_ in enumerate(return_e(y.bond_mats[0])) if _ > el_n_deficient[y.elements[count]] and not el_expand_octet[y.elements[count]] ])
+    
 # Return bool depending on if the atom is a nitro nitrogen atom
 def is_nitro(i,adj_mat,elements):
 

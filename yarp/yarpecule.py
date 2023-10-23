@@ -13,7 +13,8 @@ from yarp.taffi_functions import table_generator,return_rings,adjmat_to_adjlist,
 from yarp.properties import el_to_an,an_to_el,el_mass
 from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
 from yarp.hashes import atom_hash,yarpecule_hash
-from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles
+from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles, mol_parse
+from yarp.misc import merge_arrays, prepare_list
 
 def main(argv):
 
@@ -46,54 +47,69 @@ class yarpecule:
     ----------
 
     adj_mat: array
+             This array is indexed to the atoms in the `yarpecule` and has a one at row i and column j if there is 
+             a bond (of any kind) between the i-th and j-th atoms. 
 
     geo: array
+         An nx3 array of cartesian coordinates (in units of Angstroms), where n is the number of atoms.
+         The array is indexed to the atomic ordering of the `yarpecule`.
 
     elements: list
-
+              A list of lower-case element labels indexed to the atomic ordering of the `yarpecule`.
     q: int
+       The total charge on the `yarpecule`. 
 
     bond_mats: list of arrays
-
+               A list of arrays holding the calculated Lewis Structures for the `yarpecule`. By default, a set of
+               heuristics are used to only retain a small number of physically relevant resonance structures in this
+               list. In contrast to the `adj_mat`, the bond_mats contain bond order information at each position and
+               the number of unbonded electrons on each atom along the diagonal. The bond_mats are indexed to the
+               atomic ordering of the `yarpecule`.
+               
     masses: list
+            A list of the atomic masses in the yarpecule. These masses are used in the determination of uniqueness,
+            such that isotopomers will be considered unique.
 
     atom_hashes: array
+                 A list of hash values for each atom, based on graph connectivity and the masses of the atoms. 
 
     hash: float
+          A unique identifier for the yarpecule. See the `yarpecule_hash()` function for details on its calculation.
 
     rings: list of lists
+           Each sublist holds the indices of the atoms in a ring. By default, only non-overlapping rings are parsed
+           For example, naphthalene will only return two rings, not the outer ring that contains to two fused rings.
 
     Methods
     -------
 
     __init__
 
-    
-    
-    """
-    
+
+    Parameters
+    ----------
+    mol : var
+          The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding the 
+          (adj_mat, elements, charge),  or one or more filenames. For strings the extension is used to determine which 
+          parser to use (e.g., .xyz etc), otherwise the constructor will attempt to parse the input as a smiles string using 
+          rdkit. 
+
+    canon : bool, default=True
+            Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
+
+    Notes
+    -----
+    Constructor for the `yarpecule` class. The constructor requires the molecular graph information to calculate the
+    fundamental class attributes, including the bond-electron matrices and yarpecule hash. The molecular graph information
+    can be supplied via SMILES string, xyz file, or mol file. 
+
+    Returns
+    -------
+    self : yarpecule instance
+    """        
+
+    # Constructor
     def __init__(self,mol,canon=True):
-        """
-        Constructor for the `yarpecule` class. The constructor requires the molecular graph information to calculate the
-        fundamental class attributes, including the bond-electron matrices and yarpecule hash. The molecular graph information
-        can be supplied via SMILES string, xyz file, or mol file. 
-
-        Parameters
-        ----------
-        mol : var
-              The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding the 
-              (adj_mat, elements, charge),  or one or more filenames. For strings the extension is used to determine which 
-              parser to use (e.g., .xyz etc), otherwise the constructor will attempt to parse the input as a smiles string using 
-              rdkit. 
-
-        canon : bool, default=True
-                Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
-        
-        Returns
-        -------
-        self : yarpecule instance
-        """        
-        
         # direct branch: user passes core attributes directly
         if isinstance(mol,(tuple,list)) and len(mol) == 4:
             # consistency checks
@@ -240,7 +256,36 @@ class yarpecule:
         """
         self.elements, self.adj_mat, self.atom_hashes,self.mapping, self.geo, self.masses = canon_order(self.elements,self.adj_mat,masses=self.masses,things_to_order=[self.geo,self.masses]) # standardizes the atom indexing
         self.find_basic_attributes()
-            
+
+    def join(self,yarpecules,canon=True):
+        """
+        Method for creating a new yarpecule containing the union of the current yarpecule and all supplied yarpecules.
+
+        Parameters
+        ----------
+        yarpecules: list of yarpecules
+                    A list of the yarpecules that the user wants to merge with this yarpecule.
+
+        canon: bool, default=True
+               Controls weather the resulting yarpecule is subjected to the canonicalization ordering procedure. 
+        Returns
+        -------
+        yarpecule: yarpecule
+                   A new yarpecule containing the union of the chemical graphs contained in the supplied yarpecules. 
+
+        Notes
+        -----
+        The resulting yarpecule will not retain any of the bond-electron matrix information of the parent yarpecules.
+        """
+        yarpecules = prepare_list(yarpecules) # handles the singular case
+        all_y = [self] + yarpecules # add self to the list
+        N = sum([ len(_) for _ in all_y ]) 
+        adj_mat = merge_arrays([ _.adj_mat for _ in all_y ])
+        geo = np.vstack([ y.geo for y in all_y])
+        elements = [ e for y in all_y for e in y.elements ]
+        q = int(sum([ _.q for _ in all_y ]))
+        return yarpecule((adj_mat,geo,elements,q),canon=canon)
+        
     # dunders
     def __eq__(self, other):
         return self.hash == other.hash
@@ -256,24 +301,36 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
     Wrapper for drawing main bond_mat of a set of yarpecules using rdkit.
 
     Parameters
-
+    ----------
     yarpecules: list
                 list of yarpecule objects. 
 
     name: str
-          filename for the save (should end in an image format supported by rdkit like *.pdf).
+          filename for the save (should end in an image format supported by rdkit like \*.pdf).
+
+    label_ind: bool, default=False
+               Controls whether the atom indices are drawn in the structure. Default is no labels. 
+
+    mol_labels: list
+                This option can be used to display a label beneath each molecule (e.g., a score). 
 
     Returns
     -------
     None
     """
+
+    # Handles the singular use-case
+    yarpecules = prepare_list(yarpecules)
+    
     # Return if there is nothing to draw
     if len(yarpecules) == 0:
         return
 
+    # Keep rdkit happy
     elif len(yarpecules) > 250:
         print(f"Skipping draw_yarpecules() call. {len(yarpecules)} is too many for rdkit to render")
         return
+
     # Initialize the preferred lone electron dictionary the first time this function is called
     if not hasattr(draw_yarpecules, "bond_to_type"):
         draw_yarpecules.bond_to_type = { 1:BondType.SINGLE, 2:BondType.DOUBLE, 3:BondType.TRIPLE, 4:BondType.QUADRUPLE, 5:BondType.QUINTUPLE, 6:BondType.HEXTUPLE }
@@ -304,7 +361,11 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
             mol.GetAtomWithIdx(count_j).SetNumExplicitHs(0)
             mol.GetAtomWithIdx(count_j).SetFormalCharge(int(fc[count_j]))
             mol.GetAtomWithIdx(count_j).SetNumRadicalElectrons(int(j[count_j]%2))
-            mol.GetAtomWithIdx(count_j).UpdatePropertyCache()
+            try:
+                mol.GetAtomWithIdx(count_j).UpdatePropertyCache()
+            except:
+                print(f"problem is with atom {count_j=} {fc[count_j]=} {i.bond_mat_scores[0]=}:\n{i.elements}\n{i.adj_mat}\n{i.bond_mats[0]}")
+
         # generate coordinates
         AllChem.Compute2DCoords(mol)
 
@@ -317,8 +378,8 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
             
         mols += [mol]    
     # save the molecule
-    if mol_labels:
-        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),legends=mol_labels)
+    if mol_labels:        
+        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),legends=[ str(_) for _ in mol_labels])
     else:    
         img = Draw.MolsToGridImage(mols,subImgSize=(400, 400))
 
@@ -332,12 +393,12 @@ def draw_bmats(yarpecule,name):
     Wrapper for drawing the bond_mats of a yarpecule using rdkit.
 
     Parameters
-
+    ----------
     yarpecule: yarpecule
                yarpecule instance. 
 
     name: str
-          filename for the save (should end in an image format supported by rdkit like *.pdf).
+          filename for the save (should end in an image format supported by rdkit like `\*.pdf`).
 
     Returns
     -------
@@ -382,44 +443,18 @@ def draw_bmats(yarpecule,name):
     img.save(name)
     return
 
-def form(yarpecules,react=[],inter=True,intra=True):
-    """
-    This function yields all products that result from valid bond formations amongst the supplied yarpecules.
-
-    Parameters
-    ----------
-    yarpecules: list of yarpecules
-                This list holds the yarpecules that should be reacted. 
-
-    inter: bool, default=True
-           Controls whether intermolecular bond-formations should be returned. Here, intermolecular is defined as bond-formation
-           steps between distinct yarpecule objects.
-
-    intra: bool, default=True
-           Controls whether intramolecular bond-formations should be returned. Here, intramolecular is defined as bond-formation
-           reactions between atoms within a given yarpecule object. 
-
-    Yields
-    ------
-
-    product: yarpecule
-             The generator yields a yarpecule object holding the bond_electron matrix and other core yarpecule attributes of
-             the product resulting from bond formations.
-    """
-    # this loop only performs bond formation steps within individual yarpecule objects
-    if intra:
-        for y in yarpecules:
-            # perform radical bond formations
-            for donor in [ count for count,_ in enumerate(y.n_e_donate) if _ == 1 ]:                
-                for acceptor in [ count for count,_ in enumerate(y.n_e_accept) if _ > 0 and y.n_e_donate[count] > 0 ]:
-                    if acceptor not in y.avoid_bond[donor]:
-                        adj_mat = copy(y.adj_mat)
-                        adj_mat[donor,acceptor] = 1
-                        adj_mat[acceptor,donor] = 1
-                        yield yarpecule((y.adj_mat,y.geo,y.elements,y.q))
-    
 # Generate model compounds using bond-electron matrix with truncated graph and homolytic bond cleavages
 def generate_model_compound(index):
+
+    # Check bonds of all atoms in index, retain higher orders
+
+
+    # Hydrogenate
+
+
+    # Yield model compound
+
+
     print("this isn't coded yet")
 
 

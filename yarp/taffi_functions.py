@@ -63,7 +63,7 @@ def table_generator(elements,geometry,scale_factor=1.2,filename=None):
         # Special treatment of hydrogens 
         if elements[i] == 'H' and elements[y_ind[count]] == 'H':
             if dist_mat[i,y_ind[count]] < (el_radii[elements[i]]+el_radii[elements[y_ind[count]]])*1.5:
-                Adj_mat[i,y_ind[count]]=1
+                adj_mat[i,y_ind[count]]=1
 
     # Hermitize Adj_mat
     adj_mat=adj_mat + adj_mat.transpose()
@@ -217,7 +217,7 @@ def canon_order(elements,adj_mat,masses=None,hash_list=None,things_to_order=[],c
 
     Notes
     -----
-    The minimal return of this function are the orderd `elements`, `adj_mat`, and `hash_values`. The `idx` object 
+    The minimal return of this function is the tuple of ordered `elements`, `adj_mat`, and `hash_values`. The `idx` object 
     is only returned when `return_index=True` and `ordered_things` are only returned when objects are supplied to the 
     optional `things_to_order` argument. 
     """
@@ -231,14 +231,7 @@ def canon_order(elements,adj_mat,masses=None,hash_list=None,things_to_order=[],c
         hash_list = np.array([ atom_hash(i,adj_mat,masses) for i in range(len(elements)) ])
 
     # Find the separate subgraphs (if there are more than one)
-    gs = graph_seps(adj_mat)
-    subgraphs = []
-    loop_ind = set() # holds the set of atoms that have been assigned to a subgraph/connected_subgraph/molecule
-    for i in range(len(gs)):
-        if i not in loop_ind:
-            new_subgraph = set([count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]) # collect indices of atoms in the same sugraph as i
-            loop_ind.update(new_subgraph) # append indides of atoms in the same subgraph as i to the set of atoms that have been assigned a subgraph
-            subgraphs   += [new_subgraph] # append the set of atoms in the current subgraph to a new subgraph
+    subgraphs = gen_subgraphs(adj_mat)    
 
     # sort subgraphs based on the maximum hash value
     if change_mol_seq:
@@ -273,7 +266,44 @@ def canon_order(elements,adj_mat,masses=None,hash_list=None,things_to_order=[],c
         return tuple([elements,adj_mat,hash_list,atoms]+ordered_things)
     else:
         return tuple([elements,adj_mat,hash_list]+ordered_things)
-            
+
+def gen_subgraphs(adj_mat,gs=None):
+    """
+    A function for calculating the connected subgraphs of an adjacency matrix. The algorithm uses the graphical
+    separations between atoms to determine the connections and has a cost of n matrix multiplications, where n
+    is the size of the adjacency matrix. 
+
+    Parameters
+    ----------
+    adj_mat: array
+             The adjacency matrix that the subgraphs are being calculated for
+
+    gs: array, default=None
+        An array of the same dimensions as adj_mat, that holds the separations between each pair of nodes in the 
+        off-diagonal positions. By default these are calculated, but if the user already has them on hand then they
+        can be passed directly. 
+
+    Returns
+    -------
+    subgraphs: list of lists
+               A list of lists, where each subgraph holds the indices of the nodes in the subgraph. The ordering of
+               the lists and ordering of atoms in each subgraph should not be relied on. 
+    """
+    
+    # Calculate the graph separations between nodes (if not supplied by the user)
+    if gs is None:
+        gs = graph_seps(adj_mat)
+        
+    subgraphs = [] # outer list holding all subgraphs
+    loop_ind = set() # holds the set of atoms that have been assigned to a subgraph/connected_subgraph/molecule
+    for i in range(len(gs)):
+        if i not in loop_ind:
+            new_subgraph = set([count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]) # collect indices of atoms in the same sugraph as i (if reachable then >=0 due to graph_seps algorithm) 
+            loop_ind.update(new_subgraph) # append indides of atoms in the same subgraph as i to the set of atoms that have been assigned a subgraph
+            subgraphs   += [new_subgraph] # append the set of atoms in the current subgraph to a new subgraph
+    return subgraphs        
+
+        
 # Return ring(s) that atom idx belongs to
 # The algorithm spawns non-backtracking walks along the graph. If the walk encounters the starting node, that consistutes a cycle.        
 def return_ring_atoms(adj_list,idx,start=None,ring_size=10,counter=0,avoid_set=None,convert=True):
@@ -572,7 +602,35 @@ def graph_seps(adj_mat_0):
 #               q:       total charge on the molecule   
 #
 # Returns:     geo:      Nx3 array of optimized atomic coordinates
-# 
+#
+def opt_geo_rdkit(geo_adj_mat,elements,q=0, filename='tmp'):
+    # Write a temporary molfile for obminimize to use
+    tmp_filename = '.{}.mol'.format(filename)
+    tmp_xyz_file = '.{}.xyz'.format(filename)
+    count = 0
+    while os.path.isfile(tmp_filename):
+        count += 1
+        if count == 10:
+            print("ERROR in opt_geo_rdkit: could not find a suitable filename for the tmp geometry. Exiting...")
+            return geo
+        else:
+            tmp_filename = ".{}".format(filename) + tmp_filename            
+
+    counti = 0
+    while os.path.isfile(tmp_xyz_file):
+        counti += 1
+        if counti == 10:
+            print("ERROR in opt_geo_rdkit: could not find a suitable filename for the tmp geometry. Exiting...")
+            return geo
+        else:
+            tmp_xyz_file = ".{}".format(filename) + tmp_xyz_file
+    mol_write(tmp_filename,elements,geo,adj_mat,q=q,append_opt=False)
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+    mol=Chem.MolFromMolFile(tmp_filename)
+    AllChem.MMFFOptimizeMolecule(mol)
+    return mol.GetPosition()
+
 def opt_geo(geo,adj_mat,elements,q=0,ff='mmff94',step=100,filename='tmp'):
 
     # Write a temporary molfile for obminimize to use

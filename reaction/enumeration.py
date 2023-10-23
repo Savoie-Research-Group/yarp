@@ -1,6 +1,5 @@
 import yarp as yp
 import numpy as np
-from yarp.find_lewis import mol_write
 from yarp.find_lewis import all_zeros
 from yarp.find_lewis import bmat_unique
 import os, sys, yaml, fnmatch

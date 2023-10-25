@@ -2,7 +2,7 @@ import sys, itertools, timeit, os
 import numpy as np
 from yarp.taffi_functions import table_generator,return_rings,adjmat_to_adjlist,canon_order
 from yarp.properties import el_to_an,an_to_el,el_mass
-from yarp.find_lewis import mol_write, find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
+from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
 from yarp.hashes import atom_hash,yarpecule_hash
 from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles, mol_parse
 from yarp.misc import merge_arrays, prepare_list

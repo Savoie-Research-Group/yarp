@@ -10,7 +10,7 @@ authors = [
 ]
 description = "An object-oriented (i.e., classy) refactoring of the YARP framework."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",

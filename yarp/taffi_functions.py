@@ -630,7 +630,17 @@ def opt_geo_rdkit(geo_adj_mat,elements,q=0, filename='tmp'):
     mol=Chem.MolFromMolFile(tmp_filename)
     AllChem.MMFFOptimizeMolecule(mol)
     return mol.GetPosition()
-
+    
+# Description: This function calls obminimize (open babel geometry optimizer function) to optimize the current geometry
+#
+# Inputs:      geo:      Nx3 array of atomic coordinates
+#              adj_mat:  NxN array of connections
+#              elements: N list of element labels
+#              ff:       force-field specification passed to obminimize (uff, gaff)
+#               q:       total charge on the molecule   
+#
+# Returns:     geo:      Nx3 array of optimized atomic coordinates
+# 
 def opt_geo(geo,adj_mat,elements,q=0,ff='mmff94',step=100,filename='tmp'):
 
     # Write a temporary molfile for obminimize to use

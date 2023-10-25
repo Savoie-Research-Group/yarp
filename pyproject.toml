@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yarp"
+version = "0.0.1"
+authors = [
+  { name="Savoie Research Group", email="brettsavoie@gmail.com" },
+]
+description = "An object-oriented (i.e., classy) refactoring of the YARP framework."
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Savoie-Research-Group/yarp"
+"Bug Tracker" = "https://github.com/Savoie-Research-Group/yarp/issues"

@@ -334,7 +334,7 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
 
     # Initialize the preferred lone electron dictionary the first time this function is called
     if not hasattr(draw_yarpecules, "bond_to_type"):
-        draw_yarpecules.bond_to_type = { 1:BondType.SINGLE, 2:BondType.DOUBLE, 3:BondType.TRIPLE, 4:BondType.QUADRUPLE, 5:BondType.QUINTUPLE, 6:BondType.HEXTUPLE }
+        draw_yarpecules.bond_to_type = { 0:BondType.DATIVE, 1:BondType.SINGLE, 2:BondType.DOUBLE, 3:BondType.TRIPLE, 4:BondType.QUADRUPLE, 5:BondType.QUINTUPLE, 6:BondType.HEXTUPLE }
 
     # loop over yarpecules, create an rdkit mol for each, then plot on a grid 
     mols = []
@@ -346,13 +346,13 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
         # add atoms
         [ mol.AddAtom(Atom(el_to_an[_])) for _ in i.elements ]
         # add bonds
-        for count_j,j in enumerate(i.bond_mats[0]):
+        for count_j,j in enumerate(i.adj_mat):
             for count_k,k in enumerate(j):
                 if count_k<count_j:
                     if k == 0:
                         continue
                     else:
-                        mol.AddBond(count_j,count_k,draw_yarpecules.bond_to_type[k])
+                        mol.AddBond(count_j,count_k,draw_yarpecules.bond_to_type[i.bond_mats[0][count_j,count_k]])
                 else:
                     break
         # set explicit H-atoms and formals
@@ -379,12 +379,14 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
             
         mols += [mol]    
     # save the molecule
-    if mol_labels:        
-        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),legends=[ str(_) for _ in mol_labels])
-    else:    
-        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400))
-
-        
+    if len(mols) <= 3:
+        n_per_row = len(mols)
+    else:
+        n_per_row = 3
+    if mol_labels:
+        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=[ str(_) for _ in mol_labels])
+    else:
+        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row)        
     img.save(name)
     return
         
@@ -418,6 +420,7 @@ def draw_bmats(yarpecule,name):
         mol.RemoveAtom(0)
         # add atoms
         [ mol.AddAtom(Atom(el_to_an[_])) for _ in yarpecule.elements ]
+        # add bonds
         for count_j,j in enumerate(yarpecule.adj_mat):
             for count_k,k in enumerate(j):
                 if count_k<count_j:
@@ -438,8 +441,15 @@ def draw_bmats(yarpecule,name):
         # generate coordinates
         AllChem.Compute2DCoords(mol)
         mols += [mol]    
+
+
     # save the molecule
-    img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),legends=["score: {: <4.3f}".format(_) for _ in yarpecule.bond_mat_scores ])
+    if len(mols) <= 3:
+        n_per_row = len(mols)
+    else:
+        n_per_row = 3
+    # save the molecule
+    img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=["score: {: <4.3f}".format(_) for _ in yarpecule.bond_mat_scores ])
     img.save(name)
     return
 

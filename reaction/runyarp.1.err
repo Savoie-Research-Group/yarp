@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/hsu205/classy-yarp/reaction/main_xtb.py", line 328, in <module>
+    main(parameters)     
+  File "/home/hsu205/classy-yarp/reaction/main_xtb.py", line 248, in main
+    if args['apply_d2'] is False:
+KeyError: 'apply_d2'

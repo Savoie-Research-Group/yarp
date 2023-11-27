@@ -16,7 +16,18 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
 ]
+license = {file="LICENSE.md"}
+[project.optional-dependencies]
+test = [
+    "pyscf",
+    "pytest",
+    "pytest-cov",
+    "ase",
+    "qcengine"
+]
+doc = ["sphinx", "sphinx-rtd-theme", "sphinx_autodoc_typehints"]
 
 [project.urls]
 "Homepage" = "https://github.com/Savoie-Research-Group/yarp"
 "Bug Tracker" = "https://github.com/Savoie-Research-Group/yarp/issues"
+

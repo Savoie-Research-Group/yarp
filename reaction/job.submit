@@ -1,0 +1,21 @@
+#!/bin/bash                                                                                     
+#
+#SBATCH --job-name=classy-yarp
+#SBATCH --output=runyarp.1.out
+#SBATCH --error=runyarp.1.err
+#SBATCH -A bsavoie
+#SBATCH --nodes=1
+#SBATCH --mem-per-cpu=4500MB
+#SBATCH --ntasks-per-node=16
+#SBATCH --time 72:00:00
+
+# activate a correct anaconda environment
+source ~/anaconda3/bin/activate
+conda activate /depot/bsavoie/apps/anaconda3/envs/yarp/
+module load intel-mkl
+module load openmpi
+
+# Load environment for Gaussian
+python main_xtb.py parameters.yaml
+
+wait

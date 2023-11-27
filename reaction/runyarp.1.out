@@ -1,0 +1,191 @@
+Welcome to
+                __   __ _    ____  ____  
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        
+-----------------------
+------First Step-------
+------Enumeration------
+-----------------------
+Do the reaction enumeration on molecule: XSASRUDTFFBDDK-UHFFFAOYSA-N (xyz_test/0.xyz)
+9 cleaned products after find_lewis() filtering
+-----------------------
+------Second Step------
+Conformational Sampling
+-----------------------
+running CREST job CCGKOQOJPYTBIH on PID 2653281
+CREST job CCGKOQOJPYTBIH is finished.
+running CREST job XSASRUDTFFBDDK on PID 2653281
+CREST job XSASRUDTFFBDDK is finished.
+-----------------------
+-------Third Step------
+Conformation Generation
+-----------------------
+Finish generating reaction conformations, the output conformations are stored in /scratch/negishi/hsu205/classy-test/rxn_conf
+
+-----------------------
+-------Forth Step------
+-Growing String Method-
+----------and----------
+------Berny TS Opt-----
+-----------------------
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_7_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_4_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_3_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_3_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_2_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_0_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_2_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_5_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_2_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_0_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_1_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_8_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_6_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_1_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_1_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_4_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_5_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_4_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_6_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_8_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_8_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_6_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_5_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_0_2
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_3_0
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_7_1
+Finish preparing working environment for GSM-xTB job XSASRUDTFFBDDK_7_2
+running GSM job XSASRUDTFFBDDK_2_0 on PID 2682193
+GSM job XSASRUDTFFBDDK_2_0 is finished, with running time 189.3s
+running PYSIS job XSASRUDTFFBDDK_2_2 on PID 2682193
+PYSIS job XSASRUDTFFBDDK_2_2 is finished.
+running GSM job XSASRUDTFFBDDK_0_0 on PID 2682184
+GSM job XSASRUDTFFBDDK_0_0 is finished, with running time 195.7s
+running PYSIS job XSASRUDTFFBDDK_5_1 on PID 2682184
+PYSIS job XSASRUDTFFBDDK_5_1 is finished.
+running GSM job XSASRUDTFFBDDK_3_0 on PID 2682191
+GSM job XSASRUDTFFBDDK_3_0 is finished, with running time 189.8s
+running PYSIS job XSASRUDTFFBDDK_3_2 on PID 2682191
+PYSIS job XSASRUDTFFBDDK_3_2 is finished.
+running GSM job XSASRUDTFFBDDK_1_1 on PID 2682189
+GSM job XSASRUDTFFBDDK_1_1 is finished, with running time 101.8s
+running GSM job XSASRUDTFFBDDK_7_1 on PID 2682189
+GSM job XSASRUDTFFBDDK_7_1 is finished, with running time 96.8s
+running PYSIS job XSASRUDTFFBDDK_6_1 on PID 2682189
+PYSIS job XSASRUDTFFBDDK_6_1 is finished.
+running GSM job XSASRUDTFFBDDK_5_0 on PID 2682194
+GSM job XSASRUDTFFBDDK_5_0 is finished, with running time 191.6s
+running PYSIS job XSASRUDTFFBDDK_4_2 on PID 2682194
+PYSIS job XSASRUDTFFBDDK_4_2 is finished.
+running GSM job XSASRUDTFFBDDK_1_0 on PID 2682187
+GSM job XSASRUDTFFBDDK_1_0 is finished, with running time 189.7s
+running PYSIS job XSASRUDTFFBDDK_3_1 on PID 2682187
+PYSIS job XSASRUDTFFBDDK_3_1 is finished.
+running GSM job XSASRUDTFFBDDK_0_2 on PID 2682188
+GSM job XSASRUDTFFBDDK_0_2 is finished, with running time 55.5s
+running GSM job XSASRUDTFFBDDK_6_2 on PID 2682188
+GSM job XSASRUDTFFBDDK_6_2 is finished, with running time 55.4s
+running PYSIS job XSASRUDTFFBDDK_0_1 on PID 2682188
+PYSIS job XSASRUDTFFBDDK_0_1 is finished.
+running GSM job XSASRUDTFFBDDK_2_1 on PID 2682192
+GSM job XSASRUDTFFBDDK_2_1 is finished, with running time 102.2s
+running GSM job XSASRUDTFFBDDK_8_0 on PID 2682192
+GSM job XSASRUDTFFBDDK_8_0 is finished, with running time 166.1s
+running PYSIS job XSASRUDTFFBDDK_7_2 on PID 2682192
+PYSIS job XSASRUDTFFBDDK_7_2 is finished.
+running GSM job XSASRUDTFFBDDK_4_1 on PID 2682199
+GSM job XSASRUDTFFBDDK_4_1 is finished, with running time 101.8s
+running GSM job XSASRUDTFFBDDK_7_2 on PID 2682199
+GSM job XSASRUDTFFBDDK_7_2 is finished, with running time 57.1s
+running PYSIS job XSASRUDTFFBDDK_1_2 on PID 2682199
+PYSIS job XSASRUDTFFBDDK_1_2 is finished.
+running GSM job XSASRUDTFFBDDK_1_2 on PID 2682185
+GSM job XSASRUDTFFBDDK_1_2 is finished, with running time 55.4s
+running GSM job XSASRUDTFFBDDK_6_1 on PID 2682185
+GSM job XSASRUDTFFBDDK_6_1 is finished, with running time 101.9s
+running PYSIS job XSASRUDTFFBDDK_1_1 on PID 2682185
+PYSIS job XSASRUDTFFBDDK_1_1 is finished.
+running GSM job XSASRUDTFFBDDK_4_2 on PID 2682196
+GSM job XSASRUDTFFBDDK_4_2 is finished, with running time 54.3s
+running GSM job XSASRUDTFFBDDK_5_1 on PID 2682196
+GSM job XSASRUDTFFBDDK_5_1 is finished, with running time 102.0s
+running PYSIS job XSASRUDTFFBDDK_0_2 on PID 2682196
+PYSIS job XSASRUDTFFBDDK_0_2 is finished.
+running GSM job XSASRUDTFFBDDK_2_2 on PID 2682190
+GSM job XSASRUDTFFBDDK_2_2 is finished, with running time 55.0s
+running GSM job XSASRUDTFFBDDK_6_0 on PID 2682190
+GSM job XSASRUDTFFBDDK_6_0 is finished, with running time 175.5s
+running PYSIS job XSASRUDTFFBDDK_6_2 on PID 2682190
+PYSIS job XSASRUDTFFBDDK_6_2 is finished.
+running GSM job XSASRUDTFFBDDK_0_1 on PID 2682186
+GSM job XSASRUDTFFBDDK_0_1 is finished, with running time 98.6s
+running GSM job XSASRUDTFFBDDK_7_0 on PID 2682186
+GSM job XSASRUDTFFBDDK_7_0 is finished, with running time 165.0s
+running PYSIS job XSASRUDTFFBDDK_7_1 on PID 2682186
+PYSIS job XSASRUDTFFBDDK_7_1 is finished.
+running GSM job XSASRUDTFFBDDK_3_2 on PID 2682195
+GSM job XSASRUDTFFBDDK_3_2 is finished, with running time 54.6s
+running GSM job XSASRUDTFFBDDK_5_2 on PID 2682195
+GSM job XSASRUDTFFBDDK_5_2 is finished, with running time 55.2s
+running GSM job XSASRUDTFFBDDK_8_2 on PID 2682195
+GSM job XSASRUDTFFBDDK_8_2 is finished, with running time 54.1s
+running PYSIS job XSASRUDTFFBDDK_2_1 on PID 2682195
+PYSIS job XSASRUDTFFBDDK_2_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_8_1 on PID 2682195
+PYSIS job XSASRUDTFFBDDK_8_1 is finished.
+running GSM job XSASRUDTFFBDDK_4_0 on PID 2682200
+GSM job XSASRUDTFFBDDK_4_0 is finished, with running time 190.6s
+running PYSIS job XSASRUDTFFBDDK_4_1 on PID 2682200
+PYSIS job XSASRUDTFFBDDK_4_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_8_2 on PID 2682200
+PYSIS job XSASRUDTFFBDDK_8_2 is finished.
+running GSM job XSASRUDTFFBDDK_3_1 on PID 2682197
+GSM job XSASRUDTFFBDDK_3_1 is finished, with running time 102.4s
+running GSM job XSASRUDTFFBDDK_8_1 on PID 2682197
+GSM job XSASRUDTFFBDDK_8_1 is finished, with running time 95.0s
+running PYSIS job XSASRUDTFFBDDK_5_2 on PID 2682197
+PYSIS job XSASRUDTFFBDDK_5_2 is finished.
+GSM job XSASRUDTFFBDDK_0_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_1_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_2_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_3_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_4_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_5_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_6_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_7_0 fails to locate a TS, skip this rxn...
+GSM job XSASRUDTFFBDDK_8_0 fails to locate a TS, skip this rxn...
+TSopt job XSASRUDTFFBDDK_0_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_1_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_2_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_3_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_4_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_5_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_6_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_7_2 locates a duplicated transition state, skip this reaction...
+TSopt job XSASRUDTFFBDDK_8_2 locates a duplicated transition state, skip this reaction...
+-----------------------
+-------Fifth Step------
+----IRC calculation----
+-----------------------
+running PYSIS job XSASRUDTFFBDDK_6_1 on PID 2922333
+PYSIS job XSASRUDTFFBDDK_6_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_3_1 on PID 2922331
+PYSIS job XSASRUDTFFBDDK_3_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_2_1 on PID 2922330
+PYSIS job XSASRUDTFFBDDK_2_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_0_1 on PID 2922328
+PYSIS job XSASRUDTFFBDDK_0_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_1_1 on PID 2922329
+PYSIS job XSASRUDTFFBDDK_1_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_5_1 on PID 2922334
+PYSIS job XSASRUDTFFBDDK_5_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_7_1 on PID 2922335
+PYSIS job XSASRUDTFFBDDK_7_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_4_1 on PID 2922332
+PYSIS job XSASRUDTFFBDDK_4_1 is finished.
+running PYSIS job XSASRUDTFFBDDK_8_1 on PID 2922336
+PYSIS job XSASRUDTFFBDDK_8_1 is finished.

@@ -61,8 +61,8 @@ def xyz_parse(xyz,read_types=False, multiple=False):
                         Geometry[count,:]=np.array([float(fields[1]),float(fields[2]),float(fields[3])])
                         count = count + 1
                         if count==N_atoms:
-                            elements.append([Elements])
-                            geo.append([Geometry])
+                            elements.append(Elements)
+                            geo.append(Geometry)
         # Consistency check
         if count != len(Elements):
             print("ERROR in xyz_parse: {} has less coordinates than indicated by the header.".format(xyz))
@@ -106,8 +106,8 @@ def xyz_parse(xyz,read_types=False, multiple=False):
                             Atom_types[count] = fields[4]
                         count = count + 1
                         if count==N_atoms:
-                            elements.append([Elements])
-                            geo.append([Geometry])
+                            elements.append(Elements)
+                            geo.append(Geometry)
 
         # Consistency check
         if count != len(Elements):

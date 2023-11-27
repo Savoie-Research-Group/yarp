@@ -45,6 +45,7 @@ def main(args:dict):
     args['scratch_xtb']  = scratch_xtb
     args['scratch_crest']= scratch_crest
     args['conf_output']  = conf_output
+    enumeration=args["enumeration"]
     if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
     if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
     if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
@@ -76,8 +77,12 @@ def main(args:dict):
     print("------First Step-------")
     print("------Enumeration------")
     print("-----------------------")
-    for i in mol: rxns=enumeration(i, args=args)
-    
+    if enumeration: 
+        for i in mol: rxns=enumeration(i, args=args)
+    else:
+        rxns=[]
+        for i in mol: rxns.append(read_rxns(i, args=args))
+    """
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
@@ -249,6 +254,7 @@ def main(args:dict):
         reactions = analyze_outputs(scratch,irc_job_list,logger,charge=args['charge'],nc_thresd=args['nconf_dft'],select=args['select'])
     else:
         reactions,D2_rxns = analyze_outputs(scratch,irc_job_list,logger,charge=args['charge'],nc_thresd=args['nconf_dft'],select=args['select'],return_D2_dict=True)
+    """
     return
 
 def read_crest_in_class(rxns, scratch_crest):
@@ -286,9 +292,20 @@ def enumeration(input_mol, args={}):
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
     for count_i, i in enumerate(products):
-        R=reaction(reactant, products[0], args=args, opt=True)
+        R=reaction(reactant, i, args=args, opt=True)
         rxn.append(R)
     return rxn
+
+def read_rxns(input_mol, args={}):
+    elements, geo= xyz_parse(input_mol, multiple=True)
+    xyz_write(".tmp_R.xyz", elements[0][0], geo[0])
+    reactant=yp.yarpecule(".tmp_R.xyz")
+    os.system('rm .tmp_R.xyz')
+    xyz_write(".tmp_P.xyz", elements[1][0], geo[1])
+    product=yp.yarpecule(".tmp_P.xyz")
+    os.system('rm .tmp_P.xyz')
+    R=reaction(reactant, product, args=args, opt=False)
+    return R
 
 def write_reaction(elements, RG, PG, filename="reaction.xyz"):
     out=open(filename, 'w+')

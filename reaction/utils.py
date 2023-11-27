@@ -178,6 +178,14 @@ def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
 
     return
 
+def xyz_write(name, element, geo):
+    out=open(name, 'w+')
+    out.write('{}\n\n'.format(len(element)))
+    for count_i, i in enumerate(element):
+        out.write('{} {} {} {}\n'.format(element, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
+    out.close()
+    return
+
 def mol_write_yp(name,molecule,append_opt=False):
     elements=molecule.elements
     geo=molecule.geo
@@ -260,7 +268,7 @@ def mol_write_yp(name,molecule,append_opt=False):
 
         f.write("M  END\n$$$$\n")
 
-    return 
+    return
 
 def return_smi(molecule, namespace="obabel"):
     mol_write_yp(f"{namespace}_input.mol",molecule)

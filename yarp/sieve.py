@@ -426,7 +426,7 @@ def sieve_bmat_scores(yarpecules,thresh=0.0):
     Returns
     -------
     yarpecules: list of yarpecules
-                The yarpecules that satisfy the threshold are returned as a list
+                The yarpecules that match the sieve criteria are returned as a list
 
     Notes
     -----
@@ -434,6 +434,110 @@ def sieve_bmat_scores(yarpecules,thresh=0.0):
     """
     return [ _ for _ in yarpecules if _.bond_mat_scores[0] <= thresh ]
 
+def sieve_rings(yarpecules,sizes,keep=True):
+    """
+    This is a helper function for filtering a list of yarpecules based on whether they contain rings 
+    of a given size range (or not).
+    
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                list of yarpecules being filtered. 
+
+    sizes: list of ints
+           Contains the ring sizes that will be used to determine which yarpecules to single out. 
+           If a yarpecule has at least one ring of the size specified here then it will be counted.
+           Depending on the keep option, yarpecules will either be returned (keep=True) or not 
+           returned (keep=False) based on whether they have at least one ring of dimensions found
+           in sizes.
+
+    keep: bool, default=True
+            The default behavior is to return the yarpecules with ring sizes that are in the sizes variable.
+            The inverse behavior---returning yarpecules that don't have rings of those sizes---is achieved by
+            setting keep to False. 
+
+    Returns
+    -------
+    yarpecules: list of yarpecules
+                The yarpecules that match the sieve criteria are returned as a list
+
+    Notes
+    -----
+    An empty list is returned if none of the supplied yarpecules satisfy the threshold.
+    """
+    sizes = set(sizes)
+    if keep:
+        return [ _ for _ in yarpecules if { len(r) for r in _.rings }.intersection(sizes) ]
+    else:
+        return [ _ for _ in yarpecules if not { len(r) for r in _.rings }.intersection(sizes) ]
+    
+def sieve_fused_rings(yarpecules,keep=True):
+    """
+    This is a helper function for filtering a list of yarpecules based on whether they contain 
+    fused rings (or not).
+    
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                list of yarpecules being filtered. 
+
+    keep: bool, default=True
+            The default behavior is to return the yarpecules with fused rings.
+            The inverse behavior---returning yarpecules that don't have fused rings---is achieved by
+            setting keep to False. 
+
+    Returns
+    -------
+    yarpecules: list of yarpecules
+                The yarpecules that match the sieve criteria are returned as a list
+
+    Notes
+    -----
+    An empty list is returned if none of the supplied yarpecules satisfy the threshold.
+    """
+    if keep:
+        return [ _ for _ in yarpecules if True in [ True for c1,r1 in enumerate(_.rings) for c2,r2 in enumerate(_.rings) if c2 > c1 and set(r1).intersection(r2) ] ]
+    else:
+        return [ _ for _ in yarpecules if True not in [ True for c1,r1 in enumerate(_.rings) for c2,r2 in enumerate(_.rings) if c2 > c1 and set(r1).intersection(r2) ] ]
+
+def sieve_fc(yarpecules,fc,keep=True):
+    """
+    This is a helper function for filtering a list of yarpecules based on whether they contain 
+    fused rings (or not).
+    
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                list of yarpecules being filtered. 
+
+    fc: list of ints
+        Contains the formal charge values that will be used to determine which yarpecules are 
+        sieved. If any atom in the has a formal charge that matches that supplied in the list
+        then it is selected. Depending on the keep option, yarpecules will either be returned 
+        (keep=True) or not returned (keep=False) based on whether they have at least one atom
+        that matches the values supplied to fc. 
+
+    keep: bool, default=True
+            The default behavior is to return the yarpecules with formal charges matching one
+            or more of those in fc. The inverse behavior---returning yarpecules that don't have
+            formal charges matching those in fc---is achieved by
+            setting keep to False. 
+
+    Returns
+    -------
+    yarpecules: list of yarpecules
+                The yarpecules that match the sieve criteria are returned as a list
+
+    Notes
+    -----
+    An empty list is returned if none of the supplied yarpecules satisfy the threshold.
+    """
+    fc = set(fc)
+    if keep:
+        return [ _ for _ in yarpecules if set(_.fc).intersection(fc) ]
+    else:
+        return [ _ for _ in yarpecules if not set(_.fc).intersection(fc) ]
+        
 def sieve_valency_violations(yarpecules,inverse=False):
     """
     This is a helper function for filtering a list of yarpecules based on whether they have valency violations.

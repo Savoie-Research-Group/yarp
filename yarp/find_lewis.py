@@ -10,13 +10,14 @@ from copy import copy,deepcopy
 
 from yarp.taffi_functions import adjmat_to_adjlist,return_ring_atoms,return_rings,graph_seps
 from yarp.hashes import bmat_hash
-from yarp.properties import el_to_an,an_to_el,el_valence,el_n_deficient,el_expand_octet,el_en,el_pol,el_max_valence
+from yarp.properties import el_to_an,an_to_el,el_valence,el_n_deficient,el_expand_octet,el_en,el_pol,el_max_valence,el_n_expand_octet,el_metals
 
 def main(argv):
 
     # These imports are here just for this main convenience function for testing
     from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType    
-    from taffi_functions import table_generator,xyz_parse,parse_q
+    from yarp.taffi_functions import table_generator
+    from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles
     
     # run find_lewis on command-line supplied molecule
     if argv:
@@ -27,7 +28,7 @@ def main(argv):
         if len(mol)>4 and mol[-4:] == ".xyz":
             elements, geo = xyz_parse(mol)
             adj_mat = table_generator(elements,geo)
-            q = parse_q(mol)
+            q = xyz_q_parse(mol)
 
         # SMILES branch
         else:
@@ -65,8 +66,6 @@ def main(argv):
         bond_mats,bond_mat_scores = find_lewis(elements,adj_mat,q)
         rings = return_rings(adjmat_to_adjlist(adj_mat),max_size=10,remove_fused=True)        
         for count,i in enumerate(bond_mats):
-            e_lower = [ _.lower() for _ in elements ]        
-            e_tet = np.array([find_lewis.n_electrons[_] for _ in e_lower ])        
             print("\nscore: {}".format(bond_mat_scores[count]))
             print("{}".format(i))
         for i in rings:
@@ -132,11 +131,15 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def
     eneutral = np.array([ el_valence[_] for _ in elements ])    
 
     # Array of atom-wise octet requirements for determining electron deficiencies
-    e_tet = np.array([ el_n_deficient[_] for _ in elements ])
+    e_def = np.array([ el_n_deficient[_] for _ in elements ])
+
+    # Array of atom-wise octet requirements for determining expanded octects 
+    e_exp = np.array([ el_n_expand_octet[_] for _ in elements ])
     
     # Check that there are enough electrons to at least form all sigma bonds consistent with the adjacency
-    if ( sum(eneutral) - q  < sum( adj_mat[np.triu_indices_from(adj_mat,k=1)] )*2.0 ):
-        print("ERROR: not enough electrons to satisfy minimal adjacency requirements")
+    # This check needs to be updated to account for metals and be justified against the added cost.
+#    if ( sum(eneutral) - q  < sum( adj_mat[np.triu_indices_from(adj_mat,k=1)] )*2.0 ):
+#        print("ERROR: not enough electrons to satisfy minimal adjacency requirements")
 
     # Generate rings if they weren't supplied. Needed to determine allowed double bonds in rings and resonance
     if not rings: rings = return_rings(adjmat_to_adjlist(adj_mat),max_size=10,remove_fused=True)
@@ -166,9 +169,12 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def
     
     # Initialize score function for ranking bond_mats
     en = np.array([ el_en[_] for _ in elements ]) # base electronegativities of each atom
-    factor = -min(en)*q*w_formal if q>=0 else -max(en)*q*w_formal # subtracts off trivial formal charge penalty from cations and anions so that they have a baseline score of 0 all else being equal. 
-    obj_fun = lambda x: bmat_score(x,elements,rings,cat_en=en,an_en=en,rad_env=0*en,e_tet=e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=0,w_rad=w_rad,factor=factor,verbose=False) # aro term is turned off initially since it traps greedy optimization
-
+    rad_env = np.array([ el_en[_] for _ in elements ]) # base electronegativities of each atom
+#    factor = -min(en)*q*w_formal if q>=0 else -max(en)*q*w_formal # subtracts off trivial formal charge penalty from cations and anions so that they have a baseline score of 0 all else being equal.
+    factor = 0.0
+    
+    obj_fun = lambda x: bmat_score(x,elements,rings,cat_en=en,an_en=en,rad_env=np.zeros(len(elements)),e_def=e_def,e_exp=e_exp,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=0,w_rad=w_rad,factor=factor,verbose=False) # aro term is turned off initially since it traps greedy optimization
+    
     # Find the minimum bmat structure
     # gen_init() generates a series of initial guesses. For neutral molecules, this guess is singular. For charged molecules, it will yield all possible charge placements (expensive but safe).
     count = 0
@@ -181,7 +187,7 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def
             bond_mats,scores,_,_,_ = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps=np.zeros([len(elements),len(elements)]), min_score=scores[0], ind=len(bond_mats)-1,N_score=1000,N_max=10000,min_opt=True)
 
     # Update objective function to include (anti)aromaticity considerations and update scores of the current bmats
-    obj_fun = lambda x: bmat_score(x,elements,rings,cat_en=en,an_en=en,rad_env=0*en,e_tet=e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False)                        
+    obj_fun = lambda x: bmat_score(x,elements,rings,cat_en=en,an_en=en,rad_env=np.zeros(len(elements)),e_def=e_def,e_exp=e_exp,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False)                        
     scores = [ obj_fun(_) for _ in bond_mats ]            
             
     # Sort by initial scores
@@ -228,10 +234,16 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def
     # Calculate final scores. For finding the preferred position of formal charges, some small corrections are made to the electronegativities of anion and cations based on neighboring atoms and hybridization.
     # The scores of ions are also adjusted by their ionization/reduction energy to provide a 0-baseline for all species regardless of charge state.
     rad_env = -np.sum(adj_mat*(0.1*pol/(100+pol)),axis=1)
-    cat_en = en + rad_env
-    an_en = en + np.sum(adj_mat*(0.1*en/(100+en)),axis=1) + 0.05*s_char
-    scores = [ bmat_score(_,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
+    # cat_en = en + rad_env
+    # an_en = en + np.sum(adj_mat*(0.1*en/(100+en)),axis=1) + 0.05*s_char
+    # scores = [ bmat_score(_,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
 
+    bond_mats = adjust_metals(bond_mats,adj_mat,elements)
+    
+
+    scores = [ bmat_score(_,elements,rings,en,en,rad_env,e_def,e_exp,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
+
+    
     # # Sort by hashes
     # inds = np.argsort([ bmat_hash(_) for _ in bond_mats ])
     # bond_mats = [ bond_mats[_] for _ in inds ]
@@ -250,12 +262,24 @@ class LewisStructureError(Exception):
         self.message = message
         super().__init__(self.message)
 
-def mol_write(name,molecule,append_opt=False):
-    elements=molecule.elements
-    geo=molecule.geo
-    bond_mat=molecule.bond_mats[0]
-    q=molecule.q
-    adj_mat=molecule.adj_mat
+
+def mol_write(name,yarpecule,append_opt=False):
+    """
+    A helper function for writing a molfile based on a yarpecule
+    
+    Parameters
+    ----------
+
+    Returns
+    -------
+    None
+    """
+    
+    elements=yarpecule.elements
+    geo=yarpecule.geo
+    bond_mat=yarpecule.bond_mats[0]
+    q=yarpecule.q
+    adj_mat=yarpecule.adj_mat
     # Consistency check
     if len(elements) >= 1000:
         print( "ERROR in mol_write: the V2000 format can only accomodate up to 1000 atoms per molecule.")
@@ -328,8 +352,8 @@ def mol_write(name,molecule,append_opt=False):
 
         f.write("M  END\n$$$$\n")
 
-    return 
-
+    return         
+        
 def gen_init(obj_fun,adj_mat,elements,rings,q):
 
     """ 
@@ -364,10 +388,30 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
 
     # Array of atom-wise octet requirements for determining electron deficiencies
     e_tet = np.array([ el_n_deficient[_] for _ in elements ])
+
+    # Array of atom-wise octet requirements for determining electron deficiencies
+    e_def = np.array([ el_n_deficient[_] for _ in elements ])
+
+    # Array of atom-wise octet requirements for determining expanded octects 
+    e_exp = np.array([ el_n_expand_octet[_] for _ in elements ])
     
     # Initial neutral bond electron matrix with sigma bonds in place
     bond_mat = deepcopy(adj_mat) + np.diag(np.array([ _ - sum(adj_mat[count]) for count,_ in enumerate(eneutral) ]))
-    
+
+    # Correct metal atoms (remove formed bonds)
+    bond_mat_tmp = deepcopy(bond_mat)
+    corrs = []
+    for count_i,i in enumerate(elements):
+        if i in el_metals:
+            for count_j,j in enumerate(bond_mat[count_i]):
+                if count_i != count_j and j > 0:
+                    bond_mat_tmp[count_i,count_j] += -1
+                    bond_mat_tmp[count_j,count_i] += -1
+                    bond_mat_tmp[count_i,count_i] += 1
+                    bond_mat_tmp[count_j,count_j] += 1                    
+                    corrs += [(-1,count_i,count_j),(-1,count_j,count_i),(1,count_i,count_i),(1,count_j,count_j)]
+    bond_mat = bond_mat_tmp
+
     # Correct atoms with negative charge using q (if anions)
     qeff = q        
     n_ind = [ _ for _ in range(len(bond_mat)) if bond_mat[_,_] < 0 ]
@@ -396,8 +440,8 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
 
     # Correct expanded octets if possible (while performs CT from atoms with expanded octets
     # to deficient atoms until there are no more expanded octets or no more deficient atoms)
-    e_ind = [ count for count,_ in enumerate(return_expanded(bond_mat,elements,e_tet)) if _ > 0 and bond_mat[count,count] > 0 ]
-    d_ind = [ count for count,_ in enumerate(return_def(bond_mat,elements,e_tet)) if _ < 0 ]    
+    e_ind = [ count for count,_ in enumerate(return_expanded(bond_mat,elements,e_exp)) if _ > 0 and bond_mat[count,count] > 0 ]
+    d_ind = [ count for count,_ in enumerate(return_def(bond_mat,elements,e_def)) if _ < 0 ]    
     while (len(e_ind)>0 and len(d_ind)>0):
         for i in e_ind:
             try:
@@ -406,8 +450,8 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
                 bond_mat[i,i] -= 1
             except:
                 continue
-        e_ind = [ count for count,_ in enumerate(return_expanded(bond_mat,elements,e_tet)) if _ > 0 and bond_mat[count,count] > 0 ]
-        d_ind = [ count for count,_ in enumerate(return_def(bond_mat,elements,e_tet)) if _ < 0 ]    
+        e_ind = [ count for count,_ in enumerate(return_expanded(bond_mat,elements,e_exp)) if _ > 0 and bond_mat[count,count] > 0 ]
+        d_ind = [ count for count,_ in enumerate(return_def(bond_mat,elements,e_def)) if _ < 0 ]    
     
     # Get the indices of atoms in rings < 10 (used to determine if multiple double bonds and alkynes are allowed on an atom)
     ring_atoms = { j for i in [ _ for _ in rings if len(_) < 10 ] for j in i }
@@ -430,7 +474,7 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
             e = return_e(tmp)
             f = return_formals(tmp,elements)
             reactive = [ count for count,_ in enumerate(elements) if ( tmp[count,count] or e[count] < el_n_deficient[_] or f[count] != 0 ) ]
-
+            
             # Form bonded structure
             for j in reactive:
                 while valid_bonds(j,tmp,elements,reactive,ring_atoms):            
@@ -476,8 +520,7 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
         # Find reactive atoms (i.e., atoms with unbound electron(s) or deficient atoms or a formal charge)
         e = return_e(bond_mat)
         f = return_formals(bond_mat,elements)
-        reactive = [ count for count,_ in enumerate(elements) if ( bond_mat[count,count] or e[count] < el_n_deficient[_] or f[count] != 0 ) ]
-       
+        reactive = [ count for count,_ in enumerate(elements) if ( bond_mat[count,count] or e[count] < el_n_deficient[_] or f[count] != 0 ) and ( _ not in el_metals ) ]
         # Form bonded structure
         for j in reactive:
             while valid_bonds(j,bond_mat,elements,reactive,ring_atoms):            
@@ -772,6 +815,12 @@ def valid_moves(bond_mat,elements,reactive,rings,ring_atoms,bridgeheads,seps):
                 if j != i and seps[i,j] < 3 and ( el_expand_octet[elements[j]] or e[j] < el_n_deficient[elements[j]] ):
                     yield [(-1,i,i),(1,j,j)]
 
+        # # Move 9: i has an expanded octet and a bond with a neighbor that can be converted into a lone pair on the neighbor
+        # if e[i] > el_n_deficient[elements[i]]:
+        #     for j in return_connections(i,bond_mat,inds=reactive):
+        #         if bond_mat[i,j] > 0:
+        #             yield [(-1,i,j),(-1,j,i),(2,j,j)]
+                    
     # Move 9: shuffle aromatic and anti-aromatic bonds 
     for i in rings:
         if is_aromatic(bond_mat,i) and len(i) % 2 == 0: 
@@ -886,7 +935,7 @@ def valid_bonds(ind,bond_mat,elements,reactive,ring_atoms):
     '''
 
     e = return_e(bond_mat) # current number of electrons associated with each atom
-
+    
     # Check if a bond can be formed between neighbors ( electron available AND ( octet can be expanded OR octet is incomplete ))
     if bond_mat[ind,ind] > 0 and ( el_expand_octet[elements[ind]] or e[ind] < el_n_deficient[elements[ind]] ):
         # Check that ring constraints don't disqualify bond-formation ( not a ring atom OR no existing double/triple bonds )
@@ -894,12 +943,12 @@ def valid_bonds(ind,bond_mat,elements,reactive,ring_atoms):
            # Check on connected atoms
            for i in return_connections(ind,bond_mat,inds=reactive):
                # Electron available AND ( octect can be expanded OR octet is incomplete )
-               if bond_mat[i,i] > 0 and ( el_expand_octet[elements[i]] or e[i] < el_n_deficient[elements[ind]] ):
+               if bond_mat[i,i] > 0 and ( el_expand_octet[elements[i]] or e[i] < el_n_deficient[elements[i]] ):
                    # Check that ring constraints don't disqualify bond-formation ( not a ring atom OR no existing double/triple bonds )
                    if i not in ring_atoms or sum([ _ for count,_ in enumerate(bond_mat[i]) if count != i and _ > 1 ]) == 0:                  
                        return [(1,ind,i),(1,i,ind),(-1,ind,ind),(-1,i,i)]                                       
                 
-def bmat_score(bond_mat,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=-1,w_exp=0.1,w_formal=0.1,w_aro=-24,w_rad=0.1,factor=0.0,verbose=False):
+def bmat_score(bond_mat,elements,rings,cat_en,an_en,rad_env,e_def,e_exp,w_def=-1,w_exp=0.1,w_formal=0.1,w_aro=-24,w_rad=0.1,factor=0.0,verbose=False):
     """
     Score function used to rank candidate Lewis Structures during and after the exploration. The `find_lewis()` algorithm uses a few 
     different sets of weights at the start vs later parts of the algortihm by defining different versions  via anonymous functions.
@@ -962,28 +1011,21 @@ def bmat_score(bond_mat,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=-1,w_exp
     score: float
            The score for the supplied bond-electron matrix.
     """
-    
+    en = cat_en
+
     if verbose:
-        print("deficiency: {}".format(w_def*sum([ _*cat_en[count] for count,_ in enumerate(return_def(bond_mat,elements,e_tet)) ])))
-        print("expanded: {}".format(w_exp*sum(return_expanded(bond_mat,elements,e_tet))))
-        print("formals: {}".format(w_formal*sum([ _*cat_en[count] if _ > 0 else 0.9 * _ * an_en[count] for count,_ in enumerate(return_formals(bond_mat,elements)) ])))
+        print("deficiency: {}".format(w_def*sum([ _*en[count] for count,_ in enumerate(return_def(bond_mat,elements,e_def)) ])))
+        print("expanded: {}".format(w_exp*sum(return_expanded(bond_mat,elements,e_exp))))
+        print("formals: {}".format(w_formal*sum([ _ * en[count]*np.exp(0.05*(_-1)) for count,_ in enumerate(return_formals(bond_mat,elements)) ])))
         print("aromatic: {}".format(w_aro*sum([ is_aromatic(bond_mat,_)/len(_) for _ in rings ])))
         print("radicals: {}".format(w_rad*sum([ rad_env[_]*(bond_mat[_,_]%2) for _ in range(len(bond_mat)) ])))
 
-        # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + factor
-        return w_def*sum([ _*cat_en[count] for count,_ in enumerate(return_def(bond_mat,elements,e_tet)) ]) + \
-              w_exp*sum(return_expanded(bond_mat,elements,e_tet)) + \
-              w_formal*sum([ _ * cat_en[count] if _ > 0 else 0.9 * _ * an_en[count] for count,_ in enumerate(return_formals(bond_mat,elements)) ]) + \
-              w_aro*sum([ is_aromatic(bond_mat,_)/len(_) for _ in rings ]) + \
-              w_rad*sum([ rad_env[_]*(bond_mat[_,_]%2) for _ in range(len(bond_mat)) ]) + factor
-    else:
-
-        # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + factor
-        return w_def*sum([ _*cat_en[count] for count,_ in enumerate(return_def(bond_mat,elements,e_tet)) ]) + \
-              w_exp*sum(return_expanded(bond_mat,elements,e_tet)) + \
-              w_formal*sum([ _ * cat_en[count] if _ > 0 else 0.9 * _ * an_en[count] for count,_ in enumerate(return_formals(bond_mat,elements)) ]) + \
-              w_aro*sum([ is_aromatic(bond_mat,_)/len(_) for _ in rings ]) + \
-              w_rad*sum([ rad_env[_]*(bond_mat[_,_]%2) for _ in range(len(bond_mat)) ]) + factor
+    # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + factor
+    return w_def*sum([ _*en[count] for count,_ in enumerate(return_def(bond_mat,elements,e_def)) ]) + \
+          w_exp*sum(return_expanded(bond_mat,elements,e_exp)) + \
+          w_formal*sum([ _ * en[count]*np.exp(0.05*(_-1)) for count,_ in enumerate(return_formals(bond_mat,elements)) ]) + \
+          w_aro*sum([ is_aromatic(bond_mat,_)/len(_) for _ in rings ]) + \
+          w_rad*sum([ rad_env[_]*(bond_mat[_,_]%2) for _ in range(len(bond_mat)) ]) + factor
 
 def is_aromatic(bond_mat,ring):
     """
@@ -1020,6 +1062,10 @@ def is_aromatic(bond_mat,ring):
             prev_atom = ring[count_i - 1]
             next_atom = ring[count_i + 1]
 
+        # If there isn't a bond between the atoms then the ring can't be aromatic (this can happen if the bond is non-covalent)
+        if bond_mat[prev_atom,i] == 0:
+            return 0
+            
         # Check that there are pi electrons ( pi electrons on atom OR ( higher-order bond with ring neighbors) OR empty pi orbital
         if bond_mat[i,i] > 0 or ( bond_mat[i,prev_atom] > 1 or bond_mat[i,next_atom] > 1 ) or sum(bond_mat[i]) < 4:
 
@@ -1073,7 +1119,7 @@ def return_e(bond_mat):
     return np.sum(2*bond_mat,axis=1)-np.diag(bond_mat)
     
 # returns the electron deficiencies of each atom (based on octet goal)
-def return_def(bond_mat,elements,e_tet):
+def return_def(bond_mat,elements,e_def):
     """
     Returns returns the electron deficiencies of each atom (based on octet goal supplied via `e_tet`).
 
@@ -1087,7 +1133,7 @@ def return_def(bond_mat,elements,e_tet):
                Contains elemental information indexed to the supplied adjacency matrix. 
                Expects a list of lower-case elemental symbols.
 
-    e_tet: array
+    e_def: array
            Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
            2 for hydrogen).
 
@@ -1100,10 +1146,10 @@ def return_def(bond_mat,elements,e_tet):
     -----            
     Atoms with expanded octets return 0 not a negative value.
     """        
-    tmp = np.sum(2*bond_mat,axis=1)-np.diag(bond_mat)-e_tet
+    tmp = np.sum(2*bond_mat,axis=1)-np.diag(bond_mat)-e_def
     return np.where(tmp<0,tmp,0)
         
-def return_expanded(bond_mat,elements,e_tet):
+def return_expanded(bond_mat,elements,e_exp):
     """
     Returns returns the number of surplus electrons beyond the target for each atom (based on octet goal 
     supplied via `e_tet`).
@@ -1118,8 +1164,8 @@ def return_expanded(bond_mat,elements,e_tet):
                Contains elemental information indexed to the supplied adjacency matrix. 
                Expects a list of lower-case elemental symbols.
 
-    e_tet: array
-           Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
+    e_exp: array
+           Holds the number of electrons each atom can have until incurring an expanded octect penalty (e.g., 8 for most organics, 
            2 for hydrogen).
 
     Returns
@@ -1131,7 +1177,7 @@ def return_expanded(bond_mat,elements,e_tet):
     -----            
     Atoms with electron deficiencies return 0 not a negative value.
     """                
-    tmp = np.sum(2*bond_mat,axis=1)-np.diag(bond_mat)-e_tet
+    tmp = np.sum(2*bond_mat,axis=1)-np.diag(bond_mat)-e_exp
     return np.where(tmp>0,tmp,0)
 
 def return_formals(bond_mat,elements): 
@@ -1273,6 +1319,76 @@ def return_bo_dict(y,score_thresh=0.0):
         bo_dict[i[1]][i[0]] = bo_dict[i[0]][i[1]]
         
     return bo_dict
+
+def adjust_metals(bond_mats,adj_mat,elements):
+    """
+    Accepts a list of bond mats and will adjust the bonding about the transition metals following the covalent bond
+    classification (CBC) scheme. The adjacency matrix is used to determine where potential bonds exists. In short, 
+    if adjacency matrix indicates a potential bond between the metal and an electron-decicient atom with a radical,
+    then a covalent bond  is formed using an electron from the metal, if the atom is electron deficient without a
+    radical, then a bond is formed using two electrons from the metal, if the atom is not electron deficient (pi or 
+    lone pair containing) then no bond is formed (e.g., if the atom has a full octet then the bond is considered 
+    dative). 
+    
+    Parameters
+    ----------
+    bond_mats: list of arrays
+               Contains the bond_matrices that are being adjusted for the metal centers. 
+
+    adj_mat: array
+             Contains the connectivity of the molecular graph. 
+
+    elements: list
+              Contains the element labels for the atoms in the graph. 
+
+    Returns
+    -------
+    bond_mats: list of arrays
+               Contains the bond-electron matrices that have been updated to account for the nature of the ligands
+               about the metal center. 
+    """
+
+    # list of electron counts for determining electron deficiencies
+    e_def = np.array([ el_n_deficient[_] for _ in elements ])
+    m_inds = [ count for count,_ in enumerate(elements) if _ in el_metals ]
+    for b in bond_mats:
+        defs = return_def(b,elements,e_def)                                
+        for m_ind in m_inds:
+            for con in return_connections(m_ind,adj_mat):            
+
+                # type M - metal metal are handled at the end
+                if con in m_inds:
+                    continue                
+                # type L - dative bonds
+                elif defs[con] == 0:
+                    continue                    
+                # type X - covalent bonds
+                elif b[con,con] % 2 != 0:                    
+                    b[con,con] += -1
+                    b[m_ind,m_ind] += -1
+                    b[con,m_ind] += 1
+                    b[m_ind,con] += 1
+                # type Z - covalent bond, empty p orbital, using two electrons from the metal
+                else:
+                    b[m_ind,m_ind] += -2
+                    b[con,m_ind] += 1
+                    b[m_ind,con] += 1
+
+        # handle metal-metal bonds
+        electrons = return_e(b)
+        for m_ind in m_inds:
+            for con in return_connections(m_ind,adj_mat,inds=m_inds):
+                count = 0
+                while electrons[m_ind] < 12 and electrons[con] < 12 and b[con,con] > 0:
+                    b[m_ind,m_ind] += -1
+                    b[con,con] += -1
+                    b[m_ind,con] += 1
+                    b[con,m_ind] += 1
+                    electrons = return_e(b)                    
+                    count += 1
+                    if count == 4:
+                        break
+    return bond_mats
 
 # call main if this .py file is being called from the command line.
 if __name__ == "__main__":

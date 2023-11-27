@@ -20,7 +20,7 @@ an_to_el = { el_to_an[i]:i.lower() for i in el_to_an.keys() }
 el_valence = {  'h':1, 'he':2,\
                 'li':1, 'be':2,                                                                                                                'b':3,  'c':4,  'n':5,  'o':6,  'f':7, 'ne':8,\
                 'na':1, 'mg':2,                                                                                                               'al':3, 'si':4,  'p':5,  's':6, 'cl':7, 'ar':8,\
-                'k' :1, 'ca':2, 'sc':None, 'ti':None,  'v':None, 'cr':None, 'mn':None, 'fe':3, 'co':None, 'ni':None, 'cu':None, 'zn':None, 'ga':3, 'ge':4, 'as':5, 'se':6, 'br':7, 'kr':8,\
+                'k' :1, 'ca':2, 'sc':3, 'ti':4,  'v':5, 'cr':6, 'mn':7, 'fe':8, 'co':9, 'ni':10, 'cu':11, 'zn':12, 'ga':3, 'ge':4, 'as':5, 'se':6, 'br':7, 'kr':8,\
                 'rb':1, 'sr':2,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':3, 'sn':4, 'sb':5, 'te':6,  'i':7, 'xe':8,\
                 'cs':1, 'ba':2, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':3, 'pb':4, 'bi':5, 'po':6, 'at':7, 'rn':8  }        
 # add values for title case
@@ -28,21 +28,34 @@ for _ in list(el_valence.keys()):
     el_valence[_.title()] = el_valence[_]
 
 # Used for determining electron deficiency when calculating lewis structures
+# For transition metals we use the lowest common oxidation state to establish deficiency.    
 el_n_deficient = {  'h':2, 'he':2,\
                     'li':0, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
                     'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
-                    'k' :0, 'ca':0, 'sc':None, 'ti':None,  'v':None, 'cr':None, 'mn':None, 'fe':0, 'co':None, 'ni':None, 'cu':None, 'zn':None, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
+                    'k' :0, 'ca':0, 'sc':0, 'ti':0,  'v':0, 'cr':0, 'mn':0, 'fe':5, 'co':6, 'ni':8, 'cu':9, 'zn':10, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
                     'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
                     'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
 # add values for title case
 for _ in list(el_n_deficient.keys()):
     el_n_deficient[_.title()] = el_n_deficient[_]
 
+# Used for determining when an octet expansion penalty should be used. For organics the value in el_n_deficiency is used. 
+# For transition metals no penalty is incurred for expanding octets because of the manner in which el_n_deficient is set to the lowest common oxidation number
+el_n_expand_octet = {  'h':2, 'he':2,\
+                    'li':0, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
+                    'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
+                    'k' :1000, 'ca':1000, 'sc':1000, 'ti':1000,  'v':1000, 'cr':1000, 'mn':1000, 'fe':1000, 'co':1000, 'ni':1000, 'cu':1000, 'zn':1000, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
+                    'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
+                    'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
+# add values for title case
+for _ in list(el_n_deficient.keys()):
+    el_n_expand_octet[_.title()] = el_n_deficient[_]
+    
 # Used to determine is expanded octets are allowed when calculating Lewis structures
 el_expand_octet = { 'h':False, 'he':False,\
                     'li':False, 'be':False,                                                                                                               'b':False,  'c':False, 'n':False, 'o':False, 'f':False,'ne':False,\
                     'na':False, 'mg':False,                                                                                                               'al':True, 'si':True,  'p':True,  's':True, 'cl':True, 'ar':True,\
-                    'k' :False, 'ca':False, 'sc':None, 'ti':None,  'v':None, 'cr':None, 'mn':None, 'fe':True, 'co':None, 'ni':None, 'cu':None, 'zn':None, 'ga':True, 'ge':True, 'as':True, 'se':True, 'br':True, 'kr':True,\
+                    'k' :False, 'ca':False, 'sc':False, 'ti':False,  'v':True, 'cr':True, 'mn':True, 'fe':True, 'co':True, 'ni':True, 'cu':True, 'zn':True, 'ga':True, 'ge':True, 'as':True, 'se':True, 'br':True, 'kr':True,\
                     'rb':False, 'sr':False,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':True, 'sn':True, 'sb':True, 'te':True,  'i':True, 'xe':True,\
                     'cs':False, 'ba':False, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':True, 'pb':True, 'bi':True, 'po':True, 'at':True, 'rn':True  }
 # add values for title case
@@ -53,9 +66,11 @@ for _ in list(el_expand_octet.keys()):
 el_en = { "h" :2.3,  "he":4.16,\
           "li":0.91, "be":1.58,                                                                                                               "b" :2.05, "c" :2.54, "n" :3.07, "o" :3.61, "f" :4.19, "ne":4.79,\
           "na":0.87, "mg":1.29,                                                                                                               "al":1.61, "si":1.91, "p" :2.25, "s" :2.59, "cl":2.87, "ar":3.24,\
-          "k" :0.73, "ca":1.03, "sc":1.19, "ti":1.38, "v": 1.53, "cr":1.65, "mn":1.75, "fe":1.80, "co":1.84, "ni":1.88, "cu":1.85, "zn":1.59, "ga":1.76, "ge":1.99, "as":2.21, "se":2.42, "br":2.69, "kr":2.97,\
+          "k" :0.73, "ca":1.03, "sc":1.19, "ti":1.38, "v": 1.53, "cr":1.65, "mn":1.75, "fe":1.8, "co":1.84, "ni":1.88, "cu":1.85, "zn":1.59, "ga":1.76, "ge":1.99, "as":2.21, "se":2.42, "br":2.69, "kr":2.97,\
           "rb":0.71, "sr":0.96, "y" :1.12, "zr":1.32, "nb":1.41, "mo":1.47, "tc":1.51, "ru":1.54, "rh":1.56, "pd":1.58, "ag":1.87, "cd":1.52, "in":1.66, "sn":1.82, "sb":1.98, "te":2.16, "i" :2.36, "xe":2.58,\
-          "cs":0.66, "ba":0.88, "la":1.09, "hf":1.16, "ta":1.34, "w" :1.47, "re":1.60, "os":1.65, "ir":1.68, "pt":1.72, "au":1.92, "hg":1.76, "tl":1.79, "pb":1.85, "bi":2.01, "po":2.19, "at":2.39, "rn":2.60} 
+          "cs":0.66, "ba":0.88, "la":1.09, "hf":1.16, "ta":1.34, "w" :1.47, "re":1.60, "os":1.65, "ir":1.68, "pt":1.72, "au":1.92, "hg":1.76, "tl":1.79, "pb":1.85, "bi":2.01, "po":2.19, "at":2.39, "rn":2.60}
+
+
 # add values for title case
 for _ in list(el_en.keys()):
     el_en[_.title()] = el_en[_]
@@ -88,11 +103,11 @@ for _ in list(el_mass.keys()):
 # Atomic radii based on UFF (Rappe et al. JACS 1992) but with some tweaking based on experience. These were developed for parsing
 # bonds based on atomic separations.    
 # These radii neglect the bond-order and electronegativity corrections in the original paper. Where several values exist
-# the largest was used. All units are in angstroms.
+# the largest was used. All units are in angstroms. (1.193)
 el_radii = {  'H':0.39, 'He':0.849,\
               'Li':1.336, 'Be':1.074,                                                                                                                          'B':0.838,  'C':0.757,  'N':0.700,  'O':0.658,  'F':0.668, 'Ne':0.920,\
               'Na':1.539, 'Mg':1.421,                                                                                                                         'Al':1.15,  'Si':1.050,  'P':1.117,  'S':1.064, 'Cl':1.044, 'Ar':1.032,\
-              'K' :1.953, 'Ca':1.761, 'Sc':1.513, 'Ti':1.412,  'V':1.402, 'Cr':1.345, 'Mn':1.382, 'Fe':1.335, 'Co':1.241, 'Ni':1.164, 'Cu':1.302, 'Zn':1.193, 'Ga':1.260, 'Ge':1.197, 'As':1.211, 'Se':1.190, 'Br':1.192, 'Kr':1.147,\
+              'K' :1.953, 'Ca':1.761, 'Sc':1.513, 'Ti':1.412,  'V':1.402, 'Cr':1.345, 'Mn':1.382, 'Fe':1.335, 'Co':1.241, 'Ni':1.164, 'Cu':1.302, 'Zn':0.9, 'Ga':1.260, 'Ge':1.197, 'As':1.211, 'Se':1.190, 'Br':1.192, 'Kr':1.147,\
               'Rb':2.260, 'Sr':2.052,  'Y':1.698, 'Zr':1.564, 'Nb':1.400, 'Mo':1.484, 'Tc':1.322, 'Ru':1.478, 'Rh':1.332, 'Pd':1.338, 'Ag':1.386, 'Cd':1.403, 'In':1.459, 'Sn':1.398, 'Sb':1.407, 'Te':1.386,  'I':1.382, 'Xe':1.267,\
               'Cs':2.570, 'Ba':2.277, 'La':1.943, 'Hf':1.611, 'Ta':1.511,  'W':1.526, 'Re':1.372, 'Os':1.372, 'Ir':1.371, 'Pt':1.364, 'Au':1.262, 'Hg':1.340, 'Tl':1.518, 'Pb':1.459, 'Bi':1.512, 'Po':1.500, 'At':1.545, 'Rn':1.42,\
               'default' : 0.7 }
@@ -125,13 +140,17 @@ for _ in list(el_max_bonds.keys()):
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
 el_max_valence = {  'H':2,    'He':2,\
-                   'Li':2, 'Be':100,                                                                                                      'B':4,    'C':4,    'N':4,    'O':4,    'F':4,   'Ne':4,\
-                   'Na':2, 'Mg':100,                                                                                                     'Al':100, 'Si':100,  'P':6,  'S':4, 'Cl':100, 'Ar':100,\
-                   'K' :2, 'Ca':100, 'Sc':100, 'Ti':100,  'V':100, 'Cr':100, 'Mn':100, 'Fe':6, 'Co':100, 'Ni':100, 'Cu':100, 'Zn':100, 'Ga':100, 'Ge':100, 'As':100, 'Se':4, 'Br':100, 'Kr':100,\
-                   'Rb':2, 'Sr':100,  'Y':100, 'Zr':100, 'Nb':100, 'Mo':100, 'Tc':100, 'Ru':100, 'Rh':100, 'Pd':100, 'Ag':100, 'Cd':100, 'In':100, 'Sn':100, 'Sb':100, 'Te':100,  'I':100, 'Xe':100,\
-                   'Cs':2, 'Ba':100, 'La':100, 'Hf':100, 'Ta':100,  'W':100, 'Re':100, 'Os':100, 'Ir':100, 'Pt':100, 'Au':100, 'Hg':100, 'Tl':100, 'Pb':100, 'Bi':100, 'Po':100, 'At':100, 'Rn':100  }
+                   'Li':100, 'Be':100,                                                                                                      'B':4,    'C':4,    'N':4,    'O':4,    'F':4,   'Ne':4,\
+                   'Na':100, 'Mg':100,                                                                                                     'Al':100, 'Si':100,  'P':100,  'S':100, 'Cl':100, 'Ar':100,\
+                   'K' :100, 'Ca':100, 'Sc':100, 'Ti':100,  'V':100, 'Cr':100, 'Mn':100, 'Fe':100, 'Co':100, 'Ni':100, 'Cu':100, 'Zn':100, 'Ga':100, 'Ge':100, 'As':100, 'Se':100, 'Br':100, 'Kr':100,\
+                   'Rb':100, 'Sr':100,  'Y':100, 'Zr':100, 'Nb':100, 'Mo':100, 'Tc':100, 'Ru':100, 'Rh':100, 'Pd':100, 'Ag':100, 'Cd':100, 'In':100, 'Sn':100, 'Sb':100, 'Te':100,  'I':100, 'Xe':100,\
+                   'Cs':100, 'Ba':100, 'La':100, 'Hf':100, 'Ta':100,  'W':100, 'Re':100, 'Os':100, 'Ir':100, 'Pt':100, 'Au':100, 'Hg':100, 'Tl':100, 'Pb':100, 'Bi':100, 'Po':100, 'At':100, 'Rn':100  }
 # add values for lower case
 for _ in list(el_max_valence.keys()):
     el_max_valence[_.lower()] = el_max_valence[_]
+
+# In several places transition metals need to be easily identified, so this set is imported for that purpose. 
+el_metals = { 'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd'}
+el_metals.update({ _.lower() for _ in el_metals })
 
     

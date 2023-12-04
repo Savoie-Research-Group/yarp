@@ -9,7 +9,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class GSM:
-    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb', jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb'):
+    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb'):
         """
         Initialize a GSM job class
         input_geo: a xyz file containing the input geometry of reactant and product
@@ -35,6 +35,7 @@ class GSM:
         self.output       = f'{work_folder}/scratch/paragsm{jobid:04d}'
         self.charge       = int(charge)
         self.multiplicity = int(multiplicity)
+        self.lot=lot[-1]
         if solvent:
             if solvation_model.lower() == 'alpb': self.solvation = f'--alpb {solvent}'
             else: self.solvation = f'--gbsa {solvent}' # use GBSA implicit solvent
@@ -49,9 +50,9 @@ class GSM:
             os.system(f'cp {self.source_path}/scripts/ograd_xtb {self.work_folder}/ograd')
             with open(f'{self.work_folder}/ograd','a') as f:
                 if self.solvation:
-                    f.write(f'xtb $ofile.xyz --grad --chrg {self.charge} --uhf {self.multiplicity-1} --gfn 2 {self.solvation} > $ofile.xtbout\n\n')
+                    f.write(f'xtb $ofile.xyz --grad --chrg {self.charge} --uhf {self.multiplicity-1} --gfn {self.lot} {self.solvation} > $ofile.xtbout\n\n')
                 else:
-                    f.write(f'xtb $ofile.xyz --grad --chrg {self.charge} --uhf {self.multiplicity-1} --gfn 2 > $ofile.xtbout\n\n')
+                    f.write(f'xtb $ofile.xyz --grad --chrg {self.charge} --uhf {self.multiplicity-1} --gfn {self.lot} > $ofile.xtbout\n\n')
                 f.write('python tm2orca.py $basename\n')
                 f.write('rm xtbrestart\ncd ..\n')
         elif self.method.lower() == 'orca':

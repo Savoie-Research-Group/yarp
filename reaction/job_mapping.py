@@ -47,11 +47,11 @@ def process_input_rxn(rxns, args={}):
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", PE, PG)
                 if args["low_solvation"]:
                     solvation_model, solvent = args["low_solvation"].split("/")
-                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], jobtype=["opt"],\
+                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
                                solvent=solvent, solvation_model=solvation_model, jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
                     optjob.execute()
                 else:
-                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], jobtype=["opt"],\
+                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
                                jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
                     optjob.execute()
                 if optjob.optimization_success():
@@ -66,11 +66,11 @@ def process_input_rxn(rxns, args={}):
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", RE, RG)
                 if args["low_solvation"]:
                     solvation_model, solvent = args["low_solvation"].split("/")
-                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], jobtype=["opt"],\
+                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
                                solvent=solvent, solvation_model=solvation_model, jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
                     optjob.execute()
                 else:
-                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], jobtype=["opt"],\
+                    optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", lot=args["lot"], work_folder=args["scratch_xtb"], jobtype=["opt"],\
                                jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
                     optjob.execute()
                 if optjob.optimization_success():

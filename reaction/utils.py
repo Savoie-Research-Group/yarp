@@ -182,7 +182,7 @@ def xyz_write(name, element, geo):
     out=open(name, 'w+')
     out.write('{}\n\n'.format(len(element)))
     for count_i, i in enumerate(element):
-        out.write('{} {} {} {}\n'.format(element, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
+        out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
     out.close()
     return
 

@@ -3,14 +3,15 @@
 input: xyz_test # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
 scratch: /scratch/negishi/hsu205/classy-test # The output folder with reaction geometry for constructing reaction network.
 n_break: 2 # Indicate the number of breaking bonds
-form_all: 0 # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
+form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
 lewis_criteria: 0.0 # the criteria to find the products
 ff:            mmff94        # force field for driving the reaction coordinate           
 crest: crest
-opt_level: vtight
+lot: gfn1
 crest_quick: False
 xtb: xtb
 method: crest
+enumeration: True # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
 n_conf: 3
 strategy: 2
 nprocs: 16

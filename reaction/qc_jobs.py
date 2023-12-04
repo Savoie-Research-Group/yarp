@@ -47,6 +47,7 @@ def run_crest(crest_job, logging_queue):
             print(f"Command failed for CREST job {crest_job.jobname} with the following error message:")
             logger.info(f"Command failed for CREST job {crest_job.jobname}, check job log file for detailed information")
             print(result.stderr)
+
 def run_gsm(gsm_job, logging_queue):
     ''' subprocess for running gsm in parallel '''
     # set up logger

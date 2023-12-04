@@ -41,12 +41,12 @@ class reaction:
         n_conf=self.args["n_conf"]
         self.n_conf=self.args["n_conf"]
         # safe check
+        for count_i, i in enumerate(reactant.elements): reactant.elements[count_i]=i.capitalize()
+        for count_i, i in enumerate(product.elements): product.elements[count_i]=i.capitalize()
         for count_i, i in enumerate(reactant.elements):
             if i != product.elements[count_i]:
                 print("Fatal error: reactant and product are not same. Please check the input.....")
                 exit()
-        for count_i, i in enumerate(reactant.elements): reactant.elements[count_i]=i.capitalize()
-        for count_i, i in enumerate(product.elements): product.elements[count_i]=i.capitalize()
         if opt: self.product=geometry_opt(self.product)
         self.reactant_conf={}
         self.product_conf={}
@@ -56,10 +56,15 @@ class reaction:
         self.reactant_smiles=return_smi(self.product)
         self.rxn_conf=dict()
         self.id=0
+        self.TS_guess=dict()
+        self.TS_xtb=dict()
+        self.TS_dft=dict()
+        self.IRC_xtb=dict()
+        self.IRC_dft=dict()
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
 
-    def conf_rdkit(self, strategy=0):
-        if strategy==0 or strategy==2:
+    def conf_rdkit(self):
+        if self.args["strategy"]==0 or self.args["strategy"]==2:
             if os.path.isdir('{}/{}'.format(self.conf_path, self.reactant_inchi)) is False: os.system('mkdir {}/{}'.format(self.conf_path, self.reactant_inchi))
             if os.path.isfile('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi)) is False:
                 # sampling on reactant side
@@ -81,7 +86,7 @@ class reaction:
                 _, geo=xyz_parse('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi), multiple=True)
                 for count_i, i in enumerate(geo):
                     self.reactant_conf[count_i]=i
-        if strategy==1 or strategy==2:
+        if self.args["strategy"]==1 or self.args["strategy"]==2:
             if os.path.isdir('{}/{}'.format(self.conf_path, self.product_inchi)) is False: os.system('mkdir {}/{}'.format(self.conf_path, self.product_inchi))
             if os.path.isfile('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.product_inchi)) is False:
                 # sampling on reactant side

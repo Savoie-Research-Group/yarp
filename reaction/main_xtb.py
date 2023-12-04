@@ -149,7 +149,7 @@ def run_irc_by_xtb(rxns, logging_queue):
                 pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"])
             else:
                 if args["solvation_model"].lower()=="alpb":
-                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
+                                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
                                     alpb=args["solvent"])
                 else:
                     pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
@@ -232,6 +232,7 @@ def run_irc_by_xtb(rxns, logging_queue):
                     rxns[count].IRC_xtb[conf_i]["barriers"]=[barrier2, barrier1]
                     rxns[count].IRC_xtb[conf_i]["type"]="unintended"
     return rxns
+
 def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     args=rxns[0].args
     conf_output=args["conf_output"]

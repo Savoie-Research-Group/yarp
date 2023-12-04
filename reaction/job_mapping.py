@@ -18,6 +18,7 @@ from wrappers.xtb import XTB
 
 from yarp.taffi_functions import table_generator, xyz_write
 from yarp.find_lewis import find_lewis
+from utils import return_metal_constraint
 
 def logger_process(queue, logging_path):                                                                                                       
     """A child process for logging all information from other processes"""
@@ -41,6 +42,8 @@ def process_input_rxn(rxns, args={}):
         PG=rxn.product.geo
         R_inchi=rxn.reactant_inchi
         P_inchi=rxn.product_inchi
+        R_constraint=return_metal_constraint(rxn.reactant)
+        P_constraint=return_metal_constraint(rxn.product)
         if args["strategy"]!=0:
             if P_inchi not in job_mapping:
                 job_mapping[P_inchi]={'jobs': [f'{count_i}-P'], 'id': len(job_mapping)}
@@ -49,10 +52,12 @@ def process_input_rxn(rxns, args={}):
                     solvation_model, solvent = args["low_solvation"].split("/")
                     optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
                                solvent=solvent, solvation_model=solvation_model, jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
+                    if P_constraint!=[]: optjob.add_command(distance_constraints=P_constraint)
                     optjob.execute()
                 else:
                     optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
                                jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
+                    if P_constraint!=[]: optjob.add_command(distance_constraints=P_constraint)
                     optjob.execute()
                 if optjob.optimization_success():
                     E, G=optjob.get_final_structure()
@@ -68,10 +73,12 @@ def process_input_rxn(rxns, args={}):
                     solvation_model, solvent = args["low_solvation"].split("/")
                     optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
                                solvent=solvent, solvation_model=solvation_model, jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
+                    if R_constraint!=[]: optjob.add_command(distance_constraints=R_constraint)
                     optjob.execute()
                 else:
                     optjob=XTB(input_geo=f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", lot=args["lot"], work_folder=args["scratch_xtb"], jobtype=["opt"],\
                                jobname=f"{process_id}_{len(job_mapping)}_opt", charge=args["charge"], multiplicity=args["multiplicity"])
+                    if R_constraint!=[]: optjob.add_command(distance_constraints=R_constraint)
                     optjob.execute()
                 if optjob.optimization_success():
                     E, G=optjob.get_final_structure()

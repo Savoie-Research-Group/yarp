@@ -3,7 +3,7 @@ from openbabel import pybel
 from openbabel import openbabel as ob
 import numpy as np
 from yarp.taffi_functions import graph_seps,table_generator,return_rings,adjmat_to_adjlist,canon_order
-from yarp.properties import el_to_an,an_to_el,el_mass
+from yarp.properties import el_to_an,an_to_el,el_mass, el_radii
 from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
 from yarp.hashes import atom_hash,yarpecule_hash
 from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles, mol_parse
@@ -277,6 +277,26 @@ def return_smi(molecule, namespace="obabel"):
     os.remove(f"{namespace}_input.mol")
     return smile
 
+def return_metal_constraint(molecule):
+    # this function will return the bond constraint for metallic bonds
+    adj_mat=molecule.adj_mat
+    elements=molecule.elements
+    dis_constraint=[]
+    metal_list=['li', 'be',\
+                'na', 'mg', 'al',\
+                'k', 'ca', 'sc', 'ti', 'v', 'cr', 'mn', 'fe', 'co', 'ni', 'cu', 'zn', 'ga', 'ge',\
+                'rb', 'sr', 'y', 'zr', 'nb', 'mo', 'tc', 'ru', 'rh', 'pd', 'ag', 'cd', 'in', 'sn', 'sb',\
+                'cs', 'ba', 'lu', 'hf', 'ta', 'w', 're', 'os', 'ir', 'pt', 'au', 'hg', 'tl', 'pb', 'bi', 'po',\
+                'fr', 'ra', 'lr', 'rf', 'db', 'sg', 'bh', 'hs', 'mt', 'ds', 'rg', 'cn',\
+                'la', 'ce', 'pr', 'nd', 'pm', 'sm', 'eu', 'gd', 'tb', 'dy', 'ho', 'er', 'tm', 'yb',\
+                'ac', 'th', 'pa', 'u', 'np', 'pu', 'am', 'cm', 'bk', 'cf', 'es', 'fm', 'md', 'no']
+    for count_e, e in enumerate(elements):
+        if e.lower() in metal_list:
+            for count_i, i in enumerate(adj_mat[count_e]):
+                if i:
+                    dis_constraint.append([count_e+1, count_i+1, el_radii[e.capitalize()]+el_radii[elements[count_i].capitalize()]])
+    return dis_constraint
+                    
 def return_inchikey(molecule):
     E=molecule.elements
     G=molecule.geo

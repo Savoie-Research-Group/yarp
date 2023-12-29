@@ -183,20 +183,23 @@ class ORCA:
 
         # load geometries
         E,TSG  = xyz_parse(TS_xyz)
-        traj_F = xyz_parse(forward_traj, multiple=True)
-        traj_B = xyz_parse(backward_traj, multiple=True)
-        traj_B.reverse()
-        traj_B.append((E,TSG))
-        traj   = traj_B + traj_F
+        _, traj_F = xyz_parse(forward_traj, multiple=True)
+        _, tmp_traj_B = xyz_parse(backward_traj, multiple=True)
+        traj_B=[]
+        for k in tmp_traj_B:
+            traj_B.append(k)
+        traj_B.append(TSG)
+        traj=traj_B
+        for k in traj_F: traj.append(k)
         
         # write down traj
         for imag in traj:
-            xyz_write(f'{self.work_folder}/{self.jobname}_IRC_T_trj.xyz',imag[0],imag[1],append_opt=True)
+            xyz_write(f'{self.work_folder}/{self.jobname}_IRC_T_trj.xyz',E, imag, append_opt=True)
 
         if not return_traj:
-            return E, traj[0][1], traj[-1][1], TSG, barrier_left, barrier_right
+            return E, traj[0], traj[-1], TSG, barrier_left, barrier_right
         else:
-            return E, traj[0][1], traj[-1][1], TSG, barrier_left, barrier_right, traj 
+            return E, traj[0], traj[-1], TSG, barrier_left, barrier_right, traj 
 
     def optimization_converged(self) -> bool:
         """

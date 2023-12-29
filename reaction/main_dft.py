@@ -44,6 +44,9 @@ def main(args:dict):
     #    pickle.dump(rxns, f)
     # Run DFT IRC opt and generate results
     rxns=run_dft_irc(rxns)
+    with open(args["reaction_data"], "wb") as f:
+        pickle.dump(rxns, f)
+    writedown_result(rxns)
     return
 
 def load_rxns(rxns_pickle):
@@ -201,7 +204,7 @@ def run_dft_irc(rxns):
                 if args["dft_irc"]:
                     print(f"reaction {rxn_ind} is unpredictable, use IRC/DFT to locate TS...")
                     wf=f"{scratch_dft}/{rxn_ind}"
-                    inp_xyz=f"{wf}/{rxn_ind}-IRC.xyz"
+                    inp_xyz=f"{wf}/{rxn_ind}-TS.xyz"
                     xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_dft[i]["geo"])
                     orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-IRC",\
                                   jobtype="IRC", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
@@ -235,9 +238,9 @@ def run_dft_irc(rxns):
         job_success=False
         rxn_ind=rxn_ind.split("_")
         inchi, idx, conf_i=rxn_ind[0], int(rxn_ind[1]), int(rxn_ind[2])
+        E, G1, G2, TSG, barrier1, barrier2=irc_job.analyze_IRC()
         try:
            E, G1, G2, TSG, barrier1, barrier2=irc_job.analyze_IRC()
-           _, TSE, _=irc_job.get_energies_from_IRC()
            job_success=True
         except: pass
         if job_success is False: continue
@@ -254,7 +257,7 @@ def run_dft_irc(rxns):
                 adj_diff_r2=np.abs(bond_mat2, R_bond_mat)
                 adj_diff_p1=np.abs(bond_mat1, P_bond_mat)
                 adj_diff_p2=np.abs(bond_mat2, P_bond_mat)
-                rxns[count].IRC_xtb[conf_i]=dict()
+                rxns[count].IRC_dft[conf_i]=dict()
                 if adj_diff_r1.sum()==0:
                     if adj_diff_p2.sum()==0:
                         rxns[count].IRC_dft[conf_i]["node"]=[G1, G2]
@@ -292,13 +295,41 @@ def run_dft_irc(rxns):
                     rxns[count].IRC_dft[conf_i]["TS"]=TSG
                     rxns[count].IRC_dft[conf_i]["barriers"]=[barrier2, barrier1]
                     rxns[count].IRC_dft[conf_i]["type"]="unintended"
-    # Print out result
-    with open(f'{args["scratch_dft"]}/yarp_result.txt', 'w') as f:
-        if args["backward_DE"]: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"DE_B":<10s} {"DG_B":<10s} {"Source":<10s}\n')
-        else: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"Source":<10s}\n')
-
     return rxns
 
+def writedown_result(rxns):
+    args=rxns[0].args
+    if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
+    else: dft_lot=args["dft_lot"]
+    with open(f'{args["scratch_dft"]}/yarp_result.txt', 'w') as f:
+        if args["backward_DE"]: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"DE_B":<10s} {"DG_B":<10s} {"Type":<10s} {"Source":<10s}\n')
+        else: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"Type":<10s} {"Source":<10s}\n')
+        for rxn in rxns:
+            key=[i for i in rxn.IRC_dft.keys()]
+            print(key)
+            print(rxn.IRC_dft)
+            print(rxn.TS_dft)
+            for conf_i in key:
+                rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{conf_i}"
+                rsmi=return_smi(rxn.reactant.elements, rxn.IRC_dft[conf_i]["node"][0])
+                psmi=return_smi(rxn.reactant.elements, rxn.IRC_dft[conf_i]["node"][1])
+                try:
+                    DE_F=Constants.ha2kcalmol*(rxn.TS_dft[conf_i]["SPE"]-rxn.reactant_dft_opt["SPE"])
+                    DG_F=Constants.ha2kcalmol*(rxn.TS_dft[conf_i]["thermal"]["GibbsFreeEnergy"]-rxn.reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"])
+                except:
+                    DE_F=0.0
+                    DG_F=0.0
+                if args["backward_DE"]:
+                    try:
+                        DE_B=Constants.ha2kcalmol*(rxn.TS_dft[conf_i]["SPE"]-rxn.product_dft_opt["SPE"])
+                        DG_B=Constants.ha2kcalmol*(rxn.TS_dft[conf_i]["thermal"]["GibbsFreeEnergy"]-rxn.product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"])
+                    except:
+                        DE_B=0.0
+                        DF_B=0.0
+                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {DE_B:<10.4f} {DG_B:<10.4f} {rxn.IRC_dft[conf_i]['type']:<10s} {dft_lot:<10s}\n")
+                else:
+                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {rxn.IRC_dft[conf_i]['type']:<10s} {dft_lot:<10s}\n")
+    return
 def run_dft_opt(rxns):
     args=rxns[0].args
     crest_folder=args["scratch_crest"]
@@ -332,8 +363,8 @@ def run_dft_opt(rxns):
     if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
     else: dft_lot=args["dft_lot"]
     for rxn in rxns:
-        if dft_lot not in rxn.reactant_energy.keys() and rxn.reactant_inchi not in missing_dft: missing_dft.append(rxn.reactant_inchi)
-        if dft_lot not in rxn.product_energy.keys() and args["backward_DE"] and rxn.product_inchi not in missing_dft: missing_dft.append(rxn.product_inchi)
+        if dft_lot not in rxn.reactant_dft_opt.keys() and rxn.reactant_inchi not in missing_dft: missing_dft.append(rxn.reactant_inchi)
+        if dft_lot not in rxn.product_dft_opt.keys() and args["backward_DE"] and rxn.product_inchi not in missing_dft: missing_dft.append(rxn.product_inchi)
     
     missing=[]
     key=[i for i in all_inchi.keys()]

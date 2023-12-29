@@ -31,8 +31,8 @@ def main(args:dict):
     nprocs   = int(args['nprocs'])
     c_nprocs = int(args['c_nprocs'])
     mem      = int(args['mem'])*1000 
-    if args['low_solvation']: args['solvation_model'], args['solvent'] = args['low_solvation'].split('/')
-    else: args['solvation_model'], args['solvent'] = 'alpb', False
+    if args['low_solvation']: args['low_solvation_model'], args['solvent'] = args['low_solvation'].split('/')
+    else: args['low_solvation_model'], args['solvent'] = 'alpb', False
     method=args['method']
     form_all=int(args["form_all"])
     lewis_criteria=float(args["lewis_criteria"])
@@ -130,6 +130,8 @@ def main(args:dict):
     rxns=run_irc_by_xtb(rxns, logging_queue)
     with open("reaction.p", "wb") as f:
         pickle.dump(rxns, f)
+
+    rxns=analyze_outputs(rxns)
     return
 
 def run_irc_by_xtb(rxns, logging_queue):
@@ -141,14 +143,14 @@ def run_irc_by_xtb(rxns, logging_queue):
     for count, rxn in enumerate(rxns):
         key=[j for j in rxn.TS_xtb.keys()]
         for j in key:
-            rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{j}"
+            rxn_ind=f"{rxn.reactant_inchi}_{int(rxn.id)}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/{rxn_ind}-TS.xyz", rxn.reactant.elements, rxn.TS_xtb[j])
             if not args["solvent"]:
                 pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"])
             else:
-                if args["solvation_model"].lower()=="alpb":
+                if args["low_solvation_model"].lower()=="alpb":
                                     pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
                                     alpb=args["solvent"])
                 else:
@@ -249,7 +251,7 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
             if not args["solvent"]:
                 pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"])
             else:
-                if args["solvation_model"].lower()=='alpb':
+                if args["low_solvation_model"].lower()=='alpb':
                     pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"],\
                                     alpb=args["solvent"])
                 else:
@@ -301,7 +303,7 @@ def run_gsm_by_xtb(rxns, logging_queue):
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz = f"{conf_output}/{rxn}"
         gsm_job = GSM(input_geo=inp_xyz,input_file=args['gsm_inp'],work_folder=wf,method='xtb', lot=args["lot"], jobname=rxn_ind, jobid=count, charge=args['charge'],\
-                      multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['solvation_model'])
+                      multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['low_solvation_model'])
         gsm_job.prepare_job()
         gsm_jobs[rxn_ind] = gsm_job
 
@@ -378,7 +380,7 @@ def conf_crest(rxns, logging_queue):
         inp_xyz=f"{wf}/{inchi}.xyz"
         xyz_write(inp_xyz, jobi["E"], jobi['G'])
         crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
-                        solvent=args['solvent'], solvation_model=args['solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
+                        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
         if args['crest_quick']: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
         crest_job_list.append(crest_job)
         for jobid in jobi['jobs']: track_crest[jobid]=crest_job

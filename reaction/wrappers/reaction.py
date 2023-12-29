@@ -48,12 +48,16 @@ class reaction:
                 print("Fatal error: reactant and product are not same. Please check the input.....")
                 exit()
         if opt: self.product=geometry_opt(self.product)
-        self.reactant_conf={}
-        self.product_conf={}
+        self.reactant_dft_opt=dict()
+        self.product_dft_opt=dict()
+        self.reactant_conf=dict()
+        self.product_conf=dict()
+        self.reactant_energy=dict()
+        self.product_energy=dict()
         self.reactant_inchi=return_inchikey(self.reactant).split('-')[0]
         self.product_inchi=return_inchikey(self.product).split('-')[0]
-        self.reactant_smiles=return_smi(self.reactant)
-        self.reactant_smiles=return_smi(self.product)
+        self.reactant_smiles=return_smi_yp(self.reactant)
+        self.reactant_smiles=return_smi_yp(self.product)
         self.rxn_conf=dict()
         self.id=0
         self.TS_guess=dict()
@@ -61,6 +65,7 @@ class reaction:
         self.TS_dft=dict()
         self.IRC_xtb=dict()
         self.IRC_dft=dict()
+        self.constrained_TS=dict()
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
 
     def conf_rdkit(self):

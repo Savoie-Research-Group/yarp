@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --job-name=OPT.0
+#SBATCH --output=OPT.0.out
+#SBATCH --error=OPT.0.err
+#SBATCH -A standby
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --mem 8800MB
+#SBATCH --time 4:00:00
+
+echo Running on host `hostname`
+echo Start Time is `date`
+
+
+# Load Orca
+# set up env for Orca
+module unload openmpi
+module load intel-mkl
+export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH"
+export LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH"
+export PATH="/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH"
+export LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"
+
+
+# cd into the submission directory
+cd /scratch/negishi/hsu205/classy-test/DFT/XSASRUDTFFBDDK
+
+/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca /scratch/negishi/hsu205/classy-test/DFT/XSASRUDTFFBDDK/XSASRUDTFFBDDK-OPT.in > /scratch/negishi/hsu205/classy-test/DFT/XSASRUDTFFBDDK/XSASRUDTFFBDDK-OPT.out 
+
+wait
+
+echo End Time is `date`
+

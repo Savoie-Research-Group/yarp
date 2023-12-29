@@ -101,4 +101,15 @@ def merge_job_mappings(all_job_mappings):
         info['id']=job_list.index(id_mapping[inchi])+1
     return merged_mapping
 
-
+def monitor_jobs(slurm_jobs):
+    '''
+    Function that sleeps the script until jobids are no longer in a running or pending state in the queue
+    '''
+    while True:
+        for slurm_job in slurm_jobs:
+            if slurm_job.status() == 'FINISHED':
+                slurm_jobs.remove(slurm_job)
+        if not slurm_jobs:
+            break
+        time.sleep(60)
+    return    

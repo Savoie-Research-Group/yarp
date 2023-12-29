@@ -1,6 +1,7 @@
 import sys, itertools, timeit, os, copy  
 from openbabel import pybel
 from openbabel import openbabel as ob
+from collections import Counter    
 import numpy as np
 from yarp.taffi_functions import graph_seps,table_generator,return_rings,adjmat_to_adjlist,canon_order
 from yarp.properties import el_to_an,an_to_el,el_mass, el_radii
@@ -270,12 +271,53 @@ def mol_write_yp(name,molecule,append_opt=False):
 
     return
 
-def return_smi(molecule, namespace="obabel"):
+def return_smi(E,G,bond_mat=None,namespace='obabel'):
+    ''' Function to Return smiles string using openbabel (pybel) '''
+    if bond_mat is None:
+        xyz_write(f"{namespace}_input.xyz",E,G)
+        # Read the XYZ file using Open Babel
+        molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
+        # Generate the canonical SMILES string directly
+        smile = molecule.write(format="can").strip().split()[0]
+        # Clean up the temporary file
+        os.remove(f"{namespace}_input.xyz")
+        return smile
+
+    else:
+        mol_write(f"{namespace}_input.mol",E,G,bond_mat)
+        # Read the mol file using Open Babel
+        molecule = next(pybel.readfile("mol", f"{namespace}_input.mol"))
+        # Generate the canonical SMILES string directly
+        smile = molecule.write(format="can").strip().split()[0]
+        # Clean up the temporary file
+        os.remove(f"{namespace}_input.mol")
+
+    return smile
+
+def return_smi_yp(molecule, namespace="obabel"):
     mol_write_yp(f"{namespace}_input.mol",molecule)
     mol=next(pybel.readfile("mol", f"{namespace}_input.mol"))
     smile=mol.write(format="can").strip().split()[0]
     os.remove(f"{namespace}_input.mol")
     return smile
+
+def return_rxn_constraint(mol1, mol2):
+    adj1=mol1.adj_mat
+    adj2=mol2.adj_mat
+    bond_change=[]
+    d_adj=np.abs(adj2-adj1)
+    for i in range(len(mol1.elements)):
+        for j in range(i+1, len(mol1.elements)):
+            if d_adj[i][j]!=0: bond_change+=[(i, j)]
+    reactive_atoms=list(set([atom for bond in bond_change for atom in bond]))
+    # if there are other atoms next to at least two reactive atom in either Reactant or Product, identify them also as reactive atoms
+    gs1=graph_seps(adj1)
+    gs2=graph_seps(adj2)
+    n1=Counter([indj for indj in range(len(mol1.elements)) for indi in reactive_atoms if gs1[indi][indj]==1])
+    n2=Counter([indj for indj in range(len(mol1.elements)) for indi in reactive_atoms if gs2[indi][indj]==1])
+    reactive_atoms+=list(set([ind for ind, count in n1.items() if count>1]+[ind for ind, count in n2.items() if count>1]))
+    
+    return bond_change, reactive_atoms
 
 def return_metal_constraint(molecule):
     # this function will return the bond constraint for metallic bonds

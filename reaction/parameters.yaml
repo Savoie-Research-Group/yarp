@@ -2,6 +2,7 @@
 # Enumetation part
 input: xyz_test # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
 scratch: /scratch/negishi/hsu205/classy-test # The output folder with reaction geometry for constructing reaction network.
+reaction_data: reaction.p
 n_break: 2 # Indicate the number of breaking bonds
 form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
 lewis_criteria: 0.0 # the criteria to find the products
@@ -13,10 +14,11 @@ xtb: xtb
 method: crest
 enumeration: True # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
 n_conf: 3
+nconf_dft: 2
 strategy: 2
 nprocs: 16
 c_nprocs: 16
-mem: 1
+mem: 1 # in GB
 crest: crest
 opt_level: vtight
 crest_quick: False
@@ -26,5 +28,21 @@ pysis_wt: 180
 select: network
 charge: 0
 multiplicity: 1
+skip_low_IRC: True
+skip_low_TS: True
+constrained_TS: True
 model_path:   /home/hsu205/classy-yarp/reaction/bin
 gsm_inp:      /home/hsu205/classy-yarp/reaction/bin/inpfileq
+
+package: ORCA
+dft_nprocs: 4
+dft_lot: UHF 6-31G
+dft_wt: 4
+ppn: 8
+partition: standby
+dft_njobs: 1
+hess_recalc: 3
+dft_irc: True
+backward_DE: False
+dielectric: 95.3
+solvation: CPCM/read

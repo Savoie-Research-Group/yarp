@@ -245,18 +245,18 @@ def run_dft_irc(rxns):
         except: pass
         if job_success is False: continue
         adj_mat1, adj_mat2=table_generator(E, G1), table_generator(E, G2)
-        bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
-        bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
-        bond_mat1=bond_mat1[0]
-        bond_mat2=bond_mat2[0]
+        #bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
+        #bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
+        #bond_mat1=bond_mat1[0]
+        #bond_mat2=bond_mat2[0]
         for count, rxn in enumerate(rxns):
             if inchi==rxn.reactant_inchi and idx==rxn.id:
-                P_bond_mat=rxn.product.bond_mats[0]
-                R_bond_mat=rxn.reactant.bond_mats[0]
-                adj_diff_r1=np.abs(bond_mat1, R_bond_mat)
-                adj_diff_r2=np.abs(bond_mat2, R_bond_mat)
-                adj_diff_p1=np.abs(bond_mat1, P_bond_mat)
-                adj_diff_p2=np.abs(bond_mat2, P_bond_mat)
+                P_adj_mat=rxn.product.adj_mat
+                R_adj_mat=rxn.reactant.adj_mat
+                adj_diff_r1=np.abs(adj_mat1-R_adj_mat)
+                adj_diff_r2=np.abs(adj_mat2-R_adj_mat)
+                adj_diff_p1=np.abs(adj_mat1-P_adj_mat)
+                adj_diff_p2=np.abs(adj_mat2-P_adj_mat)
                 rxns[count].IRC_dft[conf_i]=dict()
                 if adj_diff_r1.sum()==0:
                     if adj_diff_p2.sum()==0:
@@ -306,9 +306,9 @@ def writedown_result(rxns):
         else: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"Type":<10s} {"Source":<10s}\n')
         for rxn in rxns:
             key=[i for i in rxn.IRC_dft.keys()]
-            print(key)
-            print(rxn.IRC_dft)
-            print(rxn.TS_dft)
+            #print(key)
+            #print(rxn.IRC_dft)
+            #print(rxn.TS_dft)
             for conf_i in key:
                 rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{conf_i}"
                 rsmi=return_smi(rxn.reactant.elements, rxn.IRC_dft[conf_i]["node"][0])

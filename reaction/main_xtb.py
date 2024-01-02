@@ -180,21 +180,21 @@ def run_irc_by_xtb(rxns, logging_queue):
         except: pass
         if job_success is False: continue
         adj_mat1, adj_mat2=table_generator(E, G1), table_generator(E, G2)
-        bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
-        bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
-        bond_mat1=bond_mat1[0]
-        bond_mat2=bond_mat2[0]
+        #bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
+        #bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
+        #bond_mat1=bond_mat1[0]
+        #bond_mat2=bond_mat2[0]
         for count, rxn in enumerate(rxns):
             if inchi==rxn.reactant_inchi and idx==rxn.id:
                 #rxns[count].IRC_xtb[conf_i]["node"]=[G1, G2]
                 #rxns[count].IRC_xtb[conf_i]["TS"]=TSG
                 #rxns[count].IRC_xtb[conf_i]["barriers"]=[barrier1, barrier2]
-                P_bond_mat=rxn.product.bond_mats[0]
-                R_bond_mat=rxn.reactant.bond_mats[0]
-                adj_diff_r1=np.abs(bond_mat1, R_bond_mat)
-                adj_diff_r2=np.abs(bond_mat2, R_bond_mat)
-                adj_diff_p1=np.abs(bond_mat1, P_bond_mat)
-                adj_diff_p2=np.abs(bond_mat2, P_bond_mat)
+                P_adj_mat=rxn.product.adj_mat
+                R_bond_mat=rxn.reactant.adj_mat
+                adj_diff_r1=np.abs(adj_mat1-R_adj_mat)
+                adj_diff_r2=np.abs(adj_mat2-R_adj_mat)
+                adj_diff_p1=np.abs(adj_mat1-P_adj_mat)
+                adj_diff_p2=np.abs(adj_mat2-P_adj_mat)
                 rxns[count].IRC_xtb[conf_i]=dict()
                 if adj_diff_r1.sum()==0:
                     if adj_diff_p2.sum()==0:

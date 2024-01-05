@@ -179,8 +179,9 @@ def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
 
     return
 
-def xyz_write(name, element, geo):
-    out=open(name, 'w+')
+def xyz_write(name, element, geo, append_opt=False):
+    if append_opt==False: out=open(name, 'w+')
+    else: out=open(name, 'a+')
     out.write('{}\n\n'.format(len(element)))
     for count_i, i in enumerate(element):
         out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
@@ -369,6 +370,6 @@ def return_inchikey(molecule):
         inchikey+=[inchi]
         os.system("rm .tmp.mol")
     if len(groups) == 1:
-        return inchikey[0]
+        return inchikey[0][:14]
     else:
         return '-'.join(sorted([i[:14] for i in inchikey]))                   

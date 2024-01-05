@@ -128,7 +128,7 @@ def main(args:dict):
     print("-----IRC Calculation---")
     print("-----------------------")
     rxns=run_irc_by_xtb(rxns, logging_queue)
-    with open("reaction.p", "wb") as f:
+    with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
 
     rxns=analyze_outputs(rxns)

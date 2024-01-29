@@ -123,9 +123,6 @@ def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
     keep_lone=[count_i for count_i, i in enumerate(bond_mat) if i[count_i]%2==1]
     # deal with radicals
     fc = list(return_formals(bond_mat, elements))
-    # print(fc)
-    print(elements)
-    print(bond_mat)
     # deal with charges 
     chrg = len([i for i in fc if i != 0])
     valence=[] # count the number of bonds for mol file
@@ -151,6 +148,7 @@ def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
 
             # Calculate bond order from the bond_mat
             bond_order = int(bond_mat[i[0],i[1]])
+            if bond_order==0: bond_order=1
             f.write("{:>3d}{:>3d}{:>3d}  0  0  0  0\n".format(i[0]+1,i[1]+1,bond_order))
 
         # write radical info if exist
@@ -243,7 +241,8 @@ def mol_write_yp(name,molecule,append_opt=False):
         for i in bonds:
 
             # Calculate bond order from the bond_mat
-            bond_order = int(bond_mat[i[0],i[1]])             
+            bond_order = int(bond_mat[i[0],i[1]])
+            if bond_order==0: bond_order=1
             f.write("{:>3d}{:>3d}{:>3d}  0  0  0  0\n".format(i[0]+1,i[1]+1,bond_order))
 
         # write radical info if exist

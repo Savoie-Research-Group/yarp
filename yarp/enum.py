@@ -270,7 +270,12 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
         bonds = [ (count_r,count_c) for count_r,row in enumerate(y.adj_mat) for count_c,col in enumerate(row) if ( count_r in react[count_y] and count_c in react[count_y] and col > 0 and count_c > count_r ) ] 
 
         if break_higher_order is False:
-            bonds = [ _ for _ in bonds if 1 in y.bo_dict[_[0]][_[1]] ]
+            bonds=[]
+            for i in bonds:
+                if y.bo_dict[i[0]][i[1]]==None: continue
+                elif 1 in y.bo_dict[i[0]][i[1]]:
+                    bonds.append(i)
+            #bonds = [ _ for _ in bonds if 1 in y.bo_dict[_[0]][_[1]] ]
             
         # Loop over all combinations of breakable bonds
         for combos in combinations(bonds,n):

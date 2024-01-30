@@ -87,7 +87,9 @@ def main(args:dict):
     else:
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
-        
+    
+    #for i in rxns:
+    #   i.id=f"{i.reactant.hash}_{i.product.hash}"
     # Generate the reaction id for different inchi
     inchi_array=[]
     for i in rxns:
@@ -414,19 +416,20 @@ def run_enumeration(input_mol, args=dict()):
     criteria=args["lewis_criteria"]
     reactant=yp.yarpecule(input_mol)
     mol=yp.yarpecule(input_mol)
-    print("Do the reaction enumeration on molecule: {} ({})".format(return_inchikey(reactant),input_mol))
+    print("Do the reaction enumeration on molecule: {} ({})".format(mol.hash,input_mol))
     name=input_mol.split('/')[-1].split('.')[0]
     # break bonds
     break_mol=list(yp.break_bonds(mol, n=nb))
+    #print(len(break_mol))
     # form bonds
+    print(form_all)
     if form_all: products=yp.form_bonds_all(break_mol)
-    else: products=yp.form_bonds(break_mol)
+    else: products=yp.form_bonds(break_mol, def_only=True)
     # Finish generate products
-    products=yp.sieve_bmat_scores(products)
-    #products=yp.sieve_fused_rings(mols,keep=False)
-    #products=yp.sieve_rings(mols,{3,4},keep=False)
-    #products=yp.sieve_fc(mols,[-1,1],keep=False)
-    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<=2.0]
+    # print(len(products))
+    # print(products[0].bond_mats)
+    # for i in products: print(i.bond_mat_scores[0])
+    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria]
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
     print(products[0].elements)

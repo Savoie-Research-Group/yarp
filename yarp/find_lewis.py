@@ -228,7 +228,7 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def
     # calculated as: number of bonded_atoms + number of unbound electron orbitals (pairs or radicals).
     # The latter is calculated as the minimum value over all relevant bond_mats (e.g., ester oxygen, R-O(C=O)-R will only have one lone pair not two in this calculation)
     centers = [ i+np.ceil(min([ b[count,count] for b in bond_mats ])*0.5) for count,i in enumerate(sum(adj_mat)) ] # finds the number of charge centers bonded to each atom (determines hybridization) 
-    s_char = np.array([ 1/_ for _ in centers ]) # need s-character to assign positions of anions for precisely
+    s_char = np.array([ 1/(_+0.0001) for _ in centers ]) # need s-character to assign positions of anions for precisely
     pol = np.array([ el_pol[_] for _ in elements ]) # polarizability of each atom
 
     # Calculate final scores. For finding the preferred position of formal charges, some small corrections are made to the electronegativities of anion and cations based on neighboring atoms and hybridization.

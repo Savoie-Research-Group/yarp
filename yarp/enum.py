@@ -10,7 +10,7 @@ from yarp.sieve import is_valency_violation
 from yarp.yarpecule import draw_yarpecules
 from numpy import vstack
 
-def form_bonds(yarpecules,react=[],hashes=None,inter=True,intra=True,def_only=False,hash_filter=True):
+def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=False,hash_filter=True):
     """
     This function yields all products that result from valid bond formations amongst the supplied yarpecules.
 
@@ -270,11 +270,13 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
         bonds = [ (count_r,count_c) for count_r,row in enumerate(y.adj_mat) for count_c,col in enumerate(row) if ( count_r in react[count_y] and count_c in react[count_y] and col > 0 and count_c > count_r ) ] 
 
         if break_higher_order is False:
-            bonds=[]
+            tmp_bonds=[]
             for i in bonds:
+                #print(y.bo_dict[i[0]][i[1]])
                 if y.bo_dict[i[0]][i[1]]==None: continue
                 elif 1 in y.bo_dict[i[0]][i[1]]:
-                    bonds.append(i)
+                    tmp_bonds.append(i)
+            bonds=tmp_bonds
             #bonds = [ _ for _ in bonds if 1 in y.bo_dict[_[0]][_[1]] ]
             
         # Loop over all combinations of breakable bonds

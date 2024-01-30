@@ -30,7 +30,7 @@ for _ in list(el_valence.keys()):
 # Used for determining electron deficiency when calculating lewis structures
 # For transition metals we use the lowest common oxidation state to establish deficiency.    
 el_n_deficient = {  'h':2, 'he':2,\
-                    'li':0, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
+                    'li':2, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
                     'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
                     'k' :0, 'ca':0, 'sc':0, 'ti':0,  'v':0, 'cr':0, 'mn':0, 'fe':5, 'co':6, 'ni':8, 'cu':9, 'zn':10, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
                     'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
@@ -42,7 +42,7 @@ for _ in list(el_n_deficient.keys()):
 # Used for determining when an octet expansion penalty should be used. For organics the value in el_n_deficiency is used. 
 # For transition metals no penalty is incurred for expanding octets because of the manner in which el_n_deficient is set to the lowest common oxidation number
 el_n_expand_octet = {  'h':2, 'he':2,\
-                    'li':0, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
+                    'li':2, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
                     'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
                     'k' :1000, 'ca':1000, 'sc':1000, 'ti':1000,  'v':1000, 'cr':1000, 'mn':1000, 'fe':1000, 'co':1000, 'ni':1000, 'cu':1000, 'zn':1000, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
                     'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
@@ -117,7 +117,7 @@ for _ in list(el_radii.keys()):
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
 el_max_bonds = {  'H':2,    'He':1,\
-                  'Li':None, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
+                  'Li':1, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
                   'Na':None, 'Mg':None,                                                                                                               'Al':4,    'Si':4,  'P':None,  'S':None, 'Cl':1,    'Ar':1,\
                   'K' :None, 'Ca':None, 'Sc':15, 'Ti':14,  'V':13, 'Cr':12, 'Mn':11, 'Fe':10, 'Co':9, 'Ni':8, 'Cu':None, 'Zn':None, 'Ga':3,    'Ge':None, 'As':None, 'Se':None, 'Br':1,    'Kr':None,\
                   'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':8, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
@@ -128,7 +128,7 @@ for _ in list(el_max_bonds.keys()):
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
 el_max_bonds = {  'H':2,    'He':1,\
-                  'Li':None, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
+                  'Li':1, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
                   'Na':None, 'Mg':None,                                                                                                               'Al':4,    'Si':4,  'P':None,  'S':None, 'Cl':1,    'Ar':1,\
                   'K' :None, 'Ca':None, 'Sc':15, 'Ti':14,  'V':13, 'Cr':12, 'Mn':11, 'Fe':10, 'Co':9, 'Ni':8, 'Cu':None, 'Zn':None, 'Ga':3,    'Ge':None, 'As':None, 'Se':None, 'Br':1,    'Kr':None,\
                   'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':8, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
@@ -140,7 +140,7 @@ for _ in list(el_max_bonds.keys()):
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
 el_max_valence = {  'H':2,    'He':2,\
-                   'Li':100, 'Be':100,                                                                                                      'B':4,    'C':4,    'N':4,    'O':4,    'F':4,   'Ne':4,\
+                   'Li':2, 'Be':100,                                                                                                      'B':4,    'C':4,    'N':4,    'O':4,    'F':4,   'Ne':4,\
                    'Na':100, 'Mg':100,                                                                                                     'Al':100, 'Si':100,  'P':100,  'S':100, 'Cl':100, 'Ar':100,\
                    'K' :100, 'Ca':100, 'Sc':100, 'Ti':100,  'V':100, 'Cr':100, 'Mn':100, 'Fe':100, 'Co':100, 'Ni':100, 'Cu':100, 'Zn':100, 'Ga':100, 'Ge':100, 'As':100, 'Se':100, 'Br':100, 'Kr':100,\
                    'Rb':100, 'Sr':100,  'Y':100, 'Zr':100, 'Nb':100, 'Mo':100, 'Tc':100, 'Ru':100, 'Rh':100, 'Pd':100, 'Ag':100, 'Cd':100, 'In':100, 'Sn':100, 'Sb':100, 'Te':100,  'I':100, 'Xe':100,\
@@ -150,7 +150,7 @@ for _ in list(el_max_valence.keys()):
     el_max_valence[_.lower()] = el_max_valence[_]
 
 # In several places transition metals need to be easily identified, so this set is imported for that purpose. 
-el_metals = { 'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd'}
+el_metals = {'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd'}
 el_metals.update({ _.lower() for _ in el_metals })
 
     

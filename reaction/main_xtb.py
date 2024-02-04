@@ -429,10 +429,9 @@ def run_enumeration(input_mol, args=dict()):
     # print(len(products))
     # print(products[0].bond_mats)
     # for i in products: print(i.bond_mat_scores[0])
-    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria]
+    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<=2.0] 
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
-    print(products[0].elements)
     for count_i, i in enumerate(products):
         R=reaction(reactant, i, args=args, opt=True)
         rxn.append(R)
@@ -440,10 +439,10 @@ def run_enumeration(input_mol, args=dict()):
 
 def read_rxns(input_mol, args={}):
     elements, geo= xyz_parse(input_mol, multiple=True)
-    xyz_write(".tmp_R.xyz", elements[0][0], geo[0])
+    xyz_write(".tmp_R.xyz", elements[0], geo[0])
     reactant=yp.yarpecule(".tmp_R.xyz")
     os.system('rm .tmp_R.xyz')
-    xyz_write(".tmp_P.xyz", elements[1][0], geo[1])
+    xyz_write(".tmp_P.xyz", elements[1], geo[1])
     product=yp.yarpecule(".tmp_P.xyz")
     os.system('rm .tmp_P.xyz')
     R=reaction(reactant, product, args=args, opt=False)

@@ -36,6 +36,7 @@ def main(args:dict):
     # Run DFT optimization first to get DFT energy
     # print("Running DFT optimization")
     #print(rxns)
+    '''
     rxns=run_dft_opt(rxns)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -47,6 +48,7 @@ def main(args:dict):
     rxns=run_dft_irc(rxns)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    '''
     writedown_result(rxns)
     return
 
@@ -176,8 +178,8 @@ def run_dft_tsopt(rxns):
                 _, geo=orca_opt.get_final_structure()
                 for count, rxn in enumerate(rxns):
                     inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
+                    if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
                     if inchi in rxn.reactant_inchi and ind==rxn.id:
-                        rxns[count].TS_dft[dft_lot]=dict()
                         rxns[count].TS_dft[dft_lot][conf_i]=dict()
                         rxns[count].TS_dft[dft_lot][conf_i]["geo"]=geo
                         rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
@@ -197,7 +199,8 @@ def run_dft_irc(rxns):
     # run IRC model first if we need
     if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: rxns=apply_IRC_model(rxns)
     for count, rxn in enumerate(rxns):
-        key=[i for i in rxn.TS_dft[dft_lot].keys()]
+        if dft_lot in rxn.TS_dft.keys(): key=[i for i in rxn.TS_dft[dft_lot].keys()]
+        else: continue
         for i in key:
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{i}"
             RP=False
@@ -310,15 +313,16 @@ def writedown_result(rxns):
         if args["backward_DE"]: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"DE_B":<10s} {"DG_B":<10s} {"Type":<10s} {"Source":<10s}\n')
         else: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"Type":<10s} {"Source":<10s}\n')
         for rxn in rxns:
-            key=[i for i in rxn.IRC_dft[dft_lot].keys()]
+            if dft_lot in rxn.IRC_dft.keys(): key=[i for i in rxn.IRC_dft[dft_lot].keys()]
+            else: continue
             for conf_i in key:
                 rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{conf_i}"
-                adj_mat=table_generator(rxn.reactant.elements, rxn_IRC_dft[dft_lot][conf_i]["node"][0])
-                bond_mat=find_lewis(rxn.reactant.elements, adj_mat)
+                adj_mat=table_generator(rxn.reactant.elements, rxn.IRC_dft[dft_lot][conf_i]["node"][0])
+                bond_mat, _=find_lewis(rxn.reactant.elements, adj_mat)
                 bond_mat=bond_mat[0]
                 rsmi=return_smi(rxn.reactant.elements, rxn.IRC_dft[dft_lot][conf_i]["node"][0], bond_mat=bond_mat)
-                adj_mat=table_generator(rxn.reactant.elements, rxn_IRC_dft[dft_lot][conf_i]["node"][1])
-                bond_mat=find_lewis(rxn.reactant.elements, adj_mat)
+                adj_mat=table_generator(rxn.reactant.elements, rxn.IRC_dft[dft_lot][conf_i]["node"][1])
+                bond_mat, _=find_lewis(rxn.reactant.elements, adj_mat)
                 bond_mat=bond_mat[0]
                 psmi=return_smi(rxn.reactant.elements, rxn.IRC_dft[dft_lot][conf_i]["node"][1], bond_mat=bond_mat)
                 try:
@@ -334,9 +338,9 @@ def writedown_result(rxns):
                     except:
                         DE_B=0.0
                         DF_B=0.0
-                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {DE_B:<10.4f} {DG_B:<10.4f} {rxn.IRC_dft[conf_i]['type']:<10s} {dft_lot:<10s}\n")
+                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {DE_B:<10.4f} {DG_B:<10.4f} {rxn.IRC_dft[dft_lot][conf_i]['type']:<10s} {dft_lot:<10s}\n")
                 else:
-                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {rxn.IRC_dft[conf_i]['type']:<10s} {dft_lot:<10s}\n")
+                    f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {rxn.IRC_dft[dft_lot][conf_i]['type']:<10s} {dft_lot:<10s}\n")
     return
 
 def run_dft_opt(rxns):
@@ -377,6 +381,8 @@ def run_dft_opt(rxns):
         if i not in stable_conf.keys():
             missing_conf.append(i)
     # prepare for submitting job
+    print("dft_opt")
+    print(missing_dft)
     njobs=int(args["dft_njobs"])
     if len(missing_conf) > 0:
         CREST_job_list=[]

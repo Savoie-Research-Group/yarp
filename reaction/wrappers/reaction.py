@@ -205,16 +205,16 @@ class reaction:
                 _, rg=xyz_parse(tmp_xyz_r)
                 _, pg=xyz_parse(tmp_xyz_p)
                 self.rxn_conf[N_conf]={"R": rg, "P": pg}
+                os.system(f"cp {tmp_xyz_r} {self.args['conf_output']}/{job_id}_{N_conf}.xyz; cat {tmp_xyz_p} >> {self.args['conf_output']}/{job_id}_{N_conf}.xyz;rm {tmp_xyz_r} {tmp_xyz_p}")
                 os.system(f"rm {tmp_xyz_r}")
                 os.system(f"rm {tmp_xyz_p}")
-                #os.system(f"cp {tmp_xyz_r} {self.args['conf_output']}/{job_id}_{N_conf}.xyz; cat {tmp_xyz_p} >> {self.args['conf_output']}/{job_id}_{N_conf}.xyz;rm {tmp_xyz_r} {tmp_xyz_p}")
             else:
                 _, rg=xyz_parse(tmp_xyz_p)
                 _, pg=xyz_parse(tmp_xyz_r)
                 self.rxn_conf[N_conf]={"R": rg, "P": pg}
+                os.system(f"cp {tmp_xyz_p} {self.args['conf_output']}/{job_id}_{N_conf}.xyz; cat {tmp_xyz_r} >> {self.args['conf_output']}/{job_id}_{N_conf}.xyz;rm {tmp_xyz_r} {tmp_xyz_p}")
                 os.system(f"rm {tmp_xyz_r}")
                 os.system(f"rm {tmp_xyz_p}")
-                #os.system(f"cp {tmp_xyz_p} {self.args['conf_output']}/{job_id}_{N_conf}.xyz; cat {tmp_xyz_r} >> {self.args['conf_output']}/{job_id}_{N_conf}.xyz;rm {tmp_xyz_r} {tmp_xyz_p}")
             N_conf=N_conf+1
             if N_conf>=self.args["n_conf"]: break
 

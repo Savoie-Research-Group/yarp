@@ -47,6 +47,22 @@ def main(args:dict):
     args['scratch_crest']= scratch_crest
     args['conf_output']  = conf_output
     enumeration=args["enumeration"]
+
+    #Zhao's note: added dist constraint
+    if args['constraint']:
+        total_constraints = []
+        inp_list = args['dist_constraint'].split(',')
+        print("inp_list: \n")
+        print(inp_list)
+        for a in range(0, int(len(inp_list) / 3)):
+            arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+            total_constraints.append(arg_list)
+        args['dist_constraints'] = total_constraints
+        print("args[dist_constraints]: \n", flush = True)
+        print(args['dist_constraints'], flush = True)
+        print("len(args[dist_constraints]): \n", flush = True)
+        print(len(args['dist_constraints']), len(args['dist_constraints'][0]), flush = True)
+    
     if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
     if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
     if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
@@ -390,6 +406,29 @@ def conf_crest(rxns, logging_queue):
         crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
                         solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
         if args['crest_quick']: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
+
+        #Zhao's note: add command for constraint
+        # distinguish the application of constraint on reactant/product/both
+        # jobi has the ending '-P' and '-R'
+        if args['constraint']:
+            print("crest job constraint: \n", flush = True)
+            print(crest_job.xcontrol, flush = True)
+            print("jobi['jobs'][0].endswith('-R'): ", flush = True)
+            print(jobi['jobs'][0].endswith('-R'), flush = True)
+
+            print("jobi['jobs'][0].endswith('-P'): ", flush = True)
+            print(jobi['jobs'][0].endswith('-P'), flush = True)
+            #  if product, check if apply-constraint only to product, if reactant, check if apply-constraint only to reactant
+            if((jobi['jobs'][0].endswith('-R') and not args['apply_constraint'] == 'product') or (jobi['jobs'][0].endswith('-P') and not args['apply_constraint'] == 'reactant')):
+                #Zhao's note: added dist constraint
+                total_constraints = []
+                inp_list = args['dist_constraint'].split(',')
+                for a in range(0, int(len(inp_list) / 3)):
+                    arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                    total_constraints.append(arg_list)
+
+                crest_job.add_command(distance_constraints = total_constraints)
+                
         crest_job_list.append(crest_job)
         for jobid in jobi['jobs']: track_crest[jobid]=crest_job
     input_job_list=[(crest_job, logging_queue) for crest_job in crest_job_list]

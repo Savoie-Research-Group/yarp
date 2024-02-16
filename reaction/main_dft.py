@@ -171,22 +171,23 @@ def run_dft_tsopt(rxns):
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} ts optimization jobs...")
         monitor_jobs(slurm_jobs)
-        key=[i for i in opt_jobs.keys()]
-        for i in key:
-            orca_opt=opt_jobs[i]
-            if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and orca_opt.is_TS():
-                _, geo=orca_opt.get_final_structure()
-                for count, rxn in enumerate(rxns):
-                    inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
-                    if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
-                    if inchi in rxn.reactant_inchi and ind==rxn.id:
-                        rxns[count].TS_dft[dft_lot][conf_i]=dict()
-                        rxns[count].TS_dft[dft_lot][conf_i]["geo"]=geo
-                        rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
-                        rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=orca_opt.get_energy()
-                        rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=orca_opt.get_imag_freq_mode()
     else:
         print("No ts optimiation jobs need to be performed...")
+    #Zhao's note: move the post-process out of the if statement
+    key=[i for i in opt_jobs.keys()]
+    for i in key:
+        orca_opt=opt_jobs[i]
+        if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and orca_opt.is_TS():
+            _, geo=orca_opt.get_final_structure()
+            for count, rxn in enumerate(rxns):
+                inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
+                if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
+                if inchi in rxn.reactant_inchi and ind==rxn.id:
+                    rxns[count].TS_dft[dft_lot][conf_i]=dict()
+                    rxns[count].TS_dft[dft_lot][conf_i]["geo"]=geo
+                    rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
+                    rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=orca_opt.get_energy()
+                    rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=orca_opt.get_imag_freq_mode()
     return rxns
 
 def run_dft_irc(rxns):

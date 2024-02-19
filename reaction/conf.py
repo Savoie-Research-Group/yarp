@@ -279,7 +279,8 @@ def seperate_mols(E,G,adj_mat=None,namespace='sep'):
         os.system(f"rm {namespace}_input.xyz")
         # store this fragment
         if inchikey not in mols.keys():
-            mols[inchikey] = [[frag_E,frag_G]]
+            #mols[inchikey] = [[frag_E,frag_G]]
+            mols[inchikey] = [frag_E,frag_G]
         else:
             mols[inchikey].append([frag_E,frag_G])
 

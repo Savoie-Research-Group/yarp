@@ -142,6 +142,35 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     if hash_filter:
                                         hashes.add(product.hash)
 
+def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True, def_only=False, hash_filter=True):
+    
+    yarpecules = prepare_list(yarpecules) 
+
+    # Prepare react list if it isn't the same length as the number of yarpecules
+    if len(react) != len(yarpecules):
+        react = [ set(range(len(y))) for y in yarpecules ]
+
+    if hashes is None:
+        hashes = set([ _.hash for _ in yarpecules])
+
+    # Loop over the originals
+    new = []
+    
+    for y in yarpecules:
+        newest = list(form_bonds(y,hashes=hashes))
+        hashes.update([ _.hash for _ in newest ])
+        new += newest
+    # Loop over the new molecules until no new structures are enumerated
+    nf=1
+    while nf<n:
+        for y in new:
+            newest = list(form_bonds(y,hashes=hashes))
+            hashes.update([ _.hash for _ in newest ])
+            new += newest
+        nf=nf+1
+    
+    return new
+
 def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_only=False,hash_filter=True):
     """
     This function yields all products that result from valid bond formations amongst the supplied yarpecules.

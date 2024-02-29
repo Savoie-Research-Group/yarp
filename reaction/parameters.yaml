@@ -1,8 +1,8 @@
 # Note that a bimolecular reaction is recommended to use .xyz or .mol file
 # Enumetation part
-input: xyz_test # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
-scratch: /scratch/negishi/hsu205/yarp_lithium # The output folder with reaction geometry for constructing reaction network.
-reaction_data: li_battery.p
+input: reaction_xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
+scratch: ./ # The output folder with reaction geometry for constructing reaction network.
+reaction_data: DA.p
 n_break: 2 # Indicate the number of breaking bonds
 form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
 lewis_criteria: 5.0 # the criteria to find the products
@@ -12,7 +12,7 @@ lot: gfn1
 crest_quick: False
 xtb: xtb
 method: rdkit
-enumeration: True # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
+enumeration: False # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
 n_conf: 5
 nconf_dft: 5
 strategy: 2

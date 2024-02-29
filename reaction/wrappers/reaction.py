@@ -13,7 +13,7 @@ from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdm
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
 from copy import deepcopy
-from xtb import *
+from wrappers.xtb import *
 sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
 from utils import *
 from conf import *
@@ -142,8 +142,8 @@ class reaction:
         # load ML model to find conformers 
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
-
         ind_list, pass_obj_values=[], []
+        print(tmp_rxn_dict)
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
             # apply xTB-restrained optimization soon!

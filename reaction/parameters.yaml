@@ -7,7 +7,6 @@ n_break: 2 # Indicate the number of breaking bonds
 form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
 lewis_criteria: 5.0 # the criteria to find the products
 ff:            uff        # force field for driving the reaction coordinate           
-on_pc: True
 crest: crest
 lot: gfn1
 crest_quick: False

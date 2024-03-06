@@ -22,46 +22,40 @@ from wrappers.pysis import PYSIS
 from wrappers.gsm import GSM
 
 # YARP methodology by Hsuan-Hao Hsu, Qiyuan Zhao, and Brett M. Savoie
-def main(args:dict):
+def initialize(args={}):
     input_path=args['input']
     scratch=args['scratch']
-    break_bond=int(args['n_break'])
-    strategy=int(args['strategy'])
-    n_conf=int(args['n_conf'])
-    nprocs   = int(args['nprocs'])
-    c_nprocs = int(args['c_nprocs'])
-    mem      = int(args['mem'])*1000 
+    on_pc=args["on_pc"]
     if args['low_solvation']: args['low_solvation_model'], args['solvent'] = args['low_solvation'].split('/')
     else: args['low_solvation_model'], args['solvent'] = 'alpb', False
-    method=args['method']
-    form_all=int(args["form_all"])
-    lewis_criteria=float(args["lewis_criteria"])
-    crest=args['crest']
-    xtb=args['xtb']
-    charge=args['charge']
-    multiplicity=args['multiplicity']
     scratch_xtb    = f'{scratch}/xtb_run'
     scratch_crest  = f'{scratch}/conformer'
     conf_output    = f'{scratch}/rxn_conf'
     args['scratch_xtb']  = scratch_xtb
     args['scratch_crest']= scratch_crest
     args['conf_output']  = conf_output
-    enumeration=args["enumeration"]
     if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
     if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
     if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
     if os.path.isdir(conf_output) is False: os.mkdir(conf_output)
 
     logging_path = os.path.join(scratch, "YARPrun.log")
-    logging_queue = mp.Manager().Queue(999)                                                                                                    
-    logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
-    logger_p.start()
-    start = time.time()
-    Tstart= time.time()
-    logger = logging.getLogger("main")
-    logger.addHandler(QueueHandler(logging_queue))
-    logger.setLevel(logging.INFO)
+    if on_pc is True:
+        logging_queue = mp.Manager().Queue(999)                                                                                                    
+        logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
+        logger_p.start()
+        start = time.time()
+        Tstart= time.time()
+        logger = logging.getLogger("main")
+        logger.addHandler(QueueHandler(logging_queue))
+        logger.setLevel(logging.INFO)
+    else:
+        logger=""
+        logging_queue=""
+    return args, logger, logging_queue
 
+def main(args:dict):
+    args, logger, logging_queue=initialize(args)
     print(f"""Welcome to
                 __   __ _    ____  ____  
                 \ \ / // \  |  _ \|  _ \ 
@@ -70,10 +64,10 @@ def main(args:dict):
                   |_/_/   \_\_| \_\_|
                           // Yet Another Reaction Program
         """)
-    if os.path.isfile(input_path): # Read smiles in
-        mol=[i.split('\n')[0] for i in open(input_path, 'r+').readlines()]
+    if os.path.isfile(args["input"]): # Read smiles in
+        mol=[i.split('\n')[0] for i in open(args["input"], 'r+').readlines()]
     else:
-        mol=[input_path+"/"+i for i in os.listdir(input_path) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
+        mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
     
@@ -82,7 +76,7 @@ def main(args:dict):
     print("------Enumeration------")
     print("-----------------------")
     
-    if enumeration: 
+    if args["enumeration"]: 
         for i in mol: rxns=run_enumeration(i, args=args)
     else:
         rxns=[]
@@ -105,17 +99,16 @@ def main(args:dict):
     print("------Second Step------")
     print("Conformational Sampling")
     print("-----------------------")
-    if method=='rdkit':
+    if args["method"]=='rdkit':
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
-    elif method=='crest':
+    elif args["method"]=='crest':
         rxns=conf_by_crest(rxns, logging_queue, logger)
-    
     print("-----------------------")
     print("-------Third Step------")
     print("Conformation Generation")
     print("-----------------------")
     rxns=select_rxn_conf(rxns, logging_queue)
-    # exit()
+    exit()
     print("-----------------------")
     print("-------Forth Step------")
     print("-Growing String Method-")
@@ -172,7 +165,6 @@ def run_irc_by_xtb(rxns, logging_queue):
     irc_thread=min(nprocs, len(irc_job_list))
     input_job_list=[(irc_job, logging_queue, args["pysis_wt"]) for irc_job in irc_job_list]
     Parallel(n_jobs=irc_thread)(delayed(run_pysis)(*task) for task in input_job_list)
-    
     # Read result into reaction class
     for irc_job in irc_job_list:
         if irc_job.calculation_terminated_normally() is False:
@@ -299,7 +291,6 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
 
     input_job_list=[(opt_job, logging_queue, args["pysis_wt"]) for opt_job in opt_job_list]
     Parallel(n_jobs=opt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
-    
     # Read in optimized geometry
     for opt_job in opt_job_list:
         E, G = opt_job.get_opt_geo()
@@ -386,7 +377,6 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     # Run the tasks in parallel
     input_job_list = [(tsopt_job, logging_queue, args['pysis_wt']) for tsopt_job in tsopt_job_list]
     Parallel(n_jobs=tsopt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
-
     # check tsopt jobs
     tsopt_job_list = check_dup_ts_pysis(tsopt_job_list, logger)
     for tsopt_job in tsopt_job_list:
@@ -487,7 +477,6 @@ def run_gsm_by_pysis(rxns, logging_queue):
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
     Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
     tsopt_jobs={}
-    exit()
     for count, gsm_job in enumerate(gsm_job_list):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
@@ -508,8 +497,8 @@ def select_rxn_conf(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["nprocs"]
-    if 0:
-    #if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
+    # if 0:
+    if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
     else:
         thread=min(nprocs, len(rxns))

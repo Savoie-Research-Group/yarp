@@ -143,7 +143,6 @@ class reaction:
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
         ind_list, pass_obj_values=[], []
-        print(tmp_rxn_dict)
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
             # apply xTB-restrained optimization soon!

@@ -25,7 +25,6 @@ from wrappers.gsm import GSM
 def initialize(args={}):
     input_path=args['input']
     scratch=args['scratch']
-    on_pc=args["on_pc"]
     if args['low_solvation']: args['low_solvation_model'], args['solvent'] = args['low_solvation'].split('/')
     else: args['low_solvation_model'], args['solvent'] = 'alpb', False
     scratch_xtb    = f'{scratch}/xtb_run'
@@ -40,7 +39,7 @@ def initialize(args={}):
     if os.path.isdir(conf_output) is False: os.mkdir(conf_output)
 
     logging_path = os.path.join(scratch, "YARPrun.log")
-    if on_pc is True:
+    if args["nprocs"] > 1:
         logging_queue = mp.Manager().Queue(999)                                                                                                    
         logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
         logger_p.start()
@@ -395,11 +394,6 @@ def run_gsm_by_xtb(rxns, logging_queue):
     nprocs=args["nprocs"]
     scratch=args["scratch"]
     # write the reaction xyz to conf_output for follwoing GSM calculation
-    for i in rxns:
-        key=[j for j in i.rxn_conf.keys()]
-        for j in key:
-            name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
-            write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
     gsm_jobs={}
@@ -513,6 +507,11 @@ def select_rxn_conf(rxns, logging_queue):
             startidx=endidx
         modified_rxns=Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
         rxns=modified_rxns
+    for i in rxns:
+        key=[j for j in i.rxn_conf.keys()]
+        for j in key:
+            name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
+            write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
         print(f"Finish generating reaction conformations, the output conformations are stored in {conf_output}\n")
     return rxns
 

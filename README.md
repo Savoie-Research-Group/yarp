@@ -66,3 +66,7 @@ Finally, save and quit this file.
     gsm_inp: [your yarp path/reaction/bin/inpfileq] # growing string method bin file.
 
 More details could be found in parameters.yaml.
+
+As the parameter file is created, you can run yarp by:
+
+   python main_xtb.py [your parameter yaml file]

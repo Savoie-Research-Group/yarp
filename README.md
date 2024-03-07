@@ -69,4 +69,4 @@ More details could be found in parameters.yaml.
 
 As the parameter file is created, you can run yarp by:
 
-   python main_xtb.py [your parameter yaml file]
+      python main_xtb.py [your parameter yaml file]

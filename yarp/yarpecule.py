@@ -15,6 +15,7 @@ from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n
 from yarp.hashes import atom_hash,yarpecule_hash
 from yarp.input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles,mol_parse
 from yarp.misc import merge_arrays, prepare_list
+from yarp.smiles import smiles2adjmat
 
 def main(argv):
 
@@ -97,6 +98,11 @@ class yarpecule:
     canon : bool, default=True
             Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
 
+    mode : str, default=rdkit
+            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default rdkit is used
+            but setting this to 'yarp' will use the in house parser. This variable is unused if the molecular info
+            is passed through another method besides SMILES. 
+
     Notes
     -----
     Constructor for the `yarpecule` class. The constructor requires the molecular graph information to calculate the
@@ -109,7 +115,7 @@ class yarpecule:
     """        
 
     # Constructor
-    def __init__(self,mol,canon=True):
+    def __init__(self,mol,canon=True,mode="rdkit"):
 
         # direct branch: user passes core attributes directly
         if isinstance(mol,(tuple,list)) and len(mol) == 4:
@@ -140,14 +146,14 @@ class yarpecule:
         # SMILES branch
         else:
             try:
-                self.elements, self.geo, self.adj_mat, self.q = xyz_from_smiles(mol)
+                self.elements, self.geo, self.adj_mat, self.q = xyz_from_smiles(mol,mode=mode)
             except:
                 raise TypeError("The yarpecule constructor expects either an xyz file, mol file, or a smiles string.")
 
         # Calculate elementary attributes
         self.elements = [ _.lower() for _ in self.elements ] # eventually all functions will expect lowercase element labels
         self.masses = np.array([ el_mass[_] for _ in self.elements ]) # User can update via mass update function.
-
+        
         # Canonicalize the atom indexing, or directly calculate atom hashes if not
         if canon:
             self.elements, self.adj_mat, self.atom_hashes,self.mapping, self.geo, self.masses = canon_order(self.elements,self.adj_mat,masses=self.masses,things_to_order=[self.geo,self.masses]) # standardizes the atom indexing

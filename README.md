@@ -30,7 +30,7 @@ and in .pysisyphusrc file add:
     
     [xtb]
     cmd=xtb
-    Finally, save and quit this file.
+Finally, save and quit this file.
 
 2. How to run yarp:
 

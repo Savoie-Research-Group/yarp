@@ -9,30 +9,38 @@ Documentation:
 
 1. Installation:
 1.1 Anaconda is recommended and you can get YARP repository by:
-    git clone https://github.com/Savoie-Research-Group/yarp.git
+
+   git clone https://github.com/Savoie-Research-Group/yarp.git
 
 1.2 Build the YARP environment and install required packages by:
+    
     cd yarp
     conda env create -f env.yaml
 
 1.3 Install yarp package by:
+    
     conda activate yarp
     pip install .
 
 1.4 Create pysis cmd by:
+    
     vi ~/.pysisyphusrc
-    and in .pysisyphusrc file add:
+    
+and in .pysisyphusrc file add:
+    
     [xtb]
     cmd=xtb
     Finally, save and quit this file.
 
 2. How to run yarp:
+
 2.1 YARP class:
     In yarp/yarp folder, several functions are shown, the bond-electron matrix and reaction enumeration are generated via these functions. More details are shown in yarp/examples/reaction.py 
 
 2.2 reaction class:
     All calculations, including conformational sampling, GSM, and TS characterization, are In yarp/reaction folder. In yarp/reaction/main_xtb.py, the workflow are shown. To run main_xtb.py we need a parameters.yaml file. To build a parameters.yaml file, we will need:
-	input: [reaction folder or reaction file] # it could be a folder (store several xyz, mol, or smiles files) or a xyz, mol, or smiles file.
+    
+    input: [reaction folder or reaction file] # it could be a folder (store several xyz, mol, or smiles files) or a xyz, mol, or smiles file.
     scratch: [a path you want to store result]
     reaction_data: [a pickle file] # a pickle to store and load the result
     n_break: [an integer, n] # define a break-n-bonds-form-n-bonds reaction

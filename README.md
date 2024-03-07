@@ -33,6 +33,7 @@ and in .pysisyphusrc file add:
     Finally, save and quit this file.
 
 2. How to run yarp:
+
 2.1 YARP class:
     In yarp/yarp folder, several functions are shown, the bond-electron matrix and reaction enumeration are generated via these functions. More details are shown in yarp/examples/reaction.py 
 

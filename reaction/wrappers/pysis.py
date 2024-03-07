@@ -12,7 +12,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class PYSIS:
-    def __init__(self, input_geo, work_folder=os.getcwd(), jobname='pysis', jobtype='tsopt', coord_type='redund', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
+    def __init__(self, input_geo, work_folder=os.getcwd(), jobname='pysis', jobtype='tsopt', coord_type='cart', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
         """
         Initialize a pysis job class
         input_geo: a xyz file containing the input geometry. Full path recommended
@@ -67,19 +67,31 @@ class PYSIS:
             IRC: euler, eulerpc (default), dampedvelocityverlet, gonzalezschlegel, lqa, imk, rk4
         Thresh: Convergence threshold, select from gau_loose, gau, gau_tight, gau_vtight
         """
-        
+        # For TS-opt
         if self.jobtype.lower() == 'tsopt':
             if method is None: method = 'rsprfo'
             with open(f'{self.pysis_input}','a') as f:
                 if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 50\n')
-                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 50\n')
-
+                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 300\n')
+        # For IRC calculation
         elif self.jobtype.lower()== 'irc':
             if method is None: method = 'eulerpc'
             with open(f'{self.pysis_input}','a') as f:
                 f.write(f'irc:\n type: {method}\n forward: True\n backward: True\n downhill: False\n')
                 if hess_init: f.write(f' hessian_init: {hess_init}\n')
-                f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {thresh}\n max_cycles: 50')
+                f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {thresh}\n max_cycles: 300\n')
+        # For geometry optimization
+        elif self.jobtype.lower() == 'opt':
+            if method is None: method='rfo'
+            with open(f'{self.pysis_input}', 'a') as f:
+                if hess: f.write(f'opt:\n type: {method}\n max_cycles: 50\n overachieve_factor: 3\n hessian_recalc: {hess_step}\n do_hess: True\n')
+                else: f.write(f'opt:\n type: {method}\n max_cycles: 300\n overachieve_factor: 3\n')
+        # For string methods
+        elif self.jobtype.lower()=="string":
+            if method is None: method='gs'
+            with open(f'{self.pysis_input}', 'a') as f:
+                f.write(f'cos:\n type: {method}\n max_nodes: 9\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n prep_thresh: 0.05\n reparam_every: 1\n reparam_every_full: 1\n')
+                f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
         else:
             print("Supports for other job types are underway")
@@ -216,6 +228,18 @@ class PYSIS:
             else:
                 print("No final TS xyz file has been found!")
                 return False
+    
+    def get_opt_geo(self):
+        """
+        Get the optimized geometry and elements from pysis
+        """
+        xyz_file_name=f"{self.work_folder}/final_geometry.xyz"
+        if os.path.exists(xyz_file_name):
+            E, G=xyz_parse(xyz_file_name)
+            return E, G
+        else:
+            print(f"{xyz_file_name} is failed to read.")
+            return False
 
     def is_true_ts(self):
         """

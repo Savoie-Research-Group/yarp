@@ -1,0 +1,20 @@
+geom:
+ type: redund
+ fn: /scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1-TS.xyz
+calc:
+ type: xtb
+ pal: 1
+ mem: 4000
+ charge: -1
+ mult: 1
+irc:
+ type: eulerpc
+ forward: True
+ backward: True
+ downhill: False
+ hessian_init: /scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/ts_final_hessian.h5
+endopt:
+ fragments: False
+ do_hess: False
+ thresh: gau
+ max_cycles: 400

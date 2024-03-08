@@ -1,0 +1,116 @@
+                           d8b                            888
+                           Y8P                            888
+                                                          888
+88888b.  888  888 .d8888b  888 .d8888b  888  888 88888b.  88888b.  888  888 .d8888b
+888 "88b 888  888 88K      888 88K      888  888 888 "88b 888 "88b 888  888 88K
+888  888 888  888 "Y8888b. 888 "Y8888b. 888  888 888  888 888  888 888  888 "Y8888b.
+888 d88P Y88b 888      X88 888      X88 Y88b 888 888 d88P 888  888 Y88b 888      X88
+88888P"   "Y88888  88888P' 888  88888P'  "Y88888 88888P"  888  888  "Y88888  88888P'
+888           888                            888 888
+888      Y8b d88P                       Y8b d88P 888
+888       "Y88P"                         "Y88P"  888                            
+
+Version 0.7.6.post2 (Python 3.9.17, NumPy 1.24.4, SciPy 1.11.1)
+Executed at Mon Feb 12 22:48:53 2024 on 'a171.negishi.rcac.purdue.edu'
+Platform: Linux-4.18.0-477.10.1.el8_8.x86_64-x86_64-with-glibc2.28
+Interpreter: /home/li1724/.conda/envs/2022.10-py39/Clone_Depot_YARP/bin/python
+Current working directory: /scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1
+
+If pysisyphus benefitted your research please cite:
+
+	https://doi.org/10.1002/qua.26390
+
+Good luck!
+
+{'calc': {'charge': -1, 'mem': 4000, 'mult': 1, 'pal': 1, 'type': 'xtb'},
+ 'geom': {'coord_kwargs': {},
+          'fn': '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1-TSguess.xyz',
+          'type': 'redund'},
+ 'tsopt': {'T': 298.15,
+           'do_hess': True,
+           'dump': True,
+           'h5_group_name': 'tsopt',
+           'hessian_recalc': 1,
+           'max_cycles': 400,
+           'overachieve_factor': 5,
+           'p': 101325,
+           'prefix': 'ts',
+           'thresh': 'gau',
+           'type': 'rsprfo'}}
+
+Read 1 geometry.
+                          ###########################
+                          # RUNNING TS-OPTIMIZATION #
+                          ###########################
+
+     Input geometry: Geometry(Br1_C41_Cu1_H31_N2_O1, 77 atoms)
+  Coordinate system: redund
+         Calculator: XTB calculator
+             Charge: -1
+       Multiplicity: 1
+          Optimizer: rsprfo
+
+
+If not specified otherwise, all quantities are given in au.
+
+Convergence thresholds, (overachieved when):
+	max(|force|) <= 0.000450, (0.000090) E_h a_0⁻¹ (rad⁻¹)
+	  rms(force) <= 0.000300, (0.000060) E_h a_0⁻¹ (rad⁻¹)
+	 max(|step|) <= 0.001800 a_0 (rad)
+	   rms(step) <= 0.001200 a_0 (rad)
+
+Spent 71.7 s preparing the first cycle.
+       cycle    Δ(energy) max(|force|)   rms(force)  max(|step|)    rms(step)      s/cycle
+           0          nan     0.005347     0.000625     0.076295     0.012677         0.82
+           1    -0.001335     0.001014     0.000169     0.174803     0.021129        72.91
+           2    -0.001333     0.000756     0.000118     0.183045     0.021129        72.87
+           3    -0.001241     0.001073     0.000164     0.197264     0.021129        72.71
+           4    -0.001733     0.001698     0.000206     0.193885     0.021129        72.82
+           5    -0.002216     0.002635     0.000254     0.180222     0.021129        72.66
+           6    -0.002388     0.003169     0.000301     0.216124     0.021129        72.74
+           7    -0.001399     0.003014     0.000287     0.199613     0.021129        72.88
+           8    -0.002730     0.003807     0.000395     0.149579     0.021129        72.61
+           9    -0.001337     0.001369     0.000164     0.149193     0.021129        72.72
+       -----------------------------------------------------------------------------------
+          10    -0.000692     0.000433     0.000068     0.147609     0.021129        72.74
+          11    -0.000464     0.000403     0.000050     0.155924     0.021129        72.65
+          12    -0.000355     0.000328     0.000037     0.151210     0.021129        72.85
+          13    -0.000330     0.000248     0.000042     0.138756     0.021129        72.81
+          14    -0.000337     0.000373     0.000055     0.131153     0.021129        72.66
+          15    -0.000346     0.000473     0.000067     0.130767     0.021129        72.73
+          16    -0.000345     0.000623     0.000078     0.124814     0.021129        72.55
+          17    -0.000325     0.000817     0.000087     0.108212     0.021129        72.54
+          18    -0.000273     0.000950     0.000083     0.128405     0.021129        72.67
+          19    -0.000199     0.000867     0.000067     0.152157     0.021129        72.82
+       -----------------------------------------------------------------------------------
+          20    -0.000124     0.000654     0.000050     0.155158     0.020475        72.01
+          21    -0.000053     0.000477     0.000038     0.045893     0.005969        71.97
+          22    -0.000005     0.000035     0.000004     0.001365     0.000231        71.97
+       Converged!
+
+Final summary:
+            	max(forces, internal): 0.000035 hartree/(bohr,rad)
+            	rms(forces, internal): 0.000004 hartree/(bohr,rad)
+        	max(forces,cartesian): 0.000046 hartree/bohr
+        	rms(forces,cartesian): 0.000009 hartree/bohr
+        	energy: -121.76848822 hartree
+       Wrote final, hopefully optimized, geometry to 'ts_final_geometry.xyz'
+Copied '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/ts_final_geometry.xyz' to 'ts_opt.xyz'.
+
+                         +---------------------------+
+                         | HESSIAN AT FINAL GEOMETRY |
+                         +---------------------------+
+
+... started Hessian calculation
+... calculation took 0.00 min
+... mass-weighing cartesian hessian
+... doing Eckart-projection
+
+First 10 eigenvalues [-5.9279e-05  9.7355e-06  1.3045e-05  3.0973e-05  3.3402e-05  6.4333e-05
+  8.3194e-05  8.8676e-05  1.0116e-04  1.3256e-04]
+Imaginary frequencies: [-39.58] cm⁻¹
+Wrote Hessian data HD5 file 'ts_final_hessian.h5'.
+Wrote imaginary mode with ṽ=    -39.58 cm⁻¹ to 'ts_imaginary_mode_000.trj'
+
+
+pysisyphus run took 0:27:55 h.

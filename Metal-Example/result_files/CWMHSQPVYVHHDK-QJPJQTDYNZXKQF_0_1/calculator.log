@@ -1,0 +1,708 @@
+24-02-12 23:16:50 - 205604.13 MB memory available, 4000.00 MB requested.
+24-02-12 23:16:50 - irc_000, cycle 000: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:50 - irc_000, cycle 000: Running in /tmp/irc_000_000_ovyujo19 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:50 - irc_000, cycle 000: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:51 - irc_000, cycle 000: Skip setting of 'json' file.
+24-02-12 23:16:51 - irc_000, cycle 000: Cleaned /tmp/irc_000_000_ovyujo19
+24-02-12 23:16:51 - irc_000, cycle 001: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:51 - irc_000, cycle 001: Running in /tmp/irc_000_001_ymstqixj on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:51 - irc_000, cycle 001: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:51 - irc_000, cycle 001: Skip setting of 'json' file.
+24-02-12 23:16:51 - irc_000, cycle 001: Cleaned /tmp/irc_000_001_ymstqixj
+24-02-12 23:16:51 - irc_000, cycle 002: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:51 - irc_000, cycle 002: Running in /tmp/irc_000_002_otn2vkh1 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:51 - irc_000, cycle 002: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:51 - irc_000, cycle 002: Skip setting of 'json' file.
+24-02-12 23:16:51 - irc_000, cycle 002: Cleaned /tmp/irc_000_002_otn2vkh1
+24-02-12 23:16:51 - irc_000, cycle 003: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:51 - irc_000, cycle 003: Running in /tmp/irc_000_003_xudq94na on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:51 - irc_000, cycle 003: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:52 - irc_000, cycle 003: Skip setting of 'json' file.
+24-02-12 23:16:52 - irc_000, cycle 003: Cleaned /tmp/irc_000_003_xudq94na
+24-02-12 23:16:52 - irc_000, cycle 004: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:52 - irc_000, cycle 004: Running in /tmp/irc_000_004_szvthinu on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:52 - irc_000, cycle 004: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:52 - irc_000, cycle 004: Skip setting of 'json' file.
+24-02-12 23:16:52 - irc_000, cycle 004: Cleaned /tmp/irc_000_004_szvthinu
+24-02-12 23:16:52 - irc_000, cycle 005: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:52 - irc_000, cycle 005: Running in /tmp/irc_000_005_v9_a0s01 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:52 - irc_000, cycle 005: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:53 - irc_000, cycle 005: Skip setting of 'json' file.
+24-02-12 23:16:53 - irc_000, cycle 005: Cleaned /tmp/irc_000_005_v9_a0s01
+24-02-12 23:16:53 - irc_000, cycle 006: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:53 - irc_000, cycle 006: Running in /tmp/irc_000_006_dmua4gq9 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:53 - irc_000, cycle 006: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:53 - irc_000, cycle 006: Skip setting of 'json' file.
+24-02-12 23:16:53 - irc_000, cycle 006: Cleaned /tmp/irc_000_006_dmua4gq9
+24-02-12 23:16:53 - irc_000, cycle 007: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:53 - irc_000, cycle 007: Running in /tmp/irc_000_007_nzcfcjm6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:53 - irc_000, cycle 007: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:53 - irc_000, cycle 007: Skip setting of 'json' file.
+24-02-12 23:16:53 - irc_000, cycle 007: Cleaned /tmp/irc_000_007_nzcfcjm6
+24-02-12 23:16:53 - irc_000, cycle 008: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:53 - irc_000, cycle 008: Running in /tmp/irc_000_008__t_5k_7u on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:53 - irc_000, cycle 008: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:54 - irc_000, cycle 008: Skip setting of 'json' file.
+24-02-12 23:16:54 - irc_000, cycle 008: Cleaned /tmp/irc_000_008__t_5k_7u
+24-02-12 23:16:54 - irc_000, cycle 009: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:54 - irc_000, cycle 009: Running in /tmp/irc_000_009_ksanrf0z on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:54 - irc_000, cycle 009: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:54 - irc_000, cycle 009: Skip setting of 'json' file.
+24-02-12 23:16:54 - irc_000, cycle 009: Cleaned /tmp/irc_000_009_ksanrf0z
+24-02-12 23:16:54 - irc_000, cycle 010: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:54 - irc_000, cycle 010: Running in /tmp/irc_000_010_y2e1qlwo on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:54 - irc_000, cycle 010: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:55 - irc_000, cycle 010: Skip setting of 'json' file.
+24-02-12 23:16:55 - irc_000, cycle 010: Cleaned /tmp/irc_000_010_y2e1qlwo
+24-02-12 23:16:55 - irc_000, cycle 011: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:55 - irc_000, cycle 011: Running in /tmp/irc_000_011_umnf5yww on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:55 - irc_000, cycle 011: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:55 - irc_000, cycle 011: Skip setting of 'json' file.
+24-02-12 23:16:55 - irc_000, cycle 011: Cleaned /tmp/irc_000_011_umnf5yww
+24-02-12 23:16:55 - irc_000, cycle 012: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:55 - irc_000, cycle 012: Running in /tmp/irc_000_012_oeijkbvj on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:55 - irc_000, cycle 012: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:56 - irc_000, cycle 012: Skip setting of 'json' file.
+24-02-12 23:16:56 - irc_000, cycle 012: Cleaned /tmp/irc_000_012_oeijkbvj
+24-02-12 23:16:56 - irc_000, cycle 013: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:56 - irc_000, cycle 013: Running in /tmp/irc_000_013_d_6iapm8 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:56 - irc_000, cycle 013: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:56 - irc_000, cycle 013: Skip setting of 'json' file.
+24-02-12 23:16:56 - irc_000, cycle 013: Cleaned /tmp/irc_000_013_d_6iapm8
+24-02-12 23:16:56 - irc_000, cycle 014: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:56 - irc_000, cycle 014: Running in /tmp/irc_000_014_g5kormx5 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:56 - irc_000, cycle 014: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:56 - irc_000, cycle 014: Skip setting of 'json' file.
+24-02-12 23:16:56 - irc_000, cycle 014: Cleaned /tmp/irc_000_014_g5kormx5
+24-02-12 23:16:56 - irc_000, cycle 015: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:56 - irc_000, cycle 015: Running in /tmp/irc_000_015_yf2hdg2i on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:56 - irc_000, cycle 015: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:57 - irc_000, cycle 015: Skip setting of 'json' file.
+24-02-12 23:16:57 - irc_000, cycle 015: Cleaned /tmp/irc_000_015_yf2hdg2i
+24-02-12 23:16:57 - irc_000, cycle 016: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:57 - irc_000, cycle 016: Running in /tmp/irc_000_016_zutldqc8 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:57 - irc_000, cycle 016: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:57 - irc_000, cycle 016: Skip setting of 'json' file.
+24-02-12 23:16:57 - irc_000, cycle 016: Cleaned /tmp/irc_000_016_zutldqc8
+24-02-12 23:16:57 - 205563.12 MB memory available, 4000.00 MB requested.
+24-02-12 23:16:57 - forward_end_001, cycle 000: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:57 - forward_end_001, cycle 000: Running in /tmp/forward_end_001_000_tcpdpa2k on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:57 - forward_end_001, cycle 000: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:57 - forward_end_001, cycle 000: Skip setting of 'json' file.
+24-02-12 23:16:57 - forward_end_001, cycle 000: Cleaned /tmp/forward_end_001_000_tcpdpa2k
+24-02-12 23:16:58 - forward_end_001, cycle 001: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:58 - forward_end_001, cycle 001: Running in /tmp/forward_end_001_001_umd201w5 on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:58 - forward_end_001, cycle 001: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:58 - forward_end_001, cycle 001: Skip setting of 'json' file.
+24-02-12 23:16:58 - forward_end_001, cycle 001: Cleaned /tmp/forward_end_001_001_umd201w5
+24-02-12 23:16:59 - forward_end_001, cycle 002: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:59 - forward_end_001, cycle 002: Running in /tmp/forward_end_001_002_fri3dzdd on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:59 - forward_end_001, cycle 002: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:16:59 - forward_end_001, cycle 002: Skip setting of 'json' file.
+24-02-12 23:16:59 - forward_end_001, cycle 002: Cleaned /tmp/forward_end_001_002_fri3dzdd
+24-02-12 23:16:59 - forward_end_001, cycle 003: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:16:59 - forward_end_001, cycle 003: Running in /tmp/forward_end_001_003_jajaa47l on a171.negishi.rcac.purdue.edu
+24-02-12 23:16:59 - forward_end_001, cycle 003: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:00 - forward_end_001, cycle 003: Skip setting of 'json' file.
+24-02-12 23:17:00 - forward_end_001, cycle 003: Cleaned /tmp/forward_end_001_003_jajaa47l
+24-02-12 23:17:00 - forward_end_001, cycle 004: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:00 - forward_end_001, cycle 004: Running in /tmp/forward_end_001_004_zv6qkfu4 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:00 - forward_end_001, cycle 004: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:01 - forward_end_001, cycle 004: Skip setting of 'json' file.
+24-02-12 23:17:01 - forward_end_001, cycle 004: Cleaned /tmp/forward_end_001_004_zv6qkfu4
+24-02-12 23:17:01 - forward_end_001, cycle 005: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:01 - forward_end_001, cycle 005: Running in /tmp/forward_end_001_005_ow2ur6ik on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:01 - forward_end_001, cycle 005: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:01 - forward_end_001, cycle 005: Skip setting of 'json' file.
+24-02-12 23:17:01 - forward_end_001, cycle 005: Cleaned /tmp/forward_end_001_005_ow2ur6ik
+24-02-12 23:17:02 - forward_end_001, cycle 006: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:02 - forward_end_001, cycle 006: Running in /tmp/forward_end_001_006_esz04631 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:02 - forward_end_001, cycle 006: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:02 - forward_end_001, cycle 006: Skip setting of 'json' file.
+24-02-12 23:17:02 - forward_end_001, cycle 006: Cleaned /tmp/forward_end_001_006_esz04631
+24-02-12 23:17:02 - forward_end_001, cycle 007: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:02 - forward_end_001, cycle 007: Running in /tmp/forward_end_001_007_qizecnc7 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:02 - forward_end_001, cycle 007: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:03 - forward_end_001, cycle 007: Skip setting of 'json' file.
+24-02-12 23:17:03 - forward_end_001, cycle 007: Cleaned /tmp/forward_end_001_007_qizecnc7
+24-02-12 23:17:03 - forward_end_001, cycle 008: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:03 - forward_end_001, cycle 008: Running in /tmp/forward_end_001_008_emss5tc_ on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:03 - forward_end_001, cycle 008: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:04 - forward_end_001, cycle 008: Skip setting of 'json' file.
+24-02-12 23:17:04 - forward_end_001, cycle 008: Cleaned /tmp/forward_end_001_008_emss5tc_
+24-02-12 23:17:04 - forward_end_001, cycle 009: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:04 - forward_end_001, cycle 009: Running in /tmp/forward_end_001_009_8c0go903 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:04 - forward_end_001, cycle 009: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:04 - forward_end_001, cycle 009: Skip setting of 'json' file.
+24-02-12 23:17:04 - forward_end_001, cycle 009: Cleaned /tmp/forward_end_001_009_8c0go903
+24-02-12 23:17:05 - forward_end_001, cycle 010: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:05 - forward_end_001, cycle 010: Running in /tmp/forward_end_001_010_yzkiabh9 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:05 - forward_end_001, cycle 010: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:05 - forward_end_001, cycle 010: Skip setting of 'json' file.
+24-02-12 23:17:05 - forward_end_001, cycle 010: Cleaned /tmp/forward_end_001_010_yzkiabh9
+24-02-12 23:17:05 - forward_end_001, cycle 011: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:05 - forward_end_001, cycle 011: Running in /tmp/forward_end_001_011_v547rep6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:05 - forward_end_001, cycle 011: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:06 - forward_end_001, cycle 011: Skip setting of 'json' file.
+24-02-12 23:17:06 - forward_end_001, cycle 011: Cleaned /tmp/forward_end_001_011_v547rep6
+24-02-12 23:17:06 - forward_end_001, cycle 012: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:06 - forward_end_001, cycle 012: Running in /tmp/forward_end_001_012_p_v9_cba on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:06 - forward_end_001, cycle 012: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:06 - forward_end_001, cycle 012: Skip setting of 'json' file.
+24-02-12 23:17:06 - forward_end_001, cycle 012: Cleaned /tmp/forward_end_001_012_p_v9_cba
+24-02-12 23:17:07 - forward_end_001, cycle 013: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:07 - forward_end_001, cycle 013: Running in /tmp/forward_end_001_013_zwy6mxc6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:07 - forward_end_001, cycle 013: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:07 - forward_end_001, cycle 013: Skip setting of 'json' file.
+24-02-12 23:17:07 - forward_end_001, cycle 013: Cleaned /tmp/forward_end_001_013_zwy6mxc6
+24-02-12 23:17:08 - forward_end_001, cycle 014: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:08 - forward_end_001, cycle 014: Running in /tmp/forward_end_001_014_5r06uepn on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:08 - forward_end_001, cycle 014: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:08 - forward_end_001, cycle 014: Skip setting of 'json' file.
+24-02-12 23:17:08 - forward_end_001, cycle 014: Cleaned /tmp/forward_end_001_014_5r06uepn
+24-02-12 23:17:08 - forward_end_001, cycle 015: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:08 - forward_end_001, cycle 015: Running in /tmp/forward_end_001_015_3w_n_83f on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:08 - forward_end_001, cycle 015: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:09 - forward_end_001, cycle 015: Skip setting of 'json' file.
+24-02-12 23:17:09 - forward_end_001, cycle 015: Cleaned /tmp/forward_end_001_015_3w_n_83f
+24-02-12 23:17:09 - forward_end_001, cycle 016: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:09 - forward_end_001, cycle 016: Running in /tmp/forward_end_001_016_5bn0335c on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:09 - forward_end_001, cycle 016: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:09 - forward_end_001, cycle 016: Skip setting of 'json' file.
+24-02-12 23:17:09 - forward_end_001, cycle 016: Cleaned /tmp/forward_end_001_016_5bn0335c
+24-02-12 23:17:10 - forward_end_001, cycle 017: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:10 - forward_end_001, cycle 017: Running in /tmp/forward_end_001_017_n_oapath on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:10 - forward_end_001, cycle 017: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:10 - forward_end_001, cycle 017: Skip setting of 'json' file.
+24-02-12 23:17:10 - forward_end_001, cycle 017: Cleaned /tmp/forward_end_001_017_n_oapath
+24-02-12 23:17:10 - forward_end_001, cycle 018: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:10 - forward_end_001, cycle 018: Running in /tmp/forward_end_001_018_d8gt42p4 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:10 - forward_end_001, cycle 018: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:11 - forward_end_001, cycle 018: Skip setting of 'json' file.
+24-02-12 23:17:11 - forward_end_001, cycle 018: Cleaned /tmp/forward_end_001_018_d8gt42p4
+24-02-12 23:17:11 - forward_end_001, cycle 019: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:11 - forward_end_001, cycle 019: Running in /tmp/forward_end_001_019_z6tqbp9j on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:11 - forward_end_001, cycle 019: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:11 - forward_end_001, cycle 019: Skip setting of 'json' file.
+24-02-12 23:17:11 - forward_end_001, cycle 019: Cleaned /tmp/forward_end_001_019_z6tqbp9j
+24-02-12 23:17:12 - forward_end_001, cycle 020: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:12 - forward_end_001, cycle 020: Running in /tmp/forward_end_001_020_nr2h3wx6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:12 - forward_end_001, cycle 020: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:12 - forward_end_001, cycle 020: Skip setting of 'json' file.
+24-02-12 23:17:12 - forward_end_001, cycle 020: Cleaned /tmp/forward_end_001_020_nr2h3wx6
+24-02-12 23:17:12 - forward_end_001, cycle 021: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:12 - forward_end_001, cycle 021: Running in /tmp/forward_end_001_021_o74bbram on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:12 - forward_end_001, cycle 021: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:13 - forward_end_001, cycle 021: Skip setting of 'json' file.
+24-02-12 23:17:13 - forward_end_001, cycle 021: Cleaned /tmp/forward_end_001_021_o74bbram
+24-02-12 23:17:13 - forward_end_001, cycle 022: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:13 - forward_end_001, cycle 022: Running in /tmp/forward_end_001_022_e62hbw12 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:13 - forward_end_001, cycle 022: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:14 - forward_end_001, cycle 022: Skip setting of 'json' file.
+24-02-12 23:17:14 - forward_end_001, cycle 022: Cleaned /tmp/forward_end_001_022_e62hbw12
+24-02-12 23:17:14 - forward_end_001, cycle 023: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:14 - forward_end_001, cycle 023: Running in /tmp/forward_end_001_023_2hox_b17 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:14 - forward_end_001, cycle 023: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:14 - forward_end_001, cycle 023: Skip setting of 'json' file.
+24-02-12 23:17:14 - forward_end_001, cycle 023: Cleaned /tmp/forward_end_001_023_2hox_b17
+24-02-12 23:17:15 - forward_end_001, cycle 024: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:15 - forward_end_001, cycle 024: Running in /tmp/forward_end_001_024_60ej2xmf on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:15 - forward_end_001, cycle 024: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:15 - forward_end_001, cycle 024: Skip setting of 'json' file.
+24-02-12 23:17:15 - forward_end_001, cycle 024: Cleaned /tmp/forward_end_001_024_60ej2xmf
+24-02-12 23:17:15 - forward_end_001, cycle 025: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:15 - forward_end_001, cycle 025: Running in /tmp/forward_end_001_025_jbc4c82o on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:15 - forward_end_001, cycle 025: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:16 - forward_end_001, cycle 025: Skip setting of 'json' file.
+24-02-12 23:17:16 - forward_end_001, cycle 025: Cleaned /tmp/forward_end_001_025_jbc4c82o
+24-02-12 23:17:16 - forward_end_001, cycle 026: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:16 - forward_end_001, cycle 026: Running in /tmp/forward_end_001_026_3xrq6dhf on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:16 - forward_end_001, cycle 026: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:16 - forward_end_001, cycle 026: Skip setting of 'json' file.
+24-02-12 23:17:16 - forward_end_001, cycle 026: Cleaned /tmp/forward_end_001_026_3xrq6dhf
+24-02-12 23:17:17 - forward_end_001, cycle 027: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:17 - forward_end_001, cycle 027: Running in /tmp/forward_end_001_027_a1ffvrt6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:17 - forward_end_001, cycle 027: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:17 - forward_end_001, cycle 027: Skip setting of 'json' file.
+24-02-12 23:17:17 - forward_end_001, cycle 027: Cleaned /tmp/forward_end_001_027_a1ffvrt6
+24-02-12 23:17:17 - forward_end_001, cycle 028: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:17 - forward_end_001, cycle 028: Running in /tmp/forward_end_001_028_gwzhgej2 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:17 - forward_end_001, cycle 028: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:18 - forward_end_001, cycle 028: Skip setting of 'json' file.
+24-02-12 23:17:18 - forward_end_001, cycle 028: Cleaned /tmp/forward_end_001_028_gwzhgej2
+24-02-12 23:17:18 - 205535.43 MB memory available, 4000.00 MB requested.
+24-02-12 23:17:18 - backward_end_002, cycle 000: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:18 - backward_end_002, cycle 000: Running in /tmp/backward_end_002_000_c8i0gnmx on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:18 - backward_end_002, cycle 000: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:18 - backward_end_002, cycle 000: Skip setting of 'json' file.
+24-02-12 23:17:18 - backward_end_002, cycle 000: Cleaned /tmp/backward_end_002_000_c8i0gnmx
+24-02-12 23:17:19 - backward_end_002, cycle 001: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:19 - backward_end_002, cycle 001: Running in /tmp/backward_end_002_001_o2szzwwk on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:19 - backward_end_002, cycle 001: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:19 - backward_end_002, cycle 001: Skip setting of 'json' file.
+24-02-12 23:17:19 - backward_end_002, cycle 001: Cleaned /tmp/backward_end_002_001_o2szzwwk
+24-02-12 23:17:20 - backward_end_002, cycle 002: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:20 - backward_end_002, cycle 002: Running in /tmp/backward_end_002_002_n6gtnqxk on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:20 - backward_end_002, cycle 002: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:20 - backward_end_002, cycle 002: Skip setting of 'json' file.
+24-02-12 23:17:20 - backward_end_002, cycle 002: Cleaned /tmp/backward_end_002_002_n6gtnqxk
+24-02-12 23:17:21 - backward_end_002, cycle 003: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:21 - backward_end_002, cycle 003: Running in /tmp/backward_end_002_003_lvo7tgty on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:21 - backward_end_002, cycle 003: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:21 - backward_end_002, cycle 003: Skip setting of 'json' file.
+24-02-12 23:17:21 - backward_end_002, cycle 003: Cleaned /tmp/backward_end_002_003_lvo7tgty
+24-02-12 23:17:22 - backward_end_002, cycle 004: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:22 - backward_end_002, cycle 004: Running in /tmp/backward_end_002_004_mds4b9xy on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:22 - backward_end_002, cycle 004: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:22 - backward_end_002, cycle 004: Skip setting of 'json' file.
+24-02-12 23:17:22 - backward_end_002, cycle 004: Cleaned /tmp/backward_end_002_004_mds4b9xy
+24-02-12 23:17:22 - backward_end_002, cycle 005: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:22 - backward_end_002, cycle 005: Running in /tmp/backward_end_002_005_i6ek__58 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:22 - backward_end_002, cycle 005: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:23 - backward_end_002, cycle 005: Skip setting of 'json' file.
+24-02-12 23:17:23 - backward_end_002, cycle 005: Cleaned /tmp/backward_end_002_005_i6ek__58
+24-02-12 23:17:23 - backward_end_002, cycle 006: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:23 - backward_end_002, cycle 006: Running in /tmp/backward_end_002_006_arkxlemq on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:23 - backward_end_002, cycle 006: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:24 - backward_end_002, cycle 006: Skip setting of 'json' file.
+24-02-12 23:17:24 - backward_end_002, cycle 006: Cleaned /tmp/backward_end_002_006_arkxlemq
+24-02-12 23:17:24 - backward_end_002, cycle 007: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:24 - backward_end_002, cycle 007: Running in /tmp/backward_end_002_007_tr_t62ra on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:24 - backward_end_002, cycle 007: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:25 - backward_end_002, cycle 007: Skip setting of 'json' file.
+24-02-12 23:17:25 - backward_end_002, cycle 007: Cleaned /tmp/backward_end_002_007_tr_t62ra
+24-02-12 23:17:25 - backward_end_002, cycle 008: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:25 - backward_end_002, cycle 008: Running in /tmp/backward_end_002_008_glfmx6q4 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:25 - backward_end_002, cycle 008: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:25 - backward_end_002, cycle 008: Skip setting of 'json' file.
+24-02-12 23:17:25 - backward_end_002, cycle 008: Cleaned /tmp/backward_end_002_008_glfmx6q4
+24-02-12 23:17:26 - backward_end_002, cycle 009: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:26 - backward_end_002, cycle 009: Running in /tmp/backward_end_002_009__0fpj63h on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:26 - backward_end_002, cycle 009: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:26 - backward_end_002, cycle 009: Skip setting of 'json' file.
+24-02-12 23:17:26 - backward_end_002, cycle 009: Cleaned /tmp/backward_end_002_009__0fpj63h
+24-02-12 23:17:27 - backward_end_002, cycle 010: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:27 - backward_end_002, cycle 010: Running in /tmp/backward_end_002_010_5f0kof01 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:27 - backward_end_002, cycle 010: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:27 - backward_end_002, cycle 010: Skip setting of 'json' file.
+24-02-12 23:17:27 - backward_end_002, cycle 010: Cleaned /tmp/backward_end_002_010_5f0kof01
+24-02-12 23:17:28 - backward_end_002, cycle 011: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:28 - backward_end_002, cycle 011: Running in /tmp/backward_end_002_011_u072h3ff on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:28 - backward_end_002, cycle 011: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:28 - backward_end_002, cycle 011: Skip setting of 'json' file.
+24-02-12 23:17:28 - backward_end_002, cycle 011: Cleaned /tmp/backward_end_002_011_u072h3ff
+24-02-12 23:17:28 - backward_end_002, cycle 012: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:28 - backward_end_002, cycle 012: Running in /tmp/backward_end_002_012__lmsu2a4 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:28 - backward_end_002, cycle 012: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:29 - backward_end_002, cycle 012: Skip setting of 'json' file.
+24-02-12 23:17:29 - backward_end_002, cycle 012: Cleaned /tmp/backward_end_002_012__lmsu2a4
+24-02-12 23:17:29 - backward_end_002, cycle 013: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:29 - backward_end_002, cycle 013: Running in /tmp/backward_end_002_013__iigy9zh on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:29 - backward_end_002, cycle 013: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:30 - backward_end_002, cycle 013: Skip setting of 'json' file.
+24-02-12 23:17:30 - backward_end_002, cycle 013: Cleaned /tmp/backward_end_002_013__iigy9zh
+24-02-12 23:17:30 - backward_end_002, cycle 014: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:30 - backward_end_002, cycle 014: Running in /tmp/backward_end_002_014_3c36uofa on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:30 - backward_end_002, cycle 014: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:30 - backward_end_002, cycle 014: Skip setting of 'json' file.
+24-02-12 23:17:30 - backward_end_002, cycle 014: Cleaned /tmp/backward_end_002_014_3c36uofa
+24-02-12 23:17:31 - backward_end_002, cycle 015: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:31 - backward_end_002, cycle 015: Running in /tmp/backward_end_002_015_sogmjf_t on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:31 - backward_end_002, cycle 015: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:31 - backward_end_002, cycle 015: Skip setting of 'json' file.
+24-02-12 23:17:31 - backward_end_002, cycle 015: Cleaned /tmp/backward_end_002_015_sogmjf_t
+24-02-12 23:17:32 - backward_end_002, cycle 016: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:32 - backward_end_002, cycle 016: Running in /tmp/backward_end_002_016_ekv5a9b7 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:32 - backward_end_002, cycle 016: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:32 - backward_end_002, cycle 016: Skip setting of 'json' file.
+24-02-12 23:17:32 - backward_end_002, cycle 016: Cleaned /tmp/backward_end_002_016_ekv5a9b7
+24-02-12 23:17:33 - backward_end_002, cycle 017: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:33 - backward_end_002, cycle 017: Running in /tmp/backward_end_002_017_fd3yle9r on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:33 - backward_end_002, cycle 017: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:33 - backward_end_002, cycle 017: Skip setting of 'json' file.
+24-02-12 23:17:33 - backward_end_002, cycle 017: Cleaned /tmp/backward_end_002_017_fd3yle9r
+24-02-12 23:17:33 - backward_end_002, cycle 018: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:33 - backward_end_002, cycle 018: Running in /tmp/backward_end_002_018_2ec2s5w9 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:33 - backward_end_002, cycle 018: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:34 - backward_end_002, cycle 018: Skip setting of 'json' file.
+24-02-12 23:17:34 - backward_end_002, cycle 018: Cleaned /tmp/backward_end_002_018_2ec2s5w9
+24-02-12 23:17:34 - backward_end_002, cycle 019: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:34 - backward_end_002, cycle 019: Running in /tmp/backward_end_002_019_88wav0ju on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:34 - backward_end_002, cycle 019: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:35 - backward_end_002, cycle 019: Skip setting of 'json' file.
+24-02-12 23:17:35 - backward_end_002, cycle 019: Cleaned /tmp/backward_end_002_019_88wav0ju
+24-02-12 23:17:35 - backward_end_002, cycle 020: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:35 - backward_end_002, cycle 020: Running in /tmp/backward_end_002_020_2q6e_x2c on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:35 - backward_end_002, cycle 020: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:36 - backward_end_002, cycle 020: Skip setting of 'json' file.
+24-02-12 23:17:36 - backward_end_002, cycle 020: Cleaned /tmp/backward_end_002_020_2q6e_x2c
+24-02-12 23:17:36 - backward_end_002, cycle 021: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:36 - backward_end_002, cycle 021: Running in /tmp/backward_end_002_021_9kx25o_o on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:36 - backward_end_002, cycle 021: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:36 - backward_end_002, cycle 021: Skip setting of 'json' file.
+24-02-12 23:17:36 - backward_end_002, cycle 021: Cleaned /tmp/backward_end_002_021_9kx25o_o
+24-02-12 23:17:37 - backward_end_002, cycle 022: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:37 - backward_end_002, cycle 022: Running in /tmp/backward_end_002_022_sqc0ssui on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:37 - backward_end_002, cycle 022: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:37 - backward_end_002, cycle 022: Skip setting of 'json' file.
+24-02-12 23:17:37 - backward_end_002, cycle 022: Cleaned /tmp/backward_end_002_022_sqc0ssui
+24-02-12 23:17:38 - backward_end_002, cycle 023: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:38 - backward_end_002, cycle 023: Running in /tmp/backward_end_002_023_d3ba8lm5 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:38 - backward_end_002, cycle 023: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:38 - backward_end_002, cycle 023: Skip setting of 'json' file.
+24-02-12 23:17:38 - backward_end_002, cycle 023: Cleaned /tmp/backward_end_002_023_d3ba8lm5
+24-02-12 23:17:39 - backward_end_002, cycle 024: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:39 - backward_end_002, cycle 024: Running in /tmp/backward_end_002_024_wb6gdbzy on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:39 - backward_end_002, cycle 024: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:39 - backward_end_002, cycle 024: Skip setting of 'json' file.
+24-02-12 23:17:39 - backward_end_002, cycle 024: Cleaned /tmp/backward_end_002_024_wb6gdbzy
+24-02-12 23:17:39 - backward_end_002, cycle 025: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:39 - backward_end_002, cycle 025: Running in /tmp/backward_end_002_025_rf28rc75 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:39 - backward_end_002, cycle 025: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:40 - backward_end_002, cycle 025: Skip setting of 'json' file.
+24-02-12 23:17:40 - backward_end_002, cycle 025: Cleaned /tmp/backward_end_002_025_rf28rc75
+24-02-12 23:17:40 - backward_end_002, cycle 026: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:40 - backward_end_002, cycle 026: Running in /tmp/backward_end_002_026_o8oru7ny on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:40 - backward_end_002, cycle 026: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:41 - backward_end_002, cycle 026: Skip setting of 'json' file.
+24-02-12 23:17:41 - backward_end_002, cycle 026: Cleaned /tmp/backward_end_002_026_o8oru7ny
+24-02-12 23:17:41 - backward_end_002, cycle 027: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:41 - backward_end_002, cycle 027: Running in /tmp/backward_end_002_027_akg9833u on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:41 - backward_end_002, cycle 027: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:42 - backward_end_002, cycle 027: Skip setting of 'json' file.
+24-02-12 23:17:42 - backward_end_002, cycle 027: Cleaned /tmp/backward_end_002_027_akg9833u
+24-02-12 23:17:42 - backward_end_002, cycle 028: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:42 - backward_end_002, cycle 028: Running in /tmp/backward_end_002_028_lt8lsfl1 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:42 - backward_end_002, cycle 028: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:42 - backward_end_002, cycle 028: Skip setting of 'json' file.
+24-02-12 23:17:42 - backward_end_002, cycle 028: Cleaned /tmp/backward_end_002_028_lt8lsfl1
+24-02-12 23:17:43 - backward_end_002, cycle 029: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:43 - backward_end_002, cycle 029: Running in /tmp/backward_end_002_029_qxm7_nnb on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:43 - backward_end_002, cycle 029: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:43 - backward_end_002, cycle 029: Skip setting of 'json' file.
+24-02-12 23:17:43 - backward_end_002, cycle 029: Cleaned /tmp/backward_end_002_029_qxm7_nnb
+24-02-12 23:17:44 - backward_end_002, cycle 030: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:44 - backward_end_002, cycle 030: Running in /tmp/backward_end_002_030__zvk69vi on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:44 - backward_end_002, cycle 030: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:44 - backward_end_002, cycle 030: Skip setting of 'json' file.
+24-02-12 23:17:44 - backward_end_002, cycle 030: Cleaned /tmp/backward_end_002_030__zvk69vi
+24-02-12 23:17:45 - backward_end_002, cycle 031: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:45 - backward_end_002, cycle 031: Running in /tmp/backward_end_002_031_3o9k_o_f on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:45 - backward_end_002, cycle 031: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:45 - backward_end_002, cycle 031: Skip setting of 'json' file.
+24-02-12 23:17:45 - backward_end_002, cycle 031: Cleaned /tmp/backward_end_002_031_3o9k_o_f
+24-02-12 23:17:45 - backward_end_002, cycle 032: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:45 - backward_end_002, cycle 032: Running in /tmp/backward_end_002_032_s4y79msu on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:45 - backward_end_002, cycle 032: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:46 - backward_end_002, cycle 032: Skip setting of 'json' file.
+24-02-12 23:17:46 - backward_end_002, cycle 032: Cleaned /tmp/backward_end_002_032_s4y79msu
+24-02-12 23:17:46 - backward_end_002, cycle 033: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:46 - backward_end_002, cycle 033: Running in /tmp/backward_end_002_033_fbzhsiod on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:46 - backward_end_002, cycle 033: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:47 - backward_end_002, cycle 033: Skip setting of 'json' file.
+24-02-12 23:17:47 - backward_end_002, cycle 033: Cleaned /tmp/backward_end_002_033_fbzhsiod
+24-02-12 23:17:47 - backward_end_002, cycle 034: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:47 - backward_end_002, cycle 034: Running in /tmp/backward_end_002_034_yjs099o9 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:47 - backward_end_002, cycle 034: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:47 - backward_end_002, cycle 034: Skip setting of 'json' file.
+24-02-12 23:17:47 - backward_end_002, cycle 034: Cleaned /tmp/backward_end_002_034_yjs099o9
+24-02-12 23:17:48 - backward_end_002, cycle 035: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:48 - backward_end_002, cycle 035: Running in /tmp/backward_end_002_035_ygj__ir6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:48 - backward_end_002, cycle 035: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:49 - backward_end_002, cycle 035: Skip setting of 'json' file.
+24-02-12 23:17:49 - backward_end_002, cycle 035: Cleaned /tmp/backward_end_002_035_ygj__ir6
+24-02-12 23:17:49 - backward_end_002, cycle 036: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:49 - backward_end_002, cycle 036: Running in /tmp/backward_end_002_036_4wn12zjt on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:49 - backward_end_002, cycle 036: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:50 - backward_end_002, cycle 036: Skip setting of 'json' file.
+24-02-12 23:17:50 - backward_end_002, cycle 036: Cleaned /tmp/backward_end_002_036_4wn12zjt
+24-02-12 23:17:50 - backward_end_002, cycle 037: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:50 - backward_end_002, cycle 037: Running in /tmp/backward_end_002_037_hjyeuhrs on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:50 - backward_end_002, cycle 037: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:50 - backward_end_002, cycle 037: Skip setting of 'json' file.
+24-02-12 23:17:50 - backward_end_002, cycle 037: Cleaned /tmp/backward_end_002_037_hjyeuhrs
+24-02-12 23:17:51 - backward_end_002, cycle 038: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:51 - backward_end_002, cycle 038: Running in /tmp/backward_end_002_038_oa4bz8ux on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:51 - backward_end_002, cycle 038: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:51 - backward_end_002, cycle 038: Skip setting of 'json' file.
+24-02-12 23:17:51 - backward_end_002, cycle 038: Cleaned /tmp/backward_end_002_038_oa4bz8ux
+24-02-12 23:17:52 - backward_end_002, cycle 039: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:52 - backward_end_002, cycle 039: Running in /tmp/backward_end_002_039_g90kbw4s on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:52 - backward_end_002, cycle 039: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:52 - backward_end_002, cycle 039: Skip setting of 'json' file.
+24-02-12 23:17:52 - backward_end_002, cycle 039: Cleaned /tmp/backward_end_002_039_g90kbw4s
+24-02-12 23:17:53 - backward_end_002, cycle 040: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:53 - backward_end_002, cycle 040: Running in /tmp/backward_end_002_040_ex_91td0 on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:53 - backward_end_002, cycle 040: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:53 - backward_end_002, cycle 040: Skip setting of 'json' file.
+24-02-12 23:17:53 - backward_end_002, cycle 040: Cleaned /tmp/backward_end_002_040_ex_91td0
+24-02-12 23:17:54 - backward_end_002, cycle 041: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:54 - backward_end_002, cycle 041: Running in /tmp/backward_end_002_041_fgx7lx_e on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:54 - backward_end_002, cycle 041: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:54 - backward_end_002, cycle 041: Skip setting of 'json' file.
+24-02-12 23:17:54 - backward_end_002, cycle 041: Cleaned /tmp/backward_end_002_041_fgx7lx_e
+24-02-12 23:17:55 - backward_end_002, cycle 042: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:55 - backward_end_002, cycle 042: Running in /tmp/backward_end_002_042_5l7llo4v on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:55 - backward_end_002, cycle 042: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:55 - backward_end_002, cycle 042: Skip setting of 'json' file.
+24-02-12 23:17:55 - backward_end_002, cycle 042: Cleaned /tmp/backward_end_002_042_5l7llo4v
+24-02-12 23:17:56 - backward_end_002, cycle 043: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:56 - backward_end_002, cycle 043: Running in /tmp/backward_end_002_043_39htuibg on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:56 - backward_end_002, cycle 043: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:56 - backward_end_002, cycle 043: Skip setting of 'json' file.
+24-02-12 23:17:56 - backward_end_002, cycle 043: Cleaned /tmp/backward_end_002_043_39htuibg
+24-02-12 23:17:57 - backward_end_002, cycle 044: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:57 - backward_end_002, cycle 044: Running in /tmp/backward_end_002_044_0qk6lsah on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:57 - backward_end_002, cycle 044: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:57 - backward_end_002, cycle 044: Skip setting of 'json' file.
+24-02-12 23:17:57 - backward_end_002, cycle 044: Cleaned /tmp/backward_end_002_044_0qk6lsah
+24-02-12 23:17:58 - backward_end_002, cycle 045: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:58 - backward_end_002, cycle 045: Running in /tmp/backward_end_002_045_ed502gfz on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:58 - backward_end_002, cycle 045: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:58 - backward_end_002, cycle 045: Skip setting of 'json' file.
+24-02-12 23:17:58 - backward_end_002, cycle 045: Cleaned /tmp/backward_end_002_045_ed502gfz
+24-02-12 23:17:58 - backward_end_002, cycle 046: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:58 - backward_end_002, cycle 046: Running in /tmp/backward_end_002_046_j8y_udbf on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:58 - backward_end_002, cycle 046: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:17:59 - backward_end_002, cycle 046: Skip setting of 'json' file.
+24-02-12 23:17:59 - backward_end_002, cycle 046: Cleaned /tmp/backward_end_002_046_j8y_udbf
+24-02-12 23:17:59 - backward_end_002, cycle 047: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:17:59 - backward_end_002, cycle 047: Running in /tmp/backward_end_002_047_u1lhh56b on a171.negishi.rcac.purdue.edu
+24-02-12 23:17:59 - backward_end_002, cycle 047: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:00 - backward_end_002, cycle 047: Skip setting of 'json' file.
+24-02-12 23:18:00 - backward_end_002, cycle 047: Cleaned /tmp/backward_end_002_047_u1lhh56b
+24-02-12 23:18:00 - backward_end_002, cycle 048: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:00 - backward_end_002, cycle 048: Running in /tmp/backward_end_002_048_rz9e68y_ on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:00 - backward_end_002, cycle 048: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:01 - backward_end_002, cycle 048: Skip setting of 'json' file.
+24-02-12 23:18:01 - backward_end_002, cycle 048: Cleaned /tmp/backward_end_002_048_rz9e68y_
+24-02-12 23:18:01 - backward_end_002, cycle 049: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:01 - backward_end_002, cycle 049: Running in /tmp/backward_end_002_049_umg4i33r on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:01 - backward_end_002, cycle 049: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:02 - backward_end_002, cycle 049: Skip setting of 'json' file.
+24-02-12 23:18:02 - backward_end_002, cycle 049: Cleaned /tmp/backward_end_002_049_umg4i33r
+24-02-12 23:18:02 - backward_end_002, cycle 050: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:02 - backward_end_002, cycle 050: Running in /tmp/backward_end_002_050_vy1guq6g on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:02 - backward_end_002, cycle 050: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:02 - backward_end_002, cycle 050: Skip setting of 'json' file.
+24-02-12 23:18:02 - backward_end_002, cycle 050: Cleaned /tmp/backward_end_002_050_vy1guq6g
+24-02-12 23:18:03 - backward_end_002, cycle 051: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:03 - backward_end_002, cycle 051: Running in /tmp/backward_end_002_051_5ss2t366 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:03 - backward_end_002, cycle 051: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:03 - backward_end_002, cycle 051: Skip setting of 'json' file.
+24-02-12 23:18:03 - backward_end_002, cycle 051: Cleaned /tmp/backward_end_002_051_5ss2t366
+24-02-12 23:18:04 - backward_end_002, cycle 052: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:04 - backward_end_002, cycle 052: Running in /tmp/backward_end_002_052__0zsew1a on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:04 - backward_end_002, cycle 052: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:04 - backward_end_002, cycle 052: Skip setting of 'json' file.
+24-02-12 23:18:04 - backward_end_002, cycle 052: Cleaned /tmp/backward_end_002_052__0zsew1a
+24-02-12 23:18:05 - backward_end_002, cycle 053: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:05 - backward_end_002, cycle 053: Running in /tmp/backward_end_002_053_jkepxvk1 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:05 - backward_end_002, cycle 053: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:05 - backward_end_002, cycle 053: Skip setting of 'json' file.
+24-02-12 23:18:05 - backward_end_002, cycle 053: Cleaned /tmp/backward_end_002_053_jkepxvk1
+24-02-12 23:18:06 - backward_end_002, cycle 054: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:06 - backward_end_002, cycle 054: Running in /tmp/backward_end_002_054_naikglky on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:06 - backward_end_002, cycle 054: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:06 - backward_end_002, cycle 054: Skip setting of 'json' file.
+24-02-12 23:18:06 - backward_end_002, cycle 054: Cleaned /tmp/backward_end_002_054_naikglky
+24-02-12 23:18:07 - backward_end_002, cycle 055: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:07 - backward_end_002, cycle 055: Running in /tmp/backward_end_002_055_d02cj9ux on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:07 - backward_end_002, cycle 055: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:07 - backward_end_002, cycle 055: Skip setting of 'json' file.
+24-02-12 23:18:07 - backward_end_002, cycle 055: Cleaned /tmp/backward_end_002_055_d02cj9ux
+24-02-12 23:18:07 - backward_end_002, cycle 056: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:07 - backward_end_002, cycle 056: Running in /tmp/backward_end_002_056_1bzwyogr on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:07 - backward_end_002, cycle 056: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:08 - backward_end_002, cycle 056: Skip setting of 'json' file.
+24-02-12 23:18:08 - backward_end_002, cycle 056: Cleaned /tmp/backward_end_002_056_1bzwyogr
+24-02-12 23:18:08 - backward_end_002, cycle 057: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:08 - backward_end_002, cycle 057: Running in /tmp/backward_end_002_057_gaq0o6qz on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:08 - backward_end_002, cycle 057: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:09 - backward_end_002, cycle 057: Skip setting of 'json' file.
+24-02-12 23:18:09 - backward_end_002, cycle 057: Cleaned /tmp/backward_end_002_057_gaq0o6qz
+24-02-12 23:18:09 - backward_end_002, cycle 058: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:09 - backward_end_002, cycle 058: Running in /tmp/backward_end_002_058_knbgy6qg on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:09 - backward_end_002, cycle 058: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:10 - backward_end_002, cycle 058: Skip setting of 'json' file.
+24-02-12 23:18:10 - backward_end_002, cycle 058: Cleaned /tmp/backward_end_002_058_knbgy6qg
+24-02-12 23:18:10 - backward_end_002, cycle 059: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:10 - backward_end_002, cycle 059: Running in /tmp/backward_end_002_059_i04d1ygm on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:10 - backward_end_002, cycle 059: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:11 - backward_end_002, cycle 059: Skip setting of 'json' file.
+24-02-12 23:18:11 - backward_end_002, cycle 059: Cleaned /tmp/backward_end_002_059_i04d1ygm
+24-02-12 23:18:11 - backward_end_002, cycle 060: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:11 - backward_end_002, cycle 060: Running in /tmp/backward_end_002_060_u09efve0 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:11 - backward_end_002, cycle 060: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:11 - backward_end_002, cycle 060: Skip setting of 'json' file.
+24-02-12 23:18:11 - backward_end_002, cycle 060: Cleaned /tmp/backward_end_002_060_u09efve0
+24-02-12 23:18:12 - backward_end_002, cycle 061: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:12 - backward_end_002, cycle 061: Running in /tmp/backward_end_002_061_3hq7h6k_ on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:12 - backward_end_002, cycle 061: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:12 - backward_end_002, cycle 061: Skip setting of 'json' file.
+24-02-12 23:18:12 - backward_end_002, cycle 061: Cleaned /tmp/backward_end_002_061_3hq7h6k_
+24-02-12 23:18:13 - backward_end_002, cycle 062: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:13 - backward_end_002, cycle 062: Running in /tmp/backward_end_002_062_xrgtn_og on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:13 - backward_end_002, cycle 062: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:13 - backward_end_002, cycle 062: Skip setting of 'json' file.
+24-02-12 23:18:13 - backward_end_002, cycle 062: Cleaned /tmp/backward_end_002_062_xrgtn_og
+24-02-12 23:18:14 - backward_end_002, cycle 063: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:14 - backward_end_002, cycle 063: Running in /tmp/backward_end_002_063_gonv62gp on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:14 - backward_end_002, cycle 063: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:14 - backward_end_002, cycle 063: Skip setting of 'json' file.
+24-02-12 23:18:14 - backward_end_002, cycle 063: Cleaned /tmp/backward_end_002_063_gonv62gp
+24-02-12 23:18:15 - backward_end_002, cycle 064: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:15 - backward_end_002, cycle 064: Running in /tmp/backward_end_002_064_41aw_lef on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:15 - backward_end_002, cycle 064: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:15 - backward_end_002, cycle 064: Skip setting of 'json' file.
+24-02-12 23:18:15 - backward_end_002, cycle 064: Cleaned /tmp/backward_end_002_064_41aw_lef
+24-02-12 23:18:16 - backward_end_002, cycle 065: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:16 - backward_end_002, cycle 065: Running in /tmp/backward_end_002_065_xq01b97c on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:16 - backward_end_002, cycle 065: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:16 - backward_end_002, cycle 065: Skip setting of 'json' file.
+24-02-12 23:18:16 - backward_end_002, cycle 065: Cleaned /tmp/backward_end_002_065_xq01b97c
+24-02-12 23:18:17 - backward_end_002, cycle 066: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:17 - backward_end_002, cycle 066: Running in /tmp/backward_end_002_066_h0wtuy7w on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:17 - backward_end_002, cycle 066: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:17 - backward_end_002, cycle 066: Skip setting of 'json' file.
+24-02-12 23:18:17 - backward_end_002, cycle 066: Cleaned /tmp/backward_end_002_066_h0wtuy7w
+24-02-12 23:18:18 - backward_end_002, cycle 067: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:18 - backward_end_002, cycle 067: Running in /tmp/backward_end_002_067_6o641_d2 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:18 - backward_end_002, cycle 067: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:18 - backward_end_002, cycle 067: Skip setting of 'json' file.
+24-02-12 23:18:18 - backward_end_002, cycle 067: Cleaned /tmp/backward_end_002_067_6o641_d2
+24-02-12 23:18:19 - backward_end_002, cycle 068: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:19 - backward_end_002, cycle 068: Running in /tmp/backward_end_002_068_dm84rqoj on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:19 - backward_end_002, cycle 068: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:19 - backward_end_002, cycle 068: Skip setting of 'json' file.
+24-02-12 23:18:19 - backward_end_002, cycle 068: Cleaned /tmp/backward_end_002_068_dm84rqoj
+24-02-12 23:18:20 - backward_end_002, cycle 069: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:20 - backward_end_002, cycle 069: Running in /tmp/backward_end_002_069_f_wehixk on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:20 - backward_end_002, cycle 069: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:20 - backward_end_002, cycle 069: Skip setting of 'json' file.
+24-02-12 23:18:20 - backward_end_002, cycle 069: Cleaned /tmp/backward_end_002_069_f_wehixk
+24-02-12 23:18:21 - backward_end_002, cycle 070: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:21 - backward_end_002, cycle 070: Running in /tmp/backward_end_002_070_yjeukqp8 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:21 - backward_end_002, cycle 070: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:21 - backward_end_002, cycle 070: Skip setting of 'json' file.
+24-02-12 23:18:21 - backward_end_002, cycle 070: Cleaned /tmp/backward_end_002_070_yjeukqp8
+24-02-12 23:18:21 - backward_end_002, cycle 071: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:21 - backward_end_002, cycle 071: Running in /tmp/backward_end_002_071_k0kelyp1 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:21 - backward_end_002, cycle 071: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:22 - backward_end_002, cycle 071: Skip setting of 'json' file.
+24-02-12 23:18:22 - backward_end_002, cycle 071: Cleaned /tmp/backward_end_002_071_k0kelyp1
+24-02-12 23:18:22 - backward_end_002, cycle 072: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:22 - backward_end_002, cycle 072: Running in /tmp/backward_end_002_072_6zs98ijk on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:22 - backward_end_002, cycle 072: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:23 - backward_end_002, cycle 072: Skip setting of 'json' file.
+24-02-12 23:18:23 - backward_end_002, cycle 072: Cleaned /tmp/backward_end_002_072_6zs98ijk
+24-02-12 23:18:23 - backward_end_002, cycle 073: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:23 - backward_end_002, cycle 073: Running in /tmp/backward_end_002_073_0xqiy9p2 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:23 - backward_end_002, cycle 073: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:24 - backward_end_002, cycle 073: Skip setting of 'json' file.
+24-02-12 23:18:24 - backward_end_002, cycle 073: Cleaned /tmp/backward_end_002_073_0xqiy9p2
+24-02-12 23:18:24 - backward_end_002, cycle 074: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:24 - backward_end_002, cycle 074: Running in /tmp/backward_end_002_074_sy4nwwmy on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:24 - backward_end_002, cycle 074: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:25 - backward_end_002, cycle 074: Skip setting of 'json' file.
+24-02-12 23:18:25 - backward_end_002, cycle 074: Cleaned /tmp/backward_end_002_074_sy4nwwmy
+24-02-12 23:18:25 - backward_end_002, cycle 075: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:25 - backward_end_002, cycle 075: Running in /tmp/backward_end_002_075_moj86wqx on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:25 - backward_end_002, cycle 075: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:26 - backward_end_002, cycle 075: Skip setting of 'json' file.
+24-02-12 23:18:26 - backward_end_002, cycle 075: Cleaned /tmp/backward_end_002_075_moj86wqx
+24-02-12 23:18:26 - backward_end_002, cycle 076: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:26 - backward_end_002, cycle 076: Running in /tmp/backward_end_002_076_j36ivsdj on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:26 - backward_end_002, cycle 076: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:26 - backward_end_002, cycle 076: Skip setting of 'json' file.
+24-02-12 23:18:26 - backward_end_002, cycle 076: Cleaned /tmp/backward_end_002_076_j36ivsdj
+24-02-12 23:18:27 - backward_end_002, cycle 077: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:27 - backward_end_002, cycle 077: Running in /tmp/backward_end_002_077_cvibql6t on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:27 - backward_end_002, cycle 077: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:27 - backward_end_002, cycle 077: Skip setting of 'json' file.
+24-02-12 23:18:27 - backward_end_002, cycle 077: Cleaned /tmp/backward_end_002_077_cvibql6t
+24-02-12 23:18:28 - backward_end_002, cycle 078: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:28 - backward_end_002, cycle 078: Running in /tmp/backward_end_002_078_ddk8r8s6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:28 - backward_end_002, cycle 078: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:28 - backward_end_002, cycle 078: Skip setting of 'json' file.
+24-02-12 23:18:28 - backward_end_002, cycle 078: Cleaned /tmp/backward_end_002_078_ddk8r8s6
+24-02-12 23:18:29 - backward_end_002, cycle 079: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:29 - backward_end_002, cycle 079: Running in /tmp/backward_end_002_079_2dor36_k on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:29 - backward_end_002, cycle 079: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:29 - backward_end_002, cycle 079: Skip setting of 'json' file.
+24-02-12 23:18:29 - backward_end_002, cycle 079: Cleaned /tmp/backward_end_002_079_2dor36_k
+24-02-12 23:18:30 - backward_end_002, cycle 080: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:30 - backward_end_002, cycle 080: Running in /tmp/backward_end_002_080__mf83y1p on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:30 - backward_end_002, cycle 080: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:30 - backward_end_002, cycle 080: Skip setting of 'json' file.
+24-02-12 23:18:30 - backward_end_002, cycle 080: Cleaned /tmp/backward_end_002_080__mf83y1p
+24-02-12 23:18:31 - backward_end_002, cycle 081: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:31 - backward_end_002, cycle 081: Running in /tmp/backward_end_002_081_9r7yv1p6 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:31 - backward_end_002, cycle 081: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:31 - backward_end_002, cycle 081: Skip setting of 'json' file.
+24-02-12 23:18:31 - backward_end_002, cycle 081: Cleaned /tmp/backward_end_002_081_9r7yv1p6
+24-02-12 23:18:31 - backward_end_002, cycle 082: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:31 - backward_end_002, cycle 082: Running in /tmp/backward_end_002_082_isb1va8i on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:31 - backward_end_002, cycle 082: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:32 - backward_end_002, cycle 082: Skip setting of 'json' file.
+24-02-12 23:18:32 - backward_end_002, cycle 082: Cleaned /tmp/backward_end_002_082_isb1va8i
+24-02-12 23:18:32 - backward_end_002, cycle 083: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:32 - backward_end_002, cycle 083: Running in /tmp/backward_end_002_083_80oc3y9f on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:32 - backward_end_002, cycle 083: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:33 - backward_end_002, cycle 083: Skip setting of 'json' file.
+24-02-12 23:18:33 - backward_end_002, cycle 083: Cleaned /tmp/backward_end_002_083_80oc3y9f
+24-02-12 23:18:33 - backward_end_002, cycle 084: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:33 - backward_end_002, cycle 084: Running in /tmp/backward_end_002_084_5ipht6qi on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:33 - backward_end_002, cycle 084: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:34 - backward_end_002, cycle 084: Skip setting of 'json' file.
+24-02-12 23:18:34 - backward_end_002, cycle 084: Cleaned /tmp/backward_end_002_084_5ipht6qi
+24-02-12 23:18:34 - backward_end_002, cycle 085: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:34 - backward_end_002, cycle 085: Running in /tmp/backward_end_002_085_c5ly6xd5 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:34 - backward_end_002, cycle 085: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:35 - backward_end_002, cycle 085: Skip setting of 'json' file.
+24-02-12 23:18:35 - backward_end_002, cycle 085: Cleaned /tmp/backward_end_002_085_c5ly6xd5
+24-02-12 23:18:35 - backward_end_002, cycle 086: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:35 - backward_end_002, cycle 086: Running in /tmp/backward_end_002_086_03c__i1t on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:35 - backward_end_002, cycle 086: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:35 - backward_end_002, cycle 086: Skip setting of 'json' file.
+24-02-12 23:18:35 - backward_end_002, cycle 086: Cleaned /tmp/backward_end_002_086_03c__i1t
+24-02-12 23:18:36 - backward_end_002, cycle 087: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:36 - backward_end_002, cycle 087: Running in /tmp/backward_end_002_087_ot0isqna on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:36 - backward_end_002, cycle 087: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:36 - backward_end_002, cycle 087: Skip setting of 'json' file.
+24-02-12 23:18:36 - backward_end_002, cycle 087: Cleaned /tmp/backward_end_002_087_ot0isqna
+24-02-12 23:18:37 - backward_end_002, cycle 088: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:37 - backward_end_002, cycle 088: Running in /tmp/backward_end_002_088_p48evsqw on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:37 - backward_end_002, cycle 088: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:37 - backward_end_002, cycle 088: Skip setting of 'json' file.
+24-02-12 23:18:37 - backward_end_002, cycle 088: Cleaned /tmp/backward_end_002_088_p48evsqw
+24-02-12 23:18:38 - backward_end_002, cycle 089: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:38 - backward_end_002, cycle 089: Running in /tmp/backward_end_002_089_389etes9 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:38 - backward_end_002, cycle 089: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:38 - backward_end_002, cycle 089: Skip setting of 'json' file.
+24-02-12 23:18:38 - backward_end_002, cycle 089: Cleaned /tmp/backward_end_002_089_389etes9
+24-02-12 23:18:39 - backward_end_002, cycle 090: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:39 - backward_end_002, cycle 090: Running in /tmp/backward_end_002_090_zbgruf8a on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:39 - backward_end_002, cycle 090: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:39 - backward_end_002, cycle 090: Skip setting of 'json' file.
+24-02-12 23:18:39 - backward_end_002, cycle 090: Cleaned /tmp/backward_end_002_090_zbgruf8a
+24-02-12 23:18:40 - backward_end_002, cycle 091: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:40 - backward_end_002, cycle 091: Running in /tmp/backward_end_002_091_5yawj1t7 on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:40 - backward_end_002, cycle 091: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:40 - backward_end_002, cycle 091: Skip setting of 'json' file.
+24-02-12 23:18:40 - backward_end_002, cycle 091: Cleaned /tmp/backward_end_002_091_5yawj1t7
+24-02-12 23:18:40 - backward_end_002, cycle 092: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:40 - backward_end_002, cycle 092: Running in /tmp/backward_end_002_092_smsgy1wf on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:40 - backward_end_002, cycle 092: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:41 - backward_end_002, cycle 092: Skip setting of 'json' file.
+24-02-12 23:18:41 - backward_end_002, cycle 092: Cleaned /tmp/backward_end_002_092_smsgy1wf
+24-02-12 23:18:41 - backward_end_002, cycle 093: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:41 - backward_end_002, cycle 093: Running in /tmp/backward_end_002_093_2n3ca3ka on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:41 - backward_end_002, cycle 093: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:42 - backward_end_002, cycle 093: Skip setting of 'json' file.
+24-02-12 23:18:42 - backward_end_002, cycle 093: Cleaned /tmp/backward_end_002_093_2n3ca3ka
+24-02-12 23:18:42 - backward_end_002, cycle 094: Executing /home/li1724/.conda/envs/2022.10-py39/copy-classy-yarp/bin/xtb ['--input', 'xcontrol', '--chrg', '-1', '--uhf', '0', '--iterations', '400--acc', '1.0', '--gfn', '2', '--grad']
+24-02-12 23:18:42 - backward_end_002, cycle 094: Running in /tmp/backward_end_002_094_pena19dd on a171.negishi.rcac.purdue.edu
+24-02-12 23:18:42 - backward_end_002, cycle 094: Created symlink in '/scratch/negishi/li1724/Test-Original-4-5-ClassyYARP/CWMHSQPVYVHHDK-QJPJQTDYNZXKQF_0_1/qm_calcs/cur_out'
+24-02-12 23:18:43 - backward_end_002, cycle 094: Skip setting of 'json' file.
+24-02-12 23:18:43 - backward_end_002, cycle 094: Cleaned /tmp/backward_end_002_094_pena19dd

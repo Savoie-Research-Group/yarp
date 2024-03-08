@@ -1,0 +1,15 @@
+! B97-3c def2-mTZVP CPCM(DMSO) defgrid2 NumFreq
+
+%scf
+  MaxIter 500
+end
+
+%pal
+  nproc 32
+end
+
+%maxcore 7200
+
+%base "QJPJQTDYNZXKQF-UHFFFAOYSA-N-FullTZ"
+
+*xyzfile 0 1 /scratch/negishi/li1724/Test-CentralizedCode-4-5/DFT/QJPJQTDYNZXKQF-UHFFFAOYSA-N/QJPJQTDYNZXKQF-UHFFFAOYSA-N-FullTZ.xyz

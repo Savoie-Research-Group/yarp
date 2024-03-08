@@ -10,7 +10,7 @@ Documentation:
 1. Installation:
 1.1 Anaconda is recommended and you can get YARP repository by:
 
-   git clone https://github.com/Savoie-Research-Group/yarp.git
+         git clone https://github.com/Savoie-Research-Group/yarp.git
 
 1.2 Build the YARP environment and install required packages by:
     

@@ -7,4 +7,5 @@
       * [a folder with xyz file](https://github.com/Savoie-Research-Group/yarp/tree/metal/Metal-Example/input_files/reaction_xyz) for the input reaction
     * Another folder that contains result files
 
-# For the reference of the example, please see **Figure 4** in [Kim et al.](https://doi.org/10.1021/jacs.3c00500)
+# Reference:
+  * Please see **Figure 4** in [Kim et al.](https://doi.org/10.1021/jacs.3c00500)

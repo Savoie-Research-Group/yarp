@@ -1,0 +1,20 @@
+$constrain
+force constant=0.5
+distance: 43, 1, 2.4940
+$
+
+$constrain
+force constant=0.5
+distance: 43, 22, 2.0590
+$
+
+$constrain
+force constant=0.5
+distance: 43, 75, 2.0020
+$
+
+$constrain
+force constant=0.5
+distance: 43, 76, 2.0020
+$
+

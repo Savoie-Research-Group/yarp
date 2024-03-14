@@ -1,6 +1,6 @@
 #!/bin/bash                                                                                     
 #
-#SBATCH --job-name=Test4-5-CentralizedCode
+#SBATCH --job-name=Test4-5
 #SBATCH --output=runyarp.1.out
 #SBATCH --error=runyarp.1.err
 #SBATCH -A standby
@@ -8,17 +8,15 @@
 #SBATCH --mem 5GB
 #SBATCH -n 1
 #SBATCH --time 4:00:00
-#SBATCH --mail-user=li1724@purdue.edu  # Designate email address for job communications
+#SBATCH --mail-user=<YOUR_EMAIL>  # Designate email address for job communications
 #SBATCH --mail-type=BEGIN,END,FAIL     # Events options are job BEGIN, END, NONE, FAIL, REQUEUE
 
 # activate a correct anaconda environment
-#source ~/anaconda3/bin/activate
-#conda activate /depot/bsavoie/apps/anaconda3/envs/yarp/
 module load anaconda
 conda activate copy-classy-yarp
 module load intel-mkl
 module load openmpi
 
-python /scratch/negishi/li1724/Classy-YARP-Codes/main_dft.py parameters.yaml
+python <DIRECTORY_TO_WRAPPERS>/main_dft.py parameters.yaml
 
 wait

@@ -10,6 +10,7 @@
 
 # Reference:
   * Please see **Figure 4** in [Kim et al.](https://doi.org/10.1021/jacs.3c00500)
+  * This example focuses on reaction **4 -> 5 (Oxidative Addition)**.
 
 # How to use:
   1. Install classy-YARP

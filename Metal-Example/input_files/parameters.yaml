@@ -19,7 +19,7 @@ method: crest # rdkit or crest, rdkit is using classical force field for process
 enumeration: False # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
 n_conf: 3  # conformers considered for further calculations.
 nconf_dft: 3 # n conformers for DFT calculations
-strategy: 2 
+strategy: 2 # 0 = reactant, 1 = product, 2 = both
 xtb_nprocs: 128  # Number of cores used by main_xtb.py
 crest_nprocs: 64 # Number of cores used by crest in main_xtb.py and main_dft.py
 mem: 7.2 # in GB
@@ -37,7 +37,7 @@ multiplicity: 1  # multiplicity for your system.
 skip_GSM_sanity_check: True
 skip_low_IRC: True
 skip_low_TS: True
-constrained_TS: True # COPT for DFT #
+constrained_TS: True # COPT for DFT, happens before TSOPT #
 model_path:   /scratch/negishi/li1724/Classy-YARP-Codes/bin
 gsm_inp:      /scratch/negishi/li1724/Classy-YARP-Codes/bin/inpfileq
 crest_path: /depot/bsavoie/apps/anaconda3/envs/yarp/bin/
@@ -47,17 +47,17 @@ email: True # use email notification or not
 email_address: li1724@purdue.edu
 dft_nprocs: 32  # Number of cores used by ORCA
 dft_lot: B97-3c def2-SVP
-dft_wt: 4   
+dft_wt: 4      # dft wall time 
 dft_ppn: 64    # the number of ppn used in the submission (SLURM File)
-partition: standby
+partition: standby # the queue for dft job submission, at Purdue, standby = 4hr max walltime
 dft_njobs: 1
-hess_recalc: 3
+hess_recalc: 3 # recalculate hessian every N steps
 dft_mix_basis: True # Whether to use mix basis set approach to accelerate (also reduce memory requirement) for DFT calculations
 dft_mix_lot: Cu, def2-TZVP, H, STO-3G    # level of theory for special atoms/elements for mix basis set
 dft_mix_firstlayer: True    # add mix basis set for 1st layer of metal
 dft_mix_firstlayer_lot: def2-TZVP # basis for the 1st layer atoms
-dft_fulltz_level_correction: True # whether to recalculate single point energy after the OPT/TSOPT calculation using a mix (less expensive) basis set
-dft_irc: True
-backward_DE: True
+dft_fulltz_level_correction: True # whether to recalculate single point energy with TZ for all atoms after the OPT/TSOPT calculation using a mix (less expensive) basis set
+dft_irc: True  # whether to do irc calculation after TSOPT calculation
+backward_DE: True # Whether to calculate DFT barrier from the product side
 dielectric: 0
 solvation: CPCM/DMSO

@@ -49,7 +49,7 @@ dft_nprocs: 32  # Number of cores used by ORCA
 dft_lot: B97-3c def2-SVP
 dft_wt: 4      # dft wall time 
 dft_ppn: 64    # the number of ppn used in the submission (SLURM File)
-partition: standby # the queue for dft job submission, at Purdue, standby = 4hr max walltime
+partition: standby # the queue for dft job submission, at Purdue, standby = 4hr max walltime, YARP can restart DFT jobs when they are killed by time limit. 
 dft_njobs: 1
 hess_recalc: 3 # recalculate hessian every N steps
 dft_mix_basis: True # Whether to use mix basis set approach to accelerate (also reduce memory requirement) for DFT calculations

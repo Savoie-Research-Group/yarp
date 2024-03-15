@@ -35,7 +35,10 @@ def compare_lists(list1, list2):
     # Iterate through the lists to the length of the shorter list
     for i in range(min(len(list1), len(list2))):
         # Ensure both elements are lists before comparison and have the same length
+        #print(f'i: {i}, list1: {list1[i]}\n')
+        #print(f'i: {i}, list2: {list2[i]}\n')
 
+        #if isinstance(list1[i], list) and isinstance(list2[i], list):
         try:
             for j in range(min(len(list1[i]), len(list2[i]))):
                 if list1[i][j] != list2[i][j]:
@@ -44,6 +47,8 @@ def compare_lists(list1, list2):
                         differing_indices.append(i)
         except:
             print(f"Have issue when comparing lists of list !!!\n")
+        #else:
+        #    print(f"Element at index {i} in one of the lists is not a list.")
 
     return differing_indices
 
@@ -52,15 +57,22 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         first_layer_index = []
         # get adj_mat for TS
         TS_adj_mat = table_generator(elements, geometry)
+        #print("TS_adj_mat\n", flush = True)
+        #print(TS_adj_mat, flush = True)
         # get the metals
         metal_element = [e for e in elements if e in el_metals]
         metal_ind = [ind for ind, e in enumerate(elements) if e in el_metals]
+        #print("element and index\n", flush = True)
+        #print(metal_element, flush = True)
+        #print(metal_ind, flush = True)
         # get 1st layer
         counter = 0
         for metal in metal_ind:
             metal_row = TS_adj_mat[metal]
             link_ind  = [ind for ind, val in enumerate(metal_row) if val > 0]
             link_element = [elements[a] for a in link_ind]
+            #print(f"metal index: {metal}, {metal_element[counter]}\n", flush = True)
+            #print(f"link index: {link_ind}\n link_element: {link_element}\n", flush = True)
             counter += 1
 
         if(len(link_ind) > 0):
@@ -94,8 +106,12 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         # sort the list so that element+index appears at the beginning of the list
         alnum_element = [a for a in args['dft_mix_lot'] if (any(x.isalpha() for x in a[0]) and (any(x.isnumeric() for x in a[0])))]
         not_alnum_element = [a for a in args['dft_mix_lot'] if not (any(x.isalpha() for x in a[0]) and (any(x.isnumeric() for x in a[0])))]
+        #print(f"alnum_element: {alnum_element}\n", flush = True)
+        #print(f"not_alnum_element: {not_alnum_element}\n", flush = True)
         alnum_element.extend(not_alnum_element)
         args['dft_mix_lot'] = alnum_element
+
+        #print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
 
 
 def process_mix_basis_input(args):
@@ -107,6 +123,8 @@ def process_mix_basis_input(args):
             arg_list = [inp_list[a * 2].strip(), inp_list[a * 2 + 1].strip()] # get rid of the space for each input keyword
             dft_mix_lot.append(arg_list)
 
+    #print("dft_mix_lot: ", flush = True)
+    #print(dft_mix_lot, flush = True)
 
     args['dft_mix_lot'] = dft_mix_lot
 
@@ -156,6 +174,7 @@ def main(args:dict):
     rxns=load_rxns(args["reaction_data"])
     for count, i in enumerate(rxns):
         rxns[count].args=args
+        #print(f"rxn items are: {vars(rxns[count]).items()}\n", flush = True)
         # Zhao's note: add mix basis for metal and first layer # 
         # Also add reaction atoms #
         # both reactant and product #
@@ -164,7 +183,9 @@ def main(args:dict):
 
     # Run DFT optimization first to get DFT energy
     print("Running DFT optimization", flush = True)
-    #print(rxns, flush = True)
+    print(rxns, flush = True)
+    #'''
+
 
     rxns=run_dft_opt(rxns)
     with open(args["reaction_data"], "wb") as f:
@@ -226,7 +247,7 @@ def constrained_dft_geo_opt(rxns):
             # and you want to restart it.
             if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
                 tempE, tempG=orca_job.get_final_structure()
-                print(f"Trying to Restart for {ind}\n", flush = True)
+                print(f"Trying to Restart for {ind}, tempG: {tempG}\n", flush = True)
                 xyz_write(inp_xyz, rxn.reactant.elements, tempG)
                 orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
                               mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
@@ -261,10 +282,10 @@ def constrained_dft_geo_opt(rxns):
     key=[i for i in copt.keys()]
     for i in key:
         orca_opt=copt[i]
-        print(f"Checking COPT for job {i}\n")
+        print(f"Checking COPT for job {i}, orca_opt: {orca_opt}\n")
         if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -10:
             _, geo=orca_opt.get_final_structure()
-            #print(f"COPT Works for {i}\n")
+            print(f"COPT Works for {i}\n")
             for count, rxn in enumerate(rxns):
                 inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                 if inchi in rxn.reactant_inchi and ind==rxn.id:
@@ -302,9 +323,11 @@ def run_dft_tsopt(rxns):
         elif args["skip_low_TS"] is True: key=[i for i in rxn.TS_guess.keys()]
         elif args["skip_low_IRC"] is True: key=[i for i in rxn.TS_xtb.keys()]
         else: key=[i for i in rxn.IRC_xtb.keys() if rxn.IRC_xtb[i]["type"]=="Intended" or rxn.IRC_xtb[i]["type"]=="P_unintended"]
+        print(f"TSOPT: Checking COPT Keys: {key}\n")
         for ind in key:
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{ind}"
             wf=f"{scratch_dft}/{rxn.reactant_inchi}_{rxn.id}_{ind}"
+            print(f"rxn_index: {rxn_ind}\n", flush = True)
 
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{rxn_ind}.xyz"
@@ -329,7 +352,7 @@ def run_dft_tsopt(rxns):
             # and you want to restart it.
             if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
                 tempE, tempG=orca_job.get_final_structure()
-                print(f"Trying to Restart for {ind}\n", flush = True)
+                print(f"Trying to Restart for {ind}, tempG: {tempG}\n", flush = True)
                 xyz_write(inp_xyz, rxn.reactant.elements, tempG)
                 orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
                               mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
@@ -341,6 +364,8 @@ def run_dft_tsopt(rxns):
                 opt_jobs[rxn_ind]=orca_job
 
             if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+            print(f"Checked orca_job: {opt_jobs}\n")
+            print(f"Going to run: {running_jobs}\n")
 
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
@@ -369,7 +394,7 @@ def run_dft_tsopt(rxns):
         #Zhao's note: at the last step (FullTZ single point, there is no opt)
         if orca_opt.calculation_terminated_normally() and orca_opt.is_TS() and (args['dft_fulltz_level_correction'] or orca_opt.optimization_converged()):
             _, geo=orca_opt.get_final_structure()
-            print(f"TS {i} is a TS and converged\n", flush = True)
+            print(f"TS {i}, {orca_opt} is a TS and converged\n", flush = True)
             for count, rxn in enumerate(rxns):
                 inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                 if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
@@ -397,12 +422,12 @@ def FullTZCorrection_TS(opt_jobs, args):
     # Only proceed when there is TS_dft keys
     #if dft_lot in rxn.TS_dft.keys(): key=[i for i in rxn.TS_dft[dft_lot].keys()]
     key=[i for i in opt_jobs.keys()]
-    #print(f"Redo FullTZ: Checking TS_dft Keys: {key}\n")
+    print(f"Redo FullTZ: Checking TS_dft Keys: {key}\n")
     for ind in key:
         orca_opt=opt_jobs[ind]
         rxn_ind=ind
         wf=f"{scratch_dft}/{rxn_ind}"
-        #print(f"rxn_index: {rxn_ind}\n", flush = True)
+        print(f"rxn_index: {rxn_ind}\n", flush = True)
 
         ele, geo=orca_opt.get_final_structure()
 
@@ -421,6 +446,8 @@ def FullTZCorrection_TS(opt_jobs, args):
         orca_job.generate_input()
         opt_jobs[rxn_ind]=orca_job
         if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+        print(f"Checked orca_job: {opt_jobs}\n")
+        print(f"Going to run: {running_jobs}\n")
 
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
@@ -430,15 +457,15 @@ def FullTZCorrection_TS(opt_jobs, args):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"TS-FullTZ.{i}", ppn=int(args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
             endid=min(startid+int(args["dft_njobs"]), len(running_jobs))
-            #print(f"startid: {startid}, endid: {endid}\n", flush = True)
+            print(f"startid: {startid}, endid: {endid}\n", flush = True)
             slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
             slurmjob.submit()
             startid=endid
             slurm_jobs.append(slurmjob)
-        print(f"Running {len(slurm_jobs)} Full TZ Singlepoint jobs...")
+        print(f"Running {len(slurm_jobs)} Full TZ SinglePoint jobs...")
         monitor_jobs(slurm_jobs)
     else:
-        print("No TZ-Singlepoint jobs need to be performed...")
+        print("No ts optimiation jobs need to be performed...")
 
 def run_dft_irc(rxns):
     print(f"Running IRC calculation\n", flush = True)
@@ -446,14 +473,20 @@ def run_dft_irc(rxns):
     scratch_dft=args["scratch_dft"]
     irc_jobs=dict()
     todo_list=[]
+    print(f"Doing DFT IRC NOW!!!\n")
     if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
     else: dft_lot=args["dft_lot"]
     # run IRC model first if we need
     if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: rxns=apply_IRC_model(rxns)
     for count, rxn in enumerate(rxns):
+        print(f"rxn: {rxn}\n")
+        print(f"dft_lot: {dft_lot}\n")
+        print(f"rxn.TS_dft.keys(): {rxn.TS_dft.keys()}\n")
         if dft_lot in rxn.TS_dft.keys(): key=[i for i in rxn.TS_dft[dft_lot].keys()]
         else: continue
+        print(f"IRC key: {key}\n", flush = True)
         for i in key:
+            print(f"IRC: {i}\n")
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{i}"
             RP=False
             if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: RP=rxn.IRC_xtb[i]["PR"][0]
@@ -597,6 +630,10 @@ def writedown_result(rxns):
                     f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {rxn.IRC_dft[dft_lot][conf_i]['type']:<10s} {dft_lot:<10s}\n")
     return
 
+def is_alpha_and_numeric(s):
+    # Check if the string is alphanumeric and not purely alpha or numeric
+    return s.isalnum() and not s.isalpha() and not s.isdigit()
+
 def run_dft_opt(rxns):
     args=rxns[0].args
     crest_folder=args["scratch_crest"]
@@ -610,6 +647,33 @@ def run_dft_opt(rxns):
     print(f"separated key: {key}\n", flush = True)
     print(f"inchi_dict: {inchi_dict}\n", flush = True)
     print(f"reactant_separable: {reactant_separable}, product_separable: {product_separable}\n", flush = True)
+
+    #Zhao's note: for mix-basis set, if molecule is separable, the atom indices you want to apply mix-basis-set on might not be there in separated mols, so you need to do a check#
+    #For this reason, the elements we returned in inchi_dict are with indices from molecules before the separation#
+    #for each molecule, a set of mix-basis-set will be copied and checked#
+    mix_basis_dict = dict()
+    for separated_key in key:
+        print(f"separated_key: {separated_key}\n")
+        E,G,Q = inchi_dict[separated_key][0], inchi_dict[separated_key][1], inchi_dict[separated_key][2]
+        if(args['dft_mix_basis']):
+            mix_basis_dict[separated_key] = [] 
+            # for those in dft_mix_lot with indices, check whether they exist, if not, eliminate
+            for MiXbASiS in args['dft_mix_lot']:
+                if is_alpha_and_numeric(MiXbASiS[0]) and not MiXbASiS[0] in E:
+                    continue
+                #find the current index of the atom we want to apply mix-basis in the molecule
+                #replace the old index with new ones
+                NEWMiXbASiS = copy.deepcopy(MiXbASiS)
+                if is_alpha_and_numeric(NEWMiXbASiS[0]):
+                    index_position = E.index(NEWMiXbASiS[0])
+                    NEWMiXbASiS[0] = ''.join(i for i in NEWMiXbASiS[0] if not i.isdigit()) + str(index_position)
+                mix_basis_dict[separated_key].append(NEWMiXbASiS)
+
+        #Finally, eliminate the numbers in E and put it back into inchi_dict[inchi]
+        E = [''.join(i for i in a if not i.isdigit()) for a in E]
+        inchi_dict[separated_key][0] = E
+        print(f"inchi: {separated_key}, mix_basis_dict: {mix_basis_dict[separated_key]}\n")
+    print(f"inchi_dict after process: {inchi_dict}\n")
 
     for rxn in rxns:
         print(f"rxn.reactant_conf: {bool(rxn.reactant_conf)}\n", flush = True)
@@ -722,21 +786,26 @@ def run_dft_opt(rxns):
                 print(f"After CREST Geometry: {G}\n", flush = True)
 
     print(f"AFTER CREST: stable_conf.keys(): {stable_conf.keys()}\n")
+    print(f"Missing_dft: {missing_dft}\n")
 
     # submit missing dft optimization
     if len(missing_dft)>0:
         dft_job_list=[]
         for inchi in missing_dft:
+            print(f"inchi: {inchi}\n", flush = True)
+            print(f"missing_dft: {missing_dft}\n", flush = True)
 
             if inchi not in stable_conf.keys(): continue
             E, G, Q=stable_conf[inchi]
+            print(f"DFT OPT Geometry: {G}\n", flush = True)
 
             wf=f"{dft_folder}/{inchi}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{inchi}.xyz"
             xyz_write(inp_xyz, E, G)
+            print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
             dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                         mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
+                         mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
                          jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
                          charge=Q, multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
             dft_job.generate_input()
@@ -745,15 +814,17 @@ def run_dft_opt(rxns):
             # and you want to restart it.
             if not dft_job.calculation_terminated_normally() and dft_job.new_opt_geometry():
                 tempE, tempG=dft_job.get_final_structure()
-                print(f"Trying to Restart for {inchi}\n", flush = True)
+                print(f"Trying to Restart for {inchi}, tempG: {tempG}\n", flush = True)
                 xyz_write(inp_xyz, E, tempG)
                 dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                             mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
+                             mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
                              jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
                              charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
                 dft_job.generate_input()
 
             dft_job_list.append(dft_job)
+
+        #exit()
 
         n_submit=len(dft_job_list)//int(args["dft_njobs"])
         if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
@@ -841,7 +912,7 @@ def find_all_seps(rxns, args):
     for rxn in rxns:
         tmp_dict=seperate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'])
         key=[i for i in tmp_dict.keys()]
-        #print(f"reactant key: {key}\n")
+        print(f"reactant key: {key}\n")
         reactant_separable = False
         product_separable  = False
         n_reactant_inchi = 0

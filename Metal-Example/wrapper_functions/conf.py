@@ -278,6 +278,9 @@ def seperate_mols(E,G,q,adj_mat=None,namespace='sep'):
     for group in groups:
         # parse element and geometry of each fragment
         N_atom = len(group)
+        for ind in group:
+            print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
+        #Zhao's note: might consider return "Element + index" for better control
         frag_E = [E[ind] for ind in group]
         frag_G = np.zeros([N_atom,3])
 
@@ -294,6 +297,10 @@ def seperate_mols(E,G,q,adj_mat=None,namespace='sep'):
         molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
         inchikey = molecule.write(format="inchikey").strip().split()[0]
         os.system(f"rm {namespace}_input.xyz")
+        
+        #Zhao's note: might consider return "Element + index" for better control
+        #what a waste, had to regenerate frag_E...
+        frag_E = [E[ind]+str(ind) for ind in group]
         # store this fragment
         if inchikey not in mols.keys():
             #mols[inchikey] = [[frag_E,frag_G]]

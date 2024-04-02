@@ -18,7 +18,7 @@ from constants import Constants
 from job_submission import *
 from job_mapping import *
 from conf import seperate_mols
-
+from wrappers.gaussian import Gaussian
 def main(args:dict):
     if args["solvation"]: args["solvation_model"], args["solvent"]=args["solvation"].split('/')
     else: args["solvation_model"], args["solvent"]="CPCM", False
@@ -38,6 +38,7 @@ def main(args:dict):
     #print(rxns)
     '''
     rxns=run_dft_opt(rxns)
+    
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     # Run DFT TS opt 
@@ -45,11 +46,14 @@ def main(args:dict):
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     # Run DFT IRC opt and generate results
+    '''
     rxns=run_dft_irc(rxns)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
-    '''
+    
+    #rxns=analyze_intended(rxns)
     writedown_result(rxns)
+    
     return
 
 def load_rxns(rxns_pickle):
@@ -59,8 +63,10 @@ def load_rxns(rxns_pickle):
 def constrained_dft_geo_opt(rxns):
     args=rxns[0].args
     scratch_dft=args["scratch_dft"]
-    orca_jobs=[]
+    dft_jobs=[]
     copt=dict()
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
+    else: dft_lot=args["dft_lot"]
     for rxn in rxns:
         # Three cases:
         # 1. skip_low_IRC: read TS_xtb.
@@ -81,24 +87,33 @@ def constrained_dft_geo_opt(rxns):
             else:
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
             constrained_bond, constrained_atoms=return_rxn_constraint(rxn.reactant, rxn.product)
-            orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-COPT",\
-                          jobtype="OPT Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                          solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            constraints=[f'{{C {atom} C}}' for atom in constrained_atoms]
-            orca_job.generate_geometry_settings(hess=False, constraints=constraints)
-            orca_job.generate_input()
-            copt[rxn_ind]=orca_job
-            if orca_job.calculation_terminated_normally() is False: orca_jobs.append(rxn_ind)
-    orca_jobs=sorted(orca_jobs)
+            if args["package"]=="ORCA":
+                dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-COPT",\
+                             jobtype="OPT Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                             solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                constraints=[f'{{C {atom} C}}' for atom in constrained_atoms]
+                dft_job.generate_geometry_settings(hess=False, constraints=constraints)
+                dft_job.generate_input()
+                copt[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: dft_jobs.append(rxn_ind)
+            elif args["package"]=="Gaussian":
+                dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-COPT",\
+                                 jobtype="copt", lot=dft_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                                 solvation_model=args["solvation_model"], dielectric=args["dielectric"], dispersion=args["dispersion"])
+                dft_job.generate_input(constraints=constrained_atoms)
+                copt[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: dft_jobs.append(rxn_ind)
+    dft_jobs=sorted(dft_jobs)
     slurm_jobs=[]
-    if len(orca_jobs)>0:
-        n_submit=len(orca_jobs)//int(args["dft_njobs"])
-        if len(orca_jobs)%int(args["dft_njobs"])>0: n_submit+=1
+    if len(dft_jobs)>0:
+        n_submit=len(dft_jobs)//int(args["dft_njobs"])
+        if len(dft_jobs)%int(args["dft_njobs"])>0: n_submit+=1
         startidx=0
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"COPT.{i}", ppn=args["ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(int(args["mem"])*1100))
-            endidx=min(startidx+int(args["dft_njobs"]), len(orca_jobs))
-            slurmjob.create_orca_jobs([copt[ind] for ind in orca_jobs[startidx:endidx]])
+            endidx=min(startidx+int(args["dft_njobs"]), len(dft_jobs))
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([copt[ind] for ind in dft_jobs[startidx:endidx]])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([copt[ind] for ind in dft_jobs[startidx:endidx]])
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -108,9 +123,9 @@ def constrained_dft_geo_opt(rxns):
     
     key=[i for i in copt.keys()]
     for i in key:
-        orca_opt=copt[i]
-        if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -10:
-            _, geo=orca_opt.get_final_structure()
+        dft_opt=copt[i]
+        if dft_opt.calculation_terminated_normally() and dft_opt.optimization_converged() and len(dft_opt.get_imag_freq()[0])>0 and min(dft_opt.get_imag_freq()[0]) < -10:
+            _, geo=dft_opt.get_final_structure()
             for count, rxn in enumerate(rxns):
                 inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                 if inchi in rxn.reactant_inchi and ind==rxn.id:
@@ -122,7 +137,7 @@ def run_dft_tsopt(rxns):
     opt_jobs=dict()
     running_jobs=[]
     scratch_dft=args["scratch_dft"]
-    if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
     else: dft_lot=args["dft_lot"]
     if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
     # Load TS from reaction class and prepare TS jobs
@@ -136,7 +151,6 @@ def run_dft_tsopt(rxns):
         elif args["skip_low_TS"] is True: key=[i for i in rxn.TS_guess.keys()]
         elif args["skip_low_IRC"] is True: key=[i for i in rxn.TS_xtb.keys()]
         else: key=[i for i in rxn.IRC_xtb.keys() if rxn.IRC_xtb[i]["type"]=="Intended" or rxn.IRC_xtb[i]["type"]=="P_unintended"]
-        # print(key)
         for ind in key:
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{ind}"
             wf=f"{scratch_dft}/{rxn.reactant_inchi}_{rxn.id}_{ind}"
@@ -150,13 +164,21 @@ def run_dft_tsopt(rxns):
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
             else:
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
-            orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-TSOPT",\
-                          jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                          solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]))
-            orca_job.generate_input()
-            opt_jobs[rxn_ind]=orca_job
-            if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+            if args["package"]=="ORCA":
+                dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-TSOPT",\
+                             jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                             solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                dft_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]))
+                dft_job.generate_input()
+                opt_jobs[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+            elif args["package"]=="Gaussian":
+                dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-TSOPT",\
+                                 jobtype="tsopt", lot=dft_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                                 solvation_model=args["solvation_model"], dielectric=args["dielectric"], dispersion=args["dispersion"])
+                dft_job.generate_input()
+                opt_jobs[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
         if len(running_jobs)%int(args["dft_njobs"])>0: n_submit+=1
@@ -165,7 +187,8 @@ def run_dft_tsopt(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"TSOPT.{i}", ppn=int(args["ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*1100))
             endid=min(startid+int(args["dft_njobs"]), len(running_jobs))
-            slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
             slurmjob.submit()
             startid=endid
             slurm_jobs.append(slurmjob)
@@ -173,28 +196,28 @@ def run_dft_tsopt(rxns):
         monitor_jobs(slurm_jobs)
         key=[i for i in opt_jobs.keys()]
         for i in key:
-            orca_opt=opt_jobs[i]
-            if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and orca_opt.is_TS():
-                _, geo=orca_opt.get_final_structure()
+            dft_opt=opt_jobs[i]
+            if dft_opt.calculation_terminated_normally() and dft_opt.optimization_converged() and dft_opt.is_TS():
+                _, geo=dft_opt.get_final_structure()
                 for count, rxn in enumerate(rxns):
                     inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                     if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
                     if inchi in rxn.reactant_inchi and ind==rxn.id:
                         rxns[count].TS_dft[dft_lot][conf_i]=dict()
                         rxns[count].TS_dft[dft_lot][conf_i]["geo"]=geo
-                        rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
-                        rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=orca_opt.get_energy()
-                        rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=orca_opt.get_imag_freq_mode()
+                        rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=dft_opt.get_thermal()
+                        rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=dft_opt.get_energy()
+                        rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=dft_opt.get_imag_freq_mode()
     else:
         print("No ts optimiation jobs need to be performed...")
     return rxns
 
-def run_dft_irc(rxns):
+def run_dft_irc(rxns, analyze=True):
     args=rxns[0].args
     scratch_dft=args["scratch_dft"]
     irc_jobs=dict()
     todo_list=[]
-    if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
     else: dft_lot=args["dft_lot"]
     # run IRC model first if we need
     if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: rxns=apply_IRC_model(rxns)
@@ -213,13 +236,21 @@ def run_dft_irc(rxns):
                     wf=f"{scratch_dft}/{rxn_ind}"
                     inp_xyz=f"{wf}/{rxn_ind}-TS.xyz"
                     xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_dft[dft_lot][i]["geo"])
-                    orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-IRC",\
-                                  jobtype="IRC", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                                  solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-                    orca_job.generate_irc_settings(max_iter=100)
-                    orca_job.generate_input()
-                    irc_jobs[rxn_ind]=orca_job
-                    if orca_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
+                    if args["package"]=="ORCA":
+                        dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-IRC",\
+                                     jobtype="IRC", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                                     solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                        dft_job.generate_irc_settings(max_iter=100)
+                        dft_job.generate_input()
+                        irc_jobs[rxn_ind]=dft_job
+                        if dft_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
+                    elif args["package"]=="Gaussian":
+                        dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-IRC",\
+                                         jobtype="irc", lot=dft_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                                         solvation_model=args["solvation_model"], dielectric=args["dielectric"], dispersion=args["dispersion"])
+                        dft_job.generate_input()
+                        irc_jobs[rxn_ind]=dft_job
+                        if dft_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
     if args["dft_irc"] and len(todo_list)>0:
         n_submit=len(todo_list)//int(args["dft_njobs"])
         if len(todo_list)%int(args["dft_njobs"])>0:n_submit+=1
@@ -228,7 +259,8 @@ def run_dft_irc(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"IRC.{i}", ppn=int(args["ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(int(args["mem"])*1100))
             endidx=min(startidx+int(args["dft_njobs"]), len(todo_list))
-            slurmjob.create_orca_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -251,63 +283,68 @@ def run_dft_irc(rxns):
            job_success=True
         except: pass
         if job_success is False: continue
-        adj_mat1, adj_mat2=table_generator(E, G1), table_generator(E, G2)
-        #bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
-        #bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
-        #bond_mat1=bond_mat1[0]
-        #bond_mat2=bond_mat2[0]
         for count, rxn in enumerate(rxns):
             if inchi==rxn.reactant_inchi and idx==rxn.id:
-                P_adj_mat=rxn.product.adj_mat
-                R_adj_mat=rxn.reactant.adj_mat
-                adj_diff_r1=np.abs(adj_mat1-R_adj_mat)
-                adj_diff_r2=np.abs(adj_mat2-R_adj_mat)
-                adj_diff_p1=np.abs(adj_mat1-P_adj_mat)
-                adj_diff_p2=np.abs(adj_mat2-P_adj_mat)
-                rxns[count].IRC_dft[dft_lot]=dict()
+                if dft_lot not in rxns[count].IRC_dft.keys(): rxns[count].IRC_dft[dft_lot]=dict()
                 rxns[count].IRC_dft[dft_lot][conf_i]=dict()
-                if adj_diff_r1.sum()==0:
-                    if adj_diff_p2.sum()==0:
-                        rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G1, G2]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                        rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["type"]="intended"
-                    else:
-                        rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G1, G2]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                        rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["type"]="P_unintended"
-                elif adj_diff_p1.sum()==0:
-                    if adj_diff_r2.sum()==0:
-                        rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G2, G1]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                        rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier1, barrier2]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["type"]="intended"
-                    else:
-                        rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G2, G1]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                        rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier1, barrier2]
-                        rxns[count].IRC_dft[dft_lot][conf_i]["type"]="R_unintended"
-                elif adj_diff_r2.sum()==0:
-                    rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G2, G1]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                    rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier1, barrier2]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["type"]="P_unintended"
-                elif adj_diff_p2.sum()==0:
-                    rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G1, G2]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                    rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["type"]="R_unintended"
-                else:
-                    rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G1, G2]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
-                    rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
-                    rxns[count].IRC_dft[dft_lot][conf_i]["type"]="unintended"
+                rxns[count].IRC_dft[dft_lot][conf_i]["node"]=[G1, G2]
+                rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
+                rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
+    if analyze==True: rxns=analyze_intended(rxns)
     return rxns
 
+def analyze_intended(rxns):
+    args=rxns[0].args
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
+    for count, rxn in enumerate(rxns):
+        P_adj_mat=rxn.product.adj_mat
+        R_adj_mat=rxn.reactant.adj_mat
+        if dft_lot not in rxn.IRC_dft.keys(): continue
+        for i in rxn.IRC_dft[dft_lot].keys():
+            G1=rxn.IRC_dft[dft_lot][i]["node"][0]
+            G2=rxn.IRC_dft[dft_lot][i]["node"][1]
+            adj_mat1=table_generator(rxn.reactant.elements, G1)
+            adj_mat2=table_generator(rxn.product.elements, G2)
+            barrier2=rxn.IRC_dft[dft_lot][i]["barriers"][0]
+            barrier1=rxn.IRC_dft[dft_lot][i]["barriers"][1]
+            adj_diff_r1=np.abs(adj_mat1-R_adj_mat)
+            adj_diff_r2=np.abs(adj_mat2-R_adj_mat)
+            adj_diff_p1=np.abs(adj_mat1-P_adj_mat)
+            adj_diff_p2=np.abs(adj_mat2-P_adj_mat)
+            if adj_diff_r1.sum()==0:
+                if adj_diff_p2.sum()==0:
+                    rxns[count].IRC_dft[dft_lot][i]["node"]=[G1, G2]
+                    rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier2, barrier1]
+                    rxns[count].IRC_dft[dft_lot][i]["type"]="intended"
+                else:
+                    rxns[count].IRC_dft[dft_lot][i]["node"]=[G1, G2]
+                    rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier2, barrier1]
+                    rxns[count].IRC_dft[dft_lot][i]["type"]="P_unintended"
+            elif adj_diff_p1.sum()==0:
+                if adj_diff_r2.sum()==0:
+                    rxns[count].IRC_dft[dft_lot][i]["node"]=[G2, G1]
+                    rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier1, barrier2]
+                    rxns[count].IRC_dft[dft_lot][i]["type"]="intended"
+                else:
+                    rxns[count].IRC_dft[dft_lot][i]["node"]=[G2, G1]
+                    rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier1, barrier2]
+                    rxns[count].IRC_dft[dft_lot][i]["type"]="R_unintended"
+            elif adj_diff_r2.sum()==0:
+                rxns[count].IRC_dft[dft_lot][i]["node"]=[G2, G1]
+                rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier1, barrier2]
+                rxns[count].IRC_dft[dft_lot][i]["type"]="P_unintended"
+            elif adj_diff_p2.sum()==0:
+                rxns[count].IRC_dft[dft_lot][i]["node"]=[G1, G2]
+                rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier2, barrier1]
+                rxns[count].IRC_dft[dft_lot][i]["type"]="R_unintended"
+            else:
+                rxns[count].IRC_dft[dft_lot][i]["node"]=[G1, G2]
+                rxns[count].IRC_dft[dft_lot][i]["barriers"]=[barrier2, barrier1]
+                rxns[count].IRC_dft[dft_lot][i]["type"]="unintended"
+    return rxns
 def writedown_result(rxns):
     args=rxns[0].args
-    if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
     else: dft_lot=args["dft_lot"]
     with open(f'{args["scratch_dft"]}/yarp_result.txt', 'w') as f:
         if args["backward_DE"]: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"DE_B":<10s} {"DG_B":<10s} {"Type":<10s} {"Source":<10s}\n')
@@ -363,7 +400,7 @@ def run_dft_opt(rxns):
     all_inchi=dict()
     # collect missing DFT energy
     missing_dft=[]
-    if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
     else: dft_lot=args["dft_lot"]
     inchi_key=[i for i in inchi_dict.keys()]
     for rxn in rxns:
@@ -380,14 +417,12 @@ def run_dft_opt(rxns):
     for i in missing_dft:
         if i not in stable_conf.keys():
             missing_conf.append(i)
-    # prepare for submitting job
-    print("dft_opt")
-    print(missing_dft)
     njobs=int(args["dft_njobs"])
     if len(missing_conf) > 0:
         CREST_job_list=[]
         for inchi in missing_conf:
             if inchi in missing_dft:
+                # print(inchi_dict[inchi])
                 E, G=inchi_dict[inchi][0], inchi_dict[inchi][1]
                 wf=f'{crest_folder}/{inchi}'
                 if os.path.isdir(wf) is False: os.mkdir(wf)
@@ -405,7 +440,7 @@ def run_dft_opt(rxns):
             slurmjob=SLURM_Job(jobname=f'CREST.{i}', ppn=args["ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"])*1100)
             endidx=min(startidx+njobs, len(CREST_job_list))
             slurmjob.create_crest_jobs([job for job in CREST_job_list[startidx:endidx]])
-            slurmjob.submit
+            slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} CREST jobs...")
@@ -428,10 +463,17 @@ def run_dft_opt(rxns):
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{inchi}.xyz"
             xyz_write(inp_xyz, E, G)
-            dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
-                         charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            dft_job.generate_input()
-            dft_job_list.append(dft_job)
+            if args["package"]=="ORCA":
+                dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
+                             charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                dft_job.generate_input()
+                dft_job_list.append(dft_job)
+            elif args["package"]=="Gaussian":
+                dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-OPT",\
+                                 jobtype="opt", lot=dft_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
+                                 solvation_model=args["solvation_model"], dielectric=args["dielectric"], dispersion=args["dispersion"])
+                dft_job.generate_input()
+                dft_job_list.append(dft_job)
 
         n_submit=len(dft_job_list)//int(args["dft_njobs"])
         if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
@@ -440,7 +482,8 @@ def run_dft_opt(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"OPT.{i}", ppn=args["ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"])*1100)
             endidx=min(startidx+int(args["dft_njobs"]), len(dft_job_list))
-            slurmjob.create_orca_jobs([job for job in dft_job_list[startidx:endidx]])
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([job for job in dft_job_list[startidx:endidx]])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([job for job in dft_job_list[startidx:endidx]])
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -463,7 +506,7 @@ def run_dft_opt(rxns):
                 dft_dict[inchi]["SPE"]=SPE
                 dft_dict[inchi]["thermal"]=thermal
                 dft_dict[inchi]["geo"]=G
-        if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+"/"+args["dft_lot"].split()[1]
+        if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
         else: dft_lot=args["dft_lot"]
         key=[i for i in dft_dict.keys()]
         for count, rxn in enumerate(rxns):
@@ -472,30 +515,34 @@ def run_dft_opt(rxns):
                     if dft_lot not in rxns[count].reactant_dft_opt.keys():
                         rxns[count].reactant_dft_opt[dft_lot]=dict()
                     if "SPE" not in rxns[count].reactant_dft_opt[dft_lot].keys():
-                        rxns[count].reactant_dft_opt[dft_lot]["SPE"]=dft_dict[i]["SPE"]
-                    else:
-                        rxns[count].reactant_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
+                        rxns[count].reactant_dft_opt[dft_lot]["SPE"]=0.0
+                    rxns[count].reactant_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
                     if "thermal" not in rxns[count].reactant_dft_opt[dft_lot].keys():
-                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]=dft_dict[i]["thermal"]
-                    else:
-                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
-                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
-                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
-                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
+                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]={}
+                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]=0.0
+                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"]=0.0
+                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]=0.0
+                        rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]=0.0
+                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
+                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
+                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
+                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
                 if rxn.product_inchi in dft_dict.keys() and rxn.args["backward_DE"]:
                     if dft_lot not in rxns[count].product_dft_opt.keys():
                         rxns[count].product_dft_opt[dft_lot]=dict()
                     if "SPE" not in rxns[count].product_dft_opt[dft_lot].keys():
-                        rxns[count].product_dft_opt[dft_lot]["SPE"]=dft_dict[i]["SPE"]
-                    else:
-                        rxns[count].product_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
+                        rxns[count].product_dft_opt[dft_lot]["SPE"]=0.0
+                    rxns[count].product_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
                     if "thermal" not in rxns[count].product_dft_opt[dft_lot].keys():
-                        rxns[count].product_dft_opt[dft_lot]["thermal"]=dft_dict[i]["thermal"]
-                    else:
-                        rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
-                        rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
-                        rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
-                        rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
+                        rxns[count].product_dft_opt[dft_lot]["thermal"]={}
+                        rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]=0.0
+                        rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"]=0.0
+                        rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]=0.0
+                        rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]=0.0
+                    rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
+                    rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
+                    rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
+                    rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
     return rxns
 
 def find_all_seps(rxns):

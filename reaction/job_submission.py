@@ -155,6 +155,23 @@ class SLURM_Job:
 
         self.create_job_bottom()
 
+    def create_gaussian_jobs(self, job_list, parallel=False):
+        """
+        Generate Gaussian16 jobs
+        Note: a list of gaussian job objects needs to be provided.
+        """
+        self.create_job_head()
+        with open(self.script_file, "a") as f:
+            for job in job_list:
+                f.write("# cd into the submission directory\n")
+                f.write(f"cd {job.work_folder}\n\n")
+                f.write(f"module load gaussian16/B.01\n")
+                if parallel: f.write(f"g16 < {job.gjf} > {job.output}.{job.nprocs}.out &\n")
+                else:
+                    f.write(f"g16 < {job.gjf} > {job.output} &\n")
+                f.write("\nwait\n")
+        # stop here
+
     def create_gsm_jobs(self, gsm_job_list, gsm_thread=1):
         """
         Create a GSM job script using the specified script file.

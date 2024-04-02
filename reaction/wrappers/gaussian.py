@@ -7,12 +7,13 @@ import time
 import numpy as np
 
 sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
-from parsers import xyz_parse,xyz_write
+from yarp.input_parsers import xyz_parse
 from constants import Constants
+from utils import xyz_write
 
 class Gaussian:
     def __init__(self, input_geo, work_folder=os.getcwd(), lot='B3LYP/6-31G*', jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
-                 solvent=False, dielectric=0.0,solvation_model='PCM'):
+                 solvent=False, dielectric=0.0,solvation_model='PCM', dispersion=False):
         """
         Initialize an Gaussian job class
         input_geo: a xyz file containing the input geometry
@@ -34,6 +35,7 @@ class Gaussian:
         self.output       = f'{work_folder}/{jobname}.out'
         self.additional   = False
         self.dielectric = float(dielectric)
+        self.dispersion=dispersion
         if solvent=="read":
             self.solvation = f"SCRF=(Read)"
         elif solvent:
@@ -48,30 +50,51 @@ class Gaussian:
         elements, geometry = xyz_parse(input_geo)
         self.natoms = len(elements)
         self.elements = elements
+        self.geometry = geometry
+        self.charge=int(charge)
+        self.multiplicity=int(multiplicity)
         self.xyz = f'{charge} {multiplicity}\n'
         for ind in range(len(elements)):
             self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}\n'
         self.xyz += '\n'
 
-    def generate_input(self,additional=False):
+    def generate_input(self, constraints=[]):
         """
         Create an Gaussian job script for given settings
         """
         with open(self.gjf, "w") as f:
             f.write(f"%NProcShared={self.nproc}\n")
             f.write(f"%Mem={self.mem*self.nproc}MB\n")
+            if self.dispersion:
+                command = f"#{self.lot} EmpiricalDispersion=GD3"
+            else:
+                command = f"#{self.lot}"
             if self.solvation:
-                command = f"#{self.lot} {self.solvation} {self.jobtype}"
-            else:
-                command = f"#{self.lot} {self.jobtype}"
-            if additional:
-                command += f" {additional}\n\n"
-            else:
-                command += "\n\n"
+                command += f" {self.solvation}"
+            # jobtype settings
+            if self.jobtype.lower()=="opt":
+                command += f"Opt=(maxcycles=300) Int=UltraFine SCF=QC Freq\n\n"
+            elif self.jobtype.lower()=="tsopt":
+                command+=f" OPT=(TS, CALCALL, NOEIGEN, maxcycles=300) Freq\n\n"
+            elif self.jobtype.lower()=='irc':
+                command+=f" IRC=(LQA, recorrect=never, CalcFC, maxpoints=100, Stepsize=10, maxcycles=300, Report=Cartesians)\n\n"
+            elif self.jobtype.lower()=='copt':
+                command+=f" Opt geom=connectivity\n\n"
+                # add constraints as the following form:
+                # C -1 x y z
+                # C -1 x y z
+                # H  0 x y z
+                # H  0 x y z
+                # constraint on C and fully optimize on H
+                self.xyz=f"{self.charge} {self.multiplicity}\n"
+                for count_i, i in enumerate(self.elements):
+                    if count_i in constraints:
+                        self.xyz+=f"{i:<3} -1 {self.geometry[count_i][0]:^12.8f} {self.geometry[count_i][3]:^12.8f} {self.geometry[count_i][2]:^12.8f}\n"
+                self.xyz+="\n"
             f.write(command)
-            f.write(f"Gaussian job: {self.jobname}\n\n")
+            f.write(f"{self.jobname} {self.jobtype}\n\n")
             f.write(self.xyz)    
-            if "Read" in self.solvation:
+            if self.solvation and self.dielectric>0.0:
                 f.write("solventname=newsolvent\n")
                 f.write(f"eps={self.dielectric}\n\n")
     def execute(self):
@@ -258,14 +281,23 @@ class Gaussian:
         traj   = []
         for i in range(N_image+1)[1:]:
             coords = geo_dict[str(i)]
-            Energy.append(coords[0])
+            Energy.append(float(coords[0]))
             ITC.append(coords[1])
             traj.append(np.array(coords[2:]).reshape((self.natoms,3)))
-
+        barrier=[max(Energy)-Energy[0], max(Energy)-Energy[-1]]
+        TS=traj[Energy.index(max(Energy))]
+        # Write trajectory
+        out=open(f"{self.work_folder}/{self.jobname}_traj.xyz", "w+")
+        for count_i, i in enumerate(Energy):
+            out.write("{self.natoms}\n")
+            out.write(f"Image: {count_i} Energy: {i}\n")
+            for count_j, j in enumerate(traj[count_i]):
+                out.write(f"{self.elements[count_j]} {j[0]} {j[1]} {j[2]}\n")
+        out.close()
         if not return_internal:
-            return self.elements, Energy, traj
+            return self.elements, traj[0], traj[-1], TS, barrier[0], barrier[1]
         else:
-            return self.elements, Energy, traj, ITC
+            return self.elements, traj[0], traj[-1], TS, barrier[0], barrier[1], ITC
 
     def get_thermal(self) -> dict:
         """
@@ -289,4 +321,21 @@ class Gaussian:
 
         return thermal
 
+    def get_energy(self):
+        SPE=0.0
+        # load Gaussian output file
+        lines = open(self.output, 'r', encoding="utf-8").readlines()
 
+        ZPE_corr,zero_E,H_298,F_298=0,0,0,0
+        grad_lines = []
+
+        for lc,line in enumerate(lines):
+            fields = line.split()
+            if len(fields) == 4 and fields[0] == 'Zero-point' and fields[1] == 'correction=' and fields[3] == '(Hartree/Particle)': ZPE_corr = float(fields[-2])
+            if len(fields) == 7 and fields[0] == 'Sum' and fields[2] == 'electronic' and fields[4] == 'zero-point': zero_E = float(fields[-1])
+            if len(fields) == 7 and fields[0] == 'Sum' and fields[2] == 'electronic' and fields[5] == 'Enthalpies=': H_298 = float(fields[-1])
+            if len(fields) == 8 and fields[0] == 'Sum' and fields[2] == 'electronic' and fields[5] == 'Free' and fields[6] == 'Energies=': F_298 = float(fields[-1])
+
+        # parse thermal properties from output
+        SPE=zero_E-ZPE_corr
+        return SPE

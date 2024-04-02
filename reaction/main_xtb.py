@@ -413,6 +413,7 @@ def run_gsm_by_xtb(rxns, logging_queue):
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
+    # stop 
     Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
     tsopt_jobs={}
     for count, gsm_job in enumerate(gsm_job_list):

@@ -35,7 +35,7 @@ constrained_TS: True
 model_path:   /Users/hsu205/github/classy-yarp/reaction/bin
 gsm_inp:      /home/hsu205/classy-yarp/reaction/bin/inpfileq
 
-package: ORCA
+package: ORCA #Gaussian or ORCA
 dft_nprocs: 4
 dft_lot: UHF 6-31G
 dft_wt: 4

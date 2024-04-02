@@ -36,7 +36,6 @@ def main(args:dict):
     # Run DFT optimization first to get DFT energy
     # print("Running DFT optimization")
     #print(rxns)
-    '''
     rxns=run_dft_opt(rxns)
     
     with open(args["reaction_data"], "wb") as f:
@@ -46,7 +45,6 @@ def main(args:dict):
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     # Run DFT IRC opt and generate results
-    '''
     rxns=run_dft_irc(rxns)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)

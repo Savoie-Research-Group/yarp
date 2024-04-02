@@ -21,8 +21,8 @@ el_valence = {  'h':1, 'he':2,\
                 'li':1, 'be':2,                                                                                                                'b':3,  'c':4,  'n':5,  'o':6,  'f':7, 'ne':8,\
                 'na':1, 'mg':2,                                                                                                               'al':3, 'si':4,  'p':5,  's':6, 'cl':7, 'ar':8,\
                 'k' :1, 'ca':2, 'sc':3, 'ti':4,  'v':5, 'cr':6, 'mn':7, 'fe':8, 'co':9, 'ni':10, 'cu':11, 'zn':12, 'ga':3, 'ge':4, 'as':5, 'se':6, 'br':7, 'kr':8,\
-                'rb':1, 'sr':2,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':3, 'sn':4, 'sb':5, 'te':6,  'i':7, 'xe':8,\
-                'cs':1, 'ba':2, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':3, 'pb':4, 'bi':5, 'po':6, 'at':7, 'rn':8  }        
+                'rb':1, 'sr':2,  'y':3, 'zr':4, 'nb':5, 'mo':6, 'tc':7, 'ru':8, 'rh':9, 'pd':10, 'ag':11, 'cd':12, 'in':3, 'sn':4, 'sb':5, 'te':6,  'i':7, 'xe':8,\
+                'cs':1, 'ba':2, 'la':3, 'hf':4, 'ta':5,  'w':6, 're':7, 'os':8, 'ir':9, 'pt':10, 'au':11, 'hg':12, 'tl':3, 'pb':4, 'bi':5, 'po':6, 'at':7, 'rn':8  }        
 # add values for title case
 for _ in list(el_valence.keys()):
     el_valence[_.title()] = el_valence[_]
@@ -33,8 +33,8 @@ el_n_deficient = {  'h':2, 'he':2,\
                     'li':2, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
                     'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
                     'k' :0, 'ca':0, 'sc':0, 'ti':0,  'v':0, 'cr':0, 'mn':0, 'fe':5, 'co':6, 'ni':8, 'cu':9, 'zn':10, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
-                    'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
-                    'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
+                    'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':8, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
+                    'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':8, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
 # add values for title case
 for _ in list(el_n_deficient.keys()):
     el_n_deficient[_.title()] = el_n_deficient[_]
@@ -45,8 +45,8 @@ el_n_expand_octet = {  'h':2, 'he':2,\
                     'li':2, 'be':0,                                                                                                                'b':8,  'c':8,  'n':8,  'o':8,  'f':8, 'ne':8,\
                     'na':0, 'mg':0,                                                                                                               'al':8, 'si':8,  'p':8,  's':8, 'cl':8, 'ar':8,\
                     'k' :1000, 'ca':1000, 'sc':1000, 'ti':1000,  'v':1000, 'cr':1000, 'mn':1000, 'fe':1000, 'co':1000, 'ni':1000, 'cu':1000, 'zn':1000, 'ga':8, 'ge':8, 'as':8, 'se':8, 'br':8, 'kr':8,\
-                    'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
-                    'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
+                    'rb':0, 'sr':0,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':1000, 'ag':1000, 'cd':None, 'in':8, 'sn':8, 'sb':8, 'te':8,  'i':8, 'xe':8,\
+                    'cs':0, 'ba':0, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':1000, 'hg':None, 'tl':8, 'pb':8, 'bi':8, 'po':8, 'at':8, 'rn':8  }        
 # add values for title case
 for _ in list(el_n_deficient.keys()):
     el_n_expand_octet[_.title()] = el_n_deficient[_]
@@ -55,9 +55,9 @@ for _ in list(el_n_deficient.keys()):
 el_expand_octet = { 'h':False, 'he':False,\
                     'li':False, 'be':False,                                                                                                               'b':False,  'c':False, 'n':False, 'o':False, 'f':False,'ne':False,\
                     'na':False, 'mg':False,                                                                                                               'al':True, 'si':True,  'p':True,  's':True, 'cl':True, 'ar':True,\
-                    'k' :False, 'ca':False, 'sc':False, 'ti':False,  'v':True, 'cr':True, 'mn':True, 'fe':True, 'co':True, 'ni':True, 'cu':True, 'zn':True, 'ga':True, 'ge':True, 'as':True, 'se':True, 'br':True, 'kr':True,\
-                    'rb':False, 'sr':False,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':None, 'ag':None, 'cd':None, 'in':True, 'sn':True, 'sb':True, 'te':True,  'i':True, 'xe':True,\
-                    'cs':False, 'ba':False, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':None, 'hg':None, 'tl':True, 'pb':True, 'bi':True, 'po':True, 'at':True, 'rn':True  }
+                    'k' :False, 'ca':False, 'sc':False, 'ti':False,  'v':True, 'cr':True, 'mn':True, 'fe':True, 'co':True, 'ni':True, 'cu':True, 'zn':True, 'ga':True, 'ge':True, 'as':True, 'se':True, 'br':None, 'kr':True,\
+                    'rb':False, 'sr':False,  'y':None, 'zr':None, 'nb':None, 'mo':None, 'tc':None, 'ru':None, 'rh':None, 'pd':True, 'ag':True, 'cd':None, 'in':True, 'sn':True, 'sb':True, 'te':True,  'i':True, 'xe':True,\
+                    'cs':False, 'ba':False, 'la':None, 'hf':None, 'ta':None,  'w':None, 're':None, 'os':None, 'ir':None, 'pt':None, 'au':True, 'hg':None, 'tl':True, 'pb':True, 'bi':True, 'po':True, 'at':True, 'rn':True  }
 # add values for title case
 for _ in list(el_expand_octet.keys()):
     el_expand_octet[_.title()] = el_expand_octet[_]
@@ -79,8 +79,9 @@ for _ in list(el_en.keys()):
 el_pol ={ "h" :4.5,  "he":1.38,\
           "li":164.0, "be":377,                                                                                                               "b" :20.5, "c" :11.3, "n" :7.4, "o" :5.3,  "f" :3.74, "ne":2.66,\
           "na":163.0, "mg":71.2,                                                                                                              "al":57.8, "si":37.3, "p" :25.0,"s" :19.4, "cl":14.6, "ar":11.1,\
-          "k" :290.0, "ca":161.0, "sc":97.0, "ti":100.0, "v": 87.0, "cr":83.0, "mn":68.0, "fe":62.0, "co":55, "ni":49, "cu":47.0, "zn":38.7,  "ga":50.0, "ge":40.0, "as":30.0,"se":29.0, "br":21.0, "kr":16.8,\
-          "rb":320.0, "sr":197.0, "y" :162,  "zr":112.0, "nb":98.0, "mo":87.0, "tc":79.0, "ru":72.0, "rh":66, "pd":26.1, "ag":55, "cd":46.0,  "in":65.0, "sn":53.0, "sb":43.0,"te":28.0, "i" :32.9, "xe":27.3,}
+          "k" :290.0, "ca":161.0, "sc":97.0, "ti":100.0, "v": 87.0, "cr":83.0, "mn":68.0, "fe":62.0, "co":55, "ni":49,"cu":47.0,  "zn":38.7,  "ga":50.0, "ge":40.0, "as":30.0,"se":29.0, "br":21.0, "kr":16.8,\
+          "rb":320.0, "sr":197.0, "y" :162,  "zr":112.0, "nb":98.0, "mo":87.0, "tc":79.0, "ru":72.0, "rh":66, "pd":26.1, "ag":55, "cd":46.0,  "in":65.0, "sn":53.0, "sb":43.0,"te":28.0, "i" :32.9, "xe":27.3,\
+          "cs":400.9, "ba":272.1, "la":215,  "hf":103.0, "ta":74.0, "w" :68.0, "re":62.0, "os":57.0, "ir":54, "pt":48,   "au":36, "hg":33.91, "tl":50,   "pb":47.0, "bi":48.0,"po":44.0, "at":42.0, "rn":35.0}
 # add values for title case
 for _ in list(el_pol.keys()):
     el_pol[_.title()] = el_pol[_]
@@ -116,22 +117,24 @@ for _ in list(el_radii.keys()):
     el_radii[_.lower()] = el_radii[_]
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
+# Zhao's note: changed Pd from 8 to None
 el_max_bonds = {  'H':2,    'He':1,\
                   'Li':1, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
                   'Na':None, 'Mg':None,                                                                                                               'Al':4,    'Si':4,  'P':None,  'S':None, 'Cl':1,    'Ar':1,\
                   'K' :None, 'Ca':None, 'Sc':15, 'Ti':14,  'V':13, 'Cr':12, 'Mn':11, 'Fe':10, 'Co':9, 'Ni':8, 'Cu':None, 'Zn':None, 'Ga':3,    'Ge':None, 'As':None, 'Se':None, 'Br':1,    'Kr':None,\
-                  'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':8, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
+                  'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':None, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
                   'Cs':None, 'Ba':None, 'La':15, 'Hf':14, 'Ta':13,  'W':12, 'Re':11, 'Os':10, 'Ir':9, 'Pt':8, 'Au':None, 'Hg':None, 'Tl':None, 'Pb':None, 'Bi':None, 'Po':None, 'At':None, 'Rn':None  }
 # add values for lower case
 for _ in list(el_max_bonds.keys()):
     el_max_bonds[_.lower()] = el_max_bonds[_]
 
 # This dictionary is used to flagging problematic adjacency matrices by the table_generator function.
+# Zhao's note: changed Pd from 8 to None
 el_max_bonds = {  'H':2,    'He':1,\
                   'Li':1, 'Be':None,                                                                                                                'B':4,     'C':4,     'N':4,     'O':2,     'F':1,    'Ne':1,\
                   'Na':None, 'Mg':None,                                                                                                               'Al':4,    'Si':4,  'P':None,  'S':None, 'Cl':1,    'Ar':1,\
                   'K' :None, 'Ca':None, 'Sc':15, 'Ti':14,  'V':13, 'Cr':12, 'Mn':11, 'Fe':10, 'Co':9, 'Ni':8, 'Cu':None, 'Zn':None, 'Ga':3,    'Ge':None, 'As':None, 'Se':None, 'Br':1,    'Kr':None,\
-                  'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':8, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
+                  'Rb':None, 'Sr':None,  'Y':15, 'Zr':14, 'Nb':13, 'Mo':12, 'Tc':11, 'Ru':10, 'Rh':9, 'Pd':None, 'Ag':None, 'Cd':None, 'In':None, 'Sn':None, 'Sb':None, 'Te':None,  'I':1,    'Xe':None,\
                   'Cs':None, 'Ba':None, 'La':15, 'Hf':14, 'Ta':13,  'W':12, 'Re':11, 'Os':10, 'Ir':9, 'Pt':8, 'Au':None, 'Hg':None, 'Tl':None, 'Pb':None, 'Bi':None, 'Po':None, 'At':None, 'Rn':None  }
 # add values for lower case
 for _ in list(el_max_bonds.keys()):
@@ -150,7 +153,7 @@ for _ in list(el_max_valence.keys()):
     el_max_valence[_.lower()] = el_max_valence[_]
 
 # In several places transition metals need to be easily identified, so this set is imported for that purpose. 
-el_metals = {'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd'}
+el_metals = {'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'Au'}
 el_metals.update({ _.lower() for _ in el_metals })
 
     

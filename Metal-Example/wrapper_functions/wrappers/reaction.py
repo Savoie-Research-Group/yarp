@@ -174,10 +174,10 @@ class reaction:
             if len(Gr)==0: continue
             tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"
             xyz_write(tmp_xyz_p,conf_entry['E'],Gr)
-            print(f"index: {conf_ind}, Gr: {Gr}\n")
+            #print(f"index: {conf_ind}, Gr: {Gr}\n")
             tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
             xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
-            print(f"index: {conf_ind}, conf_entry[G]: {conf_entry['G']}\n")
+            #print(f"index: {conf_ind}, conf_entry[G]: {conf_entry['G']}\n")
             #os.system(f"cp {tmp_xyz_r} {self.args['conf_output']}/{job_id}_RRRRRRR.xyz")
             #os.system(f"cp {tmp_xyz_p} {self.args['conf_output']}/{job_id}_PPPPPPP.xyz")
 

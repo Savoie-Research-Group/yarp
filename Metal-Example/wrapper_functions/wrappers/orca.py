@@ -183,7 +183,8 @@ class ORCA:
         """
         if os.path.isfile(self.output) is False: return False
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        #lines = open(self.output, 'r', encoding="utf-8").readlines()
 
         # set termination indicators
         termination_strings = ['ORCA TERMINATED NORMALLY', 'ORCA finished with error']
@@ -284,7 +285,8 @@ class ORCA:
         Check if the optimization converges
         """
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        #lines = open(self.output, 'r', encoding="utf-8").readlines()
 
         for line in reversed(lines):
             if 'THE OPTIMIZATION HAS CONVERGED' in line:

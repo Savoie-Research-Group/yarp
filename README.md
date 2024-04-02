@@ -1,6 +1,6 @@
 YARP: Yet Another Reaction Program for Automated Reaction Exploration
 
-YARP is a repository that explore the reaction network for a given set of molecules (reactants). YARP consists of construction of bond-electron matrix, product enumeration, reaction conformational sampling, transition state (TS) localization by growing string method (GSM), and TS characterization by Berny optimzation and IRC calculation. More details could be found on:
+This is an object-oriented refactoring of yarp methodology to be compatible with general reaction-discovery workflows. YARP is a repository that explore the reaction network for a given set of molecules (reactants). YARP consists of construction of bond-electron matrix, product enumeration, reaction conformational sampling, transition state (TS) localization by growing string method (GSM), and TS characterization by Berny optimzation and IRC calculation. More details could be found on:
 
 1. https://www.nature.com/articles/s43588-021-00101-3
 2. https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00081
@@ -10,7 +10,7 @@ Documentation:
 1. Installation:
 1.1 Anaconda is recommended and you can get YARP repository by:
 
-   git clone https://github.com/Savoie-Research-Group/yarp.git
+         git clone https://github.com/Savoie-Research-Group/yarp.git
 
 1.2 Build the YARP environment and install required packages by:
     

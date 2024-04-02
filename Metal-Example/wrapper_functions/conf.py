@@ -1,3 +1,7 @@
+#Zhao's note: for using yarpecule
+import yarp as yp
+
+
 import os,sys
 import numpy as np
 import logging
@@ -249,9 +253,13 @@ def closestDistanceBetweenLines(a0,a1,b0,b1,clampAll=True,clampA0=False,clampA1=
 
     return pA,pB,np.linalg.norm(pA-pB)
 
-def seperate_mols(E,G,q,adj_mat=None,namespace='sep'):
+def print_all_elements(diccct):
+        for attribute, value in diccct.__dict__.items():
+            print(f"{attribute}: {value}")
+
+def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
     #Zhao's note: pass the total charge as well #
-    ''' Function to seperate molecules and return a dictionary of each segment '''
+    ''' Function to separate molecules and return a dictionary of each segment '''
     #Zhao's note: add charge for each molecule into the mols dict#
     # generate adj mat
     if adj_mat is None: adj_mat = table_generator(E, G)
@@ -278,8 +286,8 @@ def seperate_mols(E,G,q,adj_mat=None,namespace='sep'):
     for group in groups:
         # parse element and geometry of each fragment
         N_atom = len(group)
-        for ind in group:
-            print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
+        #for ind in group:
+        #    print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
         #Zhao's note: might consider return "Element + index" for better control
         frag_E = [E[ind] for ind in group]
         frag_G = np.zeros([N_atom,3])
@@ -288,15 +296,52 @@ def seperate_mols(E,G,q,adj_mat=None,namespace='sep'):
         group_bond_mat = [bond_mat[a] for a in group]
         group_formal = return_formals(group_bond_mat, frag_E)
         frag_Charge = int(sum(group_formal))
-        print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
+        #print(f"group_bond_mat is {group_bond_mat}\n")
+        #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
 
         for count_i,i in enumerate(group):
             frag_G[count_i,:] = G[i,:]
         # generate inchikey
-        xyz_write(f"{namespace}_input.xyz",frag_E,frag_G)
-        molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
-        inchikey = molecule.write(format="inchikey").strip().split()[0]
-        os.system(f"rm {namespace}_input.xyz")
+        # Zhao's note: inchikey generated from xyz can be different from mol file (bonding info), consider changing inchikey generation here to all using mol file (consistent with init of reaction class)
+        N_atom=len(group)
+        mol=copy.deepcopy(molecule)
+        mol.elements=copy.deepcopy(frag_E)#[E[ind] for ind in group]
+        #mol.bond_mats=[bond_mat[group][:, group]]#copy.deepcopy(group_bond_mat)# 
+        #mol.geo=np.zeros([N_atom, 3])
+        mol.adj_mat=adj_mat[group][:, group]
+        mol.q = frag_Charge
+        #for count_i, i in enumerate(group): mol.geo[count_i, :]=G[i, :]
+        mol.geo = copy.deepcopy(frag_G)
+        frag_bond_mat, frag_score = find_lewis(mol.elements,mol.adj_mat,q=mol.q)
+        mol.bond_mats = [molecule.bond_mats[0][group][:, group]]
+        print(f"Writing to temporary file\n")
+        #print(f"mol object is {mol}\n")
+        #print_all_elements(mol)
+        #print(f"molecule (rxn RP) is {molecule}\n")
+        #print_all_elements(molecule)
+        #mol=deepcopy(molecule)
+        #mol.elements=frag_E
+        #mol.bond_mats=group_bond_mat
+        #mol.geo=frag_G
+        #mol.adj_mat=adj_mat[group][:, group]
+        mol_write_yp(".tmp.mol", mol)
+
+        #exit()
+
+        mol=next(pybel.readfile("mol", ".tmp.mol"))
+        inchikey=mol.write(format='inchikey').strip().split()[0]
+        #Zhao's note: take the first 14 letters
+        inchikey = inchikey[:14]
+        #inchikey+=[inchi]
+        os.system("mv .tmp.mol " + inchikey + ".mol")
+        print(f"mol inchikey is {inchikey}\n")
+        original_inchi = return_inchikey(molecule)
+        print(f"original RP molecule inchi is {original_inchi}\n")
+        #exit()
+        #xyz_write(f"{namespace}_input.xyz",frag_E,frag_G)
+        #molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
+        #inchikey = molecule.write(format="inchikey").strip().split()[0]
+        #os.system(f"rm {namespace}_input.xyz")
         
         #Zhao's note: might consider return "Element + index" for better control
         #what a waste, had to regenerate frag_E...

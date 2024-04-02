@@ -196,8 +196,8 @@ def xyz_write(name, element, geo, append_opt=False):
     else: out=open(name, 'a+')
     out.write('{}\n\n'.format(len(element)))
     for count_i, i in enumerate(element):
-        print(f"index: {count_i}, geo: {geo}", flush = True)
-        print(f"element: {i}, xyz: {geo[count_i]}\n", flush = True)
+        #print(f"index: {count_i}, geo: {geo}", flush = True)
+        #print(f"element: {i}, xyz: {geo[count_i]}\n", flush = True)
         out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
     out.close()
     return
@@ -371,6 +371,9 @@ def return_inchikey(molecule):
             groups+=[new_group]
     inchikey=[]
     mol=copy.deepcopy(molecule)
+    #Zhao's note: this seems to generate quite different inchikey if you write to xyz file, need to see why#
+    #They do result in different inchikeys, must be the bonding info, consider changing it in sep_mols
+    count = 0
     for group in groups:
         N_atom=len(group)
         mol=copy.deepcopy(molecule)
@@ -383,7 +386,10 @@ def return_inchikey(molecule):
         mol=next(pybel.readfile("mol", ".tmp.mol"))
         inchi=mol.write(format='inchikey').strip().split()[0]
         inchikey+=[inchi]
-        os.system("rm .tmp.mol")
+        os.system("mv .tmp.mol " + inchi + ".mol")
+        #os.system("rm .tmp.mol")
+        count += 1
+
     if len(groups) == 1:
         return inchikey[0][:14]
     else:

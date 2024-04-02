@@ -58,19 +58,13 @@ def process_input_rxn(rxns, args={}):
         R_constraint=return_metal_constraint(rxn.reactant)
         P_constraint=return_metal_constraint(rxn.product)
 
-        print(f"R_constraint: {R_constraint}\n")
-        print(f"P_constraint: {P_constraint}\n")
-
-        #Zhao's note: added dist constraint
-        total_constraints = []
-        inp_list = args['dist_constraint'].split(',')
-        for a in range(0, int(len(inp_list) / 3)):
-            arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
-            total_constraints.append(arg_list)
-
-        print(f"total_constraints: {total_constraints}\n", flush = True)
-
-        if(args['apply_constraint'] == 'product'):
+        #Zhao's note: added dist constraint for both reactant and product
+        if(args['constraint'] and not args['product_dist_constraint'] is None):
+            total_constraints = []
+            inp_list = args['product_dist_constraint'].split(',')
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
             for constraints in total_constraints:
                 #Check for overlaps in the atom numbers
                 print(f"product constraint: {constraints}\n", flush = True)
@@ -78,13 +72,23 @@ def process_input_rxn(rxns, args={}):
                 if not match_first_two_elements(constraints, P_constraint):
                     P_constraint.append(constraints)
 
-        if(args['apply_constraint'] == 'reactant'):
+        if(args['constraint'] and not args['reactant_dist_constraint'] is None):
+            total_constraints = []
+            inp_list = args['reactant_dist_constraint'].split(',')
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
             for constraints in total_constraints:
                 #Check for overlaps in the atom numbers
                 print(f"reactant constraint: {constraints}\n", flush = True)
                 print(f"Current R_constraint: {R_constraint}\n", flush = True)
                 if not match_first_two_elements(constraints, R_constraint):
                     R_constraint.append(constraints)
+
+        print(f"R_constraint: {R_constraint}\n")
+        print(f"P_constraint: {P_constraint}\n")
+
+        #exit()
 
         if args["strategy"]!=0:
             if P_inchi not in job_mapping:

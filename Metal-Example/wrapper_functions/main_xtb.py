@@ -63,21 +63,21 @@ def main(args:dict):
     #Zhao's note: a flag to skip the find_correct_TS function!
     args['skip_GSM_sanity_check'] = bool(args['skip_GSM_sanity_check'])
 
-    #Zhao's note: added dist constraint
+    '''
+    #Zhao's note: added dist constraint for both reactant and product
     if args['constraint']:
-        total_constraints = []
-        inp_list = args['dist_constraint'].split(',')
-        print("inp_list: \n")
-        print(inp_list)
-        for a in range(0, int(len(inp_list) / 3)):
-            arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
-            total_constraints.append(arg_list)
-        args['dist_constraints'] = total_constraints
-        print("args[dist_constraints]: \n", flush = True)
-        print(args['dist_constraints'], flush = True)
-        print("len(args[dist_constraints]): \n", flush = True)
-        print(len(args['dist_constraints']), len(args['dist_constraints'][0]), flush = True)
-
+        for side in ['reactant', 'product']:
+            if args[side + '_dist_constraint'] is None: continue
+            total_constraints = []
+            inp_list = args[side + '_dist_constraint'].split(',')
+            print("inp_list: \n")
+            print(inp_list)
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
+            args[side + '_dist_constraints'] = total_constraints.deepcopy()
+            print(f"{side}, dist_constraints: {args[side + '_dist_constraint']}, total: {total_constraints}\n", flush = True)
+    '''
     if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
     if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
     if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
@@ -302,10 +302,12 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     tsopt_jobs=dict()
     for count_i, i in enumerate(rxns):
         key=[j for j in i.TS_guess.keys()]
+        print(f"TS_guess keys: {i.TS_guess}\n", flush = True)
         for j in key:
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
+            print(f"tsopt_xtb: i: {i}\n", flush = True)
             xyz_write(f"{wf}/{rxn_ind}-TSguess.xyz", i.reactant.elements, i.TS_guess[j])
             if args["solvent"] is False:
                 pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, pysis_dir=args["pysis_path"], jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"])
@@ -433,6 +435,9 @@ def conf_crest(rxns, logging_queue):
     crest_thread=xtb_nprocs//crest_nprocs
     track_crest={}
     crest_job_list=[]
+
+    #exit()
+
     for inchi, jobi in job_mappings.items():
         wf=f"{scratch_crest}/{inchi}"
         if os.path.isdir(wf) is False: os.mkdir(wf)
@@ -445,21 +450,33 @@ def conf_crest(rxns, logging_queue):
         #Zhao's note: add command for constraint, see what happens.
         # distinguish the application of constraint on reactant/product/both
         # jobi has the ending '-P' and '-R'
+
+        #Zhao's note: think about adding the xtb metal constraints here as well?#
+        #would be nice to pass the constraints as part of the job_mapping dictionary#
+        total_constraints = []
+        #get the current reaction, loop over and compare inchi, no need for an exact match, just need to get the correct constraints#
+        for rrr in rxns:
+            if inchi==rrr.reactant_inchi or inchi == rrr.product_inchi:
+                if(jobi['jobs'][0].endswith('-R')):
+                    total_constraints = return_metal_constraint(rrr.reactant)
+                if(jobi['jobs'][0].endswith('-P')):
+                    total_constraints = return_metal_constraint(rrr.product)
+                break
+        #Zhao's note: Add user-defined constraints#
         if args['constraint']:
-            print(crest_job.xcontrol, flush = True)
-            print(jobi['jobs'][0].endswith('-R'), flush = True)
+            constraint_argument = []
+            if not args['reactant_dist_constraint'] is None and jobi['jobs'][0].endswith('-R'):
+                constraint_argument = args['reactant_dist_constraint']
+            elif not args['product_dist_constraint'] is None and jobi['jobs'][0].endswith('-P'):
+                constraint_argument = args['product_dist_constraint']
 
-            print(jobi['jobs'][0].endswith('-P'), flush = True)
-            #  if product, check if apply-constraint only to product, if reactant, check if apply-constraint only to reactant
-            if((jobi['jobs'][0].endswith('-R') and not args['apply_constraint'] == 'product') or (jobi['jobs'][0].endswith('-P') and not args['apply_constraint'] == 'reactant')):
-                #Zhao's note: added dist constraint
-                total_constraints = []
-                inp_list = args['dist_constraint'].split(',')
-                for a in range(0, int(len(inp_list) / 3)):
-                    arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
-                    total_constraints.append(arg_list)
+            inp_list = constraint_argument.split(',')
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
 
-                crest_job.add_command(distance_constraints = total_constraints)
+        if len(total_constraints) > 0:
+            crest_job.add_command(distance_constraints = total_constraints)
 
         crest_job_list.append(crest_job)
         for jobid in jobi['jobs']: track_crest[jobid]=crest_job

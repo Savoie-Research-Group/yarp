@@ -17,7 +17,7 @@ from utils import *
 from constants import Constants
 from job_submission import *
 from job_mapping import *
-from conf import seperate_mols
+from conf import separate_mols
 
 def compare_lists(list1, list2):
     """
@@ -404,6 +404,9 @@ def run_dft_tsopt(rxns):
                     rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
                     rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=orca_opt.get_energy()
                     rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=orca_opt.get_imag_freq_mode()
+                    print(f"SPE: {rxns[count].TS_dft[dft_lot][conf_i]['SPE']}\n")
+                    print(f"GibbsFreeEnergy: {rxns[count].TS_dft[dft_lot][conf_i]['thermal']['GibbsFreeEnergy']}\n")
+                    print(f"imag_mode: {rxns[count].TS_dft[dft_lot][conf_i]['imag_mode']}\n")
     return rxns
 
 # Zhao's note: function that checks and re-runs FullTZ numerical frequency calculations #
@@ -524,6 +527,11 @@ def run_dft_irc(rxns):
 
     # Read result into reaction class
     key=[i for i in irc_jobs.keys()]
+
+    #Declare/Initialize IRC results here#
+    for count, rxn in enumerate(rxns):
+        rxns[count].IRC_dft[dft_lot]=dict()
+
     for rxn_ind in key:
         irc_job=irc_jobs[rxn_ind]
         if irc_job.calculation_terminated_normally() is False:
@@ -543,6 +551,7 @@ def run_dft_irc(rxns):
         #bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
         #bond_mat1=bond_mat1[0]
         #bond_mat2=bond_mat2[0]
+        print(f"rxn_ind: {rxn_ind}, job_success: {job_success}\n")
         for count, rxn in enumerate(rxns):
             if inchi==rxn.reactant_inchi and idx==rxn.id:
                 P_adj_mat=rxn.product.adj_mat
@@ -551,7 +560,8 @@ def run_dft_irc(rxns):
                 adj_diff_r2=np.abs(adj_mat2-R_adj_mat)
                 adj_diff_p1=np.abs(adj_mat1-P_adj_mat)
                 adj_diff_p2=np.abs(adj_mat2-P_adj_mat)
-                rxns[count].IRC_dft[dft_lot]=dict()
+                #Zhao's note: the line below keeps initializing IRC_dft[dft_lot], move it above (out of the for loop)
+                #rxns[count].IRC_dft[dft_lot]=dict()
                 rxns[count].IRC_dft[dft_lot][conf_i]=dict()
                 if adj_diff_r1.sum()==0:
                     if adj_diff_p2.sum()==0:
@@ -590,6 +600,7 @@ def run_dft_irc(rxns):
                     rxns[count].IRC_dft[dft_lot][conf_i]["TS"]=TSG
                     rxns[count].IRC_dft[dft_lot][conf_i]["barriers"]=[barrier2, barrier1]
                     rxns[count].IRC_dft[dft_lot][conf_i]["type"]="unintended"
+                print(f"count: {count}, conf_i: {conf_i}, reaction type: {rxns[count].IRC_dft[dft_lot][conf_i]['type']}\n")
     return rxns
 
 def writedown_result(rxns):
@@ -600,9 +611,13 @@ def writedown_result(rxns):
         if args["backward_DE"]: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"DE_B":<10s} {"DG_B":<10s} {"Type":<10s} {"Source":<10s}\n')
         else: f.write(f'{"reaction":40s} {"R":<60s} {"P":<60s} {"DE_F":<10s} {"DG_F":<10s} {"Type":<10s} {"Source":<10s}\n')
         for rxn in rxns:
-            if dft_lot in rxn.IRC_dft.keys(): key=[i for i in rxn.IRC_dft[dft_lot].keys()]
-            else: continue
+            if dft_lot in rxn.IRC_dft.keys(): 
+                key=[i for i in rxn.IRC_dft[dft_lot].keys()]
+                print(f"IRC keys: {key}\n")
+            else: 
+                continue
             for conf_i in key:
+                print(f"writing result: conf_i: {conf_i}\n")
                 rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{conf_i}"
                 adj_mat=table_generator(rxn.reactant.elements, rxn.IRC_dft[dft_lot][conf_i]["node"][0])
                 bond_mat, _=find_lewis(rxn.reactant.elements, adj_mat)
@@ -624,7 +639,7 @@ def writedown_result(rxns):
                         DG_B=Constants.ha2kcalmol*(rxn.TS_dft[dft_lot][conf_i]["thermal"]["GibbsFreeEnergy"]-rxn.product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"])
                     except:
                         DE_B=0.0
-                        DF_B=0.0
+                        DG_B=0.0
                     f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {DE_B:<10.4f} {DG_B:<10.4f} {rxn.IRC_dft[dft_lot][conf_i]['type']:<10s} {dft_lot:<10s}\n")
                 else:
                     f.write(f"{rxn_ind:40s} {rsmi:<60s} {psmi:<60s} {DE_F:<10.4f} {DG_F:<10.4f} {rxn.IRC_dft[dft_lot][conf_i]['type']:<10s} {dft_lot:<10s}\n")
@@ -676,6 +691,8 @@ def run_dft_opt(rxns):
     print(f"inchi_dict after process: {inchi_dict}\n")
 
     for rxn in rxns:
+        rxn.reactant_dft_opt = dict()
+        rxn.product_dft_opt = dict()
         print(f"rxn.reactant_conf: {bool(rxn.reactant_conf)}\n", flush = True)
         print(f"rxn.product_conf: {bool(rxn.product_conf)}\n", flush = True)
         print(f"REACTANT GEO: {rxn.reactant.geo}\n", flush = True)
@@ -711,16 +728,16 @@ def run_dft_opt(rxns):
                 #if "-" in i_string:
                 #    i_string = i_string.split("-")[0]
                 print(f"Looping reactant inchi: {i_string}\n", flush = True)
-                if((reactant_separable or i_string in rxn.reactant_inchi) and i_string not in missing_dft):
-                    missing_dft.append(i_string)
+                if((reactant_separable or i in rxn.reactant_inchi) and i not in missing_dft):
+                    missing_dft.append(i)
         if dft_lot not in rxn.product_dft_opt.keys():
             for i in inchi_key:
                 i_string = i
                 #if "-" in i_string:
                 #    i_string = i_string.split("-")[0]
-                print(f"Looping product inchi: {i_string}\n", flush = True)
-                if((product_separable or i_string in rxn.product_inchi) and i_string not in missing_dft):
-                    missing_dft.append(i_string)
+                print(f"Looping product inchi: {i}\n", flush = True)
+                if((product_separable or i in rxn.product_inchi) and i not in missing_dft):
+                    missing_dft.append(i)
     
     missing_conf=[]
     for i in missing_dft:
@@ -857,8 +874,19 @@ def run_dft_opt(rxns):
 
         dft_dict=dict()
         for dft_job in dft_job_list:
-            inchi=dft_job.jobname.split("-OPT")[0]
-            if dft_job.calculation_terminated_normally() and dft_job.optimization_converged():
+            print(f"dft job name: {dft_job.jobname}\n", flush = True)
+            jobtype_name = "-OPT"
+            if(args['dft_fulltz_level_correction']):
+                jobtype_name = "-FullTZ"
+            inchi=dft_job.jobname.split(jobtype_name)[0]
+            CONVERGE = False
+            if not args['dft_fulltz_level_correction'] and dft_job.calculation_terminated_normally() and dft_job.optimization_converged():
+                CONVERGE = True
+            elif args['dft_fulltz_level_correction'] and dft_job.calculation_terminated_normally():
+                CONVERGE = True
+
+            if CONVERGE:
+                print(f"{inchi} OPT converged\n", flush = True)
                 imag_freq, _=dft_job.get_imag_freq()
                 if len(imag_freq) > 0:
                     print("WARNING: imaginary frequency identified for molecule {inchi}...")
@@ -870,49 +898,63 @@ def run_dft_opt(rxns):
                 dft_dict[inchi]["SPE"]=SPE
                 dft_dict[inchi]["thermal"]=thermal
                 dft_dict[inchi]["geo"]=G
+
+                print(f"inchi SPE: {SPE}\n")
         if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+"/"+args["dft_lot"].split()[1]
         else: dft_lot=args["dft_lot"]
         key=[i for i in dft_dict.keys()]
         for count, rxn in enumerate(rxns):
             for i in key:
+                print(f"i: {i}, rxn.reactant_inchi: {rxn.reactant_inchi}, rxn.product_inchi: {rxn.product_inchi}\n")
                 if i in rxn.reactant_inchi:
                     if dft_lot not in rxns[count].reactant_dft_opt.keys():
                         rxns[count].reactant_dft_opt[dft_lot]=dict()
                     if "SPE" not in rxns[count].reactant_dft_opt[dft_lot].keys():
                         rxns[count].reactant_dft_opt[dft_lot]["SPE"]=dft_dict[i]["SPE"]
+                        print(f"R: i: {i}, SPE: {dft_dict[i]['SPE']}\n")
                     else:
                         rxns[count].reactant_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
                     if "thermal" not in rxns[count].reactant_dft_opt[dft_lot].keys():
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]=dft_dict[i]["thermal"]
+                        print(f"R: i: {i}, thermal initialize: {dft_dict[i]['thermal']}\n")
                     else:
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
-                if rxn.product_inchi in dft_dict.keys() and rxn.args["backward_DE"]:
+                    print(f"R_GE: {i}, ith: {dft_dict[i]['thermal']['GibbsFreeEnergy']}, {rxns[count].reactant_dft_opt[dft_lot]['thermal']['GibbsFreeEnergy']}\n")
+                if i in rxn.product_inchi and rxn.product_inchi in dft_dict.keys() and rxn.args["backward_DE"]:
                     if dft_lot not in rxns[count].product_dft_opt.keys():
                         rxns[count].product_dft_opt[dft_lot]=dict()
                     if "SPE" not in rxns[count].product_dft_opt[dft_lot].keys():
                         rxns[count].product_dft_opt[dft_lot]["SPE"]=dft_dict[i]["SPE"]
+                        print(f"P: i: {i}, SPE: {dft_dict[i]['SPE']}\n")
                     else:
                         rxns[count].product_dft_opt[dft_lot]["SPE"]+=dft_dict[i]["SPE"]
                     if "thermal" not in rxns[count].product_dft_opt[dft_lot].keys():
                         rxns[count].product_dft_opt[dft_lot]["thermal"]=dft_dict[i]["thermal"]
+                        print(f"P: i: {i}, thermal initialize: {dft_dict[i]['thermal']}\n")
                     else:
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=dft_dict[i]["thermal"]["GibbsFreeEnergy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
+                    print(f"P_GE: {i}, ith: {dft_dict[i]['thermal']['GibbsFreeEnergy']}, {rxns[count].product_dft_opt[dft_lot]['thermal']['GibbsFreeEnergy']}\n")
 
-    exit()
+    #exit()
     return rxns
 
 def find_all_seps(rxns, args):
     inchi_dict=dict()
     for rxn in rxns:
-        tmp_dict=seperate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'])
+        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R")
         key=[i for i in tmp_dict.keys()]
+
+        original_r_inchi = return_inchikey(rxn.reactant)
+
         print(f"reactant key: {key}\n")
+        print(f"original_r_inchi: {original_r_inchi}\n")
+
         reactant_separable = False
         product_separable  = False
         n_reactant_inchi = 0
@@ -926,7 +968,10 @@ def find_all_seps(rxns, args):
         n_reactant_inchi = len(inchi_dict)
 
         if rxn.args["backward_DE"]:
-            tmp_dict=seperate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'])
+            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P")
+            original_p_inchi = return_inchikey(rxn.product)
+            print(f"original_p_inchi: {original_p_inchi}\n")
+
             key=[i for i in tmp_dict.keys()]
             print(f"product key: {key}\n")
             for i in key:

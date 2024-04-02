@@ -923,7 +923,13 @@ def run_dft_opt(rxns):
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
                     print(f"R_GE: {i}, ith: {dft_dict[i]['thermal']['GibbsFreeEnergy']}, {rxns[count].reactant_dft_opt[dft_lot]['thermal']['GibbsFreeEnergy']}\n")
-                if i in rxn.product_inchi and rxn.product_inchi in dft_dict.keys() and rxn.args["backward_DE"]:
+                print(f"i in rxn.product_inchi: {i in rxn.product_inchi}\n")
+                print(f"rxn.product_inchi in dft_dict.keys(): {rxn.product_inchi in dft_dict.keys()}\n")
+                print(f"rxn.args['backward_DE']: {rxn.args['backward_DE']}\n")
+                #Zhao's note: Need to test more on this line
+                if i in rxn.product_inchi and i in dft_dict.keys() and rxn.args["backward_DE"]:
+
+
                     if dft_lot not in rxns[count].product_dft_opt.keys():
                         rxns[count].product_dft_opt[dft_lot]=dict()
                     if "SPE" not in rxns[count].product_dft_opt[dft_lot].keys():

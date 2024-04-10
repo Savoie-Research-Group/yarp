@@ -174,17 +174,17 @@ class Gaussian:
                 break
         
         if N_imag == 0: 
-            return N_imag,[]
+            return [], N_imag
         else:
             freq_line = lines[imag_line+9].split()
             imag_freq = [float(freq_line[ind+2]) for ind in range(N_imag)]
-            return N_imag,imag_freq
+            return imag_freq, N_imag
         
     def is_TS(self) -> bool:
         """
         Check if this is a ture transition state after TS optimization 
         """
-        N_imag,imag_freq = self.get_imag_freq()
+        imag_freq, N_imag = self.get_imag_freq()
         if N_imag == 1 and abs(imag_freq[0]) > 10: return True
         else: return False
 
@@ -317,7 +317,7 @@ class Gaussian:
             if len(fields) == 8 and fields[0] == 'Sum' and fields[2] == 'electronic' and fields[5] == 'Free' and fields[6] == 'Energies=': F_298 = float(fields[-1])
 
         # parse thermal properties from output
-        thermal = {'GibbsFreeEnergy':F_298,'Enthalpy':H_298,'InnerEnergy':zero_E,'SPE':zero_E-ZPE_corr}
+        thermal = {'GibbsFreeEnergy':F_298,'Enthalpy':H_298,'InnerEnergy':zero_E,'SPE':zero_E-ZPE_corr, "Entropy": 0.0}
 
         return thermal
 

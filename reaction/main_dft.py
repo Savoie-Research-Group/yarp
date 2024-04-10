@@ -45,6 +45,7 @@ def main(args:dict):
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     # Run DFT IRC opt and generate results
+
     rxns=run_dft_irc(rxns)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -467,7 +468,7 @@ def run_dft_opt(rxns):
                 dft_job.generate_input()
                 dft_job_list.append(dft_job)
             elif args["package"]=="Gaussian":
-                dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{rxn_ind}-OPT",\
+                dft_job=Gaussian(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"])*1000, jobname=f"{inchi}-OPT",\
                                  jobtype="opt", lot=dft_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
                                  solvation_model=args["solvation_model"], dielectric=args["dielectric"], dispersion=args["dispersion"])
                 dft_job.generate_input()

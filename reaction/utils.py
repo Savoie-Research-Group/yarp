@@ -341,7 +341,22 @@ def return_metal_constraint(molecule):
                 if i:
                     dis_constraint.append([count_e+1, count_i+1, el_radii[e.capitalize()]+el_radii[elements[count_i].capitalize()]])
     return dis_constraint
-                    
+
+def return_model_rxn(reaction, depth=1):
+    # This function is written by Hsuan-Hao Hsu (hsu205@purdue.edu)
+    # Read in a true reaction and return a reaction class of model reaction
+    elements=reaction.reactant.elements
+    R_adj=reaction.reactant.adj_mat
+    P_adj=reaction.product.adj_mat
+    R_bond=reaction.reactant.bond_mats[0]
+    P_bond=reaction.product.bond_mats[0]
+    for ind in range(len(bond_mat_2)):
+        BE_change=P_bond-R_bond
+    print(BE_change)
+    bond_break=[]
+    bond_form=[]
+    return
+
 def return_inchikey(molecule):
     E=molecule.elements
     G=molecule.geo

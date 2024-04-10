@@ -37,9 +37,10 @@ class reaction:
         self.reactant=reactant
         self.product=product
         self.args=args
-        self.conf_path=self.args["scratch_crest"]
-        n_conf=self.args["n_conf"]
-        self.n_conf=self.args["n_conf"]
+        if "scratch_crest" not in args.keys(): self.conf_path="conf"
+        else: self.conf_path=self.args["scratch_crest"]
+        if "n_conf" not in args.keys(): self.n_conf=10
+        else: self.n_conf=self.args["n_conf"]
         # safe check
         for count_i, i in enumerate(reactant.elements): reactant.elements[count_i]=i.capitalize()
         for count_i, i in enumerate(product.elements): product.elements[count_i]=i.capitalize()

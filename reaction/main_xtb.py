@@ -22,35 +22,67 @@ from wrappers.pysis import PYSIS
 from wrappers.gsm import GSM
 
 # YARP methodology by Hsuan-Hao Hsu, Qiyuan Zhao, and Brett M. Savoie
-def initialize(args={}):
-    input_path=args['input']
-    scratch=args['scratch']
-    if args['low_solvation']: args['low_solvation_model'], args['solvent'] = args['low_solvation'].split('/')
-    else: args['low_solvation_model'], args['solvent'] = 'alpb', False
-    scratch_xtb    = f'{scratch}/xtb_run'
-    scratch_crest  = f'{scratch}/conformer'
-    conf_output    = f'{scratch}/rxn_conf'
-    args['scratch_xtb']  = scratch_xtb
-    args['scratch_crest']= scratch_crest
-    args['conf_output']  = conf_output
-    if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
-    if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
-    if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
-    if os.path.isdir(conf_output) is False: os.mkdir(conf_output)
-
-    logging_path = os.path.join(scratch, "YARPrun.log")
-    if args["nprocs"] > 1:
-        logging_queue = mp.Manager().Queue(999)                                                                                                    
-        logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
-        logger_p.start()
-        start = time.time()
-        Tstart= time.time()
-        logger = logging.getLogger("main")
-        logger.addHandler(QueueHandler(logging_queue))
-        logger.setLevel(logging.INFO)
+def initialize(args):
+    keys=[i for i in args.keys()]
+    if "input" not in keys:
+        print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
+        exit()
+    if "scratch" not in keys:
+        args["scratch"]=f"{os.getcwd()}/yarp_run"
+    if "low_solvation" not in keys:
+        args["low_solvation"]=False
+        args["low_solvation_model"]="alpb"
+        args["solvent"]=False
     else:
-        logger=""
-        logging_queue=""
+        args["low_solvation_model"], args["solvent"]=args['low_solvation'].split('/')
+    if "method" not in keys:
+        args["method"]="crest"
+    if "reaction_data" not in keys: args["reaction_data"]="reaction.p"
+    if "form_all" not in keys: args["form_all"]=False
+    if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
+    if "crest" not in keys: args["crest"]="crest"
+    if "xtb" not in keys: args["xtb"]="xtb"
+    if "charge" not in keys:
+        print("WARNING: Charge is not provided. Use neutral species (charge=0) as default...")
+        args["charge"]=0
+    if "multiplicity" not in keys:
+        print("WARNING: Multiplicity is not provided. Use closed-shell species (multiplicity=1) as default...")
+        args["multiplicity"]=1
+    if "enumeration" not in keys:
+        args["enumeration"]=True
+    if "n_break" not in keys:
+        args["n_break"]=2
+    else: args["n_break"]=int(args['n_break'])
+    if "strategy" not in keys:
+        args["strategy"]=2
+    else: args["strategy"]=int(args["strategy"])
+    if "n_conf" not in keys:
+        args["n_conf"]=3
+    else: args["n_conf"]=int(args["n_conf"])
+    if "nprocs" not in keys:
+        args["nprocs"]=1
+    else: args["nprocs"]=int(args["nprocs"])
+    if "c_nprocs" not in keys:
+        args["c_nprocs"]=1
+    else: args["c_nprocs"]=int(args["c_nprocs"])
+    if "mem" not in keys:
+        args["mem"]=1
+    args["scratch_xtb"]=f"{args['scratch']}/xtb_run"
+    args["scratch_crest"]=f"{args['scratch']}/conformer"
+    args["conf_output"]=f"{args['scratch']}/rxn_conf"
+    if os.path.exists(args["scratch"]) is False: os.makedirs(args["scratch"])
+    if os.path.exists(args["scratch_xtb"]) is False: os.makedirs(args["scratch_xtb"])
+    if os.path.exists(args["scratch_crest"]) is False: os.makedirs(args["scratch_crest"])
+    if os.path.exists(args["conf_output"]) is False: os.makedirs(args["conf_output"])
+    logging_path = os.path.join(args["scratch"], "YARPrun.log")
+    logging_queue = mp.Manager().Queue(999)
+    logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
+    logger_p.start()
+    start = time.time()
+    Tstart= time.time()
+    logger = logging.getLogger("main")
+    logger.addHandler(QueueHandler(logging_queue))
+    logger.setLevel(logging.INFO)
     return args, logger, logging_queue
 
 def main(args:dict):
@@ -67,17 +99,18 @@ def main(args:dict):
         mol=[i.split('\n')[0] for i in open(args["input"], 'r+').readlines()]
     else:
         mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
+    
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
-    
+        for rxn in rxns: rxn.args=args
     print("-----------------------")
     print("------First Step-------")
     print("------Enumeration------")
     print("-----------------------")
-    
+
     if args["enumeration"]: 
         for i in mol: rxns=run_enumeration(i, args=args)
-    else:
+    elif os.path.isfile(args["reaction_data"]) is False:
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
     #for i in rxns:
@@ -102,12 +135,13 @@ def main(args:dict):
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif args["method"]=='crest':
         rxns=conf_by_crest(rxns, logging_queue, logger)
+    
     print("-----------------------")
     print("-------Third Step------")
     print("Conformation Generation")
     print("-----------------------")
     rxns=select_rxn_conf(rxns, logging_queue)
-    exit()
+    # exit()
     print("-----------------------")
     print("-------Forth Step------")
     print("-Growing String Method-")
@@ -164,6 +198,7 @@ def run_irc_by_xtb(rxns, logging_queue):
     irc_thread=min(nprocs, len(irc_job_list))
     input_job_list=[(irc_job, logging_queue, args["pysis_wt"]) for irc_job in irc_job_list]
     Parallel(n_jobs=irc_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+    
     # Read result into reaction class
     for irc_job in irc_job_list:
         if irc_job.calculation_terminated_normally() is False:
@@ -272,6 +307,7 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
                 wf=f"{scratch}/xtb_run/{R_inchi}"
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 xyz_write(f"{wf}/{R_inchi}-init.xyz", PE, PG)
+                print(wf)
                 if args["solvent"]==False:
                     pysis_job=PYSIS(input_geo=f"{wf}/{R_inchi}-init.xyz", work_folder=wf, jobname=R_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"])
                 else:
@@ -290,9 +326,11 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
 
     input_job_list=[(opt_job, logging_queue, args["pysis_wt"]) for opt_job in opt_job_list]
     Parallel(n_jobs=opt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+
     # Read in optimized geometry
     for opt_job in opt_job_list:
-        E, G = opt_job.get_opt_geo()
+        if opt_job.optimization_converged(): E, G = opt_job.get_opt_geo()
+        else: continue
         ind=opt_job.jobname
         for rxn in rxns:
             if args["strategy"]!=0:
@@ -323,7 +361,8 @@ def conf_by_crest(rxns, logging_queue, logger):
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 inchi_list.append(rxn.product_inchi)
                 inp_xyz=f"{wf}/{rxn.product_inchi}.xyz"
-                xyz_write(inp_xyz, rxn.product_xtb_opt["E"], rxn.product_xtb_opt["G"])
+                if bool(rxn.product_xtb_opt) is False: xyz_write(inp_xyz, rxn.product.elements, rxn.product.geo)
+                else: xyz_write(inp_xyz, rxn.product_xtb_opt["E"], rxn.product_xtb_opt["G"])
                 crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
                         solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
                 if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
@@ -334,7 +373,8 @@ def conf_by_crest(rxns, logging_queue, logger):
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 inchi_list.append(rxn.reactant_inchi)
                 inp_xyz=f"{wf}/{rxn.reactant_inchi}.xyz"
-                xyz_write(inp_xyz, rxn.reactant_xtb_opt["E"], rxn.reactant_xtb_opt["G"])
+                if bool(rxn.reactant_xtb_opt) is False: xyz_write(inp_xyz, rxn.reactant.elements, rxn.reactant.geo)
+                else: xyz_write(inp_xyz, rxn.reactant_xtb_opt["E"], rxn.reactant_xtb_opt["G"])
                 crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
                         solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
                 if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
@@ -376,6 +416,7 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     # Run the tasks in parallel
     input_job_list = [(tsopt_job, logging_queue, args['pysis_wt']) for tsopt_job in tsopt_job_list]
     Parallel(n_jobs=tsopt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+
     # check tsopt jobs
     tsopt_job_list = check_dup_ts_pysis(tsopt_job_list, logger)
     for tsopt_job in tsopt_job_list:
@@ -394,6 +435,11 @@ def run_gsm_by_xtb(rxns, logging_queue):
     nprocs=args["nprocs"]
     scratch=args["scratch"]
     # write the reaction xyz to conf_output for follwoing GSM calculation
+    for i in rxns:
+        key=[j for j in i.rxn_conf.keys()]
+        for j in key:
+            name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
+            write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
     gsm_jobs={}
@@ -413,7 +459,6 @@ def run_gsm_by_xtb(rxns, logging_queue):
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
-    # stop 
     Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
     tsopt_jobs={}
     for count, gsm_job in enumerate(gsm_job_list):
@@ -492,8 +537,8 @@ def select_rxn_conf(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["nprocs"]
-    # if 0:
-    if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
+    if 0:
+    #if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
     else:
         thread=min(nprocs, len(rxns))
@@ -508,11 +553,6 @@ def select_rxn_conf(rxns, logging_queue):
             startidx=endidx
         modified_rxns=Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
         rxns=modified_rxns
-    for i in rxns:
-        key=[j for j in i.rxn_conf.keys()]
-        for j in key:
-            name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
-            write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
         print(f"Finish generating reaction conformations, the output conformations are stored in {conf_output}\n")
     return rxns
 

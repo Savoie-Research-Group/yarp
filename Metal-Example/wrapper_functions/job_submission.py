@@ -238,7 +238,9 @@ class SLURM_Job:
             #add module load anaconda 
             #conda activate <your current conda env>
             #This is just a fix on Purdue's machine, you can turn it off#
-            f.write(f"module load anaconda\n")
+            #Zhao's note: purdue changed its default anaconda, switch!
+            #f.write(f"module load anaconda\n")
+            f.write(f"module load anaconda/2022.10-py39\n")
             f.write(f"conda activate copy-classy-yarp\n")
 
             f.write(f"export OMP_STACKSIZE={crest_job_list[0].mem}M\n")

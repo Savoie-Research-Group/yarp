@@ -67,8 +67,6 @@ def process_input_rxn(rxns, args={}):
                 total_constraints.append(arg_list)
             for constraints in total_constraints:
                 #Check for overlaps in the atom numbers
-                print(f"product constraint: {constraints}\n", flush = True)
-                print(f"Current P_constraint: {P_constraint}\n", flush = True)
                 if not match_first_two_elements(constraints, P_constraint):
                     P_constraint.append(constraints)
 
@@ -80,20 +78,17 @@ def process_input_rxn(rxns, args={}):
                 total_constraints.append(arg_list)
             for constraints in total_constraints:
                 #Check for overlaps in the atom numbers
-                print(f"reactant constraint: {constraints}\n", flush = True)
-                print(f"Current R_constraint: {R_constraint}\n", flush = True)
                 if not match_first_two_elements(constraints, R_constraint):
                     R_constraint.append(constraints)
 
-        print(f"R_constraint: {R_constraint}\n")
-        print(f"P_constraint: {P_constraint}\n")
+        R_ADJMAT = table_generator(RE, RG)
+        P_ADJMAT = table_generator(PE, PG)
+        np.set_printoptions(threshold=sys.maxsize)
 
         #exit()
 
         if args["strategy"]!=0:
             if P_inchi not in job_mapping:
-
-                print(f"P_Constraint: {P_constraint}\n", flush = True)
 
                 job_mapping[P_inchi]={'jobs': [f'{count_i}-P'], 'id': len(job_mapping)}
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", PE, PG)
@@ -116,8 +111,6 @@ def process_input_rxn(rxns, args={}):
             else: job_mapping[P_inchi]["jobs"].append(f"{count_i}-P")
         if args["strategy"]!=1:
             if R_inchi not in job_mapping:
-
-                print(f"R_Constraint: {R_constraint}\n", flush = True)
 
                 job_mapping[R_inchi]={"jobs": [f"{count_i}-R"], "id": len(job_mapping)}
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", RE, RG)
@@ -165,3 +158,8 @@ def monitor_jobs(slurm_jobs):
             break
         time.sleep(60)
     return    
+#Zhao's note: write the jobs to txt file for monitoring#
+def write_to_last_job(slurm_jobs):
+    with open('last_jobs.txt', 'w') as file:
+        for slmjob in slurm_jobs:
+            file.write(slmjob.job_id + '\n')

@@ -73,8 +73,8 @@ class PYSIS:
         if self.jobtype.lower() == 'tsopt':
             if method is None: method = 'rsprfo'
             with open(f'{self.pysis_input}','a') as f:
-                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 800\n')
-                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 800\n')
+                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 2000\n')
+                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 2000\n')
 
         elif self.jobtype.lower()== 'irc':
             if method is None: method = 'eulerpc'

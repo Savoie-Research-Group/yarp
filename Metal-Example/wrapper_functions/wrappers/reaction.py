@@ -135,19 +135,19 @@ class reaction:
         tmp_rxn_dict=dict()
         count=0
         # Create a dictionary to store the conformers and product/reactant bond mat.
-        # Zhao's note: change this from bond_mat to adj_mat
         if self.args["strategy"]!=0:
             for i in self.product_conf.keys():
-                print(f"self.product_conf[i]: {self.product_conf[i]}\n")
+                print(f"self.product_conf[{i}]: {self.product_conf[i]}\n")
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": R_bond_mats[0], "G": deepcopy(self.product_conf[i]), 'direct':'B'}
-                #tmp_rxn_dict[count]={"E": RE, "adj_mat_r": R_adj, "G": deepcopy(self.product_conf[i]), 'direct':'B'}
                 count=count+1
+        print(f"Product sample, there are {count} tmp rxns\n", flush = True)
+
         if self.args["strategy"]!=1:
             for i in self.reactant_conf.keys():
-                print(f"self.reactant_conf[i]: {self.reactant_conf[i]}\n")
+                print(f"self.reactant_conf[{i}]: {self.reactant_conf[i]}\n")
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
-                #tmp_rxn_dict[count]={"E": RE, "adj_mat_r": P_adj, "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
                 count=count+1
+        print(f"Total: there are {count} tmp rxns\n", flush = True)
 
         #exit()
 
@@ -156,30 +156,83 @@ class reaction:
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
 
         ind_list, pass_obj_values=[], []
+
+        # Load additional constraints proposed by the user
+        reactant_total_constraints = []
+        product_total_constraints = []
+
+        if self.args['constraint']:
+            if not self.args['reactant_dist_constraint'] is None:
+                constraint_argument = self.args['reactant_dist_constraint']
+                inp_list = constraint_argument.split(',')
+                for a in range(0, int(len(inp_list) / 3)):
+                    arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                    reactant_total_constraints.append(arg_list)
+            elif not self.args['product_dist_constraint'] is None:
+                constraint_argument = self.args['product_dist_constraint']
+                inp_list =  constraint_argument.split(',')
+                for a in range(0, int(len(inp_list) / 3)):
+                    arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                    product_total_constraints.append(arg_list)
+
         for conf_ind, conf_entry in tmp_rxn_dict.items():
-            print(f"ind: {conf_ind}, conf_entry: {conf_entry}\n")
+            print(f"ind: {conf_ind}, conf_entry: {conf_entry['G'][0]}, direction: {tmp_rxn_dict[conf_ind]['direct']}\n")
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             # Zhao's note: Change here to adj_mat as well...
             # JUST DEBUG, Try skip this line?
-            #Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
+            ###Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
             #Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['adj_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
             #Gr = deepcopy(PG)
             # skip the UFF opt ???
-            if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
-                Gr = deepcopy(PG)
-            elif(tmp_rxn_dict[conf_ind]['direct'] == 'B'):
-                Gr = deepcopy(RG)
 
-            if len(Gr)==0: continue
-            tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"
-            xyz_write(tmp_xyz_p,conf_entry['E'],Gr)
-            #print(f"index: {conf_ind}, Gr: {Gr}\n")
+            #Zhao's note: added the xtb manually#
+            #xtb opt now uses the all the bonds as constraints#
+            #additional constraints are also applied by the user in args['reactant_dist_constraint'] or args['product_dist_constraint']
             tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
             xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
-            #print(f"index: {conf_ind}, conf_entry[G]: {conf_entry['G']}\n")
-            #os.system(f"cp {tmp_xyz_r} {self.args['conf_output']}/{job_id}_RRRRRRR.xyz")
-            #os.system(f"cp {tmp_xyz_p} {self.args['conf_output']}/{job_id}_PPPPPPP.xyz")
+
+            if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
+                ADMatrix = P_adj
+                All_constraint = return_all_constraint(self.product)
+                All_constraint = All_constraint + product_total_constraints
+            else:
+                ADMatrix = R_adj
+                All_constraint = return_all_constraint(self.reactant)
+                All_constraint = All_constraint + reactant_total_constraints
+                print(f"All_constraint for reactant: {All_constraint}\n")
+
+            if self.args["low_solvation"]:
+                solvation_model, solvent = self.args["low_solvation"].split("/")
+                optjob=XTB(input_geo=tmp_xyz_r,
+                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],\
+                        solvent=solvent, solvation_model=solvation_model,
+                        jobname=f"joint_xtb",
+                        charge=self.args["charge"], multiplicity=self.args["multiplicity"])
+                optjob.add_command(distance_constraints=All_constraint)
+            else:
+                optjob=XTB(input_geo=tmp_xyz_r,
+                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],\
+                        jobname=f"joint_xtb",
+                        charge=self.args["charge"], multiplicity=self.args["multiplicity"])
+                optjob.add_command(distance_constraints=All_constraint)
+            optjob.execute()
+           
+            #exit()
+
+            if optjob.optimization_success():
+                _, Gr = optjob.get_final_structure()
+            else:
+                #logger.info(f"xtb geometry optimization fails for the other end of {job_id} (conf: {conf_ind}), will use force-field optimized geometry for instead")
+                Gr = []
+
+            if len(Gr)==0: 
+                #print(f"NO Gr Generated!!!!\n", flush = True)
+                continue
+            tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"
+            xyz_write(tmp_xyz_p,conf_entry['E'],Gr)
+            tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
+            xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
 
             # calculate indicator
             indicators = return_indicator(conf_entry['E'],conf_entry['G'],Gr,namespace=f'tmp_{job_id}')
@@ -197,9 +250,6 @@ class reaction:
             model_threshold = 0.4
             if('model_threshold' in self.args):
                 model_threshold = float(self.args['model_threshold'])
-            print(f"model_threshold: {model_threshold}\n", flush = True)
-            print(f"model prediction prob: {model.predict_proba(indicators)[0][1]}\n", flush = True)
-            print(f"Check duplicate: {check_duplicate(indicators,ind_list,thresh=0.025)}\n", flush = True)
             if model.predict_proba(indicators)[0][1] > model_threshold and check_duplicate(indicators,ind_list,thresh=0.025):
                 ind_list.append(indicators)
                 pass_obj_values.append((model.predict_proba(indicators)[0][0],deepcopy(conf_entry['G']),Gr,deepcopy(conf_entry['direct'])))
@@ -208,7 +258,29 @@ class reaction:
             if os.path.isfile(tmp_xyz_r): os.remove(tmp_xyz_r)
             if os.path.isfile(tmp_xyz_p): os.remove(tmp_xyz_p)
 
+        #exit()
+
         pass_obj_values=sorted(pass_obj_values, key=lambda x: x[0])
+        
+        #Zhao's note: consider making 2 lists of top R/P conformers
+        #do cross terms, for example, the top 4 pass_obj_values are from cross terms
+        #for the cross terms, it will use the sorted best conformers from both sides
+        #modify "top_cross_terms" to use it, if not using, just let it = 0
+        top_cross_terms = 0
+        top_R = [a for a in pass_obj_values if a[3] == 'F']
+        top_P = [a for a in pass_obj_values if a[3] == 'B']
+        top_R_index, top_P_index = 0, 0
+        for index_val in range(0, top_cross_terms):
+            direction = pass_obj_values[index_val][3]
+            if(direction == 'F'):
+                pass_obj_values[index_val] = (pass_obj_values[index_val][0], pass_obj_values[index_val][1], deepcopy(top_P[top_P_index][1]), pass_obj_values[index_val][3])
+                top_P_index += 1
+            if(direction == 'B'):
+                pass_obj_values[index_val] = (pass_obj_values[index_val][0], pass_obj_values[index_val][1], deepcopy(top_R[top_R_index][1]), pass_obj_values[index_val][3])
+                top_R_index += 1
+
+        #exit()
+
         N_conf=0
         for item in pass_obj_values:
             # item[0] is the predicted score
@@ -236,7 +308,6 @@ class reaction:
                 if optjob.optimization_success():
                     _, Gr = optjob.get_final_structure()
                 else:
-                    #logger.info(f"xtb geometry optimization fails for the other end of {job_id} (conf: {conf_ind}), will use force-field optimized geometry for instead")
                     #Gr = item[2]
                     continue
 

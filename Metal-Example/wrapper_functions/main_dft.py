@@ -35,44 +35,36 @@ def compare_lists(list1, list2):
     # Iterate through the lists to the length of the shorter list
     for i in range(min(len(list1), len(list2))):
         # Ensure both elements are lists before comparison and have the same length
-        #print(f'i: {i}, list1: {list1[i]}\n')
-        #print(f'i: {i}, list2: {list2[i]}\n')
 
-        #if isinstance(list1[i], list) and isinstance(list2[i], list):
         try:
             for j in range(min(len(list1[i]), len(list2[i]))):
                 if list1[i][j] != list2[i][j]:
-                    #differing_indices.append((i, j))
                     if not i in differing_indices:
                         differing_indices.append(i)
         except:
             print(f"Have issue when comparing lists of list !!!\n")
-        #else:
-        #    print(f"Element at index {i} in one of the lists is not a list.")
 
     return differing_indices
+
+#Zhao's note: the function read finds the metal, and assign basis set to those within the 1st/2nd layer of the metal#
+#each atom in these layers will be assigned a list, [element_name+index, basis-set_name]
+#for example, [Zn1, def2-TZVP]
+#the index is needed to have precise control 
 
 def treat_mix_lot_metal_firstLayer(args, elements, geometry):
     if args['dft_mix_firstlayer']:
         first_layer_index = []
         # get adj_mat for TS
         TS_adj_mat = table_generator(elements, geometry)
-        #print("TS_adj_mat\n", flush = True)
-        #print(TS_adj_mat, flush = True)
         # get the metals
         metal_element = [e for e in elements if e in el_metals]
         metal_ind = [ind for ind, e in enumerate(elements) if e in el_metals]
-        #print("element and index\n", flush = True)
-        #print(metal_element, flush = True)
-        #print(metal_ind, flush = True)
         # get 1st layer
         counter = 0
         for metal in metal_ind:
             metal_row = TS_adj_mat[metal]
             link_ind  = [ind for ind, val in enumerate(metal_row) if val > 0]
             link_element = [elements[a] for a in link_ind]
-            #print(f"metal index: {metal}, {metal_element[counter]}\n", flush = True)
-            #print(f"link index: {link_ind}\n link_element: {link_element}\n", flush = True)
             counter += 1
 
         if(len(link_ind) > 0):
@@ -104,6 +96,7 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         args['dft_mix_lot'].extend(first_layer_index)
 
         # sort the list so that element+index appears at the beginning of the list
+        # alnum = alpha-numeric
         alnum_element = [a for a in args['dft_mix_lot'] if (any(x.isalpha() for x in a[0]) and (any(x.isnumeric() for x in a[0])))]
         not_alnum_element = [a for a in args['dft_mix_lot'] if not (any(x.isalpha() for x in a[0]) and (any(x.isnumeric() for x in a[0])))]
         #print(f"alnum_element: {alnum_element}\n", flush = True)
@@ -112,7 +105,6 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         args['dft_mix_lot'] = alnum_element
 
         #print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
-
 
 def process_mix_basis_input(args):
     args['dft_mix_basis'] = bool(args['dft_mix_basis'])
@@ -128,6 +120,30 @@ def process_mix_basis_input(args):
 
     args['dft_mix_lot'] = dft_mix_lot
 
+#Zhao's note: a function for yarp-dft to wait for the dft-jobs that are launched by the previous yarp-dft run
+#for example, the previous yarp-dft launched 2 TSOPT job and died, the 2 TSOPT jobs are still running 
+#now, if you start a new yarp-dft run, it will wait until those 2 TSOPT jobs are dead.
+#jobs will be written to a text file "last_jobs.txt", the text file will tell what jobs are currently running 
+def read_wait_for_last_jobs():
+    print("checking for unfinished jobs from the previous run\n")
+    file_path = 'last_jobs.txt'
+    if not os.path.exists(file_path): return
+    with open(file_path, 'r') as file:
+        # Use list comprehension to convert each line to an integer
+        job_ids = [int(line.strip()) for line in file]
+
+    # Now 'numbers' contains the integers as a list
+    print(f"unfinished job_ids are: {job_ids}\n")
+    print(f"Need to wait\n")
+
+    slurm_jobs = []
+    for job_id in job_ids:
+        slurm_job = SLURM_Job()
+        slurm_job.job_id = job_id
+        slurm_jobs.append(slurm_job)
+    #Monitor these jobs#
+    monitor_jobs(slurm_jobs)
+    print("All previous jobs are finished\n")
 
 def main(args:dict):
     if args["solvation"]: args["solvation_model"], args["solvent"]=args["solvation"].split('/')
@@ -138,6 +154,7 @@ def main(args:dict):
     if os.path.isdir(args["scratch_dft"]) is False: os.mkdir(args["scratch_dft"])
     if args["reaction_data"] is None: args["reaction_data"]=args["scratch"]+"/reaction.p"
 
+    #Zhao's note: an option to send emails to the user if they specify an email address
     if args["email"] is None or args["email_address"] is None:
         args["email"] = False
     if args["email_address"] is None:
@@ -168,24 +185,24 @@ def main(args:dict):
         print(f"Not Using Mix (TZ/DZ/SZ) Basis Sets, but TZ Correction used, What are you using it for???\n")
         raise RuntimeError("Please change your input file!!!")
 
+    #Zhao's note: option to use "TS_Active_Atoms" in ORCA
+    #sometimes useful, sometimes not...
+    if not 'dft_TS_Active_Atoms' in args:
+        args['dft_TS_Active_Atoms'] = False
+    else:
+        args['dft_TS_Active_Atoms'] = bool(args['dft_TS_Active_Atoms'])
+
     if os.path.exists(args["reaction_data"]) is False:
         print("No reactions are provided for refinement....")
         exit()
     rxns=load_rxns(args["reaction_data"])
     for count, i in enumerate(rxns):
         rxns[count].args=args
-        #print(f"rxn items are: {vars(rxns[count]).items()}\n", flush = True)
-        # Zhao's note: add mix basis for metal and first layer # 
-        # Also add reaction atoms #
-        # both reactant and product #
         treat_mix_lot_metal_firstLayer(args, i.reactant.elements, i.reactant.geo)
         treat_mix_lot_metal_firstLayer(args, i.product.elements,  i.product.geo)
 
-    # Run DFT optimization first to get DFT energy
-    print("Running DFT optimization", flush = True)
-    print(rxns, flush = True)
-    #'''
-
+    #Zhao's note: Read and wait for unfinished simulation#
+    read_wait_for_last_jobs()
 
     rxns=run_dft_opt(rxns)
     with open(args["reaction_data"], "wb") as f:
@@ -243,7 +260,7 @@ def constrained_dft_geo_opt(rxns):
             orca_job.generate_input()
             copt[rxn_ind]=orca_job
 
-            #Zhao's note: special case: if your ORCA opt simulation ended using short/standby/4hr job,
+            #Zhao's note: special case: if your ORCA opt simulation ended but not finished,
             # and you want to restart it.
             if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
                 tempE, tempG=orca_job.get_final_structure()
@@ -275,6 +292,8 @@ def constrained_dft_geo_opt(rxns):
             startidx=endidx
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} constrained optimization jobs on TS...")
+        #Zhao's note: append these jobs and write to the text file (for restart/waiting purpose)#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
     else: 
         print(f"No constrained optimization jobs need to be performed...")
@@ -283,7 +302,9 @@ def constrained_dft_geo_opt(rxns):
     for i in key:
         orca_opt=copt[i]
         print(f"Checking COPT for job {i}, orca_opt: {orca_opt}\n")
-        if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -10:
+        #if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -10:
+        #Zhao's note: consider make the -10 tunable as an input?
+        if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -5:
             _, geo=orca_opt.get_final_structure()
             print(f"COPT Works for {i}\n")
             for count, rxn in enumerate(rxns):
@@ -296,7 +317,7 @@ def constrained_dft_geo_opt(rxns):
             print(f"Constraint OPT does not converge for {i}, Please Check!\n")
         elif not len(orca_opt.get_imag_freq()[0])>0: 
             print(f"No imaginary Freq for {i}!!! Check!\n")
-        elif not min(orca_opt.get_imag_freq()[0]) < -10:
+        elif not min(orca_opt.get_imag_freq()[0]) < -5: #Zhao's note: make this tunable? 
             print(f"minimum imaginary Freq smaller than threshold for {i}!")
         else:
             print(f"Did you do COPT with Frequency Calculation for {i}???You probably need to redo...")
@@ -311,6 +332,13 @@ def run_dft_tsopt(rxns):
     if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
     else: dft_lot=args["dft_lot"]
     if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
+
+    RP_diff_Atoms = []
+    if(args['dft_TS_Active_Atoms']):
+        adj_diff_RP=np.abs(rxns[0].product.adj_mat - rxns[0].reactant.adj_mat)
+        # Get the elements that are non-zero #
+        RP_diff_Atoms = np.where(adj_diff_RP.any(axis=1))[0]
+        print(f"Atoms {RP_diff_Atoms} have changed between reactant/product\n")
 
     # Load TS from reaction class and prepare TS jobs
     for rxn in rxns:
@@ -344,11 +372,11 @@ def run_dft_tsopt(rxns):
                           jobname=f"{rxn_ind}-TSOPT",\
                           jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
                           solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]))
+            orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]), TS_Active_Atoms = RP_diff_Atoms)
             orca_job.generate_input()
             opt_jobs[rxn_ind]=orca_job
 
-            #Zhao's note: special case: if your ORCA opt simulation ended using short/standby/4hr job,
+            #Zhao's note: special case: if your ORCA opt simulation ended but not finished,
             # and you want to restart it.
             if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
                 tempE, tempG=orca_job.get_final_structure()
@@ -359,13 +387,11 @@ def run_dft_tsopt(rxns):
                               jobname=f"{rxn_ind}-TSOPT",\
                               jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
                               solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-                orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]))
+                orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]), TS_Active_Atoms = RP_diff_Atoms)
                 orca_job.generate_input()
                 opt_jobs[rxn_ind]=orca_job
 
             if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
-            print(f"Checked orca_job: {opt_jobs}\n")
-            print(f"Going to run: {running_jobs}\n")
 
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
@@ -380,9 +406,11 @@ def run_dft_tsopt(rxns):
             startid=endid
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} ts optimization jobs...")
+        #Zhao's note: append these jobs and write to the text file (for restart/waiting purpose)#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
     else:
-        print("No ts optimiation jobs need to be performed...")
+        print("No ts optimization jobs need to be performed...")
 
     if(args['dft_fulltz_level_correction']):
         FullTZCorrection_TS(opt_jobs, args)
@@ -407,6 +435,14 @@ def run_dft_tsopt(rxns):
                     print(f"SPE: {rxns[count].TS_dft[dft_lot][conf_i]['SPE']}\n")
                     print(f"GibbsFreeEnergy: {rxns[count].TS_dft[dft_lot][conf_i]['thermal']['GibbsFreeEnergy']}\n")
                     print(f"imag_mode: {rxns[count].TS_dft[dft_lot][conf_i]['imag_mode']}\n")
+        elif not orca_opt.calculation_terminated_normally():
+            print(f"TSOPT/FullTZ fails for {i}, Please Check!\n")
+        elif not orca_opt.is_TS():
+            print(f"{i} is NOT A TS, Please Check!\n")
+        elif not orca_opt.optimization_converged():
+            print(f"{i} OPT NOT CONVERGED!\n")
+
+        
     return rxns
 
 # Zhao's note: function that checks and re-runs FullTZ numerical frequency calculations #
@@ -416,6 +452,8 @@ def CheckFullTZRestart(dft_job):
         numfreq_command = "%freq\n  restart true\nend\n"
         dft_job.parse_additional_infoblock(numfreq_command)
 
+#Zhao's note: function that runs the FullTZ single point energy + numerical frequency calculation #
+# using triple zeta basis sets for all the atoms #
 def FullTZCorrection_TS(opt_jobs, args):
     TZ_lot = args["dft_lot"]
     scratch_dft = args['scratch_dft']
@@ -443,7 +481,6 @@ def FullTZCorrection_TS(opt_jobs, args):
                       jobname=f"{rxn_ind}-FullTZ",\
                       jobtype="NumFreq", lot=TZ_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
                       solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=False)
-        #orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]))
         #Restart FullTZ numerical frequency jobs if needed#
         CheckFullTZRestart(orca_job)
         orca_job.generate_input()
@@ -466,33 +503,29 @@ def FullTZCorrection_TS(opt_jobs, args):
             startid=endid
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} Full TZ SinglePoint jobs...")
+        #Zhao's note: append these jobs and write to the text file (for restart/waiting purpose)#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
     else:
-        print("No ts optimiation jobs need to be performed...")
+        print("No ts optimization jobs need to be performed...")
 
 def run_dft_irc(rxns):
-    print(f"Running IRC calculation\n", flush = True)
     args=rxns[0].args
     scratch_dft=args["scratch_dft"]
     irc_jobs=dict()
     todo_list=[]
-    print(f"Doing DFT IRC NOW!!!\n")
     if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
     else: dft_lot=args["dft_lot"]
     # run IRC model first if we need
     if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: rxns=apply_IRC_model(rxns)
     for count, rxn in enumerate(rxns):
-        print(f"rxn: {rxn}\n")
-        print(f"dft_lot: {dft_lot}\n")
-        print(f"rxn.TS_dft.keys(): {rxn.TS_dft.keys()}\n")
         if dft_lot in rxn.TS_dft.keys(): key=[i for i in rxn.TS_dft[dft_lot].keys()]
         else: continue
-        print(f"IRC key: {key}\n", flush = True)
         for i in key:
-            print(f"IRC: {i}\n")
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{i}"
             RP=False
             if args["skip_low_TS"] is False and args["skip_low_IRC"] is False: RP=rxn.IRC_xtb[i]["PR"][0]
+
             if RP: continue
             else:
                 # submit IRC jobs
@@ -523,6 +556,8 @@ def run_dft_irc(rxns):
             startidx=endidx
             slurm_jobs.append(slurmjob)
         print(f"running {len(slurm_jobs)} IRC jobs...")
+        #Zhao's note: append these jobs and write to the just a text file#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
 
     # Read result into reaction class
@@ -547,11 +582,6 @@ def run_dft_irc(rxns):
         except: pass
         if job_success is False: continue
         adj_mat1, adj_mat2=table_generator(E, G1), table_generator(E, G2)
-        #bond_mat1, _=find_lewis(E, adj_mat1, args["charge"])
-        #bond_mat2, _=find_lewis(E, adj_mat2, args["charge"])
-        #bond_mat1=bond_mat1[0]
-        #bond_mat2=bond_mat2[0]
-        print(f"rxn_ind: {rxn_ind}, job_success: {job_success}\n")
         for count, rxn in enumerate(rxns):
             if inchi==rxn.reactant_inchi and idx==rxn.id:
                 P_adj_mat=rxn.product.adj_mat
@@ -649,6 +679,19 @@ def is_alpha_and_numeric(s):
     # Check if the string is alphanumeric and not purely alpha or numeric
     return s.isalnum() and not s.isalpha() and not s.isdigit()
 
+#Zhao's note: a function that automatically checks the multiplicity based on the number of electrons#
+#Check if the total electron compatible with imposed multiplicity, if not, return the lowest multiplicity
+def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge):
+    return_multiplicity = Imposed_multiplicity
+    total_electron = sum([el_to_an[E.lower()] for E in Elements]) + net_charge
+    print(f"molecule: {inchi}, Total electron: {total_electron}\n")
+    #Get the lowest possible multiplicity#
+    lowest_multi = total_electron % 2 + 1
+    if(abs(Imposed_multiplicity - lowest_multi) % 2 > 0):
+        print(f"the imposed multiplicity {Imposed_multiplicity} does not agree with lowest multiplicity {lowest_multi}\n")
+        return_multiplicity = lowest_multi
+    return return_multiplicity
+
 def run_dft_opt(rxns):
     args=rxns[0].args
     crest_folder=args["scratch_crest"]
@@ -659,16 +702,21 @@ def run_dft_opt(rxns):
     #Zhao's note: consider adding a boolean here, indicating whether reactant/product is separable#
     reactant_separable, product_separable, inchi_dict=find_all_seps(rxns, args)
     key=[i for i in inchi_dict.keys()]
-    print(f"separated key: {key}\n", flush = True)
-    print(f"inchi_dict: {inchi_dict}\n", flush = True)
-    print(f"reactant_separable: {reactant_separable}, product_separable: {product_separable}\n", flush = True)
+
+    #042424: Zhao's note: check for molecules that have changed in the adj_mat
+    # if we are using TS_Active_Atoms for orca, put these changed atoms in for TS_Active_Atoms
+    if(args['dft_TS_Active_Atoms']):
+        adj_diff_RP=np.abs(rxns[0].product.adj_mat - rxns[0].reactant.adj_mat)
+        # Get the elements that are non-zero #
+        non_zero_row_indices = np.where(adj_diff_RP.any(axis=1))[0]
+        print(f"Atoms {non_zero_row_indices} have changed between reactant/product\n")
+    #exit()
 
     #Zhao's note: for mix-basis set, if molecule is separable, the atom indices you want to apply mix-basis-set on might not be there in separated mols, so you need to do a check#
     #For this reason, the elements we returned in inchi_dict are with indices from molecules before the separation#
     #for each molecule, a set of mix-basis-set will be copied and checked#
     mix_basis_dict = dict()
     for separated_key in key:
-        print(f"separated_key: {separated_key}\n")
         E,G,Q = inchi_dict[separated_key][0], inchi_dict[separated_key][1], inchi_dict[separated_key][2]
         if(args['dft_mix_basis']):
             mix_basis_dict[separated_key] = [] 
@@ -687,16 +735,12 @@ def run_dft_opt(rxns):
         #Finally, eliminate the numbers in E and put it back into inchi_dict[inchi]
         E = [''.join(i for i in a if not i.isdigit()) for a in E]
         inchi_dict[separated_key][0] = E
-        print(f"inchi: {separated_key}, mix_basis_dict: {mix_basis_dict[separated_key]}\n")
-    print(f"inchi_dict after process: {inchi_dict}\n")
+
+    #exit()
 
     for rxn in rxns:
         rxn.reactant_dft_opt = dict()
         rxn.product_dft_opt = dict()
-        print(f"rxn.reactant_conf: {bool(rxn.reactant_conf)}\n", flush = True)
-        print(f"rxn.product_conf: {bool(rxn.product_conf)}\n", flush = True)
-        print(f"REACTANT GEO: {rxn.reactant.geo}\n", flush = True)
-        print(f"PRODUCT GEO: {rxn.product.geo}\n", flush = True)
 
         if rxn.reactant_inchi not in stable_conf.keys():
             #Zhao's note: add charge
@@ -716,26 +760,15 @@ def run_dft_opt(rxns):
     if len(args["dft_lot"].split()) > 1: dft_lot=args["dft_lot"].split()[0]+'/'+args["dft_lot"].split()[1]
     else: dft_lot=args["dft_lot"]
     inchi_key=[i for i in inchi_dict.keys()]
-    print(f"dft_lot: {dft_lot}\n", flush = True)
     for rxn in rxns:
-        print(f"rxn.reactant_dft_opt.keys: {rxn.reactant_dft_opt.keys()}\n", flush = True)
-        print(f"rxn.reactant_inchi: {rxn.reactant_inchi}\n", flush = True)
-        print(f"rxn.product_dft_opt.keys:  {rxn.product_dft_opt.keys()}\n", flush = True)
-        print(f"rxn.product_inchi: {rxn.product_inchi}\n", flush = True)
         if dft_lot not in rxn.reactant_dft_opt.keys():
             for i in inchi_key:
                 i_string = i
-                #if "-" in i_string:
-                #    i_string = i_string.split("-")[0]
-                print(f"Looping reactant inchi: {i_string}\n", flush = True)
                 if((reactant_separable or i in rxn.reactant_inchi) and i not in missing_dft):
                     missing_dft.append(i)
         if dft_lot not in rxn.product_dft_opt.keys():
             for i in inchi_key:
                 i_string = i
-                #if "-" in i_string:
-                #    i_string = i_string.split("-")[0]
-                print(f"Looping product inchi: {i}\n", flush = True)
                 if((product_separable or i in rxn.product_inchi) and i not in missing_dft):
                     missing_dft.append(i)
     
@@ -744,29 +777,23 @@ def run_dft_opt(rxns):
         if i not in stable_conf.keys():
             missing_conf.append(i)
     # prepare for submitting job
-    print("dft_opt", flush = True)
     print(missing_dft)
     njobs=int(args["dft_njobs"])
-    print(f"njobs: {njobs}\n", flush = True)
-    print(f"missing_conf: {missing_conf}\n", flush = True)
-    print(f"missing_dft: {missing_dft}\n", flush = True)
    
-    print(f"BEFORE CREST: stable_conf.keys(): {stable_conf.keys()}\n")
     if len(missing_conf) > 0:
         CREST_job_list=[]
         for inchi in missing_conf:
             if inchi in missing_dft:
-                print(f"inchi in missing_dft: {inchi}\n", flush = True)
-                print(f"inchi_dict[inchi]: {inchi_dict[inchi]}\n", flush = True)
                 E, G, Q=inchi_dict[inchi][0], inchi_dict[inchi][1], inchi_dict[inchi][2]
-                print(f"Before CREST Geometry: {G}\n", flush = True)
+                #Zhao's note: Separated molecule needs to be checked for multiplicity#
+                Mol_Mult = check_multiplicity(inchi, E, args["multiplicity"], Q)
 
                 wf=f'{crest_folder}/{inchi}'
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 inp_xyz=f"{wf}/{inchi}.xyz"
                 xyz_write(inp_xyz, E, G)
                 crest_job=CREST(input_geo=inp_xyz, work_folder=wf, nproc=int(args["crest_nprocs"]), mem=int(args["mem"]*1000), quick_mode=args["crest_quick"],\
-                                opt_level=args["opt_level"], charge=Q, multiplicity=args["multiplicity"], crest_path = args['crest_path'])
+                                opt_level=args["opt_level"], charge=Q, multiplicity=Mol_Mult, crest_path = args['crest_path'])
                 CREST_job_list.append(crest_job)
         
         n_submit=len(CREST_job_list)//njobs
@@ -791,6 +818,8 @@ def run_dft_opt(rxns):
             startidx=endidx
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} CREST jobs...", flush = True)
+        #Zhao's note: append these jobs and write to the just a text file#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
         print("All CREST jobs finished...", flush = True)
 
@@ -800,21 +829,15 @@ def run_dft_opt(rxns):
                 E, G, _ = crest_job.get_stable_conformer()
                 Q = inchi_dict[inchi][2]
                 stable_conf[inchi]=[E, G, Q]
-                print(f"After CREST Geometry: {G}\n", flush = True)
-
-    print(f"AFTER CREST: stable_conf.keys(): {stable_conf.keys()}\n")
-    print(f"Missing_dft: {missing_dft}\n")
 
     # submit missing dft optimization
     if len(missing_dft)>0:
         dft_job_list=[]
         for inchi in missing_dft:
-            print(f"inchi: {inchi}\n", flush = True)
-            print(f"missing_dft: {missing_dft}\n", flush = True)
 
             if inchi not in stable_conf.keys(): continue
             E, G, Q=stable_conf[inchi]
-            print(f"DFT OPT Geometry: {G}\n", flush = True)
+            Mol_Mult = check_multiplicity(inchi, E, args["multiplicity"], Q)
 
             wf=f"{dft_folder}/{inchi}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
@@ -824,7 +847,7 @@ def run_dft_opt(rxns):
             dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
                          mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
                          jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
-                         charge=Q, multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                         charge=Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
             dft_job.generate_input()
 
             #Zhao's note: special case: if your ORCA opt simulation ended using short/standby/4hr job,
@@ -836,7 +859,7 @@ def run_dft_opt(rxns):
                 dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
                              mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
                              jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
-                             charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+                             charge=Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
                 dft_job.generate_input()
 
             dft_job_list.append(dft_job)
@@ -865,6 +888,8 @@ def run_dft_opt(rxns):
             slurm_jobs.append(slurmjob)
 
         print(f"Running {len(slurm_jobs)} DFT optimization jobs...")
+        #Zhao's note: append these jobs and write to the just a text file#
+        write_to_last_job(slurm_jobs)
         monitor_jobs(slurm_jobs)
         print("DFT optimization finished.")
 
@@ -905,7 +930,6 @@ def run_dft_opt(rxns):
         key=[i for i in dft_dict.keys()]
         for count, rxn in enumerate(rxns):
             for i in key:
-                print(f"i: {i}, rxn.reactant_inchi: {rxn.reactant_inchi}, rxn.product_inchi: {rxn.product_inchi}\n")
                 if i in rxn.reactant_inchi:
                     if dft_lot not in rxns[count].reactant_dft_opt.keys():
                         rxns[count].reactant_dft_opt[dft_lot]=dict()
@@ -922,10 +946,6 @@ def run_dft_opt(rxns):
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
-                    print(f"R_GE: {i}, ith: {dft_dict[i]['thermal']['GibbsFreeEnergy']}, {rxns[count].reactant_dft_opt[dft_lot]['thermal']['GibbsFreeEnergy']}\n")
-                print(f"i in rxn.product_inchi: {i in rxn.product_inchi}\n")
-                print(f"rxn.product_inchi in dft_dict.keys(): {rxn.product_inchi in dft_dict.keys()}\n")
-                print(f"rxn.args['backward_DE']: {rxn.args['backward_DE']}\n")
                 #Zhao's note: Need to test more on this line
                 if i in rxn.product_inchi and i in dft_dict.keys() and rxn.args["backward_DE"]:
 
@@ -945,7 +965,6 @@ def run_dft_opt(rxns):
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"]+=dft_dict[i]["thermal"]["Enthalpy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
-                    print(f"P_GE: {i}, ith: {dft_dict[i]['thermal']['GibbsFreeEnergy']}, {rxns[count].product_dft_opt[dft_lot]['thermal']['GibbsFreeEnergy']}\n")
 
     #exit()
     return rxns
@@ -976,10 +995,8 @@ def find_all_seps(rxns, args):
         if rxn.args["backward_DE"]:
             tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P")
             original_p_inchi = return_inchikey(rxn.product)
-            print(f"original_p_inchi: {original_p_inchi}\n")
 
             key=[i for i in tmp_dict.keys()]
-            print(f"product key: {key}\n")
             for i in key:
                 if i not in inchi_dict.keys():
                     inchi_dict[i]=tmp_dict[i]
@@ -1017,10 +1034,11 @@ def FullTZCorrection_RP(args, dft_job_list, stable_conf):
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz=f"{wf}/{inchi}-FullTZ.xyz"
         xyz_write(inp_xyz, E, G)
+        Mol_Mult = check_multiplicity(inchi, E, args["multiplicity"], stable_conf_Q)
         dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
                      mix_basis = False, mix_lot = args['dft_mix_lot'],\
                      jobname=f"{inchi}-FullTZ", jobtype="NumFreq", lot=TZ_lot,\
-                     charge=stable_conf_Q, multiplicity=args["multiplicity"], solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=False)
+                     charge=stable_conf_Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=False)
         #Restart FullTZ numerical frequency jobs if needed#
         CheckFullTZRestart(dft_job)
         dft_job.generate_input()
@@ -1028,8 +1046,6 @@ def FullTZCorrection_RP(args, dft_job_list, stable_conf):
 
 
     n_submit=len(dft_job_list)//int(args["dft_njobs"])
-
-    print(f"n_submit: {n_submit}\n", flush = True)
 
     if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
     startidx=0
@@ -1054,6 +1070,8 @@ def FullTZCorrection_RP(args, dft_job_list, stable_conf):
         slurm_jobs.append(slurmjob)
 
     print(f"Running {len(slurm_jobs)} Full Triple Zeta Single Point jobs...\n")
+    #Zhao's note: append these jobs and write to the just a text file#
+    write_to_last_job(slurm_jobs)
     monitor_jobs(slurm_jobs)
     print("Full TZ finished.\n")
 

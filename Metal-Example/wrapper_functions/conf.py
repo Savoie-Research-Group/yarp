@@ -273,7 +273,7 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
     # take the first one bond_mat
     bond_mat = bond_mat[0]
 
-    print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
+    #print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
 
     for i in range(len(gs)):
         if i not in loop_ind:
@@ -296,6 +296,7 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
         group_bond_mat = [bond_mat[a] for a in group]
         group_formal = return_formals(group_bond_mat, frag_E)
         frag_Charge = int(sum(group_formal))
+        print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n")
         #print(f"group_bond_mat is {group_bond_mat}\n")
         #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
 
@@ -310,20 +311,9 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
         #mol.geo=np.zeros([N_atom, 3])
         mol.adj_mat=adj_mat[group][:, group]
         mol.q = frag_Charge
-        #for count_i, i in enumerate(group): mol.geo[count_i, :]=G[i, :]
         mol.geo = copy.deepcopy(frag_G)
         frag_bond_mat, frag_score = find_lewis(mol.elements,mol.adj_mat,q=mol.q)
         mol.bond_mats = [molecule.bond_mats[0][group][:, group]]
-        print(f"Writing to temporary file\n")
-        #print(f"mol object is {mol}\n")
-        #print_all_elements(mol)
-        #print(f"molecule (rxn RP) is {molecule}\n")
-        #print_all_elements(molecule)
-        #mol=deepcopy(molecule)
-        #mol.elements=frag_E
-        #mol.bond_mats=group_bond_mat
-        #mol.geo=frag_G
-        #mol.adj_mat=adj_mat[group][:, group]
         mol_write_yp(".tmp.mol", mol)
 
         #exit()
@@ -332,19 +322,12 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
         inchikey=mol.write(format='inchikey').strip().split()[0]
         #Zhao's note: take the first 14 letters
         inchikey = inchikey[:14]
-        #inchikey+=[inchi]
         os.system("mv .tmp.mol " + inchikey + ".mol")
         print(f"mol inchikey is {inchikey}\n")
         original_inchi = return_inchikey(molecule)
         print(f"original RP molecule inchi is {original_inchi}\n")
         #exit()
-        #xyz_write(f"{namespace}_input.xyz",frag_E,frag_G)
-        #molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
-        #inchikey = molecule.write(format="inchikey").strip().split()[0]
-        #os.system(f"rm {namespace}_input.xyz")
-        
-        #Zhao's note: might consider return "Element + index" for better control
-        #what a waste, had to regenerate frag_E...
+        #Zhao's note: consider return "Element + index" for better control
         frag_E = [E[ind]+str(ind) for ind in group]
         # store this fragment
         if inchikey not in mols.keys():

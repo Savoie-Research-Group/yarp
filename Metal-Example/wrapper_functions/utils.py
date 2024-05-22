@@ -3,6 +3,7 @@ from openbabel import pybel
 from openbabel import openbabel as ob
 from collections import Counter    
 import numpy as np
+from scipy.spatial.distance import cdist
 from yarp.taffi_functions import graph_seps,table_generator,return_rings,adjmat_to_adjlist,canon_order
 from yarp.properties import el_to_an,an_to_el,el_mass, el_radii, el_metals
 from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
@@ -14,6 +15,89 @@ from rdkit import Chem
 from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdmolops, rdDistGeom
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
+
+# add atom numbers to molecule
+def addAtomIndices(mol):
+    for i, a in enumerate(mol.GetAtoms()):
+        a.SetAtomMapNum(i)
+
+def MatchAtomIndices(mol_from, mol_to):
+    assert(mol_to.GetNumAtoms() == mol_from.GetNumAtoms())
+    match = mol_to.GetSubstructMatch(mol_from)
+    assert(match)
+    assert(len(match) == mol_from.GetNumAtoms())
+    mol_to = Chem.RenumberAtoms(mol_to, match)
+    return mol_to
+def ReadMoleculeFromMolFile(mol_file_name):
+    molecule = Chem.MolFromMolFile(mol_file_name, removeHs = False)
+    return molecule
+
+def Get_Atoms_Chirality(mol, SelectedChiralCenter):
+    tags = []
+    for center in SelectedChiralCenter:
+        center_atom = mol.GetAtoms()[center]
+        tag = str(center_atom.GetChiralTag())
+        tags.append(tag)
+    return tags
+
+
+
+###################################################################
+# the purpose of this function is to enable isomer enumeration   ##
+# By using smiles, enumeration can be based on the smiles string ##
+###################################################################
+#def mol_to_xyz_to_smiles_to_mol(molecule, name):
+# taking in 2 inputs: reactant.mol or product.mol
+def Prepare_mol_file_to_xyz_smiles_for_chiralEnum(molfile_name):
+    name = molfile_name.split(".mol")[0]
+    os.system(f"obabel {name}.mol -O {name}.xyz > NUL 2>&1")
+    os.system(f"obabel {name}.xyz -O {name}.mol > NUL 2>&1")
+    P_molecule = ReadMoleculeFromMolFile(f"{name}.mol")
+    os.system(f"obabel {name}.xyz -O {name}.mol > NUL 2>&1")
+    molecule = ReadMoleculeFromMolFile(f"{name}.mol")
+
+    ps = Chem.SmilesParserParams()
+    ps.removeHs = False
+
+    os.system(f"obabel {name}.xyz -O {name}.smi > NUL 2>&1")
+    with open(f"{name}.smi", 'r') as f:
+        first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
+        obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
+    print(f"obabel_smiles: {obabel_smiles}\n")
+    molecule_from_smiles = Chem.MolFromSmiles(obabel_smiles, ps)
+    molecule_from_smiles = Chem.rdmolops.AddHs(molecule_from_smiles, addCoords = True)
+    print(f"{name}_smiles: {obabel_smiles}, numberofAtoms: {molecule_from_smiles.GetNumAtoms()}\n")
+    molecule_from_smiles = MatchAtomIndices(molecule, molecule_from_smiles)
+    addAtomIndices(molecule_from_smiles)
+
+    return molecule_from_smiles
+
+def Generate_Isomers(mol, SelectedChiralCenter):
+    for center in SelectedChiralCenter:
+        center_atom = mol.GetAtoms()[center]
+        if(str(center_atom.GetChiralTag()) == 'CHI_UNSPECIFIED'):
+            print(f"You specified chiral center is unspecified! CHECK!\n")
+            exit()
+        mol.GetAtomWithIdx(center).SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+    opts = StereoEnumerationOptions(onlyUnassigned=True,
+                                    rand=0xf00d,
+                                    tryEmbedding=True, unique=True)
+    isomers = tuple(EnumerateStereoisomers(mol, options = opts))
+    for i, iso in enumerate(isomers):
+        smi = Chem.MolToSmiles(iso, isomericSmiles=True)
+        print(f"isomer {i}, isomer smiles: {smi}\n")
+    print(f"# of stereoisomers: {len(isomers)}\n")
+    return isomers
+def Write_Isomers(isomers, name):
+    for i, x in enumerate(isomers):
+        smi = Chem.MolToSmiles(x, isomericSmiles=True)
+        print(f"smile for x: {smi}\n")
+        # ff = AllChem.UFFGetMoleculeForceField(x)
+        # ff.Initialize()
+        # ff.Minimize(energyTol=1e-7,maxIts=100000)
+
+        Chem.rdmolfiles.MolToXYZFile(x, f"{name}-{i}.xyz")
+
 def geometry_opt(molecule):
     '''
     geometry optimization on yarp class
@@ -154,10 +238,15 @@ def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
             # add fix of bond order for dative bonds around the transition metal
             bond_elements = [elements[i[0]],elements[i[1]]]
 
+            #print(f"bond_elements: {bond_elements}", flush = True)
             if (_ in el_metals for _ in bond_elements):# and (bond_order == 0):
                 bond_order = 1
             
             if bond_order==0: bond_order=1
+
+            #Zhao's note on 051424: strangely, this may not be able to handle metal-metal bond, for example, for the transmetalation case with Pd-Zn, 
+            #it cannot handle Pd-Zn bond, and the mol file has a bond order of "-1", which cannot be processed into inchikey. So we can assign "1" here.
+            if bond_order == -1: bond_order = 1
 
             f.write("{:>3d}{:>3d}{:>3d}  0  0  0  0\n".format(i[0]+1,i[1]+1,bond_order))
 
@@ -255,7 +344,17 @@ def mol_write_yp(name,molecule,append_opt=False):
 
             # Calculate bond order from the bond_mat
             bond_order = int(bond_mat[i[0],i[1]])
+
+            # add fix of bond order for dative bonds around the transition metal
+            bond_elements = [elements[i[0]],elements[i[1]]]
+
+            #print(f"bond_elements: {bond_elements}", flush = True)
+            if (_ in el_metals for _ in bond_elements):# and (bond_order == 0):
+                #print(f"FOUND METAL! bond_elements: {bond_elements}", flush = True)
+                bond_order = 1
+
             if bond_order==0: bond_order=1
+
             f.write("{:>3d}{:>3d}{:>3d}  0  0  0  0\n".format(i[0]+1,i[1]+1,bond_order))
 
         # write radical info if exist
@@ -310,6 +409,19 @@ def return_smi(E,G,bond_mat=None,namespace='obabel'):
 
     return smile
 
+def return_smi_mol(E,G,bond_mat,molecule_name):
+    ''' Function to Return smiles string using openbabel (pybel) '''
+    mol_file_name = f"{molecule_name}.mol"
+    mol_write(mol_file_name,E,G,bond_mat)
+    # Read the mol file using Open Babel
+    molecule = next(pybel.readfile("mol", mol_file_name))
+    # Generate the canonical SMILES string directly
+    smile = molecule.write(format="can").strip().split()[0]
+    # Clean up the temporary file
+    #os.remove(mol_file_name)
+
+    return smile
+
 def return_smi_yp(molecule, namespace="obabel"):
     mol_write_yp(f"{namespace}_input.mol",molecule)
     mol=next(pybel.readfile("mol", f"{namespace}_input.mol"))
@@ -334,6 +446,18 @@ def return_rxn_constraint(mol1, mol2):
     reactive_atoms+=list(set([ind for ind, count in n1.items() if count>1]+[ind for ind, count in n2.items() if count>1]))
     
     return bond_change, reactive_atoms
+
+def return_all_constraint(molecule):
+    adj_mat=molecule.adj_mat
+    elements=molecule.elements
+    dis_constraint=[]
+    dist_mat = np.triu(cdist(molecule.geo, molecule.geo))
+    for count_e, e in enumerate(elements):
+        for count_i, i in enumerate(adj_mat[count_e]):
+            if i and count_e < count_i:
+                dis_constraint.append([count_e+1, count_i+1, dist_mat[count_e, count_i]])
+    return dis_constraint
+
 
 def return_metal_constraint(molecule):
     # this function will return the bond constraint for metallic bonds

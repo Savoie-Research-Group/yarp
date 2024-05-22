@@ -48,6 +48,17 @@ def main(args:dict):
     args['scratch_xtb']  = scratch_xtb
     args['scratch_crest']= scratch_crest
     args['conf_output']  = conf_output
+
+    #Zhao's note: chiral centers of interest#
+    #if used, chirality will be enumerated#
+    args['reactant_chiral_center'] = str(args['reactant_chiral_center'])
+    if not args['reactant_chiral_center'] == 'None':
+        args['reactant_chiral_center'] = [int(a) for a in args['reactant_chiral_center'].split(',')]
+
+    args['product_chiral_center'] = str(args['product_chiral_center'])
+    if not args['product_chiral_center'] == 'None':
+        args['product_chiral_center'] = [int(a) for a in args['product_chiral_center'].split(',')]
+
     if(args["pysis_path"] == "default"):
         args["pysis_path"] = "" # Using default
     enumeration=args["enumeration"]
@@ -62,22 +73,10 @@ def main(args:dict):
 
     #Zhao's note: a flag to skip the find_correct_TS function!
     args['skip_GSM_sanity_check'] = bool(args['skip_GSM_sanity_check'])
+    #Zhao's note: sometimes low-level IRC and pysis are not very helpful, skip them by exiting right after GSM!
+    if(args['exit_after_xtbGSM'] is None): args['exit_after_xtbGSM'] = "False"
+    args['exit_after_xtbGSM']     = bool(args['exit_after_xtbGSM'])
 
-    '''
-    #Zhao's note: added dist constraint for both reactant and product
-    if args['constraint']:
-        for side in ['reactant', 'product']:
-            if args[side + '_dist_constraint'] is None: continue
-            total_constraints = []
-            inp_list = args[side + '_dist_constraint'].split(',')
-            print("inp_list: \n")
-            print(inp_list)
-            for a in range(0, int(len(inp_list) / 3)):
-                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
-                total_constraints.append(arg_list)
-            args[side + '_dist_constraints'] = total_constraints.deepcopy()
-            print(f"{side}, dist_constraints: {args[side + '_dist_constraint']}, total: {total_constraints}\n", flush = True)
-    '''
     if os.path.exists(scratch) is False: os.makedirs('{}'.format(scratch))
     if os.path.isdir(scratch_xtb) is False: os.mkdir(scratch_xtb)
     if os.path.isdir(scratch_crest) is False: os.mkdir(scratch_crest)
@@ -119,8 +118,6 @@ def main(args:dict):
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
    
-    #for i in rxns:
-    #   i.id=f"{i.reactant.hash}_{i.product.hash}"
     # Generate the reaction id for different inchi
     inchi_array=[]
     for i in rxns:
@@ -132,10 +129,7 @@ def main(args:dict):
         idx=inchi_dict[inchi]
         i.id=idx
         inchi_dict[inchi]=idx+1
-        print(f"inchi: {inchi}, index: {idx}\n")
    
-    print(f"inchi_dict: {inchi_dict}\n")
-
     #exit()
 
     print("-----------------------")
@@ -143,19 +137,14 @@ def main(args:dict):
     print("Conformational Sampling")
     print("-----------------------")
     # Zhao's note: rdkit option fails here, said the following:
-    '''
-    ids=AllChem.EmbedMultipleConfs(mol, useRandomCoords=True, numConfs=50, maxAttempts=1000000, pruneRmsThresh=0.1,\
-Boost.Python.ArgumentError: Python argument types in
-    rdkit.Chem.rdDistGeom.EmbedMultipleConfs(NoneType)
-did not match C++ signature:
-    EmbedMultipleConfs(RDKit::ROMol {lvalue} mol, unsigned int numConfs, RDKit::DGeomHelpers::EmbedParameters {lvalue} params)
-    EmbedMultipleConfs(RDKit::ROMol {lvalue} mol, unsigned int numConfs=10, unsigned int maxAttempts=0, int randomSeed=-1, bool clearConfs=True, bool useRandomCoords=False, double boxSizeMult=2.0, bool randNegEig=True, unsigned int numZeroFail=1, double pruneRmsThresh=-1.0, boost::python::dict {lvalue} coordMap={}, double forceTol=0.001, bool ignoreSmoothingFailures=False, bool enforceChirality=True, int numThreads=1, bool useExpTorsionAnglePrefs=True, bool useBasicKnowledge=True, bool printExpTorsionAngles=False, bool useSmallRingTorsions=False, bool useMacrocycleTorsions=False, unsigned int ETversion=1)
-    '''
     if method=='rdkit':
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif method=='crest':
         rxns=conf_crest(rxns, logging_queue)
-    
+   
+    #Enumerate chiral centers of interest for both reactant and product#
+    if not (args['reactant_chiral_center'] == 'None' and args['product_chiral_center'] == 'None'):
+        rxns = enumerate_chirality(rxns, logging_queue)
     #exit()
 
     print("-----------------------")
@@ -180,6 +169,12 @@ did not match C++ signature:
     print("-----------------------")
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    #Zhao's note: option to skip xtb pysis + IRC
+    #Just run DFT after xtb-GSM
+    if(args["exit_after_xtbGSM"]):
+        print(f"flag 'exit_after_xtbGSM' is {args['exit_after_xtbGSM']}, skipping xTB Berny OPT and xTB IRC!\n")
+        exit()
+
     rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
 
     print("-----------------------")
@@ -307,7 +302,6 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
-            print(f"tsopt_xtb: i: {i}\n", flush = True)
             xyz_write(f"{wf}/{rxn_ind}-TSguess.xyz", i.reactant.elements, i.TS_guess[j])
             if args["solvent"] is False:
                 pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, pysis_dir=args["pysis_path"], jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"])
@@ -413,6 +407,158 @@ def select_rxn_conf(rxns, logging_queue):
         print(f"Finish generating reaction conformations, the output conformations are stored in {conf_output}\n")
     return rxns
 
+def read_crest_in_class_isomer(rxn, scratch_crest, name):
+    #conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
+    elements, geos = xyz_parse(f"{scratch_crest}/{name}/crest_conformers.xyz", multiple=True)
+    print(f"{name}, there are {len(geos)} conformers\n")
+    if name.startswith("P"):
+        current_conf = len(rxn.product_conf)
+        for count_k, k in enumerate(geos):
+            rxn.product_conf[count_k+current_conf]=k
+
+    if name.startswith("R"):
+        current_conf = len(rxn.reactant_conf)
+        for count_k, k in enumerate(geos):
+            rxn.reactant_conf[count_k+current_conf]=k
+    return rxn
+
+#Zhao's note: enumerate the chirality of interest for both reactant and product#
+
+def enumerate_chirality(rxns, logging_queue):
+    print(f"Enumerating CHIRALITY!!!\n")
+    chunks=[]
+    input_rxns=[]
+    args=rxns[0].args
+    xtb_nprocs=args["xtb_nprocs"]
+    crest_nprocs=args["crest_nprocs"]
+    scratch_crest=args["scratch_crest"]
+    mem      = int(args['mem'])*1000
+    R_chiral_center = args['reactant_chiral_center']
+    P_chiral_center = args['product_chiral_center']
+    R_conformer_smiles = []
+    R_chirality = []
+    # Get the smiles string for all the conformers
+    for rxn in rxns:
+        R_molecule_smiles = return_smi_mol(rxn.reactant.elements,rxn.reactant.geo,rxn.reactant.bond_mats[0], "reactant")
+        P_molecule_smiles = return_smi_mol(rxn.product.elements,rxn.product.geo,rxn.product.bond_mats[0], "product")
+        R_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("reactant.mol")
+        P_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("product.mol")
+
+        print(f"Enumerate Reactant Isomers, Chiral Center: {Chem.FindMolChiralCenters(R_molecule_from_smiles)}\n")
+        print(f"Enumerate Product Isomers, Chiral Center: {Chem.FindMolChiralCenters(P_molecule_from_smiles)}\n")
+        R_Isomers = Generate_Isomers(R_molecule_from_smiles, R_chiral_center)
+        P_Isomers = Generate_Isomers(P_molecule_from_smiles, P_chiral_center)
+        Write_Isomers(R_Isomers, "R_Isomer")
+        Write_Isomers(P_Isomers, "P_Isomer")
+        # Prepare XTB opt with bond constraints
+        R_All_constraint = return_all_constraint(rxn.reactant)
+        P_All_constraint = return_all_constraint(rxn.product)
+        for count_i, iso in enumerate(P_Isomers):
+            os.system(f"cp P_Isomer-{count_i}.xyz {args['scratch_xtb']}/P_Isomer-{count_i}.xyz")
+            if args["low_solvation"]:
+                solvation_model, solvent = args["low_solvation"].split("/")
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/P_Isomer-{count_i}.xyz", 
+                        work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
+                        solvent=solvent, solvation_model=solvation_model, 
+                        jobname=f"P_Isomer-{count_i}_opt", 
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=P_All_constraint)
+            else:
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/P_Isomer-{count_i}.xyz", 
+                        work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
+                        jobname=f"P_Isomer-{count_i}_opt", 
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=P_All_constraint)
+            optjob.execute()
+
+        for count_i, iso in enumerate(R_Isomers):
+            os.system(f"cp R_Isomer-{count_i}.xyz {args['scratch_xtb']}/R_Isomer-{count_i}.xyz")
+            if args["low_solvation"]:
+                solvation_model, solvent = args["low_solvation"].split("/")
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/R_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
+                        solvent=solvent, solvation_model=solvation_model,
+                        jobname=f"R_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=R_All_constraint)
+            else:
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/R_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
+                        jobname=f"R_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=R_All_constraint)
+            optjob.execute()
+        #    exit()
+        Iso_smi = []
+        for filename in os.listdir(args['scratch_xtb']):
+            if filename.startswith("R_Isomer-") and filename.endswith(".xyz"):
+                os.system(f"obabel {args['scratch_xtb']}/{filename} -O {args['scratch_xtb']}/{filename.split()[0]}.smi")
+                with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
+                    first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
+                    obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
+                    print(f"Reactant Isomer name: {filename}, smiles: {obabel_smiles}\n")
+
+        for filename in os.listdir(args['scratch_xtb']):
+            if filename.startswith("P_Isomer-") and filename.endswith(".xyz"):
+                os.system(f"obabel {args['scratch_xtb']}/{filename} -O {args['scratch_xtb']}/{filename.split()[0]}.smi")
+                with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
+                    first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
+                    obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
+                    print(f"Product Isomer name: {filename}, smiles: {obabel_smiles}\n")
+        ########################################################
+        # RUN CREST on the MOLECULE with ENUMERATED CHIRALITY ##
+        ########################################################
+        print(f"Before Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+        print(f"Before Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
+        CREST_list = ['P_Isomer-0', 'R_Isomer-0']
+        xtb_nprocs=args["xtb_nprocs"]
+        crest_nprocs=args["crest_nprocs"]
+        scratch_crest=args["scratch_crest"]
+        mem      = int(args['mem'])*1000
+        for cjob in CREST_list:
+            wf=f"{scratch_crest}/{cjob}"
+            if os.path.isdir(wf) is False: os.mkdir(wf)
+            inp_xyz=f"{wf}/{cjob}.xyz"
+            os.system(f"cp {args['scratch_xtb']}/{cjob}_opt.xtbopt.xyz {inp_xyz}")
+            if(os.path.exists(f"{wf}/crest_best.xyz")): continue
+
+            crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=128, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
+                            solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'], crest_path = args['crest_path'])
+            if args['crest_quick']: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
+            crest_job.add_command(additional='--noreftopo ')
+            if(cjob.startswith('R')):
+                total_constraints = return_metal_constraint(rxn.reactant)
+            if(cjob.startswith('P')):
+                total_constraints = return_metal_constraint(rxn.product)
+            #Zhao's note: Add user-defined constraints#
+            if len(total_constraints) > 0:
+                crest_job.add_command(distance_constraints = total_constraints)
+            #exit()
+            crest_job.execute()
+            #exit()
+
+        for cjob in CREST_list:
+            rxn = read_crest_in_class_isomer(rxn, scratch_crest, cjob)
+        print(f"After Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+        print(f"After Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
+    #exit()
+    return rxns
+
+def read_crest_in_class(rxns, scratch_crest):
+    conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
+    for i in conf_inchi:
+        elements, geos = xyz_parse(f"{scratch_crest}/{i}/crest_conformers.xyz", multiple=True)
+        for count_j, j in enumerate(rxns):
+            if j.product_inchi in i:
+                for count_k, k in enumerate(geos):
+                    rxns[count_j].product_conf[count_k]=k
+            if j.reactant_inchi in i:
+                for count_k, k in enumerate(geos):
+                    rxns[count_j].reactant_conf[count_k]=k
+    return rxns
+
+
+
 def conf_crest(rxns, logging_queue):
     chunks=[]
     input_rxns=[]
@@ -514,9 +660,6 @@ def run_enumeration(input_mol, args=dict()):
     if form_all: products=yp.form_bonds_all(break_mol)
     else: products=yp.form_bonds(break_mol, def_only=True)
     # Finish generate products
-    # print(len(products))
-    # print(products[0].bond_mats)
-    # for i in products: print(i.bond_mat_scores[0])
     products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<=2.0] 
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
@@ -527,20 +670,12 @@ def run_enumeration(input_mol, args=dict()):
 
 def read_rxns(input_mol, args={}):
     elements, geo= xyz_parse_simple(input_mol, multiple=True)
-    print(f"elements: {elements}\n")
-    print(f"geo: {geo}\n")
-    print(f"elements[0]: {elements[0]}\n")
-    print(f"geo[0]: {geo[0]}\n")
     xyz_write(".tmp_R.xyz", elements[0], geo[0])
 
     # Zhao's note: Ask about why this canonicalization leads to failed rxn #
     reactant=yp.yarpecule(".tmp_R.xyz", canon=False)
-    #os.system('rm .tmp_R.xyz')
     xyz_write(".tmp_P.xyz", elements[1], geo[1])
     product=yp.yarpecule(".tmp_P.xyz", canon=False)
-    #os.system('rm .tmp_P.xyz')
-    print(f"reactant element: {reactant.elements}\n")
-    print(f"product  element: {product.elements}\n")
     R=reaction(reactant, product, args=args, opt_P=False)
     return R
 

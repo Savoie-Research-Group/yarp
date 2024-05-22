@@ -4,6 +4,8 @@
 * See an example of oxidative addition [here](https://github.com/Savoie-Research-Group/yarp/tree/metal/Metal-Example/)
 
 # Functionalities and Capabilities
+| Classy-YARP Capabilities | |
+| :---------------: | :---------------------: |
 | ***Special Functionalities*** | |
 | DFT job restart | :heavy_check_mark: |
 | Mix Basis-set | :heavy_check_mark: |

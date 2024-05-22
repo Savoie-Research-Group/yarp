@@ -1,7 +1,7 @@
 import yarp as yp
 import numpy as np
-reactant=yp.yarpecule("n_hex.xyz")
-print("running enumeration on n_hex.xyz")
+reactant=yp.yarpecule("cyclopentene_H2.xyz")
+print("running enumeration")
 print("bond-electron matrix")
 for count_i, i in enumerate(reactant.elements):
     print(f"{i} {reactant.bond_mats[0][count_i]}")
@@ -10,8 +10,8 @@ print(f"We have {len(break_mols)} reaction intermediates with breaking 2 bonds."
 import numpy as np
 products=yp.form_n_bonds(break_mols, n=2)
 print(f"Raw products: {len(products)}")
-products=[_ for _ in products if _.bond_mat_scores[0]<=0.0]
+products=[_ for _ in products if _.bond_mat_scores[0]<=5.0]
 # Question: what's the purpose of this line?
-print(f"We have {len(products)} products from n-hexane.")
-yp.draw_yarpecules(products, "n_hex.pdf", label_ind=True, mol_labels=[f"score {_.bond_mat_scores[0]}" for _ in products])
+print(f"We have {len(products)} products")
+yp.draw_yarpecules(products, "cyclopetene_H2.pdf", label_ind=True, mol_labels=[f"score {_.bond_mat_scores[0]}" for _ in products])
 

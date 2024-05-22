@@ -66,14 +66,15 @@ class Gaussian:
             f.write(f"%NProcShared={self.nproc}\n")
             f.write(f"%Mem={self.mem*self.nproc}MB\n")
             if self.dispersion:
-                command = f"#{self.lot} EmpiricalDispersion=GD3"
+                command = f"#{self.lot} EmpiricalDispersion=GD3 "
             else:
-                command = f"#{self.lot}"
+                command = f"#{self.lot} "
             if self.solvation:
                 command += f" {self.solvation}"
             # jobtype settings
             if self.jobtype.lower()=="opt":
-                command += f"Opt=(maxcycles=300) Int=UltraFine SCF=QC Freq\n\n"
+                if self.natoms==1: command += f"Int=UltraFine Opt=(maxcycles=300) SCF=QC\n\n"
+                else: command += f"Opt=(maxcycles=300) Int=UltraFine SCF=QC Freq\n\n"
             elif self.jobtype.lower()=="tsopt":
                 command+=f" OPT=(TS, CALCALL, NOEIGEN, maxcycles=300) Freq\n\n"
             elif self.jobtype.lower()=='irc':
@@ -289,7 +290,7 @@ class Gaussian:
         # Write trajectory
         out=open(f"{self.work_folder}/{self.jobname}_traj.xyz", "w+")
         for count_i, i in enumerate(Energy):
-            out.write("{self.natoms}\n")
+            out.write(f"{self.natoms}\n")
             out.write(f"Image: {count_i} Energy: {i}\n")
             for count_j, j in enumerate(traj[count_i]):
                 out.write(f"{self.elements[count_j]} {j[0]} {j[1]} {j[2]}\n")

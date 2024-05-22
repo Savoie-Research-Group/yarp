@@ -91,6 +91,7 @@ def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=100,filename='tmp',constr
     if np.abs(adj_mat_o-adj_mat_n).sum() == 0:
         return G
     else:
+        print("Error: geometry optimization by uff is failed.")
         return []
 
 def bondmat_to_adjmat(bond_mat):

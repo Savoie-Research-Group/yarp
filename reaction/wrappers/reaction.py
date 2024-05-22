@@ -13,7 +13,7 @@ from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdm
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
 from copy import deepcopy
-from wrappers.xtb import *
+from xtb import *
 sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
 from utils import *
 from conf import *
@@ -37,10 +37,13 @@ class reaction:
         self.reactant=reactant
         self.product=product
         self.args=args
-        if "scratch_crest" not in args.keys(): self.conf_path="conf"
-        else: self.conf_path=self.args["scratch_crest"]
-        if "n_conf" not in args.keys(): self.n_conf=10
-        else: self.n_conf=self.args["n_conf"]
+        if "scratch_crest" in args.keys(): self.conf_path=self.args["scratch_crest"]
+        else: self.conf_path="conformer"
+        if "n_conf" in args.keys():
+            n_conf=self.args["n_conf"]
+            self.n_conf=self.args["n_conf"]
+        else:
+            self.n_conf=0
         # safe check
         for count_i, i in enumerate(reactant.elements): reactant.elements[count_i]=i.capitalize()
         for count_i, i in enumerate(product.elements): product.elements[count_i]=i.capitalize()
@@ -49,6 +52,8 @@ class reaction:
                 print("Fatal error: reactant and product are not same. Please check the input.....")
                 exit()
         if opt: self.product=geometry_opt(self.product)
+        self.reactant_xtb_opt=dict()
+        self.product_xtb_opt=dict()
         self.reactant_dft_opt=dict()
         self.product_dft_opt=dict()
         self.reactant_conf=dict()
@@ -68,7 +73,7 @@ class reaction:
         self.IRC_dft=dict()
         self.constrained_TS=dict()
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
-
+        self.hash=f"{reactant.hash}-{product.hash}"
     def conf_rdkit(self):
         if self.args["strategy"]==0 or self.args["strategy"]==2:
             if os.path.isdir('{}/{}'.format(self.conf_path, self.reactant_inchi)) is False: os.system('mkdir {}/{}'.format(self.conf_path, self.reactant_inchi))
@@ -84,10 +89,14 @@ class reaction:
                 os.system('rm .reactant.tmp.mol')
                 for count_i, i in enumerate(ids):
                     geo=mol.GetConformer(i).GetPositions()
-                    self.reactant_conf[count_i]=geo
-                    out.write('{}\n\n'.format(len(self.reactant.elements)))
-                    for count, e in enumerate(self.reactant.elements):
-                        out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
+                    # check table
+                    adj_mat=table_generator(self.reactant.elements, geo, verbose=False)
+                    adj_diff=np.abs(adj_mat-self.reactant.adj_mat)
+                    if adj_diff.sum()==0:
+                        self.reactant_conf[count_i]=geo
+                        out.write('{}\n\n'.format(len(self.reactant.elements)))
+                        for count, e in enumerate(self.reactant.elements):
+                            out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
             else:
                 _, geo=xyz_parse('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi), multiple=True)
                 for count_i, i in enumerate(geo):
@@ -106,10 +115,14 @@ class reaction:
                 os.system('rm .product.tmp.mol')
                 for count_i, i in enumerate(ids):
                     geo=mol.GetConformer(i).GetPositions()
-                    self.product_conf[count_i]=geo
-                    out.write('{}\n\n'.format(len(self.product.elements)))
-                    for count, e in enumerate(self.product.elements):
-                        out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
+                    adj_mat=table_generator(self.reactant.elements, geo, verbose=False)
+                    adj_diff=np.abs(adj_mat-self.product.adj_mat)
+                    # check table
+                    if adj_diff.sum()==0:
+                        self.product_conf[count_i]=geo
+                        out.write('{}\n\n'.format(len(self.product.elements)))
+                        for count, e in enumerate(self.product.elements):
+                            out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
             else:
                 _, geo=xyz_parse('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.product_inchi), multiple=True)
                 for count_i, i in enumerate(geo):
@@ -143,12 +156,15 @@ class reaction:
         # load ML model to find conformers 
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
+
         ind_list, pass_obj_values=[], []
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
-            if len(Gr)==0: continue
+            if len(Gr)==0:
+                print("Falied to optimize")
+                continue
             tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"
             xyz_write(tmp_xyz_p,conf_entry['E'],Gr)
             tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
@@ -162,18 +178,16 @@ class reaction:
             io.write(tmp_xyz_p,product)
             _,Gr_opt = xyz_parse(tmp_xyz_p)
             indicators_opt = return_indicator(conf_entry['E'],conf_entry['G'],Gr_opt,namespace=f'tmp_{job_id}')
-
+            # # print('here')
             # if applying ase minimize_rotation_and_translation will increase the intended probability, use the rotated geometry
             if model.predict_proba(indicators)[0][1] < model.predict_proba(indicators_opt)[0][1]: indicators, Gr = indicators_opt, Gr_opt
             # check whether the channel is classified as intended and check uniqueness
-            if model.predict_proba(indicators)[0][1] > 0.4 and check_duplicate(indicators,ind_list,thresh=0.025):
+            if model.predict_proba(indicators)[0][1] > 0.0 and check_duplicate(indicators,ind_list,thresh=0.025):
                 ind_list.append(indicators)
                 pass_obj_values.append((model.predict_proba(indicators)[0][0],deepcopy(conf_entry['G']),Gr,deepcopy(conf_entry['direct'])))
-
             # remove tmp file
             if os.path.isfile(tmp_xyz_r): os.remove(tmp_xyz_r)
             if os.path.isfile(tmp_xyz_p): os.remove(tmp_xyz_p)
-
         pass_obj_values=sorted(pass_obj_values, key=lambda x: x[0])
         N_conf=0
         for item in pass_obj_values:

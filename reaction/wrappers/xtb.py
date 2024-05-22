@@ -57,7 +57,7 @@ class XTB:
 
         # XTB calculation basic command
         self.command = f'{xtb_path} {self.input_geo} {self.scf_iters} {self.charge} {self.unpair} {self.jobname} {self.lot} {self.jobtype} {self.nproc} '
-        if self.solvent: self.command += self.solvent
+        if self.solvent is True: self.command += self.solvent
         
     def generate_xcontrol(self, distance_constraints=[], cartesian_constraints=[], force_constant=0.5):
         """
@@ -110,10 +110,11 @@ class XTB:
         # go into the work folder and run the command
         os.chdir(self.work_folder)
         result = subprocess.run(f'{self.command} > {self.output}', shell=True, capture_output=True, text=True)
-
+        # print(self.command)
+        # print(result)
         # go back to the original folder
         os.chdir(current_path)
-
+        # os.system("sleep 10")
         return None
 
     def calculation_terminated_normally(self) -> bool:

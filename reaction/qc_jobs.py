@@ -60,6 +60,10 @@ def run_gsm(gsm_job, logging_queue):
     if gsm_job.calculation_terminated_normally():
         print(f"GSM job {gsm_job.jobname} has been finished, skip this job...")
         logger.info(f"GSM job {gsm_job.jobname} has been finished, skip this job...")
+    #Zhao's note: output file exists, but calculation ends with error#
+    elif gsm_job.output_file_exist() and not gsm_job.calculation_terminated_without_error():
+        print(f"GSM job {gsm_job.jobname} has been finished but has error, skip this job...")
+        logger.info(f"GSM job {gsm_job.jobname} has been finished but has error, skip this job...")
     else:
         print(f"running GSM job {gsm_job.jobname} on PID {mp.current_process().pid}")
         logger.info(f"running GSM job {gsm_job.jobname} on PID {mp.current_process().pid}")

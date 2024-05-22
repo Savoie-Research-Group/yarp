@@ -11,6 +11,8 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 from yarp.taffi_functions import table_generator
 
+from yarp.properties import el_metals
+
 class XTB:
     def __init__(self, input_geo, work_folder=os.getcwd(), lot='gfn2', jobtype=['opt'], nproc=1, scf_iters=300, jobname='xtbjob', solvent=False, solvation_model='alpb', charge=0, multiplicity=1, xtb_path='xtb'):
         """
@@ -187,15 +189,21 @@ class XTB:
         """
         Check if the optimization converges and the structure does not change
         """
-        if not self.optimization_converged(): return False
+        if not self.optimization_converged(): 
+            print(f"optimization does not converge\n")
+            return False
         E, G = xyz_parse(self.input_geo)
         _, optG = self.get_final_structure()
         adj_mat_i = table_generator(E, G)
         adj_mat_o = table_generator(E, optG)
         if np.sum(abs(adj_mat_i-adj_mat_o)) != 0:
+            print(f"old/new adj_mat doesn't agree\n")
             rows, cols = np.where(adj_mat_i != adj_mat_o)
-            contain_metal = [E[rows[ind]] in ['Zn','Mg','Li'] or E[cols[ind]] in ['Zn','Mg','Li'] for ind in range(len(rows))]
+            # Zhao's note: consider changing here to using el_metal from yarp.properties #
+            #contain_metal = [E[rows[ind]] in ['Zn','Mg','Li','Au','Pd','Ni'] or E[cols[ind]] in ['Zn','Mg','Li','Au','Pd','Ni'] for ind in range(len(rows))]
+            contain_metal = [E[rows[ind]] in el_metals or E[cols[ind]] in el_metals for ind in range(len(rows))]
             if False in contain_metal:
+                print(f"fails at contain_metal\n")
                 return False
             else:
                 return True

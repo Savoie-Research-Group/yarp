@@ -12,9 +12,46 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 from utils import xyz_write
 
+def check_by_element_and_index(element, index, mix_lot):
+
+    found = False
+    count = 0
+    for a in range(0, len(mix_lot)):
+        first_element = mix_lot[a][0]
+
+        # Zhao's note: there may be cases where you impose 2 basis sets on the same atom via different ways
+        # e.g. H, STO-3G, H31, def2-TZVP
+        # in this case, the one with element + index should have higher hierarchy than just element alone.
+        # so sort mix_lot and get those with element + index as the first ones to be checked
+        if (any(x.isalpha() for x in first_element) and (any(x.isnumeric() for x in first_element))):
+            # if it is alphanumeric, check if element+number matches
+            if element+str(index) == first_element:
+                found = True
+                count = a
+                break
+        elif first_element.isalpha():
+            # check if element match
+            if element == first_element:
+                found = True
+                count = a
+                break
+        elif first_element.isnumeric():
+            # check if number match
+            if index == int(first_element):
+                found = True
+                count = a
+                break
+    if found:
+        # check if quote mark is in the string, add if not
+        if not (mix_lot[count][1].startswith("\"") and mix_lot[count][1].endswith("\"")):
+            mix_lot[count][1] = "\"" + mix_lot[count][1] + "\""
+        return "newgto " + mix_lot[count][1] + " end"
+    else:
+        return ''
+
 # prepare corresponding input files for each calculator
 class ORCA:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B97-3c', jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
+    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B97-3c', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
                  defgrid=2, solvent=False, solvation_model='CPCM', dielectric=0.0, writedown_xyz=False):
         """
         Initialize an Orca job class
@@ -32,6 +69,8 @@ class ORCA:
         self.orca_input   = f'{work_folder}/{jobname}.in'
         self.jobtype      = jobtype
         self.lot          = lot
+        self.mix_basis    = mix_basis
+        self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
         self.nproc        = int(nproc)
         self.mem          = int(mem)
         self.scf_iters    = int(scf_iters)
@@ -53,7 +92,6 @@ class ORCA:
         # create work folder
         if os.path.isdir(self.work_folder) is False: os.mkdir(self.work_folder)
 
-        # prepare_input_geometry(self):
         if writedown_xyz is False:
             if input_geo[0] == '/': # Full path
                 self.xyz = f'*xyzfile {charge} {multiplicity} {input_geo}\n'
@@ -63,10 +101,14 @@ class ORCA:
             self.xyz = f'*xyz {charge} {multiplicity}\n'
             elements, geometry = xyz_parse(input_geo)
             for ind in range(len(elements)):
-                self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}\n'
+                self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}'
+                if self.mix_basis:
+                    # check by element or check by index
+                    self.xyz += check_by_element_and_index(elements[ind], ind, mix_lot)
+                self.xyz += f'\n'
             self.xyz += '*\n'
 
-    def generate_geometry_settings(self, hess=True, hess_step=10, constraints=[], oldhess=False):
+    def generate_geometry_settings(self, hess=True, hess_step=10, constraints=[], TS_Active_Atoms=[], oldhess=False):
         """
         Specific info block for geometry optimization
         For constraints, please use orca constraint type # Note atom index starting from 0
@@ -86,8 +128,12 @@ class ORCA:
             for constraint in constraints:
                 info += f'    {constraint}\n'
             info += '  end\n'
+        if len(TS_Active_Atoms) > 0:
+            numbers_str = '{' + '  '.join(map(str, TS_Active_Atoms)) + '}'
+            info += f"  TS_Active_Atoms {numbers_str} end\n"
+            info +=  "  TS_Active_Atoms_Factor 1.5\n"
+
         info += 'end\n\n'
-        
         self.geom = info
 
     def generate_irc_settings(self, max_iter=60, print_level=1, oldhess=False):
@@ -135,7 +181,8 @@ class ORCA:
         """
         if os.path.isfile(self.output) is False: return False
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        #lines = open(self.output, 'r', encoding="utf-8").readlines()
 
         # set termination indicators
         termination_strings = ['ORCA TERMINATED NORMALLY', 'ORCA finished with error']
@@ -151,12 +198,42 @@ class ORCA:
 
         return False
 
+    #Zhao's note: a function that checks whether the orca simulation is dead because of time limit
+    #Logic: check if new geometry is generated, this is done by checking the number of cycle of the opt.
+    #if cycle > 1 (1 should be the same as the one in the input file), if so, then restart (replace the geometry)
+    def new_opt_geometry(self) -> bool:
+        if os.path.isfile(self.output) is False: return False
+        # load orca output file
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        # identify the position of the final geometry
+        for i, line in enumerate(reversed(lines)):
+            if 'GEOMETRY OPTIMIZATION CYCLE' in line:
+                #Check if the final cycle is not 1
+                cycle = int(line.split()[4])
+                if(cycle > 1):
+                    return True # The found cycle number is not 1, new geometry is found
+                break
+        return False
+    
+    #Zhao's note: a function that checks whether numerical frequency is calculation needs restart
+    def numfreq_need_restart(self) -> bool:
+        if os.path.isfile(self.output) is False: return False
+        # then check if the Numerical frequencies are started (but not done)
+        # load orca output file
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        # identify the position of the final geometry
+        for i, line in enumerate(reversed(lines)):
+            if 'Calculating on displaced geometry' in line:
+                #Check if the final cycle is not 1
+                return True # The found cycle number is not 1, new geometry is found
+        return False
+
     def get_energy(self) -> float:
         """
         Get single point energy from Orca output file
         """
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         for line in reversed(lines):
             if 'FINAL SINGLE POINT ENERGY' in line:
@@ -169,7 +246,7 @@ class ORCA:
         Analyze IRC output, return two end points
         """
         # load output job
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # find barriers
         for lc, line in enumerate(lines):
@@ -206,7 +283,7 @@ class ORCA:
         Check if the optimization converges
         """
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         for line in reversed(lines):
             if 'THE OPTIMIZATION HAS CONVERGED' in line:
@@ -220,7 +297,7 @@ class ORCA:
         """
         imag_freq, imag_ind = [],[]
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # identify the position of the final frequencies
         for line in reversed(lines):
@@ -236,7 +313,9 @@ class ORCA:
         Check if this is a ture transition state after TS optimization 
         """
         imag_freq,_ = self.get_imag_freq()
-        if len(imag_freq) == 1 and abs(imag_freq[0]) > 10: return True
+        #Zhao's note: consider relaxing this criteria, from 10 to 5 or even 3
+        #if len(imag_freq) == 1 and abs(imag_freq[0]) > 10: return True # ORIGINAL
+        if len(imag_freq) == 1 and abs(imag_freq[0]) > 3: return True  # RELAXED CRITERIA
         else: return False
 
     def get_final_structure(self):
@@ -251,7 +330,7 @@ class ORCA:
 
         # if xyz file does not exist, go to potentially long .out file
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # identify number of atoms
         for line in lines:
@@ -281,7 +360,7 @@ class ORCA:
         Get the imaginary frequency mode
         """
         geo_lines,freq_lines, mode_lines, imag_ind = [],[],[],[]
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # identify the position of final normal mode
         for i, line in enumerate(reversed(lines)):
@@ -325,7 +404,7 @@ class ORCA:
            1   C   :   -0.011390275   -0.000447412    0.000552736    <- j
         """
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # identify number of atoms
         for line in lines:
@@ -371,7 +450,7 @@ class ORCA:
         start_line = False
         if os.path.exists(hess_file):
             # load in the hessian file
-            lines = open(hess_file, 'r', encoding="utf-8").readlines()
+            lines = open(hess_file, 'r', encoding="ISO-8859-1").readlines()
             for i, line in enumerate(lines):
                 if '$hessian' in line:
                     start_line = i + 3
@@ -414,7 +493,7 @@ class ORCA:
         Get thermochemistry properties, including Gibbs free energy, enthalpy, entropy, and inner enenrgy, from Orca output file
         """
         # load orca output file
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
 
         # parse thermal properties from output
         thermal = {'GibbsFreeEnergy':False,'Enthalpy':False,'InnerEnergy':False,'Entropy':False}

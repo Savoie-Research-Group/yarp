@@ -133,10 +133,36 @@ class GSM:
 
         # set termination indicator
         for line in reversed(lines):
-            if 'about to write tsq.xyz' in line or 'exiting' in line or 'creating final string file' in line:
+            #Zhao's note: here the if statement differs from Qiyuan's version
+            #for my case, there was "exiting" in the output file, but no tsq xyz file written
+            #for now(022724), revert it back to Qiyuan's version###
+            if 'about to write tsq.xyz' in line: #or 'exiting' in line or 'creating final string file' in line:
                 return True
 
         return False
+
+    def output_file_exist(self) -> bool:
+        """
+        Check if the output exist
+        """
+        if os.path.isfile(self.output) is True: return True
+        return False
+
+    def calculation_terminated_without_error(self) -> bool:
+        """
+        Check if the calculation terminate with error returned
+        True: has no error, ready to proceed
+        False: has error
+        """
+        if os.path.isfile(self.output) is False: return False
+        # load gsm output file
+        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        # set termination indicator
+        for line in reversed(lines):
+            if 'ERROR' in line and 'exiting' in line:
+                return False
+
+        return True
 
     def find_correct_TS(self) -> bool:
         """
@@ -146,13 +172,17 @@ class GSM:
         lines = open(self.output, 'r', encoding="utf-8").readlines()
         energies = []
         for line in reversed(lines):
-            if 'string E (kcal/mol)' in line:
+            if 'string E (kcal/mol)' in line:# and 'kcal' in line:
                 energies = [float(i) for i in line.split()[3:]]
+                print(f"string E (kcal/mol) line: {line}\n", flush = True)
+                print("Found string E (kcal/mol)\n", flush = True)
                 break
-            if 'V_profile:' in line:
-                energies = [float(i) for i in line.split()[1:]]
-                break
-        
+            #if 'V_profile:' in line:
+            #    energies = [float(i) for i in line.split()[1:]]
+            #    print(f"V_profile line: {line}\n", flush = True)
+            #    print("Found V_profile!\n", flush = True)
+            #    break
+        print(f"energies: {energies}\n", flush = True)
         if len(energies) == 0: return False
         
         # check energies
@@ -207,8 +237,16 @@ class GSM:
         Get the ts geometry (and elements) from a gsm output file
         """
         if not self.calculation_terminated_normally(): return False, []
-        if not self.find_correct_TS(): return False, []
+        #Zhao's note: redundant check, cancel
+        #if not self.find_correct_TS(): return False, []
         images = self.get_strings()
-        ts_ind = self.find_correct_TS()
-        ts = images[ts_ind]
-        return ts[0], ts[1]
+        #ts_ind = self.find_correct_TS()
+        #ts = images[ts_ind]
+        #print(f"image: {ts_ind}, ts: {ts[0]}, {ts[1]}\n", flush = True)
+        #Zhao's note: use the Qiyuan's version of the wrapper
+        ts_xyz = f'{self.work_folder}/scratch/tsq{self.jobid:04d}.xyz'
+        if os.path.exists(ts_xyz):
+            E,G = xyz_parse(ts_xyz)
+            return E, G
+        else: 
+            return False, []

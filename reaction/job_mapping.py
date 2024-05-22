@@ -31,6 +31,19 @@ def logger_process(queue, logging_path):
             break
         logger.handle(message)
 
+def match_first_two_elements(input_list, list_of_lists):
+    # Extract the first two elements of the input list
+    first_two_input = sorted(input_list[:2])
+    
+    # Iterate through each sublist in the list of lists
+    for sublist in list_of_lists:
+        # Sort the first two elements of the current sublist for an order-independent comparison
+        first_two_sublist = sorted(sublist[:2])
+        # Check if the first two elements match
+        if first_two_input == first_two_sublist:
+            return True  # Match found
+    return False  # No match found
+
 def process_input_rxn(rxns, args={}):
     job_mapping=dict()
     process_id=mp.current_process().pid
@@ -44,8 +57,39 @@ def process_input_rxn(rxns, args={}):
         P_inchi=rxn.product_inchi
         R_constraint=return_metal_constraint(rxn.reactant)
         P_constraint=return_metal_constraint(rxn.product)
+
+        #Zhao's note: added dist constraint for both reactant and product
+        if(args['constraint'] and not args['product_dist_constraint'] is None):
+            total_constraints = []
+            inp_list = args['product_dist_constraint'].split(',')
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
+            for constraints in total_constraints:
+                #Check for overlaps in the atom numbers
+                if not match_first_two_elements(constraints, P_constraint):
+                    P_constraint.append(constraints)
+
+        if(args['constraint'] and not args['reactant_dist_constraint'] is None):
+            total_constraints = []
+            inp_list = args['reactant_dist_constraint'].split(',')
+            for a in range(0, int(len(inp_list) / 3)):
+                arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+                total_constraints.append(arg_list)
+            for constraints in total_constraints:
+                #Check for overlaps in the atom numbers
+                if not match_first_two_elements(constraints, R_constraint):
+                    R_constraint.append(constraints)
+
+        R_ADJMAT = table_generator(RE, RG)
+        P_ADJMAT = table_generator(PE, PG)
+        np.set_printoptions(threshold=sys.maxsize)
+
+        #exit()
+
         if args["strategy"]!=0:
             if P_inchi not in job_mapping:
+
                 job_mapping[P_inchi]={'jobs': [f'{count_i}-P'], 'id': len(job_mapping)}
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", PE, PG)
                 if args["low_solvation"]:
@@ -67,6 +111,7 @@ def process_input_rxn(rxns, args={}):
             else: job_mapping[P_inchi]["jobs"].append(f"{count_i}-P")
         if args["strategy"]!=1:
             if R_inchi not in job_mapping:
+
                 job_mapping[R_inchi]={"jobs": [f"{count_i}-R"], "id": len(job_mapping)}
                 xyz_write(f"{args['scratch_xtb']}/{process_id}_{len(job_mapping)}_init.xyz", RE, RG)
                 if args["low_solvation"]:
@@ -113,3 +158,8 @@ def monitor_jobs(slurm_jobs):
             break
         time.sleep(60)
     return    
+#Zhao's note: write the jobs to txt file for monitoring#
+def write_to_last_job(slurm_jobs):
+    with open('last_jobs.txt', 'w') as file:
+        for slmjob in slurm_jobs:
+            file.write(slmjob.job_id + '\n')

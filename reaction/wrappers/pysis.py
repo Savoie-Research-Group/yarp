@@ -12,7 +12,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class PYSIS:
-    def __init__(self, input_geo, work_folder=os.getcwd(), jobname='pysis', jobtype='tsopt', coord_type='redund', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
+    def __init__(self, input_geo, work_folder=os.getcwd(), pysis_dir="", jobname='pysis', jobtype='tsopt', coord_type='redund', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
         """
         Initialize a pysis job class
         input_geo: a xyz file containing the input geometry. Full path recommended
@@ -37,6 +37,8 @@ class PYSIS:
         self.multiplicity = multiplicity
         self.alpb         = alpb
         self.gbsa         = gbsa
+        # Zhao's note: some special fix since the pysis in Classy-yarp repo doesn't work
+        self.pysis_dir    = pysis_dir
         # create work folder
         if os.path.isdir(self.work_folder) is False: os.mkdir(self.work_folder)
 
@@ -71,15 +73,15 @@ class PYSIS:
         if self.jobtype.lower() == 'tsopt':
             if method is None: method = 'rsprfo'
             with open(f'{self.pysis_input}','a') as f:
-                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 50\n')
-                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 50\n')
+                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 2000\n')
+                else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 2000\n')
 
         elif self.jobtype.lower()== 'irc':
             if method is None: method = 'eulerpc'
             with open(f'{self.pysis_input}','a') as f:
                 f.write(f'irc:\n type: {method}\n forward: True\n backward: True\n downhill: False\n')
                 if hess_init: f.write(f' hessian_init: {hess_init}\n')
-                f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {thresh}\n max_cycles: 50')
+                f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {thresh}\n max_cycles: 400')
 
         else:
             print("Supports for other job types are underway")
@@ -111,9 +113,9 @@ class PYSIS:
     #     env = os.environ.copy()
     #     env['OMP_NUM_THREADS'] = str(self.nproc)
     #     try:
-    #         result = subprocess.run(f'pysis {self.pysis_input} > {self.output}', shell=True, env=env, capture_output=True, text=True, timeout=timeout)
+    #         result = subprocess.run(f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', shell=True, env=env, capture_output=True, text=True, timeout=timeout)
     #     except:
-    #         result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
+    #         result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
 
     #     # go back to the original folder
     #     os.chdir(current_path)
@@ -135,14 +137,14 @@ class PYSIS:
 
         # running job and count time
         start_time = time.time()
-        process = subprocess.Popen(f'pysis {self.pysis_input} > {self.output}', shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         while True:
             if process.poll() is not None:  # process has terminated
-                result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=process.returncode, stdout=process.stdout.read(), stderr=process.stderr.read())
+                result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=process.returncode, stdout=process.stdout.read(), stderr=process.stderr.read())
                 break
             elif time.time() - start_time > timeout:
                 process.kill()  # send SIGKILL signal to the process
-                result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
+                result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
                 break
             time.sleep(1)  # wait a bit before checking again
             

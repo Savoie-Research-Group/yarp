@@ -2,8 +2,6 @@
 * Currently running tests and adding functions needed
 * See updated wrapper functions in [reaction/](https://github.com/Savoie-Research-Group/yarp/tree/metal/reaction) and [Metal-Example/wrapper_functions/](https://github.com/Savoie-Research-Group/yarp/tree/metal/Metal-Example/wrapper_functions)
 * See an example of oxidative addition [here](https://github.com/Savoie-Research-Group/yarp/tree/metal/Metal-Example/)
-![Oxidative Addition](https://github.com/Savoie-Research-Group/yarp/blob/metal/Metal-Example/result_files/4-5_IRC.gif)
-![Reductive Elimination](https://github.com/Savoie-Research-Group/yarp/blob/metal/Metal-Example/result_files/8-9_IRC.gif)
 
 # Functionalities and Capabilities
 | Classy-YARP Capabilities | |
@@ -21,3 +19,9 @@
 | Migration Insertion | :heavy_check_mark: |
 | beta-Hydride Elimination | :heavy_check_mark: |
 | More Work in Progress! | :arrows_counterclockwise: |
+
+# See some SNAPSHOTS!
+## Oxidative Addition
+![Oxidative Addition](https://github.com/Savoie-Research-Group/yarp/blob/metal/Metal-Example/result_files/4-5_IRC.gif)
+## Reductive Elimination
+![Reductive Elimination](https://github.com/Savoie-Research-Group/yarp/blob/metal/Metal-Example/result_files/8-9_IRC.gif)

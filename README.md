@@ -4,10 +4,11 @@
 * See an example of oxidative addition [here](https://github.com/Savoie-Research-Group/yarp/tree/metal/Metal-Example/)
 
 # See some SNAPSHOTS!
-| Oxidative<br>Addition | Reductive<br>Elimination | Migratory<br>Insertion | beta-Hydride<br>Elimination |
+| Cu: Oxidative<br>Addition | Cu: Reductive<br>Elimination | Au: Migratory<br>Insertion | Au: beta-Hydride<br>Elimination |
 | :---------------: | :---------------------: | :---------------------: | :---------------------: |
 | ![Oxidative Addition](Metal-Example/result_files/4-5_IRC.gif) | ![Oxidative Addition](Metal-Example/result_files/8-9_IRC.gif) | ![Migratory Insertion](Metal-Example/result_files/Gold-migratory-insertion.gif) | ![beta-Hydride Elimination](Metal-Example/result_files/beta-Hydride-Elimination.gif) |
-
+| **Pd: C-H<br>Activation** | **Mn: Ketone<br>Hydrogenation** | **Co: <br>Hydrometallation** | **Work<br>in Progress!!** |
+| ![C-H Activation](Metal-Example/result_files/Pd-C-H-Activation.gif) | ![Mn Ketone Hydrogenation](Metal-Example/result_files/Mn-Ketone-Hydrogenation-IRC.gif) | ![Hydrometallation](Metal-Example/result_files/Cobalt-Hydrometallation-IRC.gif) | ![WIP](Metal-Example/result_files/under-construction90s-90s.gif) |
 # Functionalities and Capabilities
 | Classy-YARP Capabilities | |
 | :---------------: | :---------------------: |

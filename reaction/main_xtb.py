@@ -67,6 +67,8 @@ def initialize(args):
     else: args["c_nprocs"]=int(args["c_nprocs"])
     if "mem" not in keys:
         args["mem"]=1
+    if "restart" not in keys:
+        args["restart"]=False
     args["scratch_xtb"]=f"{args['scratch']}/xtb_run"
     args["scratch_crest"]=f"{args['scratch']}/conformer"
     args["conf_output"]=f"{args['scratch']}/rxn_conf"
@@ -135,27 +137,29 @@ def main(args:dict):
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif args["method"]=='crest':
         rxns=conf_by_crest(rxns, logging_queue, logger)
-    
+    with open(args["reaction_data"], "wb") as f:
+        pickle.dump(rxns, f)
     print("-----------------------")
     print("-------Third Step------")
     print("Conformation Generation")
     print("-----------------------")
     rxns=select_rxn_conf(rxns, logging_queue)
-    # exit()
+    with open(args["reaction_data"], "wb") as f:
+        pickle.dump(rxns, f)
     print("-----------------------")
     print("-------Forth Step------")
     print("-Growing String Method-")
     print("-----------------------")
     rxns=run_gsm_by_xtb(rxns, logging_queue)
-    
+    with open(args["reaction_data"], "wb") as f:
+        pickle.dump(rxns, f)
     print("-----------------------")
     print("-------Fifth Step------")
     print("------Berny TS Opt-----")
     print("-----------------------")
+    rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
-    rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
-
     print("-----------------------")
     print("-------Sixth Step------")
     print("-----IRC Calculation---")

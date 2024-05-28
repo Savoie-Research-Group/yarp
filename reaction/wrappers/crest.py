@@ -135,7 +135,11 @@ class CREST:
         # load in crest output
         if os.path.isfile(self.output) is False: return False
 
-        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        try: lines = open(self.output, 'r', encoding="utf-8").readlines()
+        except:
+            print(f"{self.output} is failed to read. please check it!")
+            return False
+
         for n_line, line in enumerate(reversed(lines)):
             if 'CREST terminated normally.' in line:
                 return True
@@ -151,7 +155,8 @@ class CREST:
         if os.path.exists(xyz_file_name):
             E,G = xyz_parse(xyz_file_name)
             line= open(xyz_file_name, 'r', encoding="utf-8").readlines()[1]
-            SPE = float(line.split()[0]) 
+            if "energy" not in line: SPE = float(line.split()[0]) 
+            else: SPE=float(line.split()[1])
             return E, G, SPE
         else:
             return False

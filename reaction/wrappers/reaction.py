@@ -145,11 +145,11 @@ class reaction:
         tmp_rxn_dict=dict()
         count=0
         # Create a dictionary to store the conformers and product/reactant bond mat.
-        if self.args["strategy"]!=0:
+        if self.args["strategy"]!=0 and self.product_conf!={}:
             for i in self.product_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": R_bond_mats[0], "G": deepcopy(self.product_conf[i]), 'direct':'B'}
                 count=count+1
-        if self.args["strategy"]!=1:
+        if self.args["strategy"]!=1 and self.reactant_conf!={}:
             for i in self.reactant_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
                 count=count+1

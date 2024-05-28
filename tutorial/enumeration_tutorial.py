@@ -1,10 +1,15 @@
 import yarp as yp
 import numpy as np
-reactant=yp.yarpecule("cyclopentene_H2.xyz")
+reactant=yp.yarpecule("test.xyz")
+
 print("running enumeration")
-print("bond-electron matrix")
-for count_i, i in enumerate(reactant.elements):
-    print(f"{i} {reactant.bond_mats[0][count_i]}")
+yp.draw_bmats(reactant,"reactant.pdf")
+
+reactant=yp.yarpecule("test2.xyz")
+
+print("running enumeration")
+yp.draw_bmats(reactant,"reactant2.pdf")
+exit()
 break_mols=list(yp.break_bonds(reactant, n=2))
 print(f"We have {len(break_mols)} reaction intermediates with breaking 2 bonds.")
 import numpy as np

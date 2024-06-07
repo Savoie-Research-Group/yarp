@@ -205,20 +205,22 @@ class reaction:
             if self.args["low_solvation"]:
                 solvation_model, solvent = self.args["low_solvation"].split("/")
                 optjob=XTB(input_geo=tmp_xyz_r,
-                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],\
+                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
                         solvent=solvent, solvation_model=solvation_model,
                         jobname=f"joint_xtb",
                         charge=self.args["charge"], multiplicity=self.args["multiplicity"])
                 optjob.add_command(distance_constraints=All_constraint)
             else:
                 optjob=XTB(input_geo=tmp_xyz_r,
-                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],\
+                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
                         jobname=f"joint_xtb",
                         charge=self.args["charge"], multiplicity=self.args["multiplicity"])
                 optjob.add_command(distance_constraints=All_constraint)
             optjob.execute()
            
             #exit()
+
+            if(conf_ind % 20 == 0): print(f"Processed/Optimized {conf_ind} rxn confs\n", flush = True)
 
             if optjob.optimization_success():
                 _, Gr = optjob.get_final_structure()
@@ -297,11 +299,11 @@ class reaction:
             if self.args['opt']:
                 if self.args['low_solvation']:
                     solvation_model, solvent = self.args['low_solvation'].split('/')
-                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],jobname=f'opt_{job_id}_p',solvent=solvent,\
+                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',solvent=solvent,\
                                  solvation_model=solvation_model,charge=self.args['charge'],multiplicity=self.args['multiplicity'])
                 else:
                     os.system(f"cp {tmp_xyz_p} self.args['scratch_xtb']/asdasdasdasd_inp_P.xyz")
-                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],jobname=f'opt_{job_id}_p',charge=self.args['charge'],multiplicity=self.args['multiplicity'])
+                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',charge=self.args['charge'],multiplicity=self.args['multiplicity'])
 
                 optjob.execute()
 

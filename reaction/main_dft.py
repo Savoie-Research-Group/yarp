@@ -18,6 +18,7 @@ from constants import Constants
 from job_submission import *
 from job_mapping import *
 from conf import separate_mols
+from wrappers.gaussian import Gaussian
 
 def compare_lists(list1, list2):
     """
@@ -204,9 +205,11 @@ def main(args:dict):
     #Zhao's note: Read and wait for unfinished simulation#
     read_wait_for_last_jobs()
 
-    rxns=run_dft_opt(rxns)
-    with open(args["reaction_data"], "wb") as f:
-        pickle.dump(rxns, f)
+    skip_rp_opt = True
+    if not skip_rp_opt:
+        rxns=run_dft_opt(rxns)
+        with open(args["reaction_data"], "wb") as f:
+            pickle.dump(rxns, f)
 
     # Run DFT TS opt 
     rxns=run_dft_tsopt(rxns)
@@ -228,7 +231,7 @@ def load_rxns(rxns_pickle):
 def constrained_dft_geo_opt(rxns):
     args=rxns[0].args
     scratch_dft=args["scratch_dft"]
-    orca_jobs=[]
+    dft_jobs=[]
     copt=dict()
     for rxn in rxns:
         # Three cases:
@@ -250,44 +253,42 @@ def constrained_dft_geo_opt(rxns):
             else:
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
             constrained_bond, constrained_atoms=return_rxn_constraint(rxn.reactant, rxn.product)
-            orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                          mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
-                          jobname=f"{rxn_ind}-COPT",\
-                          jobtype="OPT Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                          solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            constraints=[f'{{C {atom} C}}' for atom in constrained_atoms]
-            orca_job.generate_geometry_settings(hess=False, constraints=constraints)
-            orca_job.generate_input()
-            copt[rxn_ind]=orca_job
 
-            #Zhao's note: special case: if your ORCA opt simulation ended but not finished,
-            # and you want to restart it.
-            if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
-                tempE, tempG=orca_job.get_final_structure()
-                print(f"Trying to Restart for {ind}, tempG: {tempG}\n", flush = True)
-                xyz_write(inp_xyz, rxn.reactant.elements, tempG)
-                orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                              mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
-                              jobname=f"{rxn_ind}-COPT",\
-                              jobtype="OPT Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                              solvation_model=args["solvation_model"], dielectric=args["dielectric"]
-, writedown_xyz=True)
+            #####################
+            # Prepare DFT Input #
+            #####################
+            Input = DFT_Input(args)
+            Input.input_geo  = inp_xyz
+            Input.work_folder= wf
+            Input.jobname    = f"{rxn_ind}-COPT"
+
+            if args["package"] == "ORCA":
+                Input.jobtype="OPT Freq"
+                dft_job=ORCA(Input)
                 constraints=[f'{{C {atom} C}}' for atom in constrained_atoms]
-                orca_job.generate_geometry_settings(hess=False, constraints=constraints)
-                orca_job.generate_input()
-                copt[rxn_ind]=orca_job
-
-            if orca_job.calculation_terminated_normally() is False: orca_jobs.append(rxn_ind)
-    orca_jobs=sorted(orca_jobs)
+                dft_job.generate_geometry_settings(hess=False, constraints=constraints)
+                dft_job.check_restart()
+                dft_job.generate_input()
+                copt[rxn_ind]=dft_job
+            elif args["package"] == "Gaussian":
+                Input.jobtype="copt"
+                dft_job=Gaussian(Input)
+                dft_job.check_restart()
+                dft_job.generate_input(constraints=constrained_atoms)
+                copt[rxn_ind]=dft_job
+            if dft_job.calculation_terminated_normally() is False: dft_jobs.append(rxn_ind)
+    dft_jobs=sorted(dft_jobs)
     slurm_jobs=[]
-    if len(orca_jobs)>0:
-        n_submit=len(orca_jobs)//int(args["dft_njobs"])
-        if len(orca_jobs)%int(args["dft_njobs"])>0: n_submit+=1
+    if len(dft_jobs)>0:
+        n_submit=len(dft_jobs)//int(args["dft_njobs"])
+        if len(dft_jobs)%int(args["dft_njobs"])>0: n_submit+=1
         startidx=0
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"COPT.{i}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000)), email=args["email_address"])
-            endidx=min(startidx+int(args["dft_njobs"]), len(orca_jobs))
-            slurmjob.create_orca_jobs([copt[ind] for ind in orca_jobs[startidx:endidx]])
+            endidx=min(startidx+int(args["dft_njobs"]), len(dft_jobs))
+            if args["package"] == "ORCA": slurmjob.create_orca_jobs([copt[ind] for ind in dft_jobs[startidx:endidx]])
+            elif args["package"] == "Gaussian": slurmjob.create_gaussian_jobs([copt[ind] for ind in dft_jobs[startidx:endidx]])
+            #exit()
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -300,24 +301,24 @@ def constrained_dft_geo_opt(rxns):
     
     key=[i for i in copt.keys()]
     for i in key:
-        orca_opt=copt[i]
-        print(f"Checking COPT for job {i}, orca_opt: {orca_opt}\n")
-        #if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -10:
+        dft_opt=copt[i]
+        print(f"Checking COPT for job {i}, dft_opt: {dft_opt}\n")
+        #if dft_opt.calculation_terminated_normally() and dft_opt.optimization_converged() and len(dft_opt.get_imag_freq()[0])>0 and min(dft_opt.get_imag_freq()[0]) < -10:
         #Zhao's note: consider make the -10 tunable as an input?
-        if orca_opt.calculation_terminated_normally() and orca_opt.optimization_converged() and len(orca_opt.get_imag_freq()[0])>0 and min(orca_opt.get_imag_freq()[0]) < -5:
-            _, geo=orca_opt.get_final_structure()
+        if dft_opt.calculation_terminated_normally() and dft_opt.optimization_converged() and len(dft_opt.get_imag_freq()[0])>0 and min(dft_opt.get_imag_freq()[0]) < -5:
+            _, geo=dft_opt.get_final_structure()
             print(f"COPT Works for {i}\n")
             for count, rxn in enumerate(rxns):
                 inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                 if inchi in rxn.reactant_inchi and ind==rxn.id:
                     rxns[count].constrained_TS[conf_i]=geo
-        elif not orca_opt.calculation_terminated_normally():
+        elif not dft_opt.calculation_terminated_normally():
             print(f"Constraint OPT fails for {i}, Please Check!\n")
-        elif not orca_opt.optimization_converged():
+        elif not dft_opt.optimization_converged():
             print(f"Constraint OPT does not converge for {i}, Please Check!\n")
-        elif not len(orca_opt.get_imag_freq()[0])>0: 
+        elif not len(dft_opt.get_imag_freq()[0])>0: 
             print(f"No imaginary Freq for {i}!!! Check!\n")
-        elif not min(orca_opt.get_imag_freq()[0]) < -5: #Zhao's note: make this tunable? 
+        elif not min(dft_opt.get_imag_freq()[0]) < -5: #Zhao's note: make this tunable? 
             print(f"minimum imaginary Freq smaller than threshold for {i}!")
         else:
             print(f"Did you do COPT with Frequency Calculation for {i}???You probably need to redo...")
@@ -367,31 +368,31 @@ def run_dft_tsopt(rxns):
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
             else:
                 xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_xtb[ind])
-            orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                          mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
-                          jobname=f"{rxn_ind}-TSOPT",\
-                          jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                          solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]), TS_Active_Atoms = RP_diff_Atoms)
-            orca_job.generate_input()
-            opt_jobs[rxn_ind]=orca_job
+            
+            #####################
+            # Prepare DFT Input #
+            #####################
+            Input = DFT_Input(args)
+            Input.input_geo  = inp_xyz
+            Input.work_folder= wf
+            Input.jobname    = f"{rxn_ind}-TSOPT"
 
-            #Zhao's note: special case: if your ORCA opt simulation ended but not finished,
-            # and you want to restart it.
-            if not orca_job.calculation_terminated_normally() and orca_job.new_opt_geometry():
-                tempE, tempG=orca_job.get_final_structure()
-                print(f"Trying to Restart for {ind}, tempG: {tempG}\n", flush = True)
-                xyz_write(inp_xyz, rxn.reactant.elements, tempG)
-                orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                              mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
-                              jobname=f"{rxn_ind}-TSOPT",\
-                              jobtype="OptTS Freq", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                              solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-                orca_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]), TS_Active_Atoms = RP_diff_Atoms)
-                orca_job.generate_input()
-                opt_jobs[rxn_ind]=orca_job
+            if args["package"] == "ORCA":
+                Input.jobtype="OptTS Freq"
+                dft_job = ORCA(Input)
 
-            if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+                dft_job.generate_geometry_settings(hess=True, hess_step=int(args["hess_recalc"]), TS_Active_Atoms = RP_diff_Atoms)
+                dft_job.check_restart()
+                dft_job.generate_input()
+                opt_jobs[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+            elif args["package"] == "Gaussian":
+                Input.jobtype= "tsopt"
+                dft_job=Gaussian(Input)
+                dft_job.check_restart(use_chk = True)
+                dft_job.generate_input()
+                opt_jobs[rxn_ind]=dft_job
+                if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
 
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
@@ -401,7 +402,9 @@ def run_dft_tsopt(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"TSOPT.{i}", ppn=int(args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
             endid=min(startid+int(args["dft_njobs"]), len(running_jobs))
-            slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            if args["package"] == "ORCA": slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            elif args["package"] == "Gaussian": slurmjob.create_gaussian_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            #exit()
             slurmjob.submit()
             startid=endid
             slurm_jobs.append(slurmjob)
@@ -413,55 +416,63 @@ def run_dft_tsopt(rxns):
         print("No ts optimization jobs need to be performed...")
 
     if(args['dft_fulltz_level_correction']):
-        FullTZCorrection_TS(opt_jobs, args)
+        FullTZCorrection(opt_jobs, args, stable_conf = "")
 
     #Zhao's note: move the post-process out of the if statement
     key=[i for i in opt_jobs.keys()]
     for i in key:
-        orca_opt=opt_jobs[i]
+        dft_opt=opt_jobs[i]
         #Zhao's note: at the last step (FullTZ single point, there is no opt)
-        if orca_opt.calculation_terminated_normally() and orca_opt.is_TS() and (args['dft_fulltz_level_correction'] or orca_opt.optimization_converged()):
-            _, geo=orca_opt.get_final_structure()
-            print(f"TS {i}, {orca_opt} is a TS and converged\n", flush = True)
+        if dft_opt.calculation_terminated_normally() and dft_opt.is_TS() and (args['dft_fulltz_level_correction'] or dft_opt.optimization_converged()):
+            _, geo=dft_opt.get_final_structure()
+            print(f"TS {i}, {dft_opt} is a TS and converged\n", flush = True)
             for count, rxn in enumerate(rxns):
                 inchi, ind, conf_i=i.split("_")[0], int(i.split("_")[1]), int(i.split("_")[2])
                 if dft_lot not in rxns[count].TS_dft.keys(): rxns[count].TS_dft[dft_lot]=dict()
                 if inchi in rxn.reactant_inchi and ind==rxn.id:
                     rxns[count].TS_dft[dft_lot][conf_i]=dict()
                     rxns[count].TS_dft[dft_lot][conf_i]["geo"]=geo
-                    rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=orca_opt.get_thermal()
-                    rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=orca_opt.get_energy()
-                    rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=orca_opt.get_imag_freq_mode()
+                    rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=dft_opt.get_thermal()
+                    rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=dft_opt.get_energy()
+                    rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=dft_opt.get_imag_freq_mode()
                     print(f"SPE: {rxns[count].TS_dft[dft_lot][conf_i]['SPE']}\n")
                     print(f"GibbsFreeEnergy: {rxns[count].TS_dft[dft_lot][conf_i]['thermal']['GibbsFreeEnergy']}\n")
                     print(f"imag_mode: {rxns[count].TS_dft[dft_lot][conf_i]['imag_mode']}\n")
-        elif not orca_opt.calculation_terminated_normally():
+        elif not dft_opt.calculation_terminated_normally():
             print(f"TSOPT/FullTZ fails for {i}, Please Check!\n")
-        elif not orca_opt.is_TS():
+        elif not dft_opt.is_TS():
             print(f"{i} is NOT A TS, Please Check!\n")
-        elif not orca_opt.optimization_converged():
+        elif not dft_opt.optimization_converged():
             print(f"{i} OPT NOT CONVERGED!\n")
 
-        
     return rxns
 
 # Zhao's note: function that checks and re-runs FullTZ numerical frequency calculations #
 # If a job needs to restart, add the keyword and overwrite the job #
-def CheckFullTZRestart(dft_job):
-    if not dft_job.calculation_terminated_normally() and dft_job.numfreq_need_restart():
-        numfreq_command = "%freq\n  restart true\nend\n"
-        dft_job.parse_additional_infoblock(numfreq_command)
+def CheckFullTZRestart(dft_job, args):
+    if not dft_job.calculation_terminated_normally():# and dft_job.numfreq_need_restart():
+        if args['package'] == "ORCA": 
+            numfreq_command = "%freq\n  restart true\nend\n"
+            dft_job.parse_additional_infoblock(numfreq_command)
+        elif args['package'] == "Gaussian": 
+            numfreq_command = "%freq\n  restart true\nend\n"
 
 #Zhao's note: function that runs the FullTZ single point energy + numerical frequency calculation #
 # using triple zeta basis sets for all the atoms #
-def FullTZCorrection_TS(opt_jobs, args):
+def FullTZCorrection(opt_jobs, args, stable_conf = ""):
+    '''
+    opt_jobs = dictionary that has all the initialized dft jobs 
+    stable_conf = a dictionary just for reactant/product that stores the element+geometry+charge, if TS, stable_conf = ""
+    '''
     TZ_lot = args["dft_lot"]
     scratch_dft = args['scratch_dft']
-    if len(TZ_lot.split()) > 1: TZ_lot=TZ_lot.split()[0] + " def2-mTZVP"
+    if len(TZ_lot.split()) > 1: TZ_lot=TZ_lot.split()[0] + " def2-TZVP"
     running_jobs=[]
-    # Zhao's note: also need to include the reactant/product based on the strategy
-    # Only proceed when there is TS_dft keys
-    #if dft_lot in rxn.TS_dft.keys(): key=[i for i in rxn.TS_dft[dft_lot].keys()]
+
+    TS = True
+    if not stable_conf == "": TS = False
+
+    # RP FullTZ 
     key=[i for i in opt_jobs.keys()]
     print(f"Redo FullTZ: Checking TS_dft Keys: {key}\n")
     for ind in key:
@@ -475,18 +486,42 @@ def FullTZCorrection_TS(opt_jobs, args):
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz=f"{wf}/{rxn_ind}-FullTZ.xyz"
         xyz_write(inp_xyz, ele, geo)
+       
+        #####################
+        # Prepare DFT Input #
+        #####################
+        Input = DFT_Input(args)
+        Input.input_geo = inp_xyz
+        Input.work_folder= wf
+        Input.mix_basis = False
+        Input.jobname=f"{rxn_ind}-FullTZ"
+        Input.lot = TZ_lot
+        Input.writedown_xyz=False
 
-        orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                      mix_basis = False, mix_lot = args['dft_mix_lot'],\
-                      jobname=f"{rxn_ind}-FullTZ",\
-                      jobtype="NumFreq", lot=TZ_lot, charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                      solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=False)
+        # If it is not a TS, then it is reactant/product opt#
+        # the reactant/product can be separable, get charges and multiplicities
+        if not TS:
+            stable_conf_E, _, stable_conf_Q=stable_conf[ind]
+            Mol_Mult = check_multiplicity(ind, stable_conf_E, args["multiplicity"], stable_conf_Q)
+            Input.charge = stable_conf_Q
+            Input.multiplicity = Mol_Mult
+
+        if args['package'] == "ORCA":
+            Input.jobtype="NumFreq"
+            dft_job = ORCA(Input)
+            CheckFullTZRestart(dft_job, args)
+
+        elif args['package'] == "Gaussian":
+            Input.jobtype="fulltz"
+            Input.lot = Input.lot.replace("-", "") #Gaussian doesn't like dashes
+            dft_job = Gaussian(Input)
+            dft_job.check_restart(use_chk = True)
+
         #Restart FullTZ numerical frequency jobs if needed#
-        CheckFullTZRestart(orca_job)
-        orca_job.generate_input()
-        opt_jobs[rxn_ind]=orca_job
-        if orca_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
-        print(f"Checked orca_job: {opt_jobs}\n")
+        dft_job.generate_input()
+        opt_jobs[rxn_ind]=dft_job
+        if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
+        print(f"Checked dft_job: {opt_jobs}\n")
         print(f"Going to run: {running_jobs}\n")
 
     if len(running_jobs)>0:
@@ -495,11 +530,14 @@ def FullTZCorrection_TS(opt_jobs, args):
         startid=0
         slurm_jobs=[]
         for i in range(n_submit):
-            slurmjob=SLURM_Job(jobname=f"TS-FullTZ.{i}", ppn=int(args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
+            slurmjob=SLURM_Job(jobname=f"FullTZ.{i}", ppn=int(args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
             endid=min(startid+int(args["dft_njobs"]), len(running_jobs))
             print(f"startid: {startid}, endid: {endid}\n", flush = True)
-            slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            if args['package'] == "ORCA": slurmjob.create_orca_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+            elif args['package'] == "Gaussian": slurmjob.create_gaussian_jobs([opt_jobs[ind] for ind in running_jobs[startid:endid]])
+
             slurmjob.submit()
+            exit()
             startid=endid
             slurm_jobs.append(slurmjob)
         print(f"Running {len(slurm_jobs)} Full TZ SinglePoint jobs...")
@@ -534,15 +572,28 @@ def run_dft_irc(rxns):
                     wf=f"{scratch_dft}/{rxn_ind}"
                     inp_xyz=f"{wf}/{rxn_ind}-TS.xyz"
                     xyz_write(inp_xyz, rxn.reactant.elements, rxn.TS_dft[dft_lot][i]["geo"])
-                    orca_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                                  mix_basis = args['dft_mix_basis'], mix_lot = args['dft_mix_lot'],\
-                                  jobname=f"{rxn_ind}-IRC",\
-                                  jobtype="IRC", lot=args["dft_lot"], charge=args["charge"], multiplicity=args["multiplicity"], solvent=args["solvent"],\
-                                  solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-                    orca_job.generate_irc_settings(max_iter=100)
-                    orca_job.generate_input()
-                    irc_jobs[rxn_ind]=orca_job
-                    if orca_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
+                    #####################
+                    # Prepare DFT Input #
+                    #####################
+                    Input = DFT_Input(args)
+                    Input.input_geo  = inp_xyz
+                    Input.work_folder= wf
+                    Input.jobname    = f"{rxn_ind}-IRC"
+                    if args["package"]=="ORCA":
+                        Input.jobtype="IRC"
+                        orca_job=ORCA(Input)
+
+                        orca_job.generate_irc_settings(max_iter=100)
+                        orca_job.generate_input()
+                        irc_jobs[rxn_ind]=orca_job
+                        if orca_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
+                    elif args["package"]=="Gaussian":
+                        Input.jobtype="irc"
+                        dft_job=Gaussian(Input)
+                        dft_job.check_restart(use_chk = True)
+                        dft_job.generate_input()
+                        irc_jobs[rxn_ind]=dft_job
+                        if dft_job.calculation_terminated_normally() is False: todo_list.append(rxn_ind)
     if args["dft_irc"] and len(todo_list)>0:
         n_submit=len(todo_list)//int(args["dft_njobs"])
         if len(todo_list)%int(args["dft_njobs"])>0:n_submit+=1
@@ -551,7 +602,9 @@ def run_dft_irc(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"IRC.{i}", ppn=int(args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000)), email=args["email_address"])
             endidx=min(startidx+int(args["dft_njobs"]), len(todo_list))
-            slurmjob.create_orca_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([irc_jobs[ind] for ind in todo_list[startidx:endidx]])
+
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -794,7 +847,7 @@ def run_dft_opt(rxns):
                 xyz_write(inp_xyz, E, G)
                 crest_job=CREST(input_geo=inp_xyz, work_folder=wf, nproc=int(args["crest_nprocs"]), mem=int(args["mem"]*1000), quick_mode=args["crest_quick"],\
                                 opt_level=args["opt_level"], charge=Q, multiplicity=Mol_Mult, crest_path = args['crest_path'])
-                CREST_job_list.append(crest_job)
+                if not job.calculation_terminated_normally(): CREST_job_list.append(crest_job)
         
         n_submit=len(CREST_job_list)//njobs
         if len(CREST_job_list)%njobs>0: n_submit+=1
@@ -804,15 +857,6 @@ def run_dft_opt(rxns):
             
             slurmjob=SLURM_Job(jobname=f'CREST.{i}', ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
             endidx=min(startidx+njobs, len(CREST_job_list))
-
-            # check if the job is finished
-            for job in CREST_job_list[startidx:endidx]:
-                if job.calculation_terminated_normally():
-                    # skip the job
-                    startidx += 1
-            if not (startidx < endidx): 
-                startidx=endidx
-                continue
             slurmjob.create_crest_jobs([job for job in CREST_job_list[startidx:endidx]])
             slurmjob.submit()
             startidx=endidx
@@ -833,6 +877,14 @@ def run_dft_opt(rxns):
     # submit missing dft optimization
     if len(missing_dft)>0:
         dft_job_list=[]
+
+        #####################
+        # Prepare DFT Input #
+        #####################
+        Input = DFT_Input(args)
+
+        opt_job = dict()
+
         for inchi in missing_dft:
 
             if inchi not in stable_conf.keys(): continue
@@ -844,27 +896,26 @@ def run_dft_opt(rxns):
             inp_xyz=f"{wf}/{inchi}.xyz"
             xyz_write(inp_xyz, E, G)
             print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
-            dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                         mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
-                         jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
-                         charge=Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
-            dft_job.generate_input()
-
-            #Zhao's note: special case: if your ORCA opt simulation ended using short/standby/4hr job,
-            # and you want to restart it.
-            if not dft_job.calculation_terminated_normally() and dft_job.new_opt_geometry():
-                tempE, tempG=dft_job.get_final_structure()
-                print(f"Trying to Restart for {inchi}, tempG: {tempG}\n", flush = True)
-                xyz_write(inp_xyz, E, tempG)
-                dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                             mix_basis = args['dft_mix_basis'], mix_lot = mix_basis_dict[inchi],\
-                             jobname=f"{inchi}-OPT", jobtype="OPT Freq", lot=args["dft_lot"],\
-                             charge=Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=True)
+            Input.input_geo   = inp_xyz
+            Input.jobname     = f"{inchi}-OPT"
+            Input.work_folder = wf
+            Input.mix_lot     = mix_basis_dict[inchi]
+            Input.charge      = Q
+            Input.multiplicity= Mol_Mult
+            if args['package'] == "ORCA":
+                Input.jobtype = "OPT Freq"
+                dft_job=ORCA(Input)
+                dft_job.check_restart()
                 dft_job.generate_input()
-
-            dft_job_list.append(dft_job)
-
-        #exit()
+                if not dft_job.calculation_terminated_normally(): dft_job_list.append(dft_job)
+                opt_job[inchi] = dft_job
+            elif args['package'] == "Gaussian":
+                Input.jobtype = "opt"
+                dft_job=Gaussian(Input)
+                dft_job.check_restart(use_chk = True)
+                dft_job.generate_input()
+                if not dft_job.calculation_terminated_normally(): dft_job_list.append(dft_job)
+                opt_job[inchi] = dft_job
 
         n_submit=len(dft_job_list)//int(args["dft_njobs"])
         if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
@@ -873,16 +924,9 @@ def run_dft_opt(rxns):
         for i in range(n_submit):
             slurmjob=SLURM_Job(jobname=f"OPT.{i}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
             endidx=min(startidx+int(args["dft_njobs"]), len(dft_job_list))
-            # check if the job is finished
-            for job in dft_job_list[startidx:endidx]:
-                if job.calculation_terminated_normally():
-                    # skip the job
-                    startidx += 1
-            if not (startidx < endidx):
-                startidx=endidx
-                continue
+            if args['package'] == "ORCA": slurmjob.create_orca_jobs([job for job in dft_job_list[startidx:endidx]])
+            elif args['package'] == "Gaussian": slurmjob.create_gaussian_jobs([job for job in dft_job_list[startidx:endidx]])
 
-            slurmjob.create_orca_jobs([job for job in dft_job_list[startidx:endidx]])
             slurmjob.submit()
             startidx=endidx
             slurm_jobs.append(slurmjob)
@@ -895,7 +939,7 @@ def run_dft_opt(rxns):
 
         # Zhao's note: Rerun the single point energy for the reactant/product #
         if(args['dft_fulltz_level_correction']):
-            FullTZCorrection_RP(args, dft_job_list, stable_conf)
+            FullTZCorrection(opt_job, args, stable_conf = stable_conf)
 
         dft_dict=dict()
         for dft_job in dft_job_list:
@@ -1006,76 +1050,6 @@ def find_all_seps(rxns, args):
             product_separable = (len(inchi_dict) - n_reactant_inchi) > 1
     return reactant_separable, product_separable, inchi_dict
 
-# Zhao's note: Rerun the single point energy for the reactant/product #
-def FullTZCorrection_RP(args, dft_job_list, stable_conf):
-    TZ_lot = args["dft_lot"]
-    if len(TZ_lot.split()) > 1: TZ_lot=TZ_lot.split()[0] + " def2-mTZVP"
-
-    dft_folder = args["scratch_dft"]
-
-    for dft_job_count, dft_job in enumerate(dft_job_list):
-        inchi=dft_job.jobname.split("-OPT")[0]
-        if dft_job.calculation_terminated_normally() and dft_job.optimization_converged():
-            imag_freq, _=dft_job.get_imag_freq()
-            if len(imag_freq) > 0:
-                print(f"WARNING: imaginary frequency identified for molecule {inchi}...")
-                print(f"Please Rerun your simulation for {inchi}!!!")
-                #Zhao's note: maybe we need to relax this criteria a bit...
-                #raise RuntimeError("OPT job failed!!!")
-                #continue
-        E, G=dft_job.get_final_structure()
-        # Check with the element list from stable_conf
-        stable_conf_E, _, stable_conf_Q=stable_conf[inchi]
-        if not(E == stable_conf_E):
-            raise RuntimeError("elements don't match between DFT-OPT and CREST! Check!\n")
-
-        print(f"{inchi}, G read from final structure: {G}\n", flush = True)
-        wf=f"{dft_folder}/{inchi}"
-        if os.path.isdir(wf) is False: os.mkdir(wf)
-        inp_xyz=f"{wf}/{inchi}-FullTZ.xyz"
-        xyz_write(inp_xyz, E, G)
-        Mol_Mult = check_multiplicity(inchi, E, args["multiplicity"], stable_conf_Q)
-        dft_job=ORCA(input_geo=inp_xyz, work_folder=wf, nproc=int(args["dft_nprocs"]), mem=int(args["mem"]*1000),\
-                     mix_basis = False, mix_lot = args['dft_mix_lot'],\
-                     jobname=f"{inchi}-FullTZ", jobtype="NumFreq", lot=TZ_lot,\
-                     charge=stable_conf_Q, multiplicity=Mol_Mult, solvent=args["solvent"], solvation_model=args["solvation_model"], dielectric=args["dielectric"], writedown_xyz=False)
-        #Restart FullTZ numerical frequency jobs if needed#
-        CheckFullTZRestart(dft_job)
-        dft_job.generate_input()
-        dft_job_list[dft_job_count] = dft_job
-
-
-    n_submit=len(dft_job_list)//int(args["dft_njobs"])
-
-    if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
-    startidx=0
-    slurm_jobs=[]
-    for i in range(n_submit):
-        slurmjob=SLURM_Job(jobname=f"RP-FullTZ.{i}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
-        endidx=min(startidx+int(args["dft_njobs"]), len(dft_job_list))
-        # check if the job is finished
-        for job in dft_job_list[startidx:endidx]:
-            if job.calculation_terminated_normally():
-                # skip the job
-                startidx += 1
-        if not (startidx < endidx):
-            startidx=endidx
-            continue
-        slurmjob.create_orca_jobs([job for job in dft_job_list[startidx:endidx]])
-        
-        #FOR DEBUG
-        slurmjob.submit()
-
-        startidx=endidx
-        slurm_jobs.append(slurmjob)
-
-    print(f"Running {len(slurm_jobs)} Full Triple Zeta Single Point jobs...\n")
-    #Zhao's note: append these jobs and write to the just a text file#
-    write_to_last_job(slurm_jobs)
-    monitor_jobs(slurm_jobs)
-    print("Full TZ finished.\n")
-
-    #exit()
 if __name__=="__main__":
     parameters = sys.argv[1]
     parameters = yaml.load(open(parameters, "r"), Loader=yaml.FullLoader)

@@ -10,49 +10,11 @@ sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
 
 from yarp.input_parsers import xyz_parse
 from constants import Constants
-from utils import xyz_write
-
-def check_by_element_and_index(element, index, mix_lot):
-
-    found = False
-    count = 0
-    for a in range(0, len(mix_lot)):
-        first_element = mix_lot[a][0]
-
-        # Zhao's note: there may be cases where you impose 2 basis sets on the same atom via different ways
-        # e.g. H, STO-3G, H31, def2-TZVP
-        # in this case, the one with element + index should have higher hierarchy than just element alone.
-        # so sort mix_lot and get those with element + index as the first ones to be checked
-        if (any(x.isalpha() for x in first_element) and (any(x.isnumeric() for x in first_element))):
-            # if it is alphanumeric, check if element+number matches
-            if element+str(index) == first_element:
-                found = True
-                count = a
-                break
-        elif first_element.isalpha():
-            # check if element match
-            if element == first_element:
-                found = True
-                count = a
-                break
-        elif first_element.isnumeric():
-            # check if number match
-            if index == int(first_element):
-                found = True
-                count = a
-                break
-    if found:
-        # check if quote mark is in the string, add if not
-        if not (mix_lot[count][1].startswith("\"") and mix_lot[count][1].endswith("\"")):
-            mix_lot[count][1] = "\"" + mix_lot[count][1] + "\""
-        return "newgto " + mix_lot[count][1] + " end"
-    else:
-        return ''
+from utils import xyz_write, add_mix_basis_for_atom, DFT_Input
 
 # prepare corresponding input files for each calculator
 class ORCA:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B97-3c', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
-                 defgrid=2, solvent=False, solvation_model='CPCM', dielectric=0.0, writedown_xyz=False):
+    def __init__(self, Input):
         """
         Initialize an Orca job class
         input_geo: a xyz file containing the input geometry
@@ -64,47 +26,47 @@ class ORCA:
         defgrid: grid size in Orca, default is 2 in orca but 1 here
         writedown_xyz: if True, will write xyz information into the orca input file; if False, specify the input_geo path as xyz input
         """
-        self.input_geo    = input_geo
-        self.work_folder  = work_folder
-        self.orca_input   = f'{work_folder}/{jobname}.in'
-        self.jobtype      = jobtype
-        self.lot          = lot
-        self.mix_basis    = mix_basis
-        self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
-        self.nproc        = int(nproc)
-        self.mem          = int(mem)
-        self.scf_iters    = int(scf_iters)
-        self.jobname      = jobname
-        self.defgrid      = f"defgrid{defgrid}"
-        self.output       = f'{work_folder}/{jobname}.out'
+        self.input_geo    = Input.input_geo
+        self.work_folder  = Input.work_folder
+        self.orca_input   = f'{Input.work_folder}/{Input.jobname}.in'
+        self.jobtype      = Input.jobtype
+        self.lot          = Input.lot
+        self.mix_basis    = Input.mix_basis
+        self.mix_lot      = Input.mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
+        self.nproc        = int(Input.nproc)
+        self.mem          = int(Input.mem)
+        self.scf_iters    = 500 #int(Input.scf_iters)
+        self.jobname      = Input.jobname
+        self.defgrid      = f"defgrid{Input.grid}"#f"defgrid{defgrid}"
+        self.output       = f'{Input.work_folder}/{Input.jobname}.out'
         self.geom         = False
         self.irc          = False
         self.additional   = False
-        self.dielectric    = float(dielectric)
+        self.dielectric    = float(Input.dielectric)
         self.solvation = False
-        if solvent=="read":
-            self.solvation = f"{solvation_model}"
-        elif solvent:
-            self.solvation = f"{solvation_model}({solvent})"
+        if Input.solvent=="read":
+            self.solvation = f"{Input.solvation_model}"
+        elif Input.solvent:
+            self.solvation = f"{Input.solvation_model}({Input.solvent})"
         else:
             self.solvation = False
             
         # create work folder
         if os.path.isdir(self.work_folder) is False: os.mkdir(self.work_folder)
 
-        if writedown_xyz is False:
+        if Input.writedown_xyz is False:
             if input_geo[0] == '/': # Full path
-                self.xyz = f'*xyzfile {charge} {multiplicity} {input_geo}\n'
+                self.xyz = f'*xyzfile {Input.charge} {Input.multiplicity} {Input.input_geo}\n'
             else:
-                self.xyz = f'*xyzfile {charge} {multiplicity} {os.path.join(os.getcwd(),input_geo)}\n'
+                self.xyz = f'*xyzfile {Input.charge} {Input.multiplicity} {os.path.join(os.getcwd(), Input.input_geo)}\n'
         else:
-            self.xyz = f'*xyz {charge} {multiplicity}\n'
-            elements, geometry = xyz_parse(input_geo)
-            for ind in range(len(elements)):
+            self.xyz = f'*xyz {Input.charge} {Input.multiplicity}\n'
+            elements, geometry = xyz_parse(Input.input_geo)
+            for ind, element in enumerate(elements):
                 self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}'
                 if self.mix_basis:
                     # check by element or check by index
-                    self.xyz += check_by_element_and_index(elements[ind], ind, mix_lot)
+                    self.xyz += add_mix_basis_for_atom(element, ind, self.mix_lot, "ORCA")
                 self.xyz += f'\n'
             self.xyz += '*\n'
 
@@ -505,4 +467,16 @@ class ORCA:
             if 'THERMOCHEMISTRY AT' in line: break
         
         return thermal
+    
+    def check_restart(self): # if there is a new geometry generated in the orca output, read it and process it
+        if not self.calculation_terminated_normally() and self.new_opt_geometry():
+            tempE, tempG = self.get_final_structure()
 
+            self.xyz = f'*xyz {charge} {multiplicity}\n'
+            for ind, element in enumerate(tempE):
+                self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}'
+                if self.mix_basis:
+                    # check by element or check by index
+                    self.xyz += add_mix_basis_for_atom(element, ind, self.mix_lot, "ORCA")
+                self.xyz += f'\n'
+            self.xyz += '*\n'

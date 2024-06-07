@@ -16,6 +16,85 @@ from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdm
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
 
+class DFT_Input:
+    def __init__(self, args):
+        """
+        Initialize an DFT input class
+        a wrapper for DFT input keywords 
+        including charge, multiplicity, solvation, level of theory, etc.
+        """
+        self.input_geo   = ""
+        self.work_folder = os.getcwd()
+        self.lot         = args["dft_lot"]
+        self.jobtype     = 'OPT'
+        self.nproc       = int(args["dft_nprocs"])
+        self.mem         = int(args["mem"]*1000)
+        self.mix_basis   = args['dft_mix_basis']
+        self.mix_lot     = args['dft_mix_lot']
+        self.jobname     = 'job'
+        self.charge      = args["charge"]
+        self.multiplicity= args["multiplicity"]
+        self.solvent     = args["solvent"]
+        self.dielectric  = args["dielectric"]
+        self.dispersion  = args["dispersion"]
+        self.solvation_model = args["solvation_model"]
+        self.grid        = 2
+        self.writedown_xyz   = True
+
+
+#################################################################
+# Add Mix Basis Set (available in ORCA and Gaussian)            #
+# For ORCA: add specific basis set info to the end of the atom  #
+# e.g.: C 0.1 0.1 0.1 newgto "def2-TZVP" end                    #
+# For Gaussian: add to the end of the file                      #
+# e.g.:                                                         #
+#        ****                                                   #
+#        44 48 0                                                #
+#        def2TZVP                                               #
+#        ****                                                   #
+#################################################################
+def add_mix_basis_for_atom(element, index, mix_lot, package):
+
+    found = False
+    count = 0
+    for a in range(0, len(mix_lot)):
+        first_element = mix_lot[a][0]
+
+        # Zhao's note: there may be cases where you impose 2 basis sets on the same atom via different ways
+        # e.g. H, STO-3G, H31, def2-TZVP
+        # in this case, the one with element + index should have higher hierarchy than just element alone.
+        # so sort mix_lot and get those with element + index as the first ones to be checked
+        if (any(x.isalpha() for x in first_element) and (any(x.isnumeric() for x in first_element))):
+            # if it is alphanumeric, check if element+number matches
+            if element+str(index) == first_element:
+                found = True
+                count = a
+                break
+        elif first_element.isalpha():
+            # check if element match
+            if element == first_element:
+                found = True
+                count = a
+                break
+        elif first_element.isnumeric():
+            # check if number match
+            if index == int(first_element):
+                found = True
+                count = a
+                break
+    if found:
+        mix_info = ''
+        # check if quote mark is in the string, add if not, just for ORCA
+        if package == "ORCA" and not (mix_lot[count][1].startswith("\"") and mix_lot[count][1].endswith("\"")):
+            mix_lot[count][1] = "\"" + mix_lot[count][1] + "\""
+
+        if package == "ORCA": mix_info = f"newgto {mix_lot[count][1]} end"
+        elif package == "Gaussian": mix_info = [mix_lot[count][1], index]
+        print(f"mix_information: {mix_info}\n", flush = True)
+        return mix_info
+    else:
+        return ''
+
 # add atom numbers to molecule
 def addAtomIndices(mol):
     for i, a in enumerate(mol.GetAtoms()):
@@ -39,8 +118,6 @@ def Get_Atoms_Chirality(mol, SelectedChiralCenter):
         tag = str(center_atom.GetChiralTag())
         tags.append(tag)
     return tags
-
-
 
 ###################################################################
 # the purpose of this function is to enable isomer enumeration   ##
@@ -444,7 +521,7 @@ def return_rxn_constraint(mol1, mol2):
     n1=Counter([indj for indj in range(len(mol1.elements)) for indi in reactive_atoms if gs1[indi][indj]==1])
     n2=Counter([indj for indj in range(len(mol1.elements)) for indi in reactive_atoms if gs2[indi][indj]==1])
     reactive_atoms+=list(set([ind for ind, count in n1.items() if count>1]+[ind for ind, count in n2.items() if count>1]))
-    
+
     return bond_change, reactive_atoms
 
 def return_all_constraint(molecule):

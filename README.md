@@ -71,7 +71,10 @@ As the parameter file is created, you can run yarp by:
 
       python main_xtb.py [your parameter yaml file]
 
-# See some SNAPSHOTS! :camera:
+# See some results! :camera:
+
+* Organometallic reactions
+
 | Cu: Oxidative<br>Addition | Cu: Reductive<br>Elimination | Au: Migratory<br>Insertion | Au: beta-Hydride<br>Elimination |
 | :---------------: | :---------------------: | :---------------------: | :---------------------: |
 | ![Oxidative Addition](Metal-Example/result_files/4-5_IRC.gif) | ![Oxidative Addition](Metal-Example/result_files/8-9_IRC.gif) | ![Migratory Insertion](Metal-Example/result_files/Gold-migratory-insertion.gif) | ![beta-Hydride Elimination](Metal-Example/result_files/beta-Hydride-Elimination.gif) |

@@ -1,0 +1,21 @@
+#!/bin/bash                                                                                     
+#SBATCH --job-name=yarp-4-5
+#SBATCH --output=runyarp.1.out
+#SBATCH --error=runyarp.1.err
+#SBATCH -A standby
+#SBATCH --nodes=1
+#SBATCH --mem 230400MB
+#SBATCH --ntasks-per-node=128
+#SBATCH --time 04:00:00
+#SBATCH --mail-user=<YOUR_EMAIL>  # Designate email address for job communications
+#SBATCH --mail-type=BEGIN,END,FAIL     # Events options are job BEGIN, END, NONE, FAIL, REQUEUE
+
+module load anaconda
+conda activate copy-classy-yarp
+module load intel-mkl
+module load openmpi
+
+# Load environment for Gaussian
+python <DIRECTORY_TO_WRAPPERS>/main_xtb.py parameters.yaml
+
+wait

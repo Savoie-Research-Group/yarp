@@ -73,6 +73,7 @@ As the parameter file is created, you can run yarp by:
 
 # :camera: See some results!
 ## Organometallic reactions
+* Check out our [organometallic reaction examples](Metal-Example/)
 | Cu: Oxidative<br>Addition | Cu: Reductive<br>Elimination | Au: Migratory<br>Insertion | Au: beta-Hydride<br>Elimination |
 | :---------------: | :---------------------: | :---------------------: | :---------------------: |
 | ![Oxidative Addition](Metal-Example/result_files/4-5_IRC.gif) | ![Oxidative Addition](Metal-Example/result_files/8-9_IRC.gif) | ![Migratory Insertion](Metal-Example/result_files/Gold-migratory-insertion.gif) | ![beta-Hydride Elimination](Metal-Example/result_files/beta-Hydride-Elimination.gif) |

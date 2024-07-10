@@ -384,10 +384,16 @@ def return_inchikey(molecule):
         for count_i, i in enumerate(group): mol.geo[count_i, :]=G[i, :]
         mol_write_yp(".tmp.mol", mol)
         mol=next(pybel.readfile("mol", ".tmp.mol"))
-        inchi=mol.write(format='inchikey').strip().split()[0]
+        try:
+            inchi=mol.write(format='inchikey').strip().split()[0]
+        except:
+            print(f"{mol.write(format='inchikey')}")
+            continue
         inchikey+=[inchi]
         os.system("rm .tmp.mol")
-    if len(groups) == 1:
+    if len(inchikey)==0:
+        return "ERROR"
+    elif len(groups) == 1:
         return inchikey[0][:14]
     else:
         return '-'.join(sorted([i[:14] for i in inchikey]))                   

@@ -105,6 +105,11 @@ def main(args:dict):
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
         for rxn in rxns: rxn.args=args
+    # print(len(rxns))
+    # Hsuan-Hao's test
+    # rxns=pickle.load(open("model.p", "rb"))
+    for rxn in rxns: rxn.args=args
+    # rxns=rxns[90:100]
     print("-----------------------")
     print("------First Step-------")
     print("------Enumeration------")

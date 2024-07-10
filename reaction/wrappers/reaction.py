@@ -1,4 +1,6 @@
 import sys, itertools, timeit, os
+import logging
+from logging.handlers import QueueHandler
 import numpy as np
 import pickle
 from yarp.taffi_functions import table_generator,return_rings,adjmat_to_adjlist,canon_order
@@ -129,7 +131,12 @@ class reaction:
                     self.product_conf[count_i]=i
 
     def rxn_conf_generation(self, logging_queue):
-
+        # set up logger
+        logger = logging.getLogger("main")
+        # Add handler only if it doesn't already exist
+        if not logger.hasHandlers():
+            logger.addHandler(QueueHandler(logging_queue))
+            logger.setLevel(logging.INFO)
         job_id=f"{self.reactant_inchi}_{self.id}"
         
         RG=self.reactant.geo
@@ -144,33 +151,50 @@ class reaction:
 
         tmp_rxn_dict=dict()
         count=0
+        print(self.reactant_inchi)
+        if bool(self.product_conf)==False and self.args["strategy"]!=0:
+            logger.info("Warning: No conformers for product. Just use input geometry")
+            print("Warning: No conformers for product. Just use input geometry")
+            self.product_conf[0]=self.product.geo
+            #print(self.product.elements)
+            #print(self.product_conf[0])
+        if bool(self.reactant_conf)==False and self.args["strategy"]!=1:
+            logger.info("Warning: No conformers for reactant. Just use input geometry")
+            print("Warning: No conformers for reactant. Just use input geometry")
+            self.reactant_conf[0]=self.reactant.geo
+            #print(self.reactant.elements)
+            #print(self.reactant_conf[0])
         # Create a dictionary to store the conformers and product/reactant bond mat.
-        if self.args["strategy"]!=0 and self.product_conf!={}:
+        if self.args["strategy"]!=0:
             for i in self.product_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": R_bond_mats[0], "G": deepcopy(self.product_conf[i]), 'direct':'B'}
                 count=count+1
-        if self.args["strategy"]!=1 and self.reactant_conf!={}:
+        if self.args["strategy"]!=1:
             for i in self.reactant_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
                 count=count+1
         # load ML model to find conformers 
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
-
         ind_list, pass_obj_values=[], []
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
-            if len(Gr)==0:
+            if len(Gr)==0 or len(Gr)!=len(conf_entry["G"]):
                 print("Falied to optimize")
+                logger.info("Falied to optimize")
                 continue
             tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"
+            logger.info(f"{self.args['scratch_xtb']}/{job_id}_p.xyz")
             xyz_write(tmp_xyz_p,conf_entry['E'],Gr)
             tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
             xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
-
+            logger.info(f"{self.args['scratch_xtb']}/{job_id}_r.xyz")
             # calculate indicator
+            #logger.info(f"{len(conf_entry['E'])}")
+            #logger.info(f"{len(conf_entry['G'])}")
+            #logger.info(f"{len(Gr)}")
             indicators = return_indicator(conf_entry['E'],conf_entry['G'],Gr,namespace=f'tmp_{job_id}')
             reactant=io.read(tmp_xyz_r)
             product=io.read(tmp_xyz_p)
@@ -178,7 +202,6 @@ class reaction:
             io.write(tmp_xyz_p,product)
             _,Gr_opt = xyz_parse(tmp_xyz_p)
             indicators_opt = return_indicator(conf_entry['E'],conf_entry['G'],Gr_opt,namespace=f'tmp_{job_id}')
-            # # print('here')
             # if applying ase minimize_rotation_and_translation will increase the intended probability, use the rotated geometry
             if model.predict_proba(indicators)[0][1] < model.predict_proba(indicators_opt)[0][1]: indicators, Gr = indicators_opt, Gr_opt
             # check whether the channel is classified as intended and check uniqueness

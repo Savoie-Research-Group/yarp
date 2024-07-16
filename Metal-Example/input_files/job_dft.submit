@@ -1,0 +1,22 @@
+#!/bin/bash                                                                                     
+#
+#SBATCH --job-name=Test4-5
+#SBATCH --output=runyarp.1.out
+#SBATCH --error=runyarp.1.err
+#SBATCH -A standby
+#SBATCH --nodes=1
+#SBATCH --mem 5GB
+#SBATCH -n 1
+#SBATCH --time 4:00:00
+#SBATCH --mail-user=<YOUR_EMAIL>  # Designate email address for job communications
+#SBATCH --mail-type=BEGIN,END,FAIL     # Events options are job BEGIN, END, NONE, FAIL, REQUEUE
+
+# activate a correct anaconda environment
+module load anaconda
+conda activate copy-classy-yarp
+module load intel-mkl
+module load openmpi
+
+python <DIRECTORY_TO_WRAPPERS>/main_dft.py parameters.yaml
+
+wait

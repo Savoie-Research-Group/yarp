@@ -90,11 +90,15 @@ class Gaussian:
         """
         Create an Gaussian job script for given settings
         """
+        # check if the current file "self.gjf" exist, if the don't, don't continue/restart#
+        gjf_exist = False
+        if os.path.exists(self.gjf): gjf_exist = True
+
         with open(self.gjf, "w") as f:
             f.write(f"%NProcShared={self.nproc}\n")
             f.write(f"%Mem={self.mem*self.nproc}MB\n")
             restart_string = ""
-            if not self.chkfile == "":
+            if not self.chkfile == "" and gjf_exist:
                 f.write(f"%Chk={self.chkfile}\n")
                 restart_string = ", Restart"
             if self.dispersion:
@@ -129,7 +133,7 @@ class Gaussian:
                     self.xyz+=f"{i:<3} {extra_term} {self.geometry[count_i][0]:^12.8f} {self.geometry[count_i][1]:^12.8f} {self.geometry[count_i][2]:^12.8f}\n"
                 self.xyz+="\n"
             elif self.jobtype.lower()=='fulltz':
-                command+=f" SP Freq=Numer\n\n"
+                command+=f" Freq\n\n"
 
             f.write(command)
             f.write(f"{self.jobname} {self.jobtype}\n\n")
@@ -138,7 +142,7 @@ class Gaussian:
                 f.write("solventname=newsolvent\n")
                 f.write(f"eps={self.dielectric}\n\n")
             # check atom mix basis set
-            if self.mix_basis:
+            if not (self.mix_basis or self.jobtype.lower()=='irc'): # for IRC currently ignore the mix basis set because of syntax reason
                 # check by element or check by index
                 for count_i, element in enumerate(self.elements):
                     mix_basis_summary = {}

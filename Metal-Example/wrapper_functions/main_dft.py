@@ -135,13 +135,18 @@ def read_wait_for_last_jobs():
 
     # Now 'numbers' contains the integers as a list
     print(f"unfinished job_ids are: {job_ids}\n")
+    print(f"Checking for jobs that are still undone...\n")
     print(f"Need to wait\n")
 
     slurm_jobs = []
     for job_id in job_ids:
         slurm_job = SLURM_Job()
         slurm_job.job_id = job_id
+        if slurm_job.status() == 'FINISHED':
+            continue
+        print(f"Unfinished job: {job_id}\n")
         slurm_jobs.append(slurm_job)
+
     #Monitor these jobs#
     monitor_jobs(slurm_jobs)
     print("All previous jobs are finished\n")
@@ -273,7 +278,7 @@ def constrained_dft_geo_opt(rxns):
             elif args["package"] == "Gaussian":
                 Input.jobtype="copt"
                 dft_job=Gaussian(Input)
-                dft_job.check_restart()
+                dft_job.check_restart(use_chk = True)
                 dft_job.generate_input(constraints=constrained_atoms)
                 copt[rxn_ind]=dft_job
             if dft_job.calculation_terminated_normally() is False: dft_jobs.append(rxn_ind)
@@ -740,9 +745,9 @@ def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge):
     print(f"molecule: {inchi}, Total electron: {total_electron}\n")
     #Get the lowest possible multiplicity#
     lowest_multi = total_electron % 2 + 1
-    if(abs(Imposed_multiplicity - lowest_multi) % 2 > 0):
-        print(f"the imposed multiplicity {Imposed_multiplicity} does not agree with lowest multiplicity {lowest_multi}\n")
-        return_multiplicity = lowest_multi
+    #if(abs(Imposed_multiplicity - lowest_multi) % 2 > 0):
+    #    print(f"the imposed multiplicity {Imposed_multiplicity} does not agree with lowest multiplicity {lowest_multi}\n")
+    return_multiplicity = lowest_multi
     return return_multiplicity
 
 def run_dft_opt(rxns):
@@ -847,7 +852,7 @@ def run_dft_opt(rxns):
                 xyz_write(inp_xyz, E, G)
                 crest_job=CREST(input_geo=inp_xyz, work_folder=wf, nproc=int(args["crest_nprocs"]), mem=int(args["mem"]*1000), quick_mode=args["crest_quick"],\
                                 opt_level=args["opt_level"], charge=Q, multiplicity=Mol_Mult, crest_path = args['crest_path'])
-                if not job.calculation_terminated_normally(): CREST_job_list.append(crest_job)
+                if not crest_job.calculation_terminated_normally(): CREST_job_list.append(crest_job)
         
         n_submit=len(CREST_job_list)//njobs
         if len(CREST_job_list)%njobs>0: n_submit+=1
@@ -873,6 +878,7 @@ def run_dft_opt(rxns):
                 E, G, _ = crest_job.get_stable_conformer()
                 Q = inchi_dict[inchi][2]
                 stable_conf[inchi]=[E, G, Q]
+                print(f"{crest_job} stable\n")
 
     # submit missing dft optimization
     if len(missing_dft)>0:
@@ -1010,7 +1016,7 @@ def run_dft_opt(rxns):
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"]+=dft_dict[i]["thermal"]["InnerEnergy"]
                         rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"]+=dft_dict[i]["thermal"]["Entropy"]
 
-    #exit()
+    exit()
     return rxns
 
 def find_all_seps(rxns, args):

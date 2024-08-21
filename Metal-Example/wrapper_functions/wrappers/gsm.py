@@ -9,7 +9,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class GSM:
-    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb'):
+    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb', SSM = False, bond_change = []):
         """
         Initialize a GSM job class
         input_geo: a xyz file containing the input geometry of reactant and product
@@ -36,6 +36,8 @@ class GSM:
         self.charge       = int(charge)
         self.multiplicity = int(multiplicity)
         self.lot=lot[-1]
+        self.SSM=SSM
+        self.bond_change  = bond_change
         if solvent:
             if solvation_model.lower() == 'alpb': self.solvation = f'--alpb {solvent}'
             else: self.solvation = f'--gbsa {solvent}' # use GBSA implicit solvent
@@ -73,7 +75,18 @@ class GSM:
             
         # copy input geometry to scratch
         os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial{self.jobid:04d}.xyz')
-        
+        #os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial0001.xyz')
+       
+        if(self.SSM == True):
+            with open(f'{self.work_folder}/ISOMERS{self.jobid:04d}','a') as f:
+            #with open(f'{self.work_folder}/ISOMERS0001','a') as f:
+                f.write("NEW\n")
+                for bonds in self.bond_change:
+                    if(bonds[2] == "ADD"):
+                        f.write(f"ADD   {bonds[0]+1} {bonds[1]+1}\n")
+                    elif(bonds[2] == "BREAK"):
+                        f.write(f"BREAK {bonds[0]+1} {bonds[1]+1}\n")
+
         # prepare necessary files
         if self.method.lower() == 'xtb':
             self.write_ograd()
@@ -85,6 +98,8 @@ class GSM:
             self.write_ograd()
             os.system(f'cp {self.source_path}/bin/gsm.orca {self.work_folder}')
             os.system(f'cp {self.input_file} {self.work_folder}')
+            #os.system(f'cp {self.input_file} {self.work_folder}/inpfileq')
+            #os.system(f'cp {self.source_path}/scripts/tm2orca.py {self.work_folder}/scratch')
             print(f"Finish preparing working environment for GSM-Orca job {self.jobname}")
         elif self.method.lower() == 'qchem':
             self.write_ograd()

@@ -70,6 +70,10 @@ class reaction:
         self.IRC_xtb=dict()
         self.IRC_dft=dict()
         self.constrained_TS=dict()
+        #Zhao's note: switch between xtb or rdkit force field
+        self.use_xtb = False
+        #self.use_xtb = True
+
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
 
     def conf_rdkit(self):
@@ -138,14 +142,14 @@ class reaction:
         if self.args["strategy"]!=0:
             for i in self.product_conf.keys():
                 print(f"self.product_conf[{i}]: {self.product_conf[i]}\n")
-                tmp_rxn_dict[count]={"E": RE, "bond_mat_r": R_bond_mats[0], "G": deepcopy(self.product_conf[i]), 'direct':'B'}
+                tmp_rxn_dict[count]={"E": RE, "bond_mat_r": R_bond_mats[0], "G": deepcopy(self.product_conf[i]), 'direct':'B', "adj_mat_r": R_adj}
                 count=count+1
         print(f"Product sample, there are {count} tmp rxns\n", flush = True)
 
         if self.args["strategy"]!=1:
             for i in self.reactant_conf.keys():
                 print(f"self.reactant_conf[{i}]: {self.reactant_conf[i]}\n")
-                tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
+                tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F", "adj_mat_r": P_adj}
                 count=count+1
         print(f"Total: there are {count} tmp rxns\n", flush = True)
 
@@ -177,57 +181,66 @@ class reaction:
 
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             print(f"ind: {conf_ind}, conf_entry: {conf_entry['G'][0]}, direction: {tmp_rxn_dict[conf_ind]['direct']}\n")
+            print(f"conf_entry: {conf_entry}\n")
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             # Zhao's note: Change here to adj_mat as well...
             # JUST DEBUG, Try skip this line?
-            ###Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
-            #Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['adj_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
-            #Gr = deepcopy(PG)
+            #Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
+            if not self.use_xtb:
+                #Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
+                #print(f"Gr: {Gr}\n")
+                #print(f"PG: {PG}\n")
+                if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
+                    Gr = deepcopy(PG)
+                elif(tmp_rxn_dict[conf_ind]['direct'] == 'B'):
+                    Gr = deepcopy(RG)
             # skip the UFF opt ???
 
             #Zhao's note: added the xtb manually#
             #xtb opt now uses the all the bonds as constraints#
             #additional constraints are also applied by the user in args['reactant_dist_constraint'] or args['product_dist_constraint']
-            tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
-            xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
+            elif(self.use_xtb):
+                tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
+                xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
 
-            if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
-                ADMatrix = P_adj
-                All_constraint = return_all_constraint(self.product)
-                All_constraint = All_constraint + product_total_constraints
-            else:
-                ADMatrix = R_adj
-                All_constraint = return_all_constraint(self.reactant)
-                All_constraint = All_constraint + reactant_total_constraints
-                print(f"All_constraint for reactant: {All_constraint}\n")
+                if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
+                    ADMatrix = P_adj
+                    All_constraint = return_all_constraint(self.product)
+                    All_constraint = All_constraint + product_total_constraints
+                else:
+                    ADMatrix = R_adj
+                    All_constraint = return_all_constraint(self.reactant)
+                    All_constraint = All_constraint + reactant_total_constraints
+                    print(f"All_constraint for reactant: {All_constraint}\n")
 
-            if self.args["low_solvation"]:
-                solvation_model, solvent = self.args["low_solvation"].split("/")
-                optjob=XTB(input_geo=tmp_xyz_r,
-                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
-                        solvent=solvent, solvation_model=solvation_model,
-                        jobname=f"joint_xtb",
-                        charge=self.args["charge"], multiplicity=self.args["multiplicity"])
-                optjob.add_command(distance_constraints=All_constraint)
-            else:
-                optjob=XTB(input_geo=tmp_xyz_r,
-                        work_folder=self.args["scratch_xtb"],lot=self.args["lot"], jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
-                        jobname=f"joint_xtb",
-                        charge=self.args["charge"], multiplicity=self.args["multiplicity"])
-                optjob.add_command(distance_constraints=All_constraint)
-            optjob.execute()
+                #Zhao's note: to save time, use gfnff
+                if self.args["low_solvation"]:
+                    solvation_model, solvent = self.args["low_solvation"].split("/")
+                    optjob=XTB(input_geo=tmp_xyz_r,
+                            work_folder=self.args["scratch_xtb"],lot="gfn2", jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
+                            solvent=solvent, solvation_model=solvation_model,
+                            jobname=f"joint_xtb",
+                            charge=self.args["charge"], multiplicity=self.args["multiplicity"])
+                    optjob.add_command(distance_constraints=All_constraint)
+                else:
+                    optjob=XTB(input_geo=tmp_xyz_r,
+                            work_folder=self.args["scratch_xtb"],lot="gfn2", jobtype=["opt"],nproc=self.args['xtb_nprocs'],\
+                            jobname=f"joint_xtb",
+                            charge=self.args["charge"], multiplicity=self.args["multiplicity"])
+                    optjob.add_command(distance_constraints=All_constraint)
+                optjob.execute()
            
-            #exit()
+                #exit()
 
-            if(conf_ind % 20 == 0): print(f"Processed/Optimized {conf_ind} rxn confs\n", flush = True)
-
-            if optjob.optimization_success():
-                _, Gr = optjob.get_final_structure()
-            else:
-                #logger.info(f"xtb geometry optimization fails for the other end of {job_id} (conf: {conf_ind}), will use force-field optimized geometry for instead")
-                Gr = []
-
+                if(conf_ind % 20 == 0): print(f"Processed/Optimized {conf_ind} rxn confs\n", flush = True)
+    
+                if optjob.optimization_success():
+                    _, Gr = optjob.get_final_structure()
+                else:
+                    #logger.info(f"xtb geometry optimization fails for the other end of {job_id} (conf: {conf_ind}), will use force-field optimized geometry for instead")
+                    Gr = []
+ 
             if len(Gr)==0: 
                 #print(f"NO Gr Generated!!!!\n", flush = True)
                 continue
@@ -296,14 +309,15 @@ class reaction:
             print(f"tmp_xyz_p file: {tmp_xyz_p}\n")
             xyz_write(tmp_xyz_r, RE, item[1])
             xyz_write(tmp_xyz_p, RE, item[2])
+            #Zhao's note: for speed let us try gfnff
             if self.args['opt']:
                 if self.args['low_solvation']:
                     solvation_model, solvent = self.args['low_solvation'].split('/')
-                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',solvent=solvent,\
+                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],lot='gfn2', jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',solvent=solvent,\
                                  solvation_model=solvation_model,charge=self.args['charge'],multiplicity=self.args['multiplicity'])
                 else:
                     os.system(f"cp {tmp_xyz_p} self.args['scratch_xtb']/asdasdasdasd_inp_P.xyz")
-                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',charge=self.args['charge'],multiplicity=self.args['multiplicity'])
+                    optjob = XTB(input_geo=tmp_xyz_p,work_folder=self.args['scratch_xtb'],lot='gfn2', jobtype=['opt'],nproc=self.args['xtb_nprocs'], jobname=f'opt_{job_id}_p',charge=self.args['charge'],multiplicity=self.args['multiplicity'])
 
                 optjob.execute()
 

@@ -1,7 +1,7 @@
 # Note that a bimolecular reaction is recommended to use .xyz or .mol file
 # Enumetation part
-input: tst.xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
-scratch: /Users/hsu205/github/classy-yarp/reaction # The output folder with reaction geometry for constructing reaction network.
+input: /Users/hsu205/github/classy-yarp/reaction/MR # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
+scratch: /Users/hsu205/github/classy-yarp/MR # The output folder with reaction geometry for constructing reaction network.
 reaction_data: DA.p
 n_break: 1 # Indicate the number of breaking bonds
 form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
@@ -26,7 +26,7 @@ opt: False
 pysis_wt: 3600
 select: network
 charge: 0
-multiplicity: 1
+multiplicity: 2
 skip_low_IRC: True
 skip_low_TS: True
 constrained_TS: True

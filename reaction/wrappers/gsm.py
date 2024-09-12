@@ -208,6 +208,7 @@ class GSM:
         """
         if not self.calculation_terminated_normally(): return False, []
         if not self.find_correct_TS(): return False, []
+        if not self.get_strings(): return False, []
         images = self.get_strings()
         ts_ind = self.find_correct_TS()
         ts = images[ts_ind]

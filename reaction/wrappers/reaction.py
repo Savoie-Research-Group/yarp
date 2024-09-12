@@ -15,8 +15,8 @@ from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdm
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
 from copy import deepcopy
-from xtb import *
 sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
+from wrappers.xtb import *
 from utils import *
 from conf import *
 

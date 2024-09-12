@@ -1,5 +1,5 @@
 # this program handles the model reaction problems and is created by Hsuan-Hao Hsu (hsu205@purdue.edu).
-import sys, itertools, timeit, os, copy                                                                                                                                                               
+import sys, itertools, timeit, os, copy, math                                                                                                                                                               
 from itertools import combinations
 from openbabel import pybel
 from openbabel import openbabel as ob
@@ -7,6 +7,8 @@ from collections import Counter
 import numpy as np
 import yarp as yp
 import yaml, fnmatch, pickle
+import scipy
+# from sklearn.preprocessing import normalize
 from yarp.taffi_functions import graph_seps,table_generator,return_rings,adjmat_to_adjlist,canon_order
 from yarp.properties import el_to_an,an_to_el,el_mass, el_radii
 from yarp.find_lewis import find_lewis,return_formals,return_n_e_accept,return_n_e_donate,return_formals,return_connections,return_bo_dict
@@ -26,42 +28,58 @@ from main_xtb import initialize
 def main(args:dict):
     #args, logger=initialize(args)
     args, logger, logging_queue=initialize(args)
-    '''
+    
     if os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], '*.smi'): # Read smiles in
         mol=[i.split('\n')[0] for i in open(args["input"], 'r+').readlines()]
     elif os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], '*.xyz'):
-        mol=[args["input"]]
+        mol=[args["input"]+"/"+i for i in os.listdir(args["input"])]
     else:
         mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
     radical=[]
     #print(mol)
+    
     for i in mol:
+        print("Generate uniradical for {}".format(i))
         reactant=yp.yarpecule(i)
         # find the reactant is radical or not
+        heavy=0
+        CHNO=1
+        for _ in reactant.elements:
+            if _!="H" and _!="h": heavy+=1
+            if _!="H" and _!="h" and _!="C" and _!="c" and _!="N" and _!="n" and _!="O" and _!="o": CHNO=0
+        if CHNO==0: continue
+        if heavy>20: continue
         bmat=reactant.bond_mats[0]
         is_rad=0
         for j in range(len(bmat)):
             is_rad+=int(bmat[j, j])%2
-        if is_rad: radical.append(reactant)
-        else:
+        if sum(np.abs(reactant.fc))>0:
+            print("Ionic species. Removing....")
+            continue
+        elif is_rad==1:
+            print("{} is a uni-radical.".format(i))
+            radical.append(reactant)
+        elif is_rad==0:
             tmp=generate_uniradical(reactant)
-            #print("a")
-            for j in tmp: radical.append(j)
+            for _ in tmp: radical.append(_)
     # running enumerations
+    print(f"We have {len(radical)} radicals.")
     with open("radicals.p", "wb") as f:
         pickle.dump(radical, f)
-    '''
+    
+    
     radical=pickle.load(open("radicals.p", "rb"))
-    radicals=[]
-    for _ in radical:
-        heavy=0
-        for i in _.elements:
-            if i!="H" or i!="h": heavy+=1
-        if heavy<20:
-            radicals.append(_)
-    radical=[]
-    radical=radicals
-    reactions=[]
+    
+    #radicals=[]
+    #for _ in radical:
+    #    heavy=0
+    #    for i in _.elements:
+    #        if i!="H" or i!="h": heavy+=1
+    #    if heavy<20:
+    #        radicals.append(_)
+    #radical=[]
+    #radical=radicals
+    #reactions=[]
     # print(radical)
     # print(len(radical))
     # exit()
@@ -76,30 +94,76 @@ def main(args:dict):
     print(len(reactions))
     print(len(MR_rxns))
     exit()
+    
+    count=0
+    
+    reactions=[]
+    for count_i, i in enumerate(radical):
+        break_mol=list(yp.break_bonds(i, n=args["n_break"]))
+        products=yp.form_n_bonds(break_mol, n=args["n_break"], def_only=True)
+        products=[_ for _ in products if _.bond_mat_scores[0]<=0.0]
+        for j in products:
+            reactions.append(reaction(i, j, args=args, opt=True))
+    reactions=[_ for _ in reactions if "Error" not in i.product_inchi and "Error" not in i.reactant_inchi]
+    with open("All_true.p", "wb") as f: pickle.dump(reactions, f)
+    MR_rxns, MR_dict=create_model_reactions(reactions)
+    # with open("All_true.p", "wb") as f: pickle.dump(reactions, f)
+    with open("All_model.p", "wb") as f: pickle.dump(MR_rxns, f)
+    with open("All_dict.p", "wb") as f: pickle.dump(MR_dict, f)
     """
     count=0
     while 1:
         reactions=[]
+        # if count>=5: break
         if count+10>len(radical): bound=len(radical)
         else: bound=count+10
-        if os.path.isfile(f"true_{count}_{bound}.p") is True:
+        if 0:
+        #if os.path.isfile(f"true_{count}_{bound}.p") is True:
             reactions=pickle.load(open(f"true_{count}_{bound}.p", "rb"))
         else:
             for i in range(count, bound):
-                break_mol=list(yp.break_bonds(radical[i], n=args["n_break"]))
-                products=yp.form_n_bonds(break_mol, n=args["n_break"], def_only=True)
+                #print("RADICAL")
+                #for count_e, _ in enumerate(radical[i].geo):
+                #    print(f"{radical[i].elements[count_e]} {_[0]} {_[1]} {_[2]}")
+                react=[]
+                rad=[]
+                for count_b, _ in enumerate(radical[i].bond_mats[0]):
+                    if _[count_b]%2==0: react.append(count_b)
+                    else: rad.append(count_b)
+                neb=[]
+                for _ in rad:
+                    for count_bd, bd in enumerate(radical[i].adj_mat[_]):
+                        if bd: neb.append(count_bd)
+                react=[_ for _ in react if _ not in neb] 
+                break_mol=list(break_H_bonds(radical[i], react=react))
+                #break_mol=list(yp.break_bonds(radical[i], n=args["n_break"]))
+                #products=yp.form_n_bonds(break_mol, n=args["n_break"], def_only=True)
+                products=form_radical_bonds(break_mol)
                 products=[_ for _ in products if _.bond_mat_scores[0]<=0.0]
-                for j in products: reactions.append(reaction(radical[i], j, args=args, opt=True))
-            reactions=[i for i in reactions if "Error" not in i.product_inchi and "Error" not in i.reactant_inchi]
-            with open(f"true_{count}_{bound}.p", "wb") as f:
+                for j in products:
+                    print("Create reaction class....")
+                    if np.sum(abs(radical[i].adj_mat-j.adj_mat))==0: continue
+                    product_geo=opt_geo(j.elements, j.geo, j.bond_mats[0])
+                    if product_geo!=[]:
+                        j.geo=product_geo
+                        reactions.append(reaction(radical[i], j, args=args, opt=False))
+            reactions=[i for i in reactions if "ERROR" not in i.product_inchi and "ERROR" not in i.reactant_inchi]
+            reactions=[i for i in reactions if i.product_inchi!=i.reactant_inchi]
+            with open(f"MR/true_{count}_{bound}.p", "wb") as f:
+                print(f"MR/true_{count}_{bound}.p")
                 pickle.dump(reactions,f)
+        print("Create model reaction....")
         MR_rxns, MR_dict=create_model_reactions(reactions)
-        with open(f"model_{count}_{bound}.p", "wb") as f:
+        #print(len(reactions))
+        #print(len(MR_rxns))
+        #print(f"model_{count}_{bound}.p")
+        with open(f"MR/model_{count}_{bound}.p", "wb") as f:
             pickle.dump(MR_rxns, f)
-        with open(f"MRdict_{count}_{bound}.p", "wb") as f:
+        with open(f"MR/MRdict_{count}_{bound}.p", "wb") as f:
             pickle.dump(MR_dict, f)
         if count+10>=len(radical): break
         count=count+10
+        #break
         #if count>=len(radical):break
     """
     for i in radical:
@@ -161,7 +225,7 @@ def generate_uniradical(reactant):
         #prod=geometry_opt(prod)
         #print(prod.adj_mat)
         for count_i, i in enumerate(range(len(prod.adj_mat))):
-            if prod.adj_mat[count_i].sum()==0: # the seperate hydrogen atom
+            if prod.adj_mat[count_i].sum()==0: # the separate hydrogen atom
                continue
             else:
                elements.append(prod.elements[count_i])
@@ -205,6 +269,8 @@ def return_model_rxn(rxn, depth=1):
             if j>0 and j==depth and count_j not in reactive_atoms and count_j not in edge_idx: edge_idx.append(count_j)
     # keep_idx stores the info of the atoms we want to keep
     # next step is adding hydrogens at the edge atom
+    # print(keep_idx)
+    # print(edge_idx)
     new_R_E, new_R_geo, new_P_geo=return_model_geo(elements, R_geo, R_bond, BE_change, keep_idx, edge_idx)
     if len(new_P_geo)<=2 or len(new_R_geo)<=2:
         print("Failed to optimize geometry for model reaction.")
@@ -215,7 +281,7 @@ def return_model_rxn(rxn, depth=1):
     xyz_write(".tmp_P.xyz", new_R_E, new_P_geo)
     product=yp.yarpecule(".tmp_P.xyz", canon=False)
     os.system("rm .tmp_P.xyz")
-    R=reaction(reactant, product, args=rxn.args, opt=False)
+    R=reaction(reactant, product, args=rxn.args, opt=True)
     return R
 
 def return_model_geo(elements, geo, bondmat, BE_change, keep_idx, edge_idx):
@@ -230,7 +296,7 @@ def return_model_geo(elements, geo, bondmat, BE_change, keep_idx, edge_idx):
             new_bondmat.append([j for count_j, j in enumerate(bondmat[count_i]) if count_j in keep_idx])
             new_BE_change.append([j for count_j, j in enumerate(BE_change[count_i]) if count_j in keep_idx])
             for count_j, j in enumerate(bondmat[count_i]):
-                if count_j != count_i: tmp+=j
+              if count_j != count_i: tmp+=j
             numbond.append(tmp)
     for i in new_edge:
         # add hydrogen to the edge atoms
@@ -243,9 +309,64 @@ def return_model_geo(elements, geo, bondmat, BE_change, keep_idx, edge_idx):
             bond_length=el_radii[new_E[i]]+el_radii["H"]
         for j in range(num_add_hydrogen):
             new_E.append("H")
-            const=2*3.1415926/num_add_hydrogen*float(j)
-            argu=1
-            cycle=0
+            #const=2*3.1415926/num_add_hydrogen*float(j)
+            #argu=1
+            #cycle=0
+            connect_ids=[count_k for count_k, k in enumerate(new_bondmat[i]) if count_k!=i and k>=1]
+            if len(connect_ids)==1: # don't need to use cross
+                vec=[new_geo[i][0]-new_geo[connect_ids[0]][0],new_geo[i][1]-new_geo[connect_ids[0]][1], new_geo[i][2]-new_geo[connect_ids[0]][2]]
+                #print(vec)
+                vec=vec/np.linalg.norm(vec)
+                if vec[2]>1E-6: imag_vec=np.array([1.0, 1.0, -(vec[0]+vec[1])/vec[2]])
+                else: imag_vec=np.array([1.0, 1.0, 0.0])
+                rotate=rotate_matrix(imag_vec, 1.0/6.0*math.pi+np.random.rand()/math.pi)
+                vec=np.dot(rotate, vec)
+                vec=vec/np.linalg.norm(vec)
+                #print(vec)
+                new_coord=new_geo[i]+vec*bond_length
+            else:
+                vecs=[]
+                # print(connect_ids)
+                for k in connect_ids:
+                    vec=[new_geo[k][0]-new_geo[i][0], new_geo[k][1]-new_geo[i][1], new_geo[k][2]-new_geo[i][2]]
+                    vecs.append(vec/np.linalg.norm(vec))
+                for k in range(len(connect_ids)-1):
+                    if k==0: 
+                        vec=np.cross(vecs[k], vecs[k+1])
+                        while np.linalg.norm(vec)<1E-6: # two vectors are parallel (sin(theta)=0)
+                            vec=np.cross(vecs[k], vecs[k+1]+0.1*np.random.rand(3))
+                            vec=vec/np.linalg.norm(vec)
+                    else:
+                        vec=np.cross(vec, vecs[k+1])
+                        while np.linalg.norm(vec)<1E-6:
+                            vec=np.cross(vec, vecs[k+1]+0.1*np.random.rand(3))
+                            vec=vec/np.linalg.norm(vec)
+                #vec=vec/np.linalg.norm(vec)
+                goal=1
+                cycle=0
+                while goal:
+                    cycle+=1
+                    dot_product=[]
+                    for k in vecs:
+                        dot_product.append(np.dot(vec, k))
+                    if max(dot_product)>0.95: # Too close
+                        goal=1
+                        abs_dot=[k for k in dot_product]
+                        axis=vecs[abs_dot.index(min(abs_dot))]
+                        deg=0.5*math.pi
+                        rotate=rotate_matrix(axis, deg)
+                        #print(cycle)
+                        #print(rotate)
+                        vec=np.dot(rotate, vec)
+                    if max(dot_product)<0.95 or cycle>5:
+                        goal=0
+                #for k in vecs:
+                #    if (np.dot(vec,k))>0.95: print("Close")
+                new_coord=new_geo[i]+vec*bond_length+0.01*np.random.rand(3)
+                #print(vecs)
+                #print(vec)
+            new_geo.append(new_coord)
+            '''
             while argu or cycle<10:
                 if cycle<3: vec=[bond_length*cos(const), bond_length*sin(const), 0.0]
                 elif cycle<6: vec=[0.0, bond_length*cos(const), bond_length*sin(const)]
@@ -259,6 +380,7 @@ def return_model_geo(elements, geo, bondmat, BE_change, keep_idx, edge_idx):
                     #print(dist)
                     if dist<0.2: argu=1
             new_geo.append(new_coord)
+            '''
             for count_k, k in enumerate(new_bondmat):
                 if count_k != i:
                     new_bondmat[count_k].append(0)
@@ -282,17 +404,37 @@ def return_model_geo(elements, geo, bondmat, BE_change, keep_idx, edge_idx):
     new_bondmat=np.asarray(new_bondmat)
     #print(new_E)
     #print(new_bondmat)
+    # new_geo=opt_geo(new_E, new_geo, new_bondmat)
+    # exit()
     try:
+        #print("A")
+        #print("Model Reactant")
+        #for count_i, i in enumerate(new_geo):
+        #    print(f"{new_E[count_i]} {i[0]} {i[1]} {i[2]}")
+        
         new_geo=opt_geo(new_E, new_geo, new_bondmat)
+        #print("After OPT")
+        #for count_i, i in enumerate(new_geo):
+        #    print(f"{new_E[count_i]} {i[0]} {i[1]} {i[2]}")
     except:
         return [], [], []
     try:
+        #print("Model Product")
         new_BE_change=np.asarray(new_BE_change)
         new_bondmat=new_bondmat+new_BE_change
+        
+        #for count_i, i in enumerate(new_geo):
+        #    print(f"{new_E[count_i]} {i[0]} {i[1]} {i[2]}")
+        #print("B")
+        
         new_change_geo=opt_geo(new_E, new_geo, new_bondmat) 
     except:
         return [], [], []
     return new_E, new_geo, new_change_geo
+
+def rotate_matrix(axis, deg):
+    rotate_matrix=scipy.linalg.expm(np.cross(np.eye(3), axis/scipy.linalg.norm(axis)*deg))
+    return rotate_matrix
 
 def return_bnfm(bondmat):
     break_bond=[]
@@ -322,6 +464,7 @@ def return_adj_change(adjmat):
                     reactive_atoms.append(i)
                     reactive_atoms.append(j)
     return keep_idx, reactive_atoms
+
 def break_H_bonds(mol, react=[]):
     hashes=set([])
     bonds=[(count_r, count_c) for count_r, row in enumerate(mol.adj_mat) for count_c, col in enumerate(row) if (count_r in react and col>0)]
@@ -329,10 +472,40 @@ def break_H_bonds(mol, react=[]):
         adj_mat=copy.copy(mol.adj_mat)
         adj_mat[b[0], b[1]]=0
         adj_mat[b[1], b[0]]=0
+        bmat=copy.copy(mol.bond_mats[0])
+        bmat[b[0], b[1]]-=1
+        bmat[b[1], b[0]]-=1
+        bmat[b[0], b[0]]+=1
+        bmat[b[1], b[1]]+=1
         tmp=yp.yarpecule((adj_mat, mol.geo, mol.elements, mol.q), canon=False)
+        tmp.bond_mats[0]=bmat
         if tmp.hash not in hashes:
             yield tmp
             hashes.add(tmp.hash)
+
+def form_radical_bonds(mol):
+    yarpecules=prepare_list(mol)
+    hashes=set([_.hash for _ in yarpecules])
+    for y in yarpecules:
+        react=[]
+        for count, _ in enumerate(y.bond_mats[0]):
+            if _[count]%2!=0: react.append(count)
+        if len(react)!=3: continue
+        form_bonds=[(react[0], react[1]), (react[0], react[2]), (react[1], react[2])]
+        for i in form_bonds:
+            adj_mat=copy.copy(y.adj_mat)
+            bmat=copy.copy(y.bond_mats[0])
+            adj_mat[i[0], i[1]]=1
+            adj_mat[i[1], i[0]]=1
+            bmat[i[0], i[1]]+=1
+            bmat[i[1], i[0]]+=1
+            bmat[i[0], i[0]]-=1
+            bmat[i[1], i[1]]-=1
+            tmp=yp.yarpecule((adj_mat, y.geo, y.elements, y.q), canon=False)
+            tmp.bond_mats[0]=bmat
+            if tmp.hash not in hashes:
+                yield tmp
+                hashes.add(tmp.hash)
 
 if __name__=="__main__":
     parameters = sys.argv[1]

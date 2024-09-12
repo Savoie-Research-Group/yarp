@@ -98,7 +98,7 @@ class XTB:
         if len(distance_constraints) > 0 or len(cartesian_constraints) > 0:
             self.generate_xcontrol(distance_constraints, cartesian_constraints, force_constant)
             self.command += f' --input {self.xcontrol}'
-        
+        #print(self.command)
     def execute(self):
         """
         Execute a XTB calculation using the runtime flags
@@ -110,6 +110,8 @@ class XTB:
         # go into the work folder and run the command
         os.chdir(self.work_folder)
         result = subprocess.run(f'{self.command} > {self.output}', shell=True, capture_output=True, text=True)
+        print(self.command)
+        print(self.output)
         # print(self.command)
         # print(result)
         # go back to the original folder
@@ -122,8 +124,11 @@ class XTB:
         Check if the calculation terminate normally
         """
         # load in xtb output
+        print("NORMAL")
+        print(os.path.isfile(self.output))
         if os.path.isfile(self.output) is False: return False
         lines = open(self.output, 'r', encoding="utf-8").readlines()
+        
         for n_line, line in enumerate(reversed(lines)):
             if 'finished run' in line:
                 return True

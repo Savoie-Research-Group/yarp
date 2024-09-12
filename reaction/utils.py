@@ -14,6 +14,8 @@ from rdkit import Chem
 from rdkit.Chem import EnumerateStereoisomers, AllChem, TorsionFingerprints, rdmolops, rdDistGeom
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.ML.Cluster import Butina
+import fnmatch
+from wrappers.xtb import *
 def geometry_opt(molecule):
     '''
     geometry optimization on yarp class
@@ -27,7 +29,56 @@ def geometry_opt(molecule):
     os.system("rm {}".format(mol_file))
     return molecule
 
-def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=100,filename='tmp',constraints=[]):
+def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
+    '''
+    Apply xTB to find product/reactant geometry from reactant/product geometry.
+    elements: the elements for geo (a list)
+    geo: the geometry of product or reactant
+    bond_mat: the bond electron matrix for reactant or product
+    q: the charge state
+    '''
+    tmp_xyz_file=f".{filename}.xyz"
+    tmp_inp_file=f".{filename}.inp"
+    bond=return_bond_info(bond_mat)
+    length=[]
+    constraints=[]
+    xyz_write(tmp_xyz_file, elements, geo)
+    for i in bond: length.append(el_radii[elements[i[0]]]+el_radii[elements[i[1]]])
+    for count_i, i in enumerate(bond): constraints+=[(i[0]+1, i[1]+1, length[count_i])]
+    #print("A")
+    optjob = XTB(input_geo=tmp_xyz_file,work_folder='.',jobtype=['opt'],jobname='opt',charge=q) 
+    optjob.add_command(distance_constraints=constraints, force_constant=1.0)
+    optjob.execute()
+    # print(optjob.optimization_success())  
+    if optjob.optimization_success():
+        _, Gr = optjob.get_final_structure()
+        print(Gr)
+    else:
+        print("XTB fails to locate reactant/product pair for this conformer.")
+        return []
+    adj_mat_o = bondmat_to_adjmat(bond_mat)
+    adj_mat_n = table_generator(elements, Gr)
+    
+    try:
+        files=[i for i in os.listdir(".") if fnmatch.fnmatch(i, f".{filename}*")]
+        for i in files: os.remove(i)
+    except:
+        pass
+
+    if np.abs(adj_mat_o-adj_mat_n).sum() == 0:
+        return G            
+    else:
+       print("XTB fails to locate reactant/product pair for this conformer.")
+       return []   
+# def generate_xtb_constraint(bond, length, filename=".tmp.inp")
+def return_bond_info(mat):
+    info=[]
+    for i in range(len(mat)-1):
+        for j in range(i+1, len(mat)):
+            if mat[i][j]>0:
+                info+=[(i, j)]
+    return info
+def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=1000,filename='tmp',constraints=[]):
     ''' 
     Apply openbabel to perform force field geometry optimization 
     Will support constraints option in the near future 
@@ -80,8 +131,8 @@ def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=100,filename='tmp',constr
     _,G = xyz_parse(tmp_xyz_file)
     # Remove the tmp file that was read by obminimize
     try:
-        os.remove(tmp_filename)
-        os.remove(tmp_xyz_file)
+        files=[i for i in os.listdir(".") if fnmatch.fnmatch(i, f".{filename}*")]
+        for i in files: os.remove(i)
     except:
         pass
 
@@ -91,6 +142,7 @@ def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=100,filename='tmp',constr
     if np.abs(adj_mat_o-adj_mat_n).sum() == 0:
         return G
     else:
+        # print(adj_mat_o-adj_mat_n)
         print("Error: geometry optimization by uff is failed.")
         return []
 

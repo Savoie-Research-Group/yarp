@@ -157,14 +157,14 @@ def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True,
     new = []
     
     for y in yarpecules:
-        newest = list(form_bonds(y,hashes=hashes))
+        newest = list(form_bonds(y,hashes=hashes, def_only=def_only))
         hashes.update([ _.hash for _ in newest ])
         new += newest
     # Loop over the new molecules until no new structures are enumerated
     nf=1
     while nf<n:
         for y in new:
-            newest = list(form_bonds(y,hashes=hashes))
+            newest = list(form_bonds(y,hashes=hashes, def_only=def_only))
             hashes.update([ _.hash for _ in newest ])
             new += newest
         nf=nf+1
@@ -283,11 +283,13 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules) 
-
+    #print(react)
     # Prepare react list if it isn't the same length as the number of yarpecules
+    #print(len(react))
+    #print(len(yarpecules))
     if len(react) != len(yarpecules):
         react = [ set(range(len(y))) for y in yarpecules ]
-
+    #print(react)
     # Prepare hash set if it isn't already supplied
     if hashes is None:
         hashes = set([])
@@ -297,7 +299,6 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
 
         # Collect distinct bonds involving atoms in react 
         bonds = [ (count_r,count_c) for count_r,row in enumerate(y.adj_mat) for count_c,col in enumerate(row) if ( count_r in react[count_y] and count_c in react[count_y] and col > 0 and count_c > count_r ) ] 
-
         if break_higher_order is False:
             tmp_bonds=[]
             for i in bonds:

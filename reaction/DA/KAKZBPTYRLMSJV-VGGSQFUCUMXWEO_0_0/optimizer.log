@@ -1,0 +1,427 @@
+Created optimizer with prefix forward_end_
+Initial trust radius: 0.500000
+Using Fischer Hessian
+89 degrees of freedom.
+                                 #############
+                                 # CYCLE 000 #
+                                 #############
+    Energy:   -17.924258 au
+norm(grad):     0.005963 au / bohr (rad)
+ rms(grad):     0.000632 au / bohr (rad)
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.88374128e-01
+	eigenvalue_min=-5.18208482e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.88374128e-01
+	eigenvalue_min=-5.18208482e-04
+norm(step)=0.153830 au (rad)
+
+                                 #############
+                                 # CYCLE 001 #
+                                 #############
+    Energy:   -17.924637 au
+norm(grad):     0.002500 au / bohr (rad)
+ rms(grad):     0.000265 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -2.5910e-04 au
+	Actual change: -3.7912e-04 au
+	Coefficient: 146.32%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.84557403e-01
+	eigenvalue_min=-2.85639963e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.84557403e-01
+	eigenvalue_min=-2.85639963e-04
+norm(step)=0.177808 au (rad)
+
+                                 #############
+                                 # CYCLE 002 #
+                                 #############
+    Energy:   -17.924813 au
+norm(grad):     0.001246 au / bohr (rad)
+ rms(grad):     0.000132 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -1.4282e-04 au
+	Actual change: -1.7560e-04 au
+	Coefficient: 122.96%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.97612256e-01
+	eigenvalue_min=-3.45655623e-05
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.387581.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.99941672e-01
+	eigenvalue_min=-1.06745414e-05
+norm(step)=0.069608 au (rad)
+
+                                 #############
+                                 # CYCLE 003 #
+                                 #############
+    Energy:   -17.924834 au
+norm(grad):     0.000700 au / bohr (rad)
+ rms(grad):     0.000074 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -5.4127e-07 au
+	Actual change: -2.1220e-05 au
+	Coefficient: 3920.39%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.99779343e-01
+	eigenvalue_min=-4.23337240e-06
+Trying GDIIS with 2 previous cycles.
+	Error vectors are linearly independent: True
+	GDIIS coefficients: [ 1.355 -0.355]
+	Sum of positive coefficients: 1.35
+	Sum of negative coefficients: 0.35
+	Sums are valid: True
+	GDIIS step has valid length: True
+	GDIIS step has valid direction: True
+	GDIIS step is valid: True
+
+Trying GDIIS with 3 previous cycles.
+	Error vectors are linearly independent: True
+	GDIIS coefficients: [ 1.4915 -0.6951  0.2037]
+	Sum of positive coefficients: 1.70
+	Sum of negative coefficients: 0.70
+	Sums are valid: True
+	GDIIS step has valid length: True
+	GDIIS step has valid direction: False
+	GDIIS step is valid: False
+	Used 2 error vectors for GDIIS.
+
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.99985056e-01
+	eigenvalue_min=-1.83563435e-06
+norm(step)=0.021037 au (rad)
+
+                                 #############
+                                 # CYCLE 004 #
+                                 #############
+    Energy:   -17.924837 au
+norm(grad):     0.000319 au / bohr (rad)
+ rms(grad):     0.000034 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -1.7213e-06 au
+	Actual change: -2.5874e-06 au
+	Coefficient: 150.32%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.99993200e-01
+	eigenvalue_min=-6.45389017e-07
+rms(force) is overachieved
+Convergence achieved! Skipping inter/extrapolation.
+norm(step)=0.003688 au (rad)
+rms(force) is overachieved
+Successful invocations:
+	     GEDIIS: 0
+	      GDIIS: 1
+	Line Search: 1
+
+Created optimizer with prefix backward_end_
+Initial trust radius: 0.500000
+Using Fischer Hessian
+79 degrees of freedom.
+                                 #############
+                                 # CYCLE 000 #
+                                 #############
+    Energy:   -17.819616 au
+norm(grad):     0.002917 au / bohr (rad)
+ rms(grad):     0.000328 au / bohr (rad)
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.00312717e-01
+	eigenvalue_min=-1.58065326e-03
+Proposed RFO step with norm 0.7492 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000471
+Positive definite Hessian: True
+Hard case: False
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.00312717e-01
+	eigenvalue_min=-1.58065326e-03
+Proposed RFO step with norm 0.7492 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000471
+Positive definite Hessian: True
+Hard case: False
+norm(step)=0.495546 au (rad)
+
+                                 #############
+                                 # CYCLE 001 #
+                                 #############
+    Energy:   -17.820545 au
+norm(grad):     0.002760 au / bohr (rad)
+ rms(grad):     0.000310 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -7.2357e-04 au
+	Actual change: -9.2914e-04 au
+	Coefficient: 128.41%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.01483828e-01
+	eigenvalue_min=-1.21841085e-03
+Proposed RFO step with norm 0.7461 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000462
+Positive definite Hessian: True
+Hard case: False
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.01483828e-01
+	eigenvalue_min=-1.21841085e-03
+Proposed RFO step with norm 0.7461 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000462
+Positive definite Hessian: True
+Hard case: False
+norm(step)=0.495047 au (rad)
+
+                                 #############
+                                 # CYCLE 002 #
+                                 #############
+    Energy:   -17.821266 au
+norm(grad):     0.001773 au / bohr (rad)
+ rms(grad):     0.000199 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -5.5652e-04 au
+	Actual change: -7.2134e-04 au
+	Coefficient: 129.62%
+	Keeping current trust radius at 0.500000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-7.98451261e-01
+	eigenvalue_min=-9.45836897e-04
+Proposed RFO step with norm 0.7540 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000470
+Positive definite Hessian: True
+Hard case: False
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-7.98451261e-01
+	eigenvalue_min=-9.45836897e-04
+Proposed RFO step with norm 0.7540 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000470
+Positive definite Hessian: True
+Hard case: False
+norm(step)=0.499301 au (rad)
+
+                                 #############
+                                 # CYCLE 003 #
+                                 #############
+    Energy:   -17.821815 au
+norm(grad):     0.001146 au / bohr (rad)
+ rms(grad):     0.000129 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -4.3047e-04 au
+	Actual change: -5.4841e-04 au
+	Coefficient: 127.40%
+	Increasing trust radius.
+	Updated trust radius: 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.09920581e-01
+	eigenvalue_min=-6.82982006e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.09920581e-01
+	eigenvalue_min=-6.82982006e-04
+norm(step)=0.724194 au (rad)
+
+                                 #############
+                                 # CYCLE 004 #
+                                 #############
+    Energy:   -17.822360 au
+norm(grad):     0.001181 au / bohr (rad)
+ rms(grad):     0.000133 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: -3.4149e-04 au
+	Actual change: -5.4592e-04 au
+	Coefficient: 159.86%
+	Keeping current trust radius at 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.32243346e-01
+	eigenvalue_min=-3.97390949e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.32243346e-01
+	eigenvalue_min=-3.97390949e-04
+norm(step)=0.666164 au (rad)
+
+                                 #############
+                                 # CYCLE 005 #
+                                 #############
+    Energy:   -17.822675 au
+norm(grad):     0.001071 au / bohr (rad)
+ rms(grad):     0.000120 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: -1.9870e-04 au
+	Actual change: -3.1416e-04 au
+	Coefficient: 158.11%
+	Keeping current trust radius at 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.50133221e-01
+	eigenvalue_min=-2.34576346e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=8.50133221e-01
+	eigenvalue_min=-2.34576346e-04
+norm(step)=0.619394 au (rad)
+
+                                 #############
+                                 # CYCLE 006 #
+                                 #############
+    Energy:   -17.822857 au
+norm(grad):     0.000838 au / bohr (rad)
+ rms(grad):     0.000094 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: -1.1729e-04 au
+	Actual change: -1.8241e-04 au
+	Coefficient: 155.52%
+	Keeping current trust radius at 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.71597840e-01
+	eigenvalue_min=-1.31436346e-04
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.71597840e-01
+	eigenvalue_min=-1.31436346e-04
+norm(step)=0.562440 au (rad)
+
+                                 #############
+                                 # CYCLE 007 #
+                                 #############
+    Energy:   -17.822956 au
+norm(grad):     0.000579 au / bohr (rad)
+ rms(grad):     0.000065 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: -6.5718e-05 au
+	Actual change: -9.8527e-05 au
+	Coefficient: 149.92%
+	Keeping current trust radius at 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.05525402e-01
+	eigenvalue_min=-6.08038249e-05
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.05525402e-01
+	eigenvalue_min=-6.08038249e-05
+norm(step)=0.468559 au (rad)
+
+                                 #############
+                                 # CYCLE 008 #
+                                 #############
+    Energy:   -17.822998 au
+norm(grad):     0.000324 au / bohr (rad)
+ rms(grad):     0.000036 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: -3.0402e-05 au
+	Actual change: -4.2812e-05 au
+	Coefficient: 140.82%
+	Keeping current trust radius at 1.000000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.51855627e-01
+	eigenvalue_min=-1.98932565e-05
+rms(force) is overachieved
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.967964.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.95291909e-01
+	eigenvalue_min=-3.94110108e-06
+norm(step)=0.366552 au (rad)
+rms(force) is overachieved
+
+                                 #############
+                                 # CYCLE 009 #
+                                 #############
+    Energy:   -17.823012 au
+norm(grad):     0.000210 au / bohr (rad)
+ rms(grad):     0.000024 au / bohr (rad)
+Trust radius update
+	Current trust radius: 1.000000
+	Predicted change: 2.5619e-05 au
+	Actual change: -1.3932e-05 au
+	Coefficient: -54.38%
+	Decreasing trust radius.
+	Updated trust radius: 0.250000
+Did BFGS Hessian update.
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.88902950e-01
+	eigenvalue_min=-4.50685717e-06
+max(force) is overachieved
+rms(force) is overachieved
+Force convergence overachieved!
+Convergence achieved! Skipping inter/extrapolation.
+norm(step)=0.150230 au (rad)
+max(force) is overachieved
+rms(force) is overachieved
+Force convergence overachieved!
+Successful invocations:
+	     GEDIIS: 0
+	      GDIIS: 0
+	Line Search: 1
+

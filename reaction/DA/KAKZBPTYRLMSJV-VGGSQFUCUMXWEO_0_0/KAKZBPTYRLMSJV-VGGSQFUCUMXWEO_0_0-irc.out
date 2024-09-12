@@ -1,0 +1,246 @@
+                           d8b                            888
+                           Y8P                            888
+                                                          888
+88888b.  888  888 .d8888b  888 .d8888b  888  888 88888b.  88888b.  888  888 .d8888b
+888 "88b 888  888 88K      888 88K      888  888 888 "88b 888 "88b 888  888 88K
+888  888 888  888 "Y8888b. 888 "Y8888b. 888  888 888  888 888  888 888  888 "Y8888b.
+888 d88P Y88b 888      X88 888      X88 Y88b 888 888 d88P 888  888 Y88b 888      X88
+88888P"   "Y88888  88888P' 888  88888P'  "Y88888 88888P"  888  888  "Y88888  88888P'
+888           888                            888 888
+888      Y8b d88P                       Y8b d88P 888
+888       "Y88P"                         "Y88P"  888                            
+
+Version 0.7.6.post2 (Python 3.8.15, NumPy 1.24.3, SciPy 1.10.1)
+Executed at Thu Sep 12 02:13:55 2024 on 'hsu205sinch2019.lan'
+Platform: macOS-10.16-x86_64-i386-64bit
+Interpreter: /Users/hsu205/miniconda3/envs/yarp/bin/python
+Current working directory: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0
+
+If pysisyphus benefitted your research please cite:
+
+	https://doi.org/10.1002/qua.26390
+
+Good luck!
+
+{'calc': {'charge': 0, 'mem': 4000, 'mult': 1, 'pal': 1, 'type': 'xtb'},
+ 'endopt': {'T': 298.15,
+            'do_hess': False,
+            'dump': True,
+            'fragments': False,
+            'geom': {'coord_kwargs': {}, 'type': 'redund'},
+            'max_cycles': 300,
+            'overachieve_factor': 5,
+            'p': 101325,
+            'thresh': 'gau',
+            'type': 'rfo'},
+ 'geom': {'coord_kwargs': {},
+          'fn': '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0-TS.xyz',
+          'type': 'cart'},
+ 'irc': {'backward': True,
+         'downhill': False,
+         'forward': True,
+         'hessian_init': '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/ts_final_hessian.h5',
+         'rms_grad_thresh': 0.001,
+         'type': 'eulerpc'}}
+
+Read 1 geometry.
+                                ###############
+                                # RUNNING IRC #
+                                ###############
+
+Convergence thresholds (non mass-weighted gradient):
+	     rms(|gradient|) <= 0.001000 E_h a_0⁻¹
+	             Δenergy <= 0.000001 E_h
+
+Calculating energy and gradient at TS.
+Transition vector is mode 0 with wavenumber -393.53 cm⁻¹.
+Crossover temperature T_c: 90.11 K
+Energy-based (ΔE=0.001 au) initial displacement from the TS using 2rd derivatives.
+Initial step lengths (not mass-weighted):
+	 Forward: 0.2033 au
+	Backward: 0.2033 au
+IRC length in mw. coords, max(|grad|) and rms(grad) in unweighted coordinates.
+
+                               #################
+                               # IRC - FORWARD #
+                               #################
+
+Requested energy lowering:  0.0010 au ( 2.63 kJ mol⁻¹)
+   Actual energy lowering:  0.0012 au ( 3.28 kJ mol⁻¹)
+                        Δ: -0.0002 au (-0.65 kJ mol⁻¹)
+
+
+        Step   IRC length      dE / au  max(|grad|)    rms(grad)
+        --------------------------------------------------------
+           0     0.288959    -0.001897     0.012135     0.004101
+           1     0.576441    -0.002991     0.018152     0.006148
+           2     0.863132    -0.004243     0.024628     0.008372
+           3     1.146617    -0.005484     0.031054     0.010535
+           4     1.427655    -0.006616     0.036689     0.012427
+           5     1.707833    -0.007610     0.041578     0.014076
+           6     1.987869    -0.008520     0.046003     0.015591
+        Bonds formed: [C1-C6], [C0-C9]
+           7     2.268370    -0.009313     0.049183     0.016709
+           8     2.547230    -0.009740     0.050633     0.017196
+           9     2.823009    -0.009761     0.050431     0.017047
+          10     3.093022    -0.009363     0.048555     0.016321
+          11     3.354600    -0.008603     0.045174     0.015087
+          12     3.606435    -0.007592     0.040436     0.013404
+          13     3.845572    -0.006353     0.034533     0.011349
+          14     4.069482    -0.004994     0.027696     0.009015
+          15     4.275634    -0.003620     0.020224     0.006521
+          16     4.459174    -0.002321     0.012622     0.004062
+          17     4.610037    -0.001223     0.005799     0.001973
+          18     4.716335    -0.000509     0.001972     0.000799
+        rms(grad) converged!
+
+                               ##################
+                               # IRC - BACKWARD #
+                               ##################
+
+Requested energy lowering:  0.0010 au ( 2.63 kJ mol⁻¹)
+   Actual energy lowering:  0.0008 au ( 1.97 kJ mol⁻¹)
+                        Δ:  0.0002 au ( 0.65 kJ mol⁻¹)
+
+
+        Step   IRC length      dE / au  max(|grad|)    rms(grad)
+        --------------------------------------------------------
+           0     0.237983    -0.000623     0.004122     0.001334
+           1     0.491481    -0.000740     0.004549     0.001464
+           2     0.740660    -0.000773     0.004716     0.001506
+           3     0.983015    -0.000762     0.004711     0.001493
+           4     1.219165    -0.000731     0.004595     0.001445
+           5     1.451682    -0.000693     0.004403     0.001373
+           6     1.679613    -0.000644     0.004165     0.001287
+           7     1.905401    -0.000597     0.003897     0.001193
+           8     2.128784    -0.000547     0.003612     0.001096
+           9     2.349675    -0.000496     0.003321     0.000999
+        rms(grad) converged!
+                       #################################
+                       # OPTIMIZING REACTION PATH ENDS #
+                       #################################
+
+
+                      +----------------------------------+
+                      | RUNNING FORWARD_END OPTIMIZATION |
+                      +----------------------------------+
+
+     Input geometry: Geometry(C6_H10, 16 atoms)
+  Coordinate system: redund
+         Calculator: XTB calculator
+             Charge: 0
+       Multiplicity: 1
+          Optimizer: rfo
+
+
+If not specified otherwise, all quantities are given in au.
+
+Convergence thresholds, (overachieved when):
+	max(|force|) <= 0.000450, (0.000090) E_h a_0⁻¹ (rad⁻¹)
+	  rms(force) <= 0.000300, (0.000060) E_h a_0⁻¹ (rad⁻¹)
+	 max(|step|) <= 0.001800 a_0 (rad)
+	   rms(step) <= 0.001200 a_0 (rad)
+
+Spent 0.0 s preparing the first cycle.
+       cycle    Δ(energy) max(|force|)   rms(force)  max(|step|)    rms(step)      s/cycle
+           0          nan     0.001311     0.000632     0.040009     0.016306         0.06
+           1    -0.000379     0.001260     0.000265     0.050049     0.018848         0.05
+           2    -0.000176     0.000366     0.000132     0.018385     0.007378         0.06
+           3    -0.000021     0.000241     0.000074     0.005347     0.002230         0.06
+           4    -0.000003     0.000099     0.000034     0.000941     0.000391         0.05
+       Converged!
+
+Final summary:
+            	max(forces, internal): 0.000099 hartree/(bohr,rad)
+            	rms(forces, internal): 0.000034 hartree/(bohr,rad)
+        	max(forces,cartesian): 0.000213 hartree/bohr
+        	rms(forces,cartesian): 0.000080 hartree/bohr
+        	energy: -17.92483682 hartree
+       Wrote final, hopefully optimized, geometry to 'forward_end_final_geometry.xyz'
+
+Moved 'forward_end_final_geometry.xyz' to 'forward_end_opt.xyz'.
+
+                     +-----------------------------------+
+                     | RUNNING BACKWARD_END OPTIMIZATION |
+                     +-----------------------------------+
+
+     Input geometry: Geometry(C6_H10, 16 atoms)
+  Coordinate system: redund
+         Calculator: XTB calculator
+             Charge: 0
+       Multiplicity: 1
+          Optimizer: rfo
+
+
+If not specified otherwise, all quantities are given in au.
+
+Convergence thresholds, (overachieved when):
+	max(|force|) <= 0.000450, (0.000090) E_h a_0⁻¹ (rad⁻¹)
+	  rms(force) <= 0.000300, (0.000060) E_h a_0⁻¹ (rad⁻¹)
+	 max(|step|) <= 0.001800 a_0 (rad)
+	   rms(step) <= 0.001200 a_0 (rad)
+
+Spent 0.0 s preparing the first cycle.
+       cycle    Δ(energy) max(|force|)   rms(force)  max(|step|)    rms(step)      s/cycle
+           0          nan     0.001060     0.000328     0.148615     0.055753         0.05
+           1    -0.000929     0.001064     0.000310     0.150656     0.055697         0.05
+           2    -0.000721     0.000508     0.000199     0.163459     0.056176         0.05
+           3    -0.000548     0.000324     0.000129     0.226877     0.081478         0.05
+           4    -0.000546     0.000496     0.000133     0.190959     0.074949         0.05
+           5    -0.000314     0.000365     0.000120     0.160312     0.069687         0.06
+           6    -0.000182     0.000227     0.000094     0.146173     0.063279         0.05
+           7    -0.000099     0.000215     0.000065     0.129763     0.052717         0.06
+           8    -0.000043     0.000138     0.000036     0.115201     0.041240         0.05
+           9    -0.000014     0.000082     0.000024     0.059860     0.016902         0.05
+       Converged!
+
+Final summary:
+            	max(forces, internal): 0.000082 hartree/(bohr,rad)
+            	rms(forces, internal): 0.000024 hartree/(bohr,rad)
+        	max(forces,cartesian): 0.000114 hartree/bohr
+        	rms(forces,cartesian): 0.000043 hartree/bohr
+        	energy: -17.82301231 hartree
+       Wrote final, hopefully optimized, geometry to 'backward_end_final_geometry.xyz'
+
+Moved 'backward_end_final_geometry.xyz' to 'backward_end_opt.xyz'.
+
+
+                 #############################################
+                 # BARRIER HEIGHTS AFTER END OPTIMIZATION(S) #
+                 #############################################
+
+All tabulated quantities are given in au.
+
+           File            E_el
+           --------------------
+/Users...ry.xyz      -17.924837
+             TS      -17.812259
+/Users...ry.xyz      -17.823012
+
+                                  +----------+
+                                  | BARRIERS |
+                                  +----------+
+
+Temperature: 298.15 K
+Pressure: 101325.0 Pa
+
+Corrections:
+Change of standard-state: False, 0.0 kJ mol⁻¹
+                 Solvent: False
+         Thermochemistry: False
+
+Left geometry:
+	0: forward_end_final_geometry.xyz (Geometry(C6_H10), 16 atoms)
+TS geometry:
+	0:  (Geometry(C6_H10), 16 atoms)
+Right geometry:
+	0: backward_end_final_geometry.xyz (Geometry(C6_H10), 16 atoms)
+
+Minimum energy of 0.0 kJ mol⁻¹ at 'Left'.
+
+	  Left:     0.00 kJ mol⁻¹ (1 geometry)
+	    TS:   295.57 kJ mol⁻¹ (1 geometry)
+	 Right:   267.34 kJ mol⁻¹ (1 geometry)
+
+Wrote optimized end-geometries and TS to 'left_ts_right_geoms.trj'
+pysisyphus run took 0:00:08 h.

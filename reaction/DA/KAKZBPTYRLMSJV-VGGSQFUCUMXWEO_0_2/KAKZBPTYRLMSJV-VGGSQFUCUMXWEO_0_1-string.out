@@ -1,0 +1,109 @@
+                           d8b                            888
+                           Y8P                            888
+                                                          888
+88888b.  888  888 .d8888b  888 .d8888b  888  888 88888b.  88888b.  888  888 .d8888b
+888 "88b 888  888 88K      888 88K      888  888 888 "88b 888 "88b 888  888 88K
+888  888 888  888 "Y8888b. 888 "Y8888b. 888  888 888  888 888  888 888  888 "Y8888b.
+888 d88P Y88b 888      X88 888      X88 Y88b 888 888 d88P 888  888 Y88b 888      X88
+88888P"   "Y88888  88888P' 888  88888P'  "Y88888 88888P"  888  888  "Y88888  88888P'
+888           888                            888 888
+888      Y8b d88P                       Y8b d88P 888
+888       "Y88P"                         "Y88P"  888                            
+
+Version 0.7.6.post2 (Python 3.8.15, NumPy 1.24.3, SciPy 1.10.1)
+Executed at Thu Sep 12 02:12:19 2024 on 'hsu205sinch2019.lan'
+Platform: macOS-10.16-x86_64-i386-64bit
+Interpreter: /Users/hsu205/miniconda3/envs/yarp/bin/python
+Current working directory: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_2
+
+If pysisyphus benefitted your research please cite:
+
+	https://doi.org/10.1002/qua.26390
+
+Good luck!
+
+{'calc': {'charge': 0, 'mem': 4000, 'mult': 1, 'pal': 1, 'type': 'xtb'},
+ 'cos': {'climb': True,
+         'climb_lanczos': False,
+         'climb_rms': 0.005,
+         'fix_ends': True,
+         'max_nodes': 9,
+         'reparam_check': 'rms',
+         'reparam_every': 1,
+         'reparam_every_full': 1,
+         'type': 'gs'},
+ 'geom': {'coord_kwargs': {},
+          'fn': ['/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/R.xyz',
+                 '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/P.xyz'],
+          'type': 'cart'},
+ 'opt': {'align': True,
+         'dump': True,
+         'scale_step': 'global',
+         'stop_in_when_full': -1,
+         'type': 'string'}}
+
+Read 2 geometries.
+Path with 2 moving images.
+                           #########################
+                           # RUNNING GROWINGSTRING #
+                           #########################
+
+     Input geometry: ChainOfStates, 4 images, (C6_H10, 16 atoms) per image
+  Coordinate system: cart
+         Calculator: XTB calculator
+             Charge: 0
+       Multiplicity: 1
+          Optimizer: string
+
+
+If not specified otherwise, all quantities are given in au.
+
+Convergence thresholds:
+	max(|force|) <= 0.002500 E_h a_0⁻¹
+	  rms(force) <= 0.001700 E_h a_0⁻¹
+
+Spent 0.0 s preparing the first cycle.
+       cycle    Δ(energy) max(|force|)   rms(force)  max(|step|)    rms(step)      s/cycle
+           0          nan     0.042307     0.011545     0.042307     0.011545         0.21
+       	String=  2+2 HEI=02/04 (E_hei-E_0)=   7.1 kJ/mol norm(forces_true,hei)=0.079452 E_h/a_0
+           1          nan     0.024468     0.008546     0.024468     0.008546         0.18
+       	String=  3+3 HEI=03/06 (E_hei-E_0)=  14.3 kJ/mol norm(forces_true,hei)=0.053695 E_h/a_0
+           2          nan     0.025817     0.007372     0.025817     0.007372         0.26
+       	String=  4+4 HEI=04/08 (E_hei-E_0)=  34.4 kJ/mol norm(forces_true,hei)=0.065749 E_h/a_0
+           3          nan     0.021256     0.006028     0.021256     0.006028         0.36
+       	String=  5+5 HEI=05/10 (E_hei-E_0)=  55.6 kJ/mol norm(forces_true,hei)=0.059695 E_h/a_0
+           4          nan     0.015042     0.004845     0.015042     0.004845         0.39
+       	String= Full HEI=06/11 (E_hei-E_0)=  64.4 kJ/mol norm(forces_true,hei)=0.036260 E_h/a_0
+Starting to climb in next iteration.
+           5    -0.012369     0.012567     0.004238     0.083507     0.026355         0.39
+       	String= Full HEI=06/11 (E_hei-E_0)=  61.3 kJ/mol norm(forces_true,hei)=0.030443 E_h/a_0
+           6    -0.050331     0.010710     0.003618     0.028239     0.009275         0.80
+       	String= Full HEI=06/11 (E_hei-E_0)=  49.1 kJ/mol norm(forces_true,hei)=0.034289 E_h/a_0
+           7    -0.011408     0.011165     0.003380     0.034750     0.011841         0.39
+       	String= Full HEI=06/11 (E_hei-E_0)=  44.0 kJ/mol norm(forces_true,hei)=0.024232 E_h/a_0
+           8    -0.009939     0.011126     0.002864     0.030378     0.010571         0.40
+       	String= Full HEI=06/11 (E_hei-E_0)=  38.6 kJ/mol norm(forces_true,hei)=0.019557 E_h/a_0
+           9    -0.004836     0.011726     0.002568     0.028932     0.009614         0.41
+       	String= Full HEI=06/11 (E_hei-E_0)=  34.5 kJ/mol norm(forces_true,hei)=0.017005 E_h/a_0
+       -----------------------------------------------------------------------------------
+          10    -0.002702     0.010933     0.002260     0.030631     0.008780         0.52
+       	String= Full HEI=06/11 (E_hei-E_0)=  31.3 kJ/mol norm(forces_true,hei)=0.013964 E_h/a_0
+          11    -0.001280     0.008794     0.001956     0.030526     0.007900         0.42
+       	String= Full HEI=06/11 (E_hei-E_0)=  29.1 kJ/mol norm(forces_true,hei)=0.011790 E_h/a_0
+          12    -0.000682     0.007222     0.001626     0.027453     0.006858         0.41
+       	String= Full HEI=06/11 (E_hei-E_0)=  27.4 kJ/mol norm(forces_true,hei)=0.010051 E_h/a_0
+          13    -0.000093     0.006313     0.001322     0.021699     0.005657         0.41
+       	String= Full HEI=06/11 (E_hei-E_0)=  26.2 kJ/mol norm(forces_true,hei)=0.008585 E_h/a_0
+          14     0.000059     0.005037     0.001075     0.018899     0.004591         0.55
+       	String= Full HEI=06/11 (E_hei-E_0)=  25.4 kJ/mol norm(forces_true,hei)=0.007419 E_h/a_0
+          15     0.000041     0.003480     0.000881     0.015478     0.003734         0.40
+       	String= Full HEI=06/11 (E_hei-E_0)=  24.8 kJ/mol norm(forces_true,hei)=0.006496 E_h/a_0
+          16    -0.000290     0.002497     0.000727     0.011976     0.003082         0.40
+       	String= Full HEI=06/11 (E_hei-E_0)=  24.3 kJ/mol norm(forces_true,hei)=0.005755 E_h/a_0
+       Converged!
+
+       Wrote final, hopefully optimized, geometry to 'final_geometries.trj'
+Splined HEI is at 5.33/10.00, between image 5 and 6 (0-based indexing).
+Wrote splined HEI to 'splined_hei.xyz'
+
+pysisyphus run took 0:00:13 h.

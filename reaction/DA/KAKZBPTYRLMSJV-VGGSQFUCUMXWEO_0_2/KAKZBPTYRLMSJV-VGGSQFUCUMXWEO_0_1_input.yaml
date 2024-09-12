@@ -1,0 +1,23 @@
+geom:
+ type: cart
+ fn: ['/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/R.xyz', '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/P.xyz']
+calc:
+ type: xtb
+ pal: 1
+ mem: 4000
+ charge: 0
+ mult: 1
+cos:
+ type: gs
+ max_nodes: 9
+ climb: True
+ climb_rms: 0.005
+ climb_lanczos: False
+ reparam_check: rms
+ reparam_every: 1
+ reparam_every_full: 1
+opt:
+ type: string
+ stop_in_when_full: -1
+ align: True
+ scale_step: global

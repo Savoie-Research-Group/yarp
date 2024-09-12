@@ -62,7 +62,7 @@ class PYSIS:
         Default and available method for different jobs:
             preopt
             OPT: will be added in the near FUTURE 
-            COS: will be added in the near FUTURE 
+            COS: will be added in the near FUTURE
             TSOPT: rsirfo, rsprfo (default), trim
             IRC: euler, eulerpc (default), dampedvelocityverlet, gonzalezschlegel, lqa, imk, rk4
         Thresh: Convergence threshold, select from gau_loose, gau, gau_tight, gau_vtight
@@ -90,7 +90,7 @@ class PYSIS:
         elif self.jobtype.lower()=="string":
             if method is None: method='gs'
             with open(f'{self.pysis_input}', 'a') as f:
-                f.write(f'cos:\n type: {method}\n max_nodes: 9\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n prep_thresh: 0.05\n reparam_every: 1\n reparam_every_full: 1\n')
+                f.write(f'cos:\n type: {method}\n max_nodes: 9\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
                 f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
         else:

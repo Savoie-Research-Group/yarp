@@ -1,0 +1,15 @@
+geom:
+ type: cart
+ fn: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1-TSguess.xyz
+calc:
+ type: xtb
+ pal: 1
+ mem: 4000
+ charge: 0
+ mult: 1
+tsopt:
+ type: rsprfo
+ do_hess: True
+ hessian_recalc: 1
+ thresh: gau
+ max_cycles: 50

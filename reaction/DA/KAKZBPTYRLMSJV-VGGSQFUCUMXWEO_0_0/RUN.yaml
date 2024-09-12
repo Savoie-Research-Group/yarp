@@ -1,0 +1,46 @@
+assert: null
+barrier: null
+calc:
+  charge: 0
+  mem: 4000
+  mult: 1
+  pal: 1
+  type: xtb
+cos: null
+endopt:
+  T: 298.15
+  do_hess: false
+  dump: true
+  fragments: false
+  geom:
+    coord_kwargs: {}
+    type: redund
+  max_cycles: 300
+  overachieve_factor: 5
+  p: 101325
+  thresh: gau
+  type: rfo
+geom:
+  coord_kwargs: {}
+  fn: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0-TS.xyz
+  type: cart
+glob: null
+interpol: null
+irc:
+  backward: true
+  downhill: false
+  forward: true
+  hessian_init: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/ts_final_hessian.h5
+  rms_grad_thresh: 0.001
+  type: eulerpc
+md: null
+mdp: null
+opt: null
+perf: null
+precontr: null
+preopt: null
+scan: null
+shake: null
+stocastic: null
+tsopt: null
+version: 0.7.6.post2

@@ -1,0 +1,39 @@
+assert: null
+barrier: null
+calc:
+  charge: 0
+  mem: 4000
+  mult: 1
+  pal: 1
+  type: xtb
+cos: null
+endopt: null
+geom:
+  coord_kwargs: {}
+  fn: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1-TSguess.xyz
+  type: cart
+glob: null
+interpol: null
+irc: null
+md: null
+mdp: null
+opt: null
+perf: null
+precontr: null
+preopt: null
+scan: null
+shake: null
+stocastic: null
+tsopt:
+  T: 298.15
+  do_hess: true
+  dump: true
+  h5_group_name: tsopt
+  hessian_recalc: 1
+  max_cycles: 50
+  overachieve_factor: 5
+  p: 101325
+  prefix: ts
+  thresh: gau
+  type: rsprfo
+version: 0.7.6.post2

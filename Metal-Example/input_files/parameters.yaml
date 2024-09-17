@@ -1,63 +1,70 @@
 # Note that a bimolecular reaction is recommended to use .xyz or .mol file
 # Enumetation part
 input: reaction_xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
-scratch: /scratch/negishi/li1724/Test-CentralizedCode-4-5 # The output folder with reaction geometry for constructing reaction network.
-reaction_data: li_battery.p   # a pickle to store and load the result
+scratch: /scratch/negishi/li1724/TRY-SSM/SSM/Co-3-CO/YARP/
+reaction_data: li_battery.p
 n_break: 2 # Indicate the number of breaking bonds
-form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
+form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0)
 lewis_criteria: 5.0 # the criteria to find the products
-ff:            uff        # force field for driving the reaction coordinate           
-crest: crest   # the command for CREST. (usually it would be crest)
-lot: gfn2      # the level of theory in xTB.
-crest_quick: True # if true, the crest with quick mode will be performed.
-constraint:    True # distance constraints on molecules (xtb/crest)
-dist_constraint: 38, 43, 2.0, 32, 43, 2.75, 37, 43, 2.75, 43, 1, 3.5, 43, 22, 3.5 #atom indices (start from 1) for Cu and atoms on the substrate
-apply_constraint: reactant   # can be reactant/product,or both
+ff:            uff        # force field for driving the reaction coordinate
+crest: crest
+lot: gfn2
+crest_quick: True
+constraint:    True
+reactant_dist_constraint: 1, 74, 4.0, 1, 75, 4.0, 62, 74, 3.0, 62, 75, 3.0  # start from 1, rotated CO
+product_dist_constraint:  1, 26, 1.9 # start from 1
 
 xtb: xtb
 method: crest # rdkit or crest, rdkit is using classical force field for processing the geometry (and optimization)
 enumeration: False # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
-n_conf: 3  # conformers considered for further calculations.
-nconf_dft: 3 # n conformers for DFT calculations
-strategy: 2 # 0 = reactant, 1 = product, 2 = both
+n_conf: 6
+nconf_dft: 3
+strategy: 2
 xtb_nprocs: 128  # Number of cores used by main_xtb.py
 crest_nprocs: 64 # Number of cores used by crest in main_xtb.py and main_dft.py
-mem: 7.2 # in GB
+mem: 1.8 # in GB
 crest: crest
-opt_level: vtight # define the convergence for xTB.
-crest_quick: True  # if true, the crest with quick mode will be performed.
-low_solvation: False # define the solvation models in xTB.
-solvent: False # define the solvent.
-opt: False 
-pysis_wt: 3600
+opt_level: vtight
+crest_quick: True
+low_solvation: False
+solvent: False
+opt: True 
+pysis_wt: 86400
 pysis_path: /home/li1724/.conda/envs/2022.10-py39/Clone_Depot_YARP/bin/
 select: loose
-charge: -1    # charge of your system.
-multiplicity: 1  # multiplicity for your system.
+charge: -1
+multiplicity: 1
 skip_GSM_sanity_check: True
 skip_low_IRC: True
 skip_low_TS: True
-constrained_TS: True # COPT for DFT, happens before TSOPT #
+exit_after_xtbGSM: True
+reactant_chiral_center: None
+product_chiral_center:  None
+constrained_TS: False # COPT for DFT #
 model_path:   /scratch/negishi/li1724/Classy-YARP-Codes/bin
-gsm_inp:      /scratch/negishi/li1724/Classy-YARP-Codes/bin/inpfileq
+gsm_inp:      /scratch/negishi/li1724/Classy-YARP-Codes/bin/ssm_inpfileq
+#gsm_inp:      /scratch/negishi/li1724/Classy-YARP-Codes/bin/inpfileq
+model_threshold: 0.05
 crest_path: /depot/bsavoie/apps/anaconda3/envs/yarp/bin/
 
-package: ORCA
+package: Gaussian
 email: True # use email notification or not
-email_address: li1724@purdue.edu
-dft_nprocs: 32  # Number of cores used by ORCA
-dft_lot: B97-3c def2-SVP
-dft_wt: 4      # dft wall time 
-dft_ppn: 64    # the number of ppn used in the submission (SLURM File)
-partition: standby # the queue for dft job submission, at Purdue, standby = 4hr max walltime, YARP can restart DFT jobs when they are killed by time limit. 
+email_address: zhaoli2023@u.northwestern.edu 
+dft_nprocs: 128  # Number of cores used by ORCA
+dft_lot: B3LYP def2SVP
+dft_wt: 4
+dft_ppn: 128    # the number of ppn used in the submission (SLURM File)
+partition: standby
 dft_njobs: 1
-hess_recalc: 3 # recalculate hessian every N steps
-dft_mix_basis: True # Whether to use mix basis set approach to accelerate (also reduce memory requirement) for DFT calculations
-dft_mix_lot: Cu, def2-TZVP, H, STO-3G    # level of theory for special atoms/elements for mix basis set
-dft_mix_firstlayer: True    # add mix basis set for 1st layer of metal
-dft_mix_firstlayer_lot: def2-TZVP # basis for the 1st layer atoms
-dft_fulltz_level_correction: True # whether to recalculate single point energy with TZ for all atoms after the OPT/TSOPT calculation using a mix (less expensive) basis set
-dft_irc: True  # whether to do irc calculation after TSOPT calculation
-backward_DE: True # Whether to calculate DFT barrier from the product side
+hess_recalc: 6
+dft_mix_basis: True
+dft_mix_lot: Co, def2TZVP, H, STO3G    # level of theory for special atoms/elements
+dft_mix_firstlayer: True    # add mix lot for 1st layer of metal
+dft_mix_firstlayer_lot: def2TZVP # basis for the 1st layer atoms
+dft_fulltz_level_correction: False # whether to recalculate single point energy after the OPT/TSOPT calculation using a less expensive basis set
+dft_TS_Active_Atoms: False   # Flag for checking atoms that changed adj_mat, and focus TSOPT on these atoms
+dft_irc: True
+backward_DE: True
 dielectric: 0
-solvation: CPCM/DMSO
+solvation: CPCM/n,n-DiMethylFormamide
+dispersion: False

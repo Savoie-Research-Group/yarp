@@ -129,7 +129,6 @@ def main(args:dict):
         idx=inchi_dict[inchi]
         i.id=idx
         inchi_dict[inchi]=idx+1
-    
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
@@ -543,6 +542,7 @@ def select_rxn_conf(rxns, logging_queue):
     if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
     else:
+        
         thread=min(nprocs, len(rxns))
         chunk_size=len(rxns)//thread
         remainder=len(rxns)%thread
@@ -553,8 +553,10 @@ def select_rxn_conf(rxns, logging_queue):
             endidx=startidx+chunk_size+(1 if i < remainder else 0)
             chunks.append(input_data_list[startidx:endidx])
             startidx=endidx
-        modified_rxns=Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
-        rxns=modified_rxns
+        Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
+        #rxns=modified_rxns
+        
+        #for i in rxns: i.rxn_conf_generate(logging_queue)
         print(f"Finish generating reaction conformations, the output conformations are stored in {conf_output}\n")
     return rxns
 
@@ -620,15 +622,17 @@ def run_enumeration(input_mol, args=dict()):
     name=input_mol.split('/')[-1].split('.')[0]
     # break bonds
     break_mol=list(yp.break_bonds(mol, n=nb))
-    #print(len(break_mol))
-    # form bonds
+    
     if form_all: products=yp.form_bonds_all(break_mol)
     else: products=yp.form_n_bonds(break_mol, n=nb)
-    # Finish generate products
-    # print(len(products))
-    # print(products[0].bond_mats)
-    # for i in products: print(i.bond_mat_scores[0])
-    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<=2.0] 
+
+    products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<2.0] 
+    product=[]
+    for _ in products:
+        if _.rings!=[]:
+           if len(_.rings[0])>4: product.append(_)
+        else: product.append(_)
+    products=product
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
     for count_i, i in enumerate(products):

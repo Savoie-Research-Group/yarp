@@ -1,0 +1,36 @@
+name: Python application test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'  # Specify the Python version
+
+    - name: Install dependencies
+      run: |
+        #python -m pip install --upgrade pip
+        if [ -f pytest_requirements.txt ]; then 
+          pip install -r pytest_requirements.txt; 
+        fi
+        pip install numpy
+        pip install rdkit
+        pip install scipy
+        pip install .
+
+        #if [ -f env.yaml ]; then 
+        #  #conda install --file env.yaml
+        #  conda env create -f env.yaml
+        #fi
+
+    - name: Run pytest
+      run: |
+              #conda activate yarp
+               cd examples/; pytest -s # Assuming your tests are in the 'tests' directory

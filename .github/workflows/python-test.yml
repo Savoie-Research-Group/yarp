@@ -17,13 +17,43 @@ jobs:
     - name: Install dependencies
       run: |
         #python -m pip install --upgrade pip
+        #conda create --name ENV python=3.9
+        #conda init
+        #conda activate ENV
+        #cd /opt/hostedtoolcache/Python/3.9.20/x64/bin/; ls
         if [ -f pytest_requirements.txt ]; then 
           pip install -r pytest_requirements.txt; 
         fi
-        pip install numpy
+        #pip install pytest-executable
+        #pip install pipdeptree
+        #pip install dask
+        export CONDA_ALWAYS_YES="true"
+        pip install 'numpy==1.24.0'
         pip install rdkit
         pip install scipy
+        pip install xtb
+        pip install joblib
+        pip install PyYAML
+        pip install openbabel-wheel
+        pip install pandas
+        pip install ase
+        #pip install xtb
+        conda install -y conda-forge::xtb
+        pip install xgboost
+        pip install h5py
+        pip install pysisyphus
+        conda install -y conda-forge::crest
+        unset CONDA_ALWAYS_YES
         pip install .
+
+        # CHECK
+        pip freeze
+
+        # Prepare pysis env
+        cp .pysisyphusrc /home/runner/.pysisyphusrc
+        cond=asd
+        sed -i "s|CONDA_ENV|${CONDA}|g" /home/runner/.pysisyphusrc
+        #which crest
 
         #if [ -f env.yaml ]; then 
         #  #conda install --file env.yaml
@@ -33,4 +63,22 @@ jobs:
     - name: Run pytest
       run: |
               #conda activate yarp
-               cd examples/; pytest -s # Assuming your tests are in the 'tests' directory
+              #cd examples/; pytest -s # Assuming your tests are in the 'tests' directory
+               home=$(pwd)
+               cd /opt/hostedtoolcache/Python/3.9.20/x64/bin/
+               ls
+               echo $CONDA
+               cd $CONDA/bin
+               ls
+               which pip;    echo "GOOD1"
+               echo $(pwd)
+               $CONDA/bin/xtb --version
+               $CONDA/bin/crest --version
+               pysis --version
+               #obabel --version
+               cd $home/pyTEST_Example/;
+               # xtb and crest are in conda bin, others in pip bin
+               sed -i "s|CONDA_PATH|${CONDA}|g" test_rxn.py
+               pytest -s
+
+      shell: bash

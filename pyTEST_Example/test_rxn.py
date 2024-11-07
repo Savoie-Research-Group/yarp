@@ -75,9 +75,9 @@ def rxn_setYAML(current_path, model_path, gsm_path, conda_path):
 
 def rxn_xtb():
     subprocess.call("python main_xtb.py parameters.yaml", shell=True)
-    subprocess.call("cat IRC-record.txt", shell=True)
+    subprocess.call("cat RESULT/IRC-record.txt", shell=True)
 
-    df = pd.read_csv('IRC-record.txt', delim_whitespace=True)
+    df = pd.read_csv('RESULT/IRC-record.txt', delim_whitespace=True)
     # Check for 'intended' entry in 'type' column and if the barrier equals 6.747
     intended_row = df[df['type'] == 'intended']
     # Print result if intended row exists and barrier check

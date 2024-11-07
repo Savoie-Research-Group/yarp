@@ -5,30 +5,6 @@ import pandas as pd
 import numpy as np
 #import yarp as yp
 #from calculator import add
-'''
-import yarp as yp
-import numpy as np
-import threading
-import pickle
-import multiprocessing as mp
-from multiprocessing import Queue
-from logging.handlers import QueueHandler
-from joblib import Parallel, delayed
-from yarp.find_lewis import all_zeros
-from yarp.find_lewis import bmat_unique
-import os, sys, yaml, fnmatch
-import logging
-from openbabel import pybel
-from utils import *
-from wrappers.reaction import *
-from job_mapping import *
-from wrappers.crest import CREST
-from qc_jobs import *
-from conf import *
-from analyze_functions import *
-from wrappers.pysis import PYSIS
-from wrappers.gsm import GSM
-'''
 def truthy(value):
     return bool(value)
 def falsy(value):
@@ -89,6 +65,8 @@ def rxn_xtb():
 
 def test_file():
     current_directory = os.getcwd() + '/'
+    subprocess.call(f"cd {current_directory}/pyTEST_Example/")
+
     CONDA="CONDA_PATH" # will be replaced by a real path when running the github workflow #
     if CONDA=="CONDA_" + "PATH":
         # use "which crest" to find the path #
@@ -96,13 +74,17 @@ def test_file():
         CONDA = STR.split("/bin/crest")[0]
 
     rxn_setYAML(current_path = current_directory, 
-            model_path = f"{current_directory}/bin",
-            gsm_path   = f"{current_directory}/bin/inpfileq",
+            model_path = f"{current_directory}/pyTEST_Example/bin",
+            gsm_path   = f"{current_directory}/pyTEST_Example/bin/inpfileq",
             conda_path = f"{CONDA}/bin")
 
+    # run YARP-xtb for DA example #
     barrier = rxn_xtb()
     assert(np.abs(barrier - 6.747132) < 0.01)
-    '''
+    print(f"YARP-xtb CHECK FINISHED\n")
+
+    # run Organometallics YARP for Fe(CO)5 #
+    subprocess.call(f"cd {current_directory}/examples/")
     assert  os.path.exists('FeCO5.xyz')
     assert  check_metal("FeCO5.xyz")
     print("Organometallics CHECK FINISHED\n")
@@ -113,5 +95,5 @@ def test_file():
     form_bond(a, hashes, 2)
     break_bond(a, hashes, 2)
     assert len(hashes) == 29
-    '''
+    
 

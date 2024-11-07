@@ -60,11 +60,11 @@ jobs:
                $CONDA/bin/crest --version
                pysis --version
                #obabel --version
-               cd $home/pyTEST_Example/;
+               #cd $home/pyTEST_Example/;
                # xtb and crest are in conda bin, others in pip bin
                sed -i "s|CONDA_PATH|${CONDA}|g" test_rxn.py
                pytest -s
                echo $(pwd); ls
-               cd RESULT/; echo $(pwd); ls
+               cd $home/pyTEST_Example/RESULT/; echo $(pwd); ls
                cat IRC*
       shell: bash

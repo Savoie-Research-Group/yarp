@@ -130,7 +130,6 @@ def main(args:dict):
         i.id=idx
         inchi_dict[inchi]=idx+1
 
-    #exit()
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
@@ -141,7 +140,6 @@ def main(args:dict):
         rxns=conf_by_crest(rxns, logging_queue, logger)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
-    exit()
     print("-----------------------")
     print("-------Third Step------")
     print("Conformation Generation")
@@ -454,11 +452,13 @@ def run_gsm_by_pysis(rxns, logging_queue):
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/R.xyz", i.reactant.elements, i.rxn_conf[j]["R"])
             xyz_write(f"{wf}/P.xyz", i.reactant.elements, i.rxn_conf[j]["P"])
+
     gsm_thread=min(nprocs, len(rxn_folder))
     gsm_jobs={}
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_folder):
         inp_xyz = [f"{rxn}/R.xyz", f"{rxn}/P.xyz"]
+        wf=rxn_folder[count]
         if not args["solvent"]:
             gsm_job = PYSIS(inp_xyz, work_folder=wf, jobname=rxn.split('/')[-1], jobtype="string", coord_type="cart", nproc=nprocs, charge=args["charge"], multiplicity=args["multiplicity"])       
         else:
@@ -502,6 +502,10 @@ def run_gsm_by_xtb(rxns, logging_queue):
         key=[j for j in i.rxn_conf.keys()]
         for j in key:
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
+            if(os.path.isfile(f"{name}")):
+                elements, geo= xyz_parse(f"{name}", multiple=True)
+                i.rxn_conf[j]["R"] = geo[0]
+                i.rxn_conf[j]["P"] = geo[1]
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
@@ -540,12 +544,40 @@ def run_gsm_by_xtb(rxns, logging_queue):
                     rxns[count_i].TS_guess[conf_i]=TSG
     return rxns
 
+def count_xyz_files_with_string(search_string, directory='.'):
+    # Get list of all files in the specified directory
+    files = os.listdir(directory)
+    
+    # Filter files that contain the search string and have the .xyz extension
+    matching_files = [file for file in files if search_string in file and file.endswith('.xyz')]
+    
+    # Return the count of matching files
+    return len(matching_files)
+
 def select_rxn_conf(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["nprocs"]
     if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
+        # read confs #
+        for rxni, i in enumerate(rxns):
+            #key=[j for j in i.rxn_conf.keys()]
+            rxns[rxni].rxn_conf = dict()
+            rxn_conf_name = f"{i.reactant_inchi}_{i.id}_"
+            Number_confs  = count_xyz_files_with_string(rxn_conf_name, conf_output)
+            for j in range(0,Number_confs):
+                print(f"number of confs: {Number_confs}, j: {j}\n")
+                rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
+                name=f"{conf_output}/{rxn_ind}.xyz"
+                if(os.path.isfile(f"{name}")):
+                    elements, geo= xyz_parse(f"{name}", multiple=True)
+                    rg = geo[0]
+                    pg = geo[1]
+                    rxns[rxni].rxn_conf[j]={"R": rg, "P": pg}
+                    print(f"rxns[rxni].rxn_conf[j]: {rxns[rxni].rxn_conf[j]}\n")
+            key=[j for j in rxns[rxni].rxn_conf.keys()]
+            print(f"rxn: {rxni}, rxn_name: {rxn_conf_name}, key: {key}\n")
     else:
         
         thread=min(nprocs, len(rxns))

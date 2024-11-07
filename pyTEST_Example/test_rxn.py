@@ -65,7 +65,7 @@ def rxn_xtb():
 
 def test_file():
     current_directory = os.getcwd() + '/'
-    subprocess.call(f"cd {current_directory}/pyTEST_Example/")
+    #subprocess.call(f"cd {current_directory}/pyTEST_Example/", shell=True)
 
     CONDA="CONDA_PATH" # will be replaced by a real path when running the github workflow #
     if CONDA=="CONDA_" + "PATH":
@@ -74,8 +74,8 @@ def test_file():
         CONDA = STR.split("/bin/crest")[0]
 
     rxn_setYAML(current_path = current_directory, 
-            model_path = f"{current_directory}/pyTEST_Example/bin",
-            gsm_path   = f"{current_directory}/pyTEST_Example/bin/inpfileq",
+            model_path = f"{current_directory}/bin",
+            gsm_path   = f"{current_directory}/bin/inpfileq",
             conda_path = f"{CONDA}/bin")
 
     # run YARP-xtb for DA example #
@@ -83,8 +83,9 @@ def test_file():
     assert(np.abs(barrier - 6.747132) < 0.01)
     print(f"YARP-xtb CHECK FINISHED\n")
 
+    '''
     # run Organometallics YARP for Fe(CO)5 #
-    subprocess.call(f"cd {current_directory}/examples/")
+    subprocess.call(f"cd {current_directory}/examples/", shell=True)
     assert  os.path.exists('FeCO5.xyz')
     assert  check_metal("FeCO5.xyz")
     print("Organometallics CHECK FINISHED\n")
@@ -95,5 +96,5 @@ def test_file():
     form_bond(a, hashes, 2)
     break_bond(a, hashes, 2)
     assert len(hashes) == 29
-    
+    '''
 

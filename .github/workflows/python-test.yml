@@ -53,19 +53,20 @@ jobs:
                ls
                echo $CONDA
                cd $CONDA/bin
-               ls
-               which pip;    echo "GOOD1"
-               echo $(pwd)
-               $CONDA/bin/xtb --version
-               $CONDA/bin/crest --version
-               pysis --version
+               
+               #ls
+               #echo $(pwd)
+               #$CONDA/bin/xtb --version
+               #$CONDA/bin/crest --version
+               #pysis --version
+               # test Organometallics
                #obabel --version
-               #cd $home/pyTEST_Example/;
-               cd $home/
+               #
+               # run Organometallic YARP Example #
+               cd $home/examples/
+               pytest -s
+               cd $home/pyTEST_Example/
                # xtb and crest are in conda bin, others in pip bin
                sed -i "s|CONDA_PATH|${CONDA}|g" test_rxn.py
                pytest -s
-               echo $(pwd); ls
-               cd $home/pyTEST_Example/RESULT/; echo $(pwd); ls
-               cat IRC*
       shell: bash

@@ -16,34 +16,26 @@ jobs:
 
     - name: Install dependencies
       run: |
-        #python -m pip install --upgrade pip
-        #conda create --name ENV python=3.9
-        #conda init
-        #conda activate ENV
-        #cd /opt/hostedtoolcache/Python/3.9.20/x64/bin/; ls
         if [ -f pytest_requirements.txt ]; then 
           pip install -r pytest_requirements.txt; 
         fi
-        #pip install pytest-executable
-        #pip install pipdeptree
-        #pip install dask
         export CONDA_ALWAYS_YES="true"
-        pip install 'numpy==1.24.0'
-        pip install rdkit
-        pip install scipy
+        pip install 'rdkit==2024.3.5'
+        pip install 'scipy==1.11.1'
         pip install xtb
-        pip install joblib
-        pip install PyYAML
+        pip install 'joblib==1.3.1'
+        pip install 'PyYAML==6.0.1'
         pip install openbabel-wheel
-        pip install pandas
-        pip install ase
-        #pip install xtb
+        pip install 'pandas==2.0.3'
+        pip install 'ase==3.22.1'
         conda install -y conda-forge::xtb
-        pip install xgboost
-        pip install h5py
+        pip install 'xgboost==1.7.6'
+        pip install 'h5py==3.9.0'
         pip install pysisyphus
         conda install -y conda-forge::crest
         unset CONDA_ALWAYS_YES
+        pip install --force-reinstall 'scikit-learn==1.3.0'
+        pip install --force-reinstall 'numpy==1.24.4'
         pip install .
 
         # CHECK
@@ -53,17 +45,9 @@ jobs:
         cp .pysisyphusrc /home/runner/.pysisyphusrc
         cond=asd
         sed -i "s|CONDA_ENV|${CONDA}|g" /home/runner/.pysisyphusrc
-        #which crest
-
-        #if [ -f env.yaml ]; then 
-        #  #conda install --file env.yaml
-        #  conda env create -f env.yaml
-        #fi
 
     - name: Run pytest
       run: |
-              #conda activate yarp
-              #cd examples/; pytest -s # Assuming your tests are in the 'tests' directory
                home=$(pwd)
                cd /opt/hostedtoolcache/Python/3.9.20/x64/bin/
                ls
@@ -80,5 +64,7 @@ jobs:
                # xtb and crest are in conda bin, others in pip bin
                sed -i "s|CONDA_PATH|${CONDA}|g" test_rxn.py
                pytest -s
-
+               echo $(pwd); ls
+               cd RESULT/; echo $(pwd); ls
+               cat IRC*
       shell: bash

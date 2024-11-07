@@ -73,25 +73,33 @@ def rxn_setYAML(current_path, model_path, gsm_path, conda_path):
     with open('parameters.yaml', 'w') as file: file.write(filedata)
 
 def rxn_xtb():
-    #subprocess.call("crest ", shell=True)
-    #subprocess.call("pysis ", shell=True)
-    #subprocess.call("xtb "  , shell=True)
-
     subprocess.call("python main_xtb.py parameters.yaml", shell=True)
-    #exec(open("main_xtb.py").read()) 
+    subprocess.call("cat IRC-record.txt", shell=True)
 
+    df = pd.read_csv('IRC-record.txt', delim_whitespace=True)
+    # Check for 'intended' entry in 'type' column and if the barrier equals 6.747
+    intended_row = df[df['type'] == 'intended']
+    # Print result if intended row exists and barrier check
+    barrier = 1000
+    if not intended_row.empty and np.abs(float(intended_row['barrier'].values[0]):
+        barrier = np.abs(float(intended_row['barrier'].values[0])
+    return barrier
 
 def test_file():
     current_directory = os.getcwd() + '/'
-    CONDA="CONDA_PATH"
+    CONDA="CONDA_PATH" # will be replaced by a real path when running the github workflow #
+    if CONDA=="CONDA_" + "PATH":
+        # use "which crest" to find the path #
+        STR = os.popen('which crest').read().rstrip()
+        CONDA = STR.split("/bin/crest")[0]
+
     rxn_setYAML(current_path = current_directory, 
             model_path = f"{current_directory}/bin",
             gsm_path   = f"{current_directory}/bin/inpfileq",
             conda_path = f"{CONDA}/bin")
 
-    rxn_xtb()
-    with open('parameters.yaml', 'rb') as f: conf = yaml.safe_load(f.read())
-    #RUN(conf)
+    barrier = rxn_xtb()
+    assert(np.abs(barrier - 6.747132) < 0.01)
     '''
     assert  os.path.exists('FeCO5.xyz')
     assert  check_metal("FeCO5.xyz")

@@ -1,6 +1,7 @@
 import pytest, os, re, yaml
 import shutil
 import subprocess
+import pandas
 #import yarp as yp
 #from calculator import add
 '''
@@ -81,8 +82,8 @@ def rxn_xtb():
     intended_row = df[df['type'] == 'intended']
     # Print result if intended row exists and barrier check
     barrier = 1000
-    if not intended_row.empty and float(intended_row['barrier'].values[0]):
-        barrier = float(intended_row['barrier'].values[0]
+    if not intended_row.empty:
+        barrier = float(intended_row['barrier'].values[0])
     return barrier
 
 def test_file():

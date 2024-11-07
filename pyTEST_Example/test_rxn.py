@@ -1,7 +1,7 @@
 import pytest, os, re, yaml
 import shutil
 import subprocess
-import pandas
+import pandas as pd
 #import yarp as yp
 #from calculator import add
 '''

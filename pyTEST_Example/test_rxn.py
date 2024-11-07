@@ -81,8 +81,8 @@ def rxn_xtb():
     intended_row = df[df['type'] == 'intended']
     # Print result if intended row exists and barrier check
     barrier = 1000
-    if not intended_row.empty and np.abs(float(intended_row['barrier'].values[0]):
-        barrier = np.abs(float(intended_row['barrier'].values[0])
+    if not intended_row.empty and float(intended_row['barrier'].values[0]):
+        barrier = float(intended_row['barrier'].values[0]
     return barrier
 
 def test_file():

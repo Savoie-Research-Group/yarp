@@ -9,7 +9,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class GSM:
-    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb'):
+    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb', SSM = False, bond_change = []):
         """
         Initialize a GSM job class
         input_geo: a xyz file containing the input geometry of reactant and product
@@ -36,6 +36,8 @@ class GSM:
         self.charge       = int(charge)
         self.multiplicity = int(multiplicity)
         self.lot=lot[-1]
+        self.SSM=SSM
+        self.bond_change  = bond_change
         if solvent:
             if solvation_model.lower() == 'alpb': self.solvation = f'--alpb {solvent}'
             else: self.solvation = f'--gbsa {solvent}' # use GBSA implicit solvent
@@ -73,7 +75,18 @@ class GSM:
             
         # copy input geometry to scratch
         os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial{self.jobid:04d}.xyz')
-        
+        #os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial0001.xyz')
+       
+        if(self.SSM == True):
+            with open(f'{self.work_folder}/ISOMERS{self.jobid:04d}','a') as f:
+            #with open(f'{self.work_folder}/ISOMERS0001','a') as f:
+                f.write("NEW\n")
+                for bonds in self.bond_change:
+                    if(bonds[2] == "ADD"):
+                        f.write(f"ADD   {bonds[0]+1} {bonds[1]+1}\n")
+                    elif(bonds[2] == "BREAK"):
+                        f.write(f"BREAK {bonds[0]+1} {bonds[1]+1}\n")
+
         # prepare necessary files
         if self.method.lower() == 'xtb':
             self.write_ograd()
@@ -85,6 +98,8 @@ class GSM:
             self.write_ograd()
             os.system(f'cp {self.source_path}/bin/gsm.orca {self.work_folder}')
             os.system(f'cp {self.input_file} {self.work_folder}')
+            #os.system(f'cp {self.input_file} {self.work_folder}/inpfileq')
+            #os.system(f'cp {self.source_path}/scripts/tm2orca.py {self.work_folder}/scratch')
             print(f"Finish preparing working environment for GSM-Orca job {self.jobname}")
         elif self.method.lower() == 'qchem':
             self.write_ograd()
@@ -133,10 +148,36 @@ class GSM:
 
         # set termination indicator
         for line in reversed(lines):
-            if 'about to write tsq.xyz' in line or 'exiting' in line or 'creating final string file' in line:
+            #Zhao's note: here the if statement differs from Qiyuan's version
+            #for my case, there was "exiting" in the output file, but no tsq xyz file written
+            #for now(022724), revert it back to Qiyuan's version###
+            if 'about to write tsq.xyz' in line: #or 'exiting' in line or 'creating final string file' in line:
                 return True
 
         return False
+
+    def output_file_exist(self) -> bool:
+        """
+        Check if the output exist
+        """
+        if os.path.isfile(self.output) is True: return True
+        return False
+
+    def calculation_terminated_without_error(self) -> bool:
+        """
+        Check if the calculation terminate with error returned
+        True: has no error, ready to proceed
+        False: has error
+        """
+        if os.path.isfile(self.output) is False: return False
+        # load gsm output file
+        lines = open(self.output, 'r', encoding="utf-8").readlines()
+        # set termination indicator
+        for line in reversed(lines):
+            if 'ERROR' in line and 'exiting' in line:
+                return False
+
+        return True
 
     def find_correct_TS(self) -> bool:
         """
@@ -146,13 +187,17 @@ class GSM:
         lines = open(self.output, 'r', encoding="utf-8").readlines()
         energies = []
         for line in reversed(lines):
-            if 'string E (kcal/mol)' in line:
+            if 'string E (kcal/mol)' in line:# and 'kcal' in line:
                 energies = [float(i) for i in line.split()[3:]]
+                print(f"string E (kcal/mol) line: {line}\n", flush = True)
+                print("Found string E (kcal/mol)\n", flush = True)
                 break
-            if 'V_profile:' in line:
-                energies = [float(i) for i in line.split()[1:]]
-                break
-        
+            #if 'V_profile:' in line:
+            #    energies = [float(i) for i in line.split()[1:]]
+            #    print(f"V_profile line: {line}\n", flush = True)
+            #    print("Found V_profile!\n", flush = True)
+            #    break
+        print(f"energies: {energies}\n", flush = True)
         if len(energies) == 0: return False
         
         # check energies
@@ -207,9 +252,17 @@ class GSM:
         Get the ts geometry (and elements) from a gsm output file
         """
         if not self.calculation_terminated_normally(): return False, []
-        if not self.find_correct_TS(): return False, []
+        #Zhao's note: redundant check, cancel
+        #if not self.find_correct_TS(): return False, []
         if not self.get_strings(): return False, []
         images = self.get_strings()
-        ts_ind = self.find_correct_TS()
-        ts = images[ts_ind]
-        return ts[0], ts[1]
+        #ts_ind = self.find_correct_TS()
+        #ts = images[ts_ind]
+        #print(f"image: {ts_ind}, ts: {ts[0]}, {ts[1]}\n", flush = True)
+        #Zhao's note: use the Qiyuan's version of the wrapper
+        ts_xyz = f'{self.work_folder}/scratch/tsq{self.jobid:04d}.xyz'
+        if os.path.exists(ts_xyz):
+            E,G = xyz_parse(ts_xyz)
+            return E, G
+        else: 
+            return False, []

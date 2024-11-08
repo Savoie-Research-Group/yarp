@@ -31,10 +31,11 @@ class reaction:
 
     product: yarpecule class for product
 
-    opt: perform initial geometry optimization on product side. (default: False)
+    opt_P: perform initial geometry optimization on product  side. (default: False)
+    opt_R: perform initial geometry optimization on reactant side. (default: False)
     
     """
-    def __init__(self, reactant, product, args=dict(), opt=True):
+    def __init__(self, reactant, product, args=dict(), opt_R=False, opt_P=True):
         
         self.reactant=reactant
         self.product=product
@@ -53,7 +54,8 @@ class reaction:
             if i != product.elements[count_i]:
                 print("Fatal error: reactant and product are not same. Please check the input.....")
                 exit()
-        if opt: self.product=geometry_opt(self.product)
+        if opt_R: self.reactant=geometry_opt(self.reactant)
+        if opt_P: self.product=geometry_opt(self.product)
         self.reactant_xtb_opt=dict()
         self.product_xtb_opt=dict()
         self.reactant_dft_opt=dict()
@@ -74,7 +76,12 @@ class reaction:
         self.IRC_xtb=dict()
         self.IRC_dft=dict()
         self.constrained_TS=dict()
+        #Zhao's note: switch between xtb or rdkit force field
+        self.use_xtb = False
+        #self.use_xtb = True
+
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
+
         self.hash=f"{reactant.hash}-{product.hash}"
     def conf_rdkit(self):
         if self.args["strategy"]==0 or self.args["strategy"]==2:
@@ -92,13 +99,13 @@ class reaction:
                 for count_i, i in enumerate(ids):
                     geo=mol.GetConformer(i).GetPositions()
                     # check table
-                    adj_mat=table_generator(self.reactant.elements, geo, verbose=False)
+                    adj_mat=table_generator(self.reactant.elements, geo)
                     adj_diff=np.abs(adj_mat-self.reactant.adj_mat)
-                    if adj_diff.sum()==0:
-                        self.reactant_conf[count_i]=geo
-                        out.write('{}\n\n'.format(len(self.reactant.elements)))
-                        for count, e in enumerate(self.reactant.elements):
-                            out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
+                    #if adj_diff.sum()==0:
+                    self.reactant_conf[count_i]=geo
+                    out.write('{}\n\n'.format(len(self.reactant.elements)))
+                    for count, e in enumerate(self.reactant.elements):
+                        out.write('{} {} {} {}\n'.format(e.capitalize(), geo[count][0], geo[count][1], geo[count][2]))
             else:
                 _, geo=xyz_parse('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi), multiple=True)
                 for count_i, i in enumerate(geo):
@@ -117,7 +124,7 @@ class reaction:
                 os.system('rm .product.tmp.mol')
                 for count_i, i in enumerate(ids):
                     geo=mol.GetConformer(i).GetPositions()
-                    adj_mat=table_generator(self.reactant.elements, geo, verbose=False)
+                    adj_mat=table_generator(self.reactant.elements, geo)
                     adj_diff=np.abs(adj_mat-self.product.adj_mat)
                     # check table
                     if adj_diff.sum()==0:
@@ -138,7 +145,7 @@ class reaction:
             logger.addHandler(QueueHandler(logging_queue))
             logger.setLevel(logging.INFO)
         job_id=f"{self.reactant_inchi}_{self.id}"
-        
+
         RG=self.reactant.geo
         RE=self.reactant.elements
         R_adj=self.reactant.adj_mat
@@ -173,7 +180,7 @@ class reaction:
             for i in self.reactant_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
                 count=count+1
-        # load ML model to find conformers 
+        # load ML model to find conformers
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
         ind_list, pass_obj_values=[], []
@@ -181,6 +188,8 @@ class reaction:
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
+            #print(f"conf_ind: {conf_ind}, conf_entry['G']: {conf_entry['G']}\n")
+            #print(f"bond_mat: {conf_entry['bond_mat_r']}, Gr: {Gr}\n")
             if len(Gr)==0 or len(Gr)!=len(conf_entry["G"]):
                 print("Falied to optimize")
                 logger.info("Falied to optimize")
@@ -261,4 +270,3 @@ class reaction:
         # add a joint-opt alignment if too few alignments pass the criteria
         # will add soon
         return
-

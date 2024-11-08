@@ -1,5 +1,5 @@
 #!/bin/env python                                                                                                                                                             
-# Author: Qiyuan Zhao (zhaoqy1996@gmail.com)
+# Author: Qiyuan Zhao (zhaoqy1996@gmail.com), Zhao Li
 
 import subprocess
 import os
@@ -17,7 +17,7 @@ wait
 # compared with directly call crest in each line
 
 class SLURM_Job:
-    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False):
+    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False, email = ""):
         """
         Initialize slurm job parameters
         Time needs to be specify in hours
@@ -31,6 +31,9 @@ class SLURM_Job:
         self.submit_path = submit_path
         self.specify_array = specify_array
         self.script_file = os.path.join(submit_path, jobname+'.submit')
+
+        #Zhao's note: add Email notification
+        self.email = email
 
     def submit(self):
         """
@@ -81,9 +84,17 @@ class SLURM_Job:
             f.write(f"#SBATCH --nodes={self.node}\n")
             f.write(f"#SBATCH --ntasks-per-node={self.ppn}\n")
             f.write(f"#SBATCH --mem {self.mem*self.ppn}MB\n")
+
+            #print(f"length of self.email: {len(self.email)}\n", flush = True)
+            #print(f"SLURM Email: {self.email}\n", flush = True)
+
+            if len(self.email) > 0:
+                f.write(f"#SBATCH --mail-user={self.email}\n")
+                f.write(f"#SBATCH --mail-type=BEGIN,END,FAIL\n")
             f.write(f"#SBATCH --time {self.time}:00:00\n\n")
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
+
 
     def create_job_bottom(self):
         """
@@ -240,6 +251,15 @@ class SLURM_Job:
 
         with open(self.script_file, "a") as f:
 
+            #Zhao's note: try fixing crest env
+            #add module load anaconda 
+            #conda activate <your current conda env>
+            #This is just a fix on Purdue's machine, you can turn it off#
+            #Zhao's note: purdue changed its default anaconda, switch!
+            #f.write(f"module load anaconda\n")
+            f.write(f"module load anaconda/2022.10-py39\n")
+            f.write(f"conda activate copy-classy-yarp\n")
+
             f.write(f"export OMP_STACKSIZE={crest_job_list[0].mem}M\n")
             f.write(f"export OMP_NUM_THREADS={crest_job_list[0].nproc}\n")
 
@@ -295,5 +315,3 @@ class SLURM_Job:
             except OSError:
                 pass
     '''
-
-

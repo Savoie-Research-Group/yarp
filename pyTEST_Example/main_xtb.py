@@ -21,20 +21,41 @@ from analyze_functions import *
 from wrappers.pysis import PYSIS
 from wrappers.gsm import GSM
 
-# YARP methodology by Hsuan-Hao Hsu, Qiyuan Zhao, and Brett M. Savoie
+from calculator import Calculator
+
+# YARP methodology by Hsuan-Hao Hsu, Zhao Li, Qiyuan Zhao, and Brett M. Savoie
 def initialize(args):
     keys=[i for i in args.keys()]
     if "input" not in keys:
         print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
         exit()
+    if 'XTB_OPT_Calculator' not in keys:
+        args['XTB_OPT_Calculator'] = "PYSIS"
+    if 'GSM_Calculator' not in keys:
+        args['GSM_Calculator'] = "PYSIS"
+
+    # GSM or SSM #
+    # must use the GSM calculator #
+    if "SSM" not in keys:
+        args['SSM'] = False
+    else:
+        args['SSM'] = bool(args['SSM'])
+
     if "scratch" not in keys:
         args["scratch"]=f"{os.getcwd()}/yarp_run"
     if "low_solvation" not in keys:
         args["low_solvation"]=False
         args["low_solvation_model"]="alpb"
         args["solvent"]=False
+        args["solvation_model"]="CPCM"
     else:
         args["low_solvation_model"], args["solvent"]=args['low_solvation'].split('/')
+
+    #Zhao's note: pysis absolute path (user can provide this in yaml file)#
+
+    if not ("pysis_path" in keys):
+        args["pysis_path"] = "" # Using default
+
     if "method" not in keys:
         args["method"]="crest"
     if "reaction_data" not in keys: args["reaction_data"]="reaction.p"
@@ -59,12 +80,19 @@ def initialize(args):
     if "n_conf" not in keys:
         args["n_conf"]=3
     else: args["n_conf"]=int(args["n_conf"])
-    if "nprocs" not in keys:
-        args["nprocs"]=1
-    else: args["nprocs"]=int(args["nprocs"])
-    if "c_nprocs" not in keys:
-        args["c_nprocs"]=1
-    else: args["c_nprocs"]=int(args["c_nprocs"])
+    #accepting either "nprocs" or "xtb_nprocs"#
+    if "xtb_nprocs" in keys:
+        args["xtb_nprocs"]=int(args["xtb_nprocs"])
+    elif "nprocs" in keys:
+        args["xtb_nprocs"]=int(args['nprocs'])
+    else: args["xtb_nprocs"]=1
+    #accepting either "crest_nprocs" or "c_nprocs"#
+    if "crest_nprocs" in keys:
+        args["crest_nprocs"]=int(args["crest_nprocs"])
+    elif "c_nprocs" in keys:
+        args["crest_nprocs"]=int(args['c_nprocs'])
+    else: args["crest_nprocs"]=1
+
     if "mem" not in keys:
         args["mem"]=1
     if "restart" not in keys:
@@ -76,6 +104,47 @@ def initialize(args):
     if os.path.exists(args["scratch_xtb"]) is False: os.makedirs(args["scratch_xtb"])
     if os.path.exists(args["scratch_crest"]) is False: os.makedirs(args["scratch_crest"])
     if os.path.exists(args["conf_output"]) is False: os.makedirs(args["conf_output"])
+
+    #Zhao's note: for using non-default crest executable
+    #Just provide the folder, not the executable
+    #Need the final "/"
+    if not 'crest_path' in args:
+        args['crest_path'] = os.popen('which crest').read().rstrip()
+    else:
+        args['crest_path'] = args['crest_path'] + "crest"
+
+    #Zhao's note: add user defined constraints based on atom index (starting from 1)
+    R_constraints = []
+    P_constraints = []
+
+    if 'reactant_dist_constraint' in keys:
+        inp_list = args['reactant_dist_constraint'].split(',')
+        if not(len(inp_list) % 3 == 0): 
+            print(f"Need to provide 3 values for one constraint: AtomA, AtomB, and Distance")
+            exit()
+        for a in range(0, int(len(inp_list) / 3)):
+            arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+            R_constraints.append(arg_list)
+    if 'product_dist_constraint' in keys:
+        inp_list = args['product_dist_constraint'].split(',')
+        if not(len(inp_list) % 3 == 0): 
+            print(f"Need to provide 3 values for one constraint: AtomA, AtomB, and Distance")
+            exit()
+        for a in range(0, int(len(inp_list) / 3)):
+            arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
+            print(f"P_constraints: {arg_list}\n")
+            P_constraints.append(arg_list)
+    args['reactant_dist_constraint'] = R_constraints
+    args['product_dist_constraint']  = P_constraints
+
+    print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
+    print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
+
+    if not 'reactant_chiral_center' in keys:
+        args['reactant_chiral_center'] = 'None'
+    if not 'product_chiral_center'  in keys:
+        args['product_chiral_center']  = 'None'
+
     logging_path = os.path.join(args["scratch"], "YARPrun.log")
     logging_queue = mp.Manager().Queue(999)
     logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
@@ -88,6 +157,8 @@ def initialize(args):
     return args, logger, logging_queue
 
 def main(args:dict):
+    #Zhao's note: add this function to avoid recusionerror (reaches max)
+    sys.setrecursionlimit(10000)
     args, logger, logging_queue=initialize(args)
     print(f"""Welcome to
                 __   __ _    ____  ____  
@@ -129,7 +200,6 @@ def main(args:dict):
         idx=inchi_dict[inchi]
         i.id=idx
         inchi_dict[inchi]=idx+1
-
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
@@ -138,8 +208,14 @@ def main(args:dict):
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif args["method"]=='crest':
         rxns=conf_by_crest(rxns, logging_queue, logger)
+
+    #Enumerate chiral centers of interest for both reactant and product#
+    if not (args['reactant_chiral_center'] == 'None' and args['product_chiral_center'] == 'None'):
+        rxns = enumerate_chirality(rxns, logging_queue)
+
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+
     print("-----------------------")
     print("-------Third Step------")
     print("Conformation Generation")
@@ -154,6 +230,8 @@ def main(args:dict):
     rxns=run_gsm_by_pysis(rxns, logging_queue)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    #Zhao's note: option to skip xtb pysis + IRC
+    #Just run DFT after xtb-GSM
     print("-----------------------")
     print("-------Fifth Step------")
     print("------Berny TS Opt-----")
@@ -161,6 +239,7 @@ def main(args:dict):
     rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+
     print("-----------------------")
     print("-------Sixth Step------")
     print("-----IRC Calculation---")
@@ -177,9 +256,11 @@ def main(args:dict):
 def run_irc_by_xtb(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     irc_jobs=dict()
+
+    selected_Calculator = "PYSIS"
     for count, rxn in enumerate(rxns):
         key=[j for j in rxn.TS_xtb.keys()]
         for j in key:
@@ -187,18 +268,16 @@ def run_irc_by_xtb(rxns, logging_queue):
             wf=f"{scratch}/{rxn_ind}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/{rxn_ind}-TS.xyz", rxn.reactant.elements, rxn.TS_xtb[j])
-            if not args["solvent"]:
-                pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"])
-            else:
-                if "alpb" in args["low_solvation_model"].lower():
-                                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
-                                    alpb=args["solvent"])
-                else:
-                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TS.xyz", work_folder=wf, jobname=rxn_ind, jobtype="irc", charge=args["charge"], multiplicity=args["multiplicity"],\
-                                    gbsa=args["solvent"])
-            if os.path.isfile(f"{wf}/ts_final_hessian.h5"): pysis_job.generate_input(calctype="xtb", hess_init=f"{wf}/ts_final_hessian.h5")
-            else: pysis_job.generate_input(calctype='xtb')
+            # SETUP CALCULATION #
+            Input=Calculator(args)
+            Input.input_geo=f"{wf}/{rxn_ind}-TS.xyz"
+            Input.work_folder=wf
+            Input.jobname=rxn_ind
+            Input.jobtype="irc"
+            Input.nproc=nprocs
+            pysis_job=Input.Setup(selected_Calculator, args)
             irc_jobs[rxn_ind]=pysis_job
+
     irc_job_list=[irc_jobs[ind] for ind in sorted(irc_jobs.keys())]
     irc_thread=min(nprocs, len(irc_job_list))
     input_job_list=[(irc_job, logging_queue, args["pysis_wt"]) for irc_job in irc_job_list]
@@ -277,7 +356,7 @@ def run_irc_by_xtb(rxns, logging_queue):
 
 def run_opt_by_xtb(rxns, logging_queue, logger):
     args=rxns[0].args
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     wf=f"{scratch}/xtb_run"
     if os.path.isdir(wf) is False: os.mkdir(wf)
@@ -291,50 +370,61 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
         P_inchi=i.product_inchi
         R_constraint=return_metal_constraint(i.reactant)
         P_constraint=return_metal_constraint(i.product)
+
+        R_constraint.extend(args['reactant_dist_constraint'])
+        P_constraint.extend(args['product_dist_constraint'])
+        print(f"R_constraint: {R_constraint}\n")
+        print(f"P_constraint: {P_constraint}\n")
+
+        print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
+        print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
+
+        # SETUP CALCULATION #
+        selected_Calculator = args['XTB_OPT_Calculator']
+        Input=Calculator(args)
         if args['strategy']!=0:
             if P_inchi not in opt_jobs.keys():
                 wf=f"{scratch}/xtb_run/{P_inchi}"
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 xyz_write(f"{wf}/{P_inchi}-init.xyz", PE, PG)
-                if args["solvent"]==False:
-                    pysis_job=PYSIS(input_geo=f"{wf}/{P_inchi}-init.xyz", work_folder=wf, jobname=P_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"])
-                else:
-                    if args["low_solvation_model"].lower()=='alpb':
-                        pysis_job=PYSIS(input_geo=f"{wf}/{P_inchi}-init.xyz", work_folder=wf, jobname=P_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                        alpb=args["solvent"])
-                    else:
-                        pysis_job=PYSIS(input_geo=f"{wf}/{P_inchi}-init.xyz", work_folder=wf, jobname=P_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                        gbsa=args["solvent"])
-                pysis_job.generate_input(calctype='xtb', hess=True, hess_step=1)
-                opt_jobs[P_inchi]=pysis_job
+
+                Input.input_geo=f"{wf}/{P_inchi}-init.xyz"
+                Input.work_folder=wf
+                Input.jobname=P_inchi
+                Input.jobtype="opt"
+                Input.nproc=nprocs
+                job=Input.Setup(selected_Calculator, args, P_constraint)
+                opt_jobs[P_inchi]=job
         if args["strategy"]!=1:
             if R_inchi not in opt_jobs.keys():
                 wf=f"{scratch}/xtb_run/{R_inchi}"
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 xyz_write(f"{wf}/{R_inchi}-init.xyz", PE, PG)
                 print(wf)
-                if args["solvent"]==False:
-                    pysis_job=PYSIS(input_geo=f"{wf}/{R_inchi}-init.xyz", work_folder=wf, jobname=R_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"])
-                else:
-                    if args["low_solvation_model"].lower()=='alpb':
-                        pysis_job=PYSIS(input_geo=f"{wf}/{R_inchi}-init.xyz", work_folder=wf, jobname=R_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                        alpb=args["solvent"])
-                    else:
-                        pysis_job=PYSIS(input_geo=f"{wf}/{R_inchi}-init.xyz", work_folder=wf, jobname=R_inchi, jobtype='opt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                        gbsa=args["solvent"])
-                pysis_job.generate_input(calctype='xtb', hess=True, hess_step=1)
-                opt_jobs[R_inchi]=pysis_job
+
+                Input.input_geo=f"{wf}/{R_inchi}-init.xyz"
+                Input.work_folder=wf
+                Input.jobname=R_inchi
+                Input.jobtype="opt"
+                Input.nproc=nprocs
+                job=Input.Setup(selected_Calculator, args, R_constraint)
+                opt_jobs[R_inchi]=job
+        
+    #exit()
     # Finish creat pysis jobs
     # create a process pool
     opt_job_list=[opt_jobs[ind] for ind in sorted(opt_jobs.keys())]
     opt_thread=min(nprocs, len(opt_job_list))
 
-    input_job_list=[(opt_job, logging_queue, args["pysis_wt"]) for opt_job in opt_job_list]
-    Parallel(n_jobs=opt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+    input_job_list=[(opt_job, logging_queue) for opt_job in opt_job_list]
+    #input_job_list=[(opt_job, logging_queue, args["pysis_wt"]) for opt_job in opt_job_list]
+
+    if(args['XTB_OPT_Calculator'] == "PYSIS"): Parallel(n_jobs=opt_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+    elif(args['XTB_OPT_Calculator'] == "XTB"): Parallel(n_jobs=opt_thread)(delayed(run_xtb)(*task) for task in input_job_list)
 
     # Read in optimized geometry
     for opt_job in opt_job_list:
-        if opt_job.optimization_converged(): E, G = opt_job.get_opt_geo()
+        if opt_job.optimization_converged(): E, G = opt_job.get_final_structure()
         else: continue
         ind=opt_job.jobname
         for rxn in rxns:
@@ -342,26 +432,37 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
                 inchi=rxn.product_inchi
                 if ind==inchi:
                     rxn.product_xtb_opt={"E": E, "G": G}
-                    print(f"product opt, G: {G}\n")
             if args["strategy"]!=1:
                 inchi=rxn.reactant_inchi
                 if ind==inchi:
                     rxn.reactant_xtb_opt={"E": E, "G":G}
-                    print(f"reactant opt, G: {G}\n")
     return rxns
 
 def conf_by_crest(rxns, logging_queue, logger):
     rxns=run_opt_by_xtb(rxns, logging_queue, logger)
+
+    #exit()
+
     chunks=[]
     args=rxns[0].args
-    nprocs=args["nprocs"]
-    c_nprocs=args["c_nprocs"]
+    nprocs=args["xtb_nprocs"]
+    c_nprocs=args["crest_nprocs"]
     scratch_crest=args["scratch_crest"]
     mem=int(args["mem"])*1000
     crest_job_list=[]
     inchi_list=[]
     thread=nprocs//c_nprocs
+    print(rxns)
     for rxn in rxns:
+        print(rxn)
+        print(f"product_inchi:  {rxn.product_inchi}\n")
+        print(f"reactant_inchi: {rxn.reactant_inchi}\n")
+        R_constraint=return_metal_constraint(rxn.reactant)
+        P_constraint=return_metal_constraint(rxn.product)
+
+        R_constraint.extend(args['reactant_dist_constraint'])
+        P_constraint.extend(args['product_dist_constraint'])
+
         if args["strategy"]!=0:
             if rxn.product_inchi not in inchi_list:
                 wf=f"{scratch_crest}/{rxn.product_inchi}"
@@ -370,10 +471,22 @@ def conf_by_crest(rxns, logging_queue, logger):
                 inp_xyz=f"{wf}/{rxn.product_inchi}.xyz"
                 if bool(rxn.product_xtb_opt) is False: xyz_write(inp_xyz, rxn.product.elements, rxn.product.geo)
                 else: xyz_write(inp_xyz, rxn.product_xtb_opt["E"], rxn.product_xtb_opt["G"])
-                crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
-                        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'], crest_path=args["crest"])
-                if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
-                crest_job_list.append(crest_job)
+
+                Input = Calculator(args)
+                Input.input_geo=inp_xyz
+                Input.work_folder=wf
+                Input.jobtype="crest"
+                Input.nproc=c_nprocs
+                crest_job=Input.Setup("CREST", args, P_constraint)
+                #crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
+                #        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
+                #if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
+
+                #if len(P_constraint) > 0:
+                #    crest_job.add_command(distance_constraints = P_constraint)
+
+                print(f"CREST JOB: {crest_job}\n")
+                if not crest_job.calculation_terminated_normally(): crest_job_list.append(crest_job)
         if args["strategy"]!=1:
             if rxn.reactant_inchi not in inchi_list:
                 wf=f"{scratch_crest}/{rxn.reactant_inchi}"
@@ -382,19 +495,34 @@ def conf_by_crest(rxns, logging_queue, logger):
                 inp_xyz=f"{wf}/{rxn.reactant_inchi}.xyz"
                 if bool(rxn.reactant_xtb_opt) is False: xyz_write(inp_xyz, rxn.reactant.elements, rxn.reactant.geo)
                 else: xyz_write(inp_xyz, rxn.reactant_xtb_opt["E"], rxn.reactant_xtb_opt["G"])
-                crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
-                        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'], crest_path=args["crest"])
-                if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
-                crest_job_list.append(crest_job)
+                #crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
+                #        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
+                #if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
+
+                #if len(R_constraint) > 0:
+                #    crest_job.add_command(distance_constraints = R_constraint)
+                Input = Calculator(args)
+                Input.input_geo=inp_xyz
+                Input.work_folder=wf
+                Input.jobtype="crest"
+                Input.nproc=c_nprocs
+                crest_job=Input.Setup("CREST", args, R_constraint)
+
+                print(f"CREST JOB: {crest_job}\n")
+                if not crest_job.calculation_terminated_normally(): crest_job_list.append(crest_job)
     input_job_list=[(crest_job, logging_queue) for crest_job in crest_job_list]
+    print(f"crest_job_list: {crest_job_list}\n")
+    print(f"input_job_list: {input_job_list}\n")
+    #exit()
     Parallel(n_jobs=thread)(delayed(run_crest)(*task) for task in input_job_list)
     rxns=read_crest_in_class(rxns, scratch_crest)
+    #exit()
     return rxns
 
 def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     args=rxns[0].args
     conf_output=args["conf_output"]
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     tsopt_jobs=dict()
     for count_i, i in enumerate(rxns):
@@ -404,17 +532,17 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
             wf=f"{scratch}/{rxn_ind}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/{rxn_ind}-TSguess.xyz", i.reactant.elements, i.TS_guess[j])
-            if args["solvent"] is False:
-                pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"])
-            else:
-                if args["low_solvation_model"].lower()=='alpb':
-                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                    alpb=args["solvent"])
-                else:
-                    pysis_job=PYSIS(input_geo=f"{wf}/{rxn_ind}-TSguess.xyz", work_folder=wf, jobname=rxn_ind, jobtype='tsopt', charge=args["charge"], multiplicity=args["multiplicity"],\
-                                    gbsa=args["solvent"])
-            pysis_job.generate_input(calctype='xtb', hess=True, hess_step=1)
-            tsopt_jobs[rxn_ind]=pysis_job
+
+            selected_calculator = "PYSIS"
+            Input = Calculator(args)
+            Input.input_geo=f"{wf}/{rxn_ind}-TSguess.xyz"
+            Input.work_folder=wf
+            Input.jobname=rxn_ind
+            Input.jobtype="tsopt"
+            Input.nproc=nprocs
+            job=Input.Setup(selected_calculator, args)
+
+            tsopt_jobs[rxn_ind]=job
 
     # Create a process pool with gsm_thread processes
     tsopt_job_list= [tsopt_jobs[ind] for ind in sorted(tsopt_jobs.keys())]
@@ -428,6 +556,7 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     tsopt_job_list = check_dup_ts_pysis(tsopt_job_list, logger)
     for tsopt_job in tsopt_job_list:
         TSE, TSG = tsopt_job.get_final_ts()
+        print(f"tsopt_job: {tsopt_job}, TSG: {TSG}\n")
         ind=tsopt_job.jobname
         ind=ind.split('_')
         inchi, idx, conf_i=ind[0], int(ind[1]), int(ind[2])
@@ -439,48 +568,83 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
 def run_gsm_by_pysis(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     rxn_folder=[]
+    all_conf_bond_changes = [] # for SSM (needs bond change information)
     # write the reaction xyz to conf_output for follwoing GSM calculation
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
+        print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
         for j in key:
+            print(f"key: {j}\n")
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             rxn_folder.append(wf)
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/R.xyz", i.reactant.elements, i.rxn_conf[j]["R"])
             xyz_write(f"{wf}/P.xyz", i.reactant.elements, i.rxn_conf[j]["P"])
+            #Zhao's debug: get bond mat for reactant/product confs
+            rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
+            pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
 
+            print(f"rconf_adj: {rconf_adj}\n")
+            print(f"pconf_adj: {pconf_adj}\n")
+
+            rows, cols = np.where(rconf_adj != pconf_adj)
+            print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
+
+            react_adj = rconf_adj - pconf_adj
+            break_rows, break_cols = np.where(react_adj > 0)
+            add_rows,   add_cols   = np.where(react_adj < 0)
+            add_bonds = [sorted(pair) for pair in zip(add_rows, add_cols)]
+            add_bonds = [list(pair) for pair in set(tuple(pair) for pair in add_bonds)]
+            for count, b in enumerate(add_bonds): add_bonds[count].append("ADD")
+
+            break_bonds = [sorted(pair) for pair in zip(break_rows, break_cols)]
+            break_bonds = [list(pair) for pair in set(tuple(pair) for pair in break_bonds)]
+            for count, b in enumerate(break_bonds): break_bonds[count].append("BREAK")
+
+            bond_changes = []; bond_changes.extend(add_bonds); bond_changes.extend(break_bonds);
+            all_conf_bond_changes.append(bond_changes)
+
+            print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
+            print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
+            print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
     gsm_thread=min(nprocs, len(rxn_folder))
     gsm_jobs={}
+    
+    selected_calculator = args['GSM_Calculator']
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_folder):
         inp_xyz = [f"{rxn}/R.xyz", f"{rxn}/P.xyz"]
-        wf=rxn_folder[count]
-        if not args["solvent"]:
-            gsm_job = PYSIS(inp_xyz, work_folder=wf, jobname=rxn.split('/')[-1], jobtype="string", coord_type="cart", nproc=nprocs, charge=args["charge"], multiplicity=args["multiplicity"])       
-        else:
-            if "alpb" in args["low_solvation_model"].lower():
-                gsm_job = PYSIS(inp_xyz, work_folder=wf, jobname=rxn.split('/')[-1], jobtype="string", coord_type="cart", nproc=nprocs, charge=args["charge"], multiplicity=args["multiplicity"],\
-                                alpb=args["solvent"])
-            else:
-                gsm_job = PYSIS(inp_xyz, work_folder=wf, jobname=rxn.split('/')[-1], jobtype="string", coord_type="cart", nproc=nprocs, charge=args["charge"], multiplicity=args["multiplicity"],\
-                                gbsa=args["solvent"])
-        gsm_job.generate_input(calctype="xtb")
-        gsm_jobs[rxn.split('/')[-1]] = gsm_job
+
+        Input = Calculator(args)
+        Input.input_geo=inp_xyz
+        Input.work_folder=rxn
+        Input.jobname=rxn.split('/')[-1]
+        Input.jobtype="gsm"
+        Input.nproc=nprocs
+        job=Input.Setup(selected_calculator, args, bond_change=all_conf_bond_changes[count])
+
+        gsm_jobs[rxn.split('/')[-1]] = job
 
     # Create a process pool with gsm_thread processes
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
-    Parallel(n_jobs=gsm_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+
+    print(f"gsm_job_list: {gsm_job_list}, input_job_list: {input_job_list}\n")
+
+    if(args['GSM_Calculator'] == "PYSIS"): Parallel(n_jobs=gsm_thread)(delayed(run_pysis)(*task) for task in input_job_list)
+    elif(args['GSM_Calculator'] == "GSM"): Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
+
     tsopt_jobs={}
     for count, gsm_job in enumerate(gsm_job_list):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
         elif os.path.isfile(f"{gsm_job.work_folder}/splined_hei.xyz") is True:
+            print(f"GSM job {gsm_job.work_folder} exist\n")
             print(f"GSM job {gsm_job.jobname} is coverged!")
             TSE, TSG=xyz_parse(f"{gsm_job.work_folder}/splined_hei.xyz")
             # Read guess TS into reaction class
@@ -495,18 +659,43 @@ def run_gsm_by_pysis(rxns, logging_queue):
 def run_gsm_by_xtb(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     # write the reaction xyz to conf_output for follwoing GSM calculation
+    all_conf_bond_changes = []
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
         for j in key:
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
-            if(os.path.isfile(f"{name}")):
-                elements, geo= xyz_parse(f"{name}", multiple=True)
-                i.rxn_conf[j]["R"] = geo[0]
-                i.rxn_conf[j]["P"] = geo[1]
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
+            #Zhao's debug: get bond mat for reactant/product confs
+            rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
+            pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
+
+            print(f"rconf_adj: {rconf_adj}\n")
+            print(f"pconf_adj: {pconf_adj}\n")
+
+            rows, cols = np.where(rconf_adj != pconf_adj)
+            print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
+
+            react_adj = rconf_adj - pconf_adj
+            break_rows, break_cols = np.where(react_adj > 0)
+            add_rows,   add_cols   = np.where(react_adj < 0)
+            add_bonds = [sorted(pair) for pair in zip(add_rows, add_cols)]
+            add_bonds = [list(pair) for pair in set(tuple(pair) for pair in add_bonds)]
+            for count, b in enumerate(add_bonds): add_bonds[count].append("ADD")
+
+            break_bonds = [sorted(pair) for pair in zip(break_rows, break_cols)]
+            break_bonds = [list(pair) for pair in set(tuple(pair) for pair in break_bonds)]
+            for count, b in enumerate(break_bonds): break_bonds[count].append("BREAK")
+
+            bond_changes = []; bond_changes.extend(add_bonds); bond_changes.extend(break_bonds);
+            all_conf_bond_changes.append(bond_changes)
+
+            print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
+            print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
+            print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
+
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
     gsm_jobs={}
@@ -517,8 +706,9 @@ def run_gsm_by_xtb(rxns, logging_queue):
         wf = f"{scratch}/{rxn_ind}"
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz = f"{conf_output}/{rxn}"
+
         gsm_job = GSM(input_geo=inp_xyz,input_file=args['gsm_inp'],work_folder=wf,method='xtb', lot=args["lot"], jobname=rxn_ind, jobid=count, charge=args['charge'],\
-                      multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['low_solvation_model'])
+                      multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['low_solvation_model'], SSM = do_SSM, bond_change = all_conf_bond_changes[count])
         gsm_job.prepare_job()
         gsm_jobs[rxn_ind] = gsm_job
 
@@ -547,17 +737,17 @@ def run_gsm_by_xtb(rxns, logging_queue):
 def count_xyz_files_with_string(search_string, directory='.'):
     # Get list of all files in the specified directory
     files = os.listdir(directory)
-    
+
     # Filter files that contain the search string and have the .xyz extension
     matching_files = [file for file in files if search_string in file and file.endswith('.xyz')]
-    
+
     # Return the count of matching files
     return len(matching_files)
 
 def select_rxn_conf(rxns, logging_queue):
     args=rxns[0].args
     conf_output=args["conf_output"]
-    nprocs=args["nprocs"]
+    nprocs=args["xtb_nprocs"]
     if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
         # read confs #
@@ -567,7 +757,7 @@ def select_rxn_conf(rxns, logging_queue):
             rxn_conf_name = f"{i.reactant_inchi}_{i.id}_"
             Number_confs  = count_xyz_files_with_string(rxn_conf_name, conf_output)
             for j in range(0,Number_confs):
-                print(f"number of confs: {Number_confs}, j: {j}\n")
+                #print(f"number of confs: {Number_confs}, j: {j}\n")
                 rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
                 name=f"{conf_output}/{rxn_ind}.xyz"
                 if(os.path.isfile(f"{name}")):
@@ -590,19 +780,174 @@ def select_rxn_conf(rxns, logging_queue):
             endidx=startidx+chunk_size+(1 if i < remainder else 0)
             chunks.append(input_data_list[startidx:endidx])
             startidx=endidx
-        Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
+        rxn_list = Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
+        print(f"rxn_list: {len(rxn_list)}\n")
+
         #rxns=modified_rxns
         
         #for i in rxns: i.rxn_conf_generate(logging_queue)
+        count = 0
+        for c, chunk in enumerate(rxn_list):
+            for i, rxn in enumerate(chunk):
+                rxns[count].rxn_conf = rxn.rxn_conf
+                key=[j for j in rxns[count].rxn_conf.keys()]
+                chunk_key=[j for j in rxn.rxn_conf.keys()]
+                count += 1
+                print(f"generate_rxn_conf DONE: rxn: {rxn}, rxn.rxn_conf.keys: {key}, chunk_key: {chunk_key}\n")
+        #exit()
+        '''
+        count = 0
+        for c, chunk in enumerate(chunks):
+            for i, input_data in enumerate(chunk):
+                rxn, logging_queue = input_data
+                rxns[count].rxn_conf = rxn.rxn_conf
+                key=[j for j in rxns[count].rxn_conf.keys()]
+                chunk_key=[j for j in rxn.rxn_conf.keys()]
+                count += 1
+                print(f"generate_rxn_conf DONE: rxn: {rxn}, rxn.rxn_conf.keys: {key}, chunk_key: {chunk_key}\n")
+        '''
         print(f"Finish generating reaction conformations, the output conformations are stored in {conf_output}\n")
+        #exit()
+    return rxns
+
+def read_crest_in_class_isomer(rxn, scratch_crest, name):
+    #conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
+    elements, geos = xyz_parse(f"{scratch_crest}/{name}/crest_conformers.xyz", multiple=True)
+    print(f"{name}, there are {len(geos)} conformers\n")
+    if name.startswith("P"):
+        current_conf = len(rxn.product_conf)
+        for count_k, k in enumerate(geos):
+            rxn.product_conf[count_k+current_conf]=k
+
+    if name.startswith("R"):
+        current_conf = len(rxn.reactant_conf)
+        for count_k, k in enumerate(geos):
+            rxn.reactant_conf[count_k+current_conf]=k
+    return rxn
+
+#Zhao's note: enumerate the chirality of interest for both reactant and product#
+def enumerate_chirality(rxns, logging_queue):
+    print(f"Enumerating CHIRALITY!!!\n")
+    chunks=[]
+    input_rxns=[]
+    args=rxns[0].args
+    xtb_nprocs=args["xtb_nprocs"]
+    crest_nprocs=args["crest_nprocs"]
+    scratch_crest=args["scratch_crest"]
+    mem      = int(args['mem'])*1000
+    R_chiral_center = args['reactant_chiral_center']
+    P_chiral_center = args['product_chiral_center']
+    R_conformer_smiles = []
+    R_chirality = []
+    # Get the smiles string for all the conformers
+    for rxn in rxns:
+        R_molecule_smiles = return_smi_mol(rxn.reactant.elements,rxn.reactant.geo,rxn.reactant.bond_mats[0], "reactant")
+        P_molecule_smiles = return_smi_mol(rxn.product.elements,rxn.product.geo,rxn.product.bond_mats[0], "product")
+        R_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("reactant.mol")
+        P_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("product.mol")
+
+        print(f"Enumerate Reactant Isomers, Chiral Center: {Chem.FindMolChiralCenters(R_molecule_from_smiles)}\n")
+        print(f"Enumerate Product Isomers, Chiral Center: {Chem.FindMolChiralCenters(P_molecule_from_smiles)}\n")
+        R_Isomers = Generate_Isomers(R_molecule_from_smiles, R_chiral_center)
+        P_Isomers = Generate_Isomers(P_molecule_from_smiles, P_chiral_center)
+        Write_Isomers(R_Isomers, "R_Isomer")
+        Write_Isomers(P_Isomers, "P_Isomer")
+        # Prepare XTB opt with bond constraints
+        R_All_constraint = return_all_constraint(rxn.reactant)
+        P_All_constraint = return_all_constraint(rxn.product)
+        for count_i, iso in enumerate(P_Isomers):
+            os.system(f"cp P_Isomer-{count_i}.xyz {args['scratch_xtb']}/P_Isomer-{count_i}.xyz")
+            if args["low_solvation"]:
+                solvation_model, solvent = args["low_solvation"].split("/")
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/P_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
+                        solvent=solvent, solvation_model=solvation_model,
+                        jobname=f"P_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=P_All_constraint)
+            else:
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/P_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
+                        jobname=f"P_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=P_All_constraint)
+            optjob.execute()
+
+        for count_i, iso in enumerate(R_Isomers):
+            os.system(f"cp R_Isomer-{count_i}.xyz {args['scratch_xtb']}/R_Isomer-{count_i}.xyz")
+            if args["low_solvation"]:
+                solvation_model, solvent = args["low_solvation"].split("/")
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/R_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"],lot=args["lot"], jobtype=["opt"],\
+                        solvent=solvent, solvation_model=solvation_model,
+                        jobname=f"R_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=R_All_constraint)
+            else:
+                optjob=XTB(input_geo=f"{args['scratch_xtb']}/R_Isomer-{count_i}.xyz",
+                        work_folder=args["scratch_xtb"], lot=args["lot"], jobtype=["opt"],\
+                        jobname=f"R_Isomer-{count_i}_opt",
+                        charge=args["charge"], multiplicity=args["multiplicity"])
+                optjob.add_command(distance_constraints=R_All_constraint)
+            optjob.execute()
+        Iso_smi = []
+        for filename in os.listdir(args['scratch_xtb']):
+            if filename.startswith("R_Isomer-") and filename.endswith(".xyz"):
+                os.system(f"obabel {args['scratch_xtb']}/{filename} -O {args['scratch_xtb']}/{filename.split()[0]}.smi")
+                with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
+                    first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
+                    obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
+                    print(f"Reactant Isomer name: {filename}, smiles: {obabel_smiles}\n")
+
+        for filename in os.listdir(args['scratch_xtb']):
+            if filename.startswith("P_Isomer-") and filename.endswith(".xyz"):
+                os.system(f"obabel {args['scratch_xtb']}/{filename} -O {args['scratch_xtb']}/{filename.split()[0]}.smi")
+                with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
+                    first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
+                    obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
+                    print(f"Product Isomer name: {filename}, smiles: {obabel_smiles}\n")
+        ########################################################
+        # RUN CREST on the MOLECULE with ENUMERATED CHIRALITY ##
+        ########################################################
+        print(f"Before Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+        print(f"Before Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
+        CREST_list = ['P_Isomer-0', 'R_Isomer-0']
+        xtb_nprocs=args["xtb_nprocs"]
+        crest_nprocs=args["crest_nprocs"]
+        scratch_crest=args["scratch_crest"]
+        mem      = int(args['mem'])*1000
+        for cjob in CREST_list:
+            wf=f"{scratch_crest}/{cjob}"
+            if os.path.isdir(wf) is False: os.mkdir(wf)
+            inp_xyz=f"{wf}/{cjob}.xyz"
+            os.system(f"cp {args['scratch_xtb']}/{cjob}_opt.xtbopt.xyz {inp_xyz}")
+            if(os.path.exists(f"{wf}/crest_best.xyz")): continue
+
+            crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=128, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
+                            solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'], crest_path = args['crest_path'])
+            if args['crest_quick']: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
+            crest_job.add_command(additional='--noreftopo ')
+            if(cjob.startswith('R')):
+                total_constraints = return_metal_constraint(rxn.reactant)
+            if(cjob.startswith('P')):
+                total_constraints = return_metal_constraint(rxn.product)
+            #Zhao's note: Add user-defined constraints#
+            if len(total_constraints) > 0:
+                crest_job.add_command(distance_constraints = total_constraints)
+            crest_job.execute()
+
+        for cjob in CREST_list:
+            rxn = read_crest_in_class_isomer(rxn, scratch_crest, cjob)
+        print(f"After Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+        print(f"After Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
     return rxns
 
 def conf_crest(rxns, logging_queue):
     chunks=[]
     input_rxns=[]
     args=rxns[0].args
-    nprocs=args["nprocs"]
-    c_nprocs=args["c_nprocs"]
+    nprocs=args["xtb_nprocs"]
+    c_nprocs=args["crest_nprocs"]
     scratch_crest=args["scratch_crest"]
     mem      = int(args['mem'])*1000
     for count_i, i in enumerate(rxns): input_rxns.append((count_i, i, args))
@@ -639,6 +984,7 @@ def conf_crest(rxns, logging_queue):
 def read_crest_in_class(rxns, scratch_crest):
     conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
     for i in conf_inchi:
+        if not(os.path.isfile(f"{scratch_crest}/{i}/crest_conformers.xyz")): continue
         elements, geos = xyz_parse(f"{scratch_crest}/{i}/crest_conformers.xyz", multiple=True)
         for count_j, j in enumerate(rxns):
             if j.product_inchi in i:
@@ -686,7 +1032,7 @@ def read_rxns(input_mol, args={}):
     xyz_write(".tmp_P.xyz", elements[1], geo[1])
     product=yp.yarpecule(".tmp_P.xyz", canon=False)
     os.system('rm .tmp_P.xyz')
-    R=reaction(reactant, product, args=args, opt=False)
+    R=reaction(reactant, product, args=args, opt_R=False, opt_P=False)
     return R
 
 def write_reaction(elements, RG, PG, filename="reaction.xyz"):

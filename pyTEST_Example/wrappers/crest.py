@@ -53,10 +53,10 @@ class CREST:
         if crest_path is None: crest_path = os.popen('which crest').read().rstrip()
 
         # crest calculation basic command
-        self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
+        self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} -opt {opt_level} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
         if quick_mode: self.command += f'-{quick_mode} '
         if self.solvent: self.command += self.solvent
-        print(f"CREST COMMAND: {self.command}\n")
+        
     def generate_xcontrol(self, distance_constraints=[], cartesian_constraints=[], force_constant=0.5):
         """
         Generate an XTB input file with constraints

@@ -12,7 +12,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class PYSIS:
-    def __init__(self, input_geo, work_folder=os.getcwd(), jobname='pysis', jobtype='tsopt', coord_type='cart', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
+    def __init__(self, input_geo, work_folder=os.getcwd(), pysis_dir="", jobname='pysis', jobtype='tsopt', coord_type='cart', nproc=1, mem=4000, charge=0, multiplicity=1, alpb=False, gbsa=False):
         """
         Initialize a pysis job class
         input_geo: a xyz file containing the input geometry. Full path recommended
@@ -37,8 +37,49 @@ class PYSIS:
         self.multiplicity = multiplicity
         self.alpb         = alpb
         self.gbsa         = gbsa
+        # Zhao's note: some special fix since the pysis in Classy-yarp repo doesn't work
+        self.pysis_dir    = pysis_dir
         # create work folder
         if os.path.isdir(self.work_folder) is False: os.mkdir(self.work_folder)
+
+    # Zhao's note: add distance constraints between two atoms
+    def generate_constraints(self, distance_constraints=[]):
+        """
+        Generate an XTB input file with constraints
+        Each element in distance_constraints should be [atomi,atomj,distance] -- index start from 1
+        cartesian_constraints should be a list of atoms that need to be constrained
+        """
+        with open(self.pysis_input, 'a') as f:
+            if len(distance_constraints) > 0:
+                f.write(f'potentials:\n type: restraint\n')
+                f.write(f'restraints: [')
+
+                for count, dis in enumerate(distance_constraints):
+                    f.write(f'[[BOND, {dis[0]}, {dis[1]}], 0.5, {dis[2]:.4f}]')
+                    if count < (len(distance_constraints) - 1):
+                        f.write(' ,')
+                    else:
+                        f.write(']\n')
+                #f.write('$\n\n')
+            '''
+            if len(cartesian_constraints) > 0:
+                list_of_ranges, used_atoms = [], []
+                for i in sorted(cartesian_constraints):
+                    atom_range = []
+                    if i not in used_atoms:
+                        while i in cartesian_constraints:
+                            used_atoms.append(i)
+                            atom_range.append(i)
+                            i += 1
+                        if len(atom_range) == 1:
+                            list_of_ranges += str(atom_range[0])
+                        else:
+                            list_of_ranges.append(f'{atom_range[0]}-{atom_range[-1]}')
+
+                # write into constraints
+                f.write(f'$constrain\nforce constant={force_constant}\natoms: {",".join(list_of_ranges)}\n$\n\n')
+            '''
+        return
 
     def generate_calculator_settings(self, calctype='xtb'):
         """
@@ -123,9 +164,9 @@ class PYSIS:
     #     env = os.environ.copy()
     #     env['OMP_NUM_THREADS'] = str(self.nproc)
     #     try:
-    #         result = subprocess.run(f'pysis {self.pysis_input} > {self.output}', shell=True, env=env, capture_output=True, text=True, timeout=timeout)
+    #         result = subprocess.run(f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', shell=True, env=env, capture_output=True, text=True, timeout=timeout)
     #     except:
-    #         result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
+    #         result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
 
     #     # go back to the original folder
     #     os.chdir(current_path)
@@ -147,14 +188,14 @@ class PYSIS:
 
         # running job and count time
         start_time = time.time()
-        process = subprocess.Popen(f'pysis {self.pysis_input} > {self.output}', shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         while True:
             if process.poll() is not None:  # process has terminated
-                result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=process.returncode, stdout=process.stdout.read(), stderr=process.stderr.read())
+                result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=process.returncode, stdout=process.stdout.read(), stderr=process.stderr.read())
                 break
             elif time.time() - start_time > timeout:
                 process.kill()  # send SIGKILL signal to the process
-                result = subprocess.CompletedProcess(args=f'pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
+                result = subprocess.CompletedProcess(args=f'{self.pysis_dir}pysis {self.pysis_input} > {self.output}', returncode=1, stdout='', stderr=f"PYSIS job {self.jobname} timed out")
                 break
             time.sleep(1)  # wait a bit before checking again
             
@@ -229,7 +270,7 @@ class PYSIS:
                 print("No final TS xyz file has been found!")
                 return False
     
-    def get_opt_geo(self):
+    def get_final_structure(self):
         """
         Get the optimized geometry and elements from pysis
         """

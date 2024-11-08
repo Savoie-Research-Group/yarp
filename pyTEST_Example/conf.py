@@ -1,3 +1,7 @@
+#Zhao's note: for using yarpecule
+import yarp as yp
+
+
 import os,sys
 import numpy as np
 import logging
@@ -21,11 +25,22 @@ from utils import *
 from yarp.taffi_functions import table_generator, xyz_write
 from yarp.find_lewis import find_lewis
 
+def generate_rxn_conf_FIX(rxn, logging_queue):
+        #rxn, logging_queue = input_data
+        rxn.rxn_conf_generation(logging_queue)
+        print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
+        #input_data_list[i] = (rxn, logging_queue)
+    #return rxn
+
 def generate_rxn_conf(input_data_list):
-    for input_data in input_data_list:
+    rxn_list = []
+    for i, input_data in enumerate(input_data_list):
         rxn, logging_queue = input_data
         rxn.rxn_conf_generation(logging_queue)
-    return rxn
+        print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
+        input_data_list[i] = (rxn, logging_queue)
+        rxn_list.append(rxn)
+    return rxn_list
 
 def return_indicator(E,RG,PG,namespace='node'):
     '''
@@ -33,7 +48,7 @@ def return_indicator(E,RG,PG,namespace='node'):
     Input:
           E:   elements
           RG:  reactant geometry
-          RG:  reactant geometry
+          PG:  product  geometry
     Output:
           RMSD: mass-weighted RMSD between reactant and product, threshold < 1.6
           max_dis:  maximum bond length change between non-H atoms, threshold < 4.0
@@ -249,14 +264,28 @@ def closestDistanceBetweenLines(a0,a1,b0,b1,clampAll=True,clampA0=False,clampA1=
 
     return pA,pB,np.linalg.norm(pA-pB)
 
-def seperate_mols(E,G,adj_mat=None,namespace='sep'):
-    ''' Function to seperate molecules and return a dictionary of each segment '''
+def print_all_elements(diccct):
+        for attribute, value in diccct.__dict__.items():
+            print(f"{attribute}: {value}")
+
+def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
+    #Zhao's note: pass the total charge as well #
+    ''' Function to separate molecules and return a dictionary of each segment '''
+    #Zhao's note: add charge for each molecule into the mols dict#
     # generate adj mat
     if adj_mat is None: adj_mat = table_generator(E, G)
     # Seperate reactant(s)
     gs      = graph_seps(adj_mat)
     groups  = []
     loop_ind= []
+
+    # Calculate bond mat #
+    bond_mat, score = find_lewis(E,adj_mat,q=q)
+    # take the first one bond_mat
+    bond_mat = bond_mat[0]
+
+    #print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
+
     for i in range(len(gs)):
         if i not in loop_ind:
             new_group =[count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]
@@ -268,20 +297,55 @@ def seperate_mols(E,G,adj_mat=None,namespace='sep'):
     for group in groups:
         # parse element and geometry of each fragment
         N_atom = len(group)
+        #for ind in group:
+        #    print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
+        #Zhao's note: might consider return "Element + index" for better control
         frag_E = [E[ind] for ind in group]
         frag_G = np.zeros([N_atom,3])
+
+        #Zhao's note: get group charge
+        group_bond_mat = [bond_mat[a] for a in group]
+        group_formal = return_formals(group_bond_mat, frag_E)
+        frag_Charge = int(sum(group_formal))
+        print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n")
+        #print(f"group_bond_mat is {group_bond_mat}\n")
+        #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
+
         for count_i,i in enumerate(group):
             frag_G[count_i,:] = G[i,:]
         # generate inchikey
-        xyz_write(f"{namespace}_input.xyz",frag_E,frag_G)
-        molecule = next(pybel.readfile("xyz", f"{namespace}_input.xyz"))
-        inchikey = molecule.write(format="inchikey").strip().split()[0]
-        os.system(f"rm {namespace}_input.xyz")
+        # Zhao's note: inchikey generated from xyz can be different from mol file (bonding info), consider changing inchikey generation here to all using mol file (consistent with init of reaction class)
+        N_atom=len(group)
+        mol=copy.deepcopy(molecule)
+        mol.elements=copy.deepcopy(frag_E)#[E[ind] for ind in group]
+        #mol.bond_mats=[bond_mat[group][:, group]]#copy.deepcopy(group_bond_mat)# 
+        #mol.geo=np.zeros([N_atom, 3])
+        mol.adj_mat=adj_mat[group][:, group]
+        mol.q = frag_Charge
+        mol.geo = copy.deepcopy(frag_G)
+        frag_bond_mat, frag_score = find_lewis(mol.elements,mol.adj_mat,q=mol.q)
+        mol.bond_mats = [molecule.bond_mats[0][group][:, group]]
+        mol_write_yp(".tmp.mol", mol)
+
+        #exit()
+
+        mol=next(pybel.readfile("mol", ".tmp.mol"))
+        inchikey=mol.write(format='inchikey').strip().split()[0]
+        #Zhao's note: take the first 14 letters
+        inchikey = inchikey[:14]
+        os.system("mv .tmp.mol " + inchikey + ".mol")
+        print(f"mol inchikey is {inchikey}\n")
+        original_inchi = return_inchikey(molecule)
+        print(f"original RP molecule inchi is {original_inchi}\n")
+        #exit()
+        #Zhao's note: consider return "Element + index" for better control
+        frag_E = [E[ind]+str(ind) for ind in group]
         # store this fragment
         if inchikey not in mols.keys():
-            mols[inchikey] = [[frag_E,frag_G]]
+            #mols[inchikey] = [[frag_E,frag_G]]
+            mols[inchikey] = [frag_E,frag_G,frag_Charge]
         else:
-            mols[inchikey].append([frag_E,frag_G])
+            mols[inchikey].append([frag_E,frag_G,frag_Charge])
 
     return mols
 

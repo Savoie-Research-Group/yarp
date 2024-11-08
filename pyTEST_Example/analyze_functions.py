@@ -128,7 +128,7 @@ def predict_TS(rxn, conf_i, IRC_model):
 
     return rxn
 def TS_prediction(rxn, conf_i, IRC_model):
-    Radii=yarp.el_radii
+    Radii=yp.el_radii
     E=rxn.reactant.elements
     Radj=rxn.reactant.adj_mat
     Padj=rxn.product.adj_mat

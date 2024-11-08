@@ -63,9 +63,11 @@ jobs:
                #obabel --version
                #
                # run Organometallic YARP Example #
+               which crest
                cd $home/examples/
                pytest -s
                cd $home/pyTEST_Example/
+               mkdir RESULT
                # xtb and crest are in conda bin, others in pip bin
                sed -i "s|CONDA_PATH|${CONDA}|g" test_rxn.py
                pytest -s

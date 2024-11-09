@@ -53,7 +53,9 @@ class CREST:
         if crest_path is None: crest_path = os.popen('which crest').read().rstrip()
 
         # crest calculation basic command
-        self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} -opt {opt_level} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
+        # Zhao's note: after experimenting, "-opt" keyword seems broken in crest-3, but available in crest-2
+        self.command = f'{crest_path} {self.input_geo} {self.lot} {self.charge} {self.unpair} -nozs -T {self.nproc} '
+        #self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} -opt {opt_level} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
         if quick_mode: self.command += f'-{quick_mode} '
         if self.solvent: self.command += self.solvent
         
@@ -139,12 +141,6 @@ class CREST:
 
         try: 
             lines = open(self.output, 'r', encoding="utf-8").readlines()
-            with open(f"{self.output}", 'r') as file:
-            #Read the content of the file
-                file_content = file.read()
-                #Print the content
-                print(f"FILE: {self.output}\n")
-                print(f"{file_content}")
 
         except:
             print(f"{self.output} is failed to read. please check it!")

@@ -124,6 +124,8 @@ class CREST:
         env = os.environ.copy()
         env['OMP_NUM_THREADS'] = str(self.nproc)
         result = subprocess.run(f"{self.command} > {self.output}", shell=True, env=env, capture_output=True, text=True)
+        print(f"command: {self.command}\n")
+
         os.chdir(current_path)
 
         return result
@@ -138,6 +140,13 @@ class CREST:
         try: lines = open(self.output, 'r', encoding="utf-8").readlines()
         except:
             print(f"{self.output} is failed to read. please check it!")
+            with open(f"{self.output}", 'r') as file:
+            #Read the content of the file
+                file_content = file.read()
+                #Print the content
+                print(f"FILE: {self.output}\n")
+                print(f"{file_content}")
+
             return False
 
         for n_line, line in enumerate(reversed(lines)):

@@ -93,7 +93,7 @@ def main(args):
                 #TS_dict[i][dft_lot]["SPE"]=dft_opt.get_energy()
                 TS_dict[i][dft_lot]["imag_mode"]=dft_opt.get_imag_freq_mode()
     else:
-        print("No ts optimiation jobs need to be performed...")
+        print("No ts optimization jobs need to be performed...")
 
     # Finish running TS-opt jobs
     # Prepare IRC jobs

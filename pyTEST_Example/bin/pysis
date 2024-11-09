@@ -1,8 +1,0 @@
-#!/home/li1724/.conda/envs/2022.10-py39/myenv/bin/python3.9
-# -*- coding: utf-8 -*-
-import re
-import sys
-from pysisyphus.run import run
-if __name__ == '__main__':
-    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
-    sys.exit(run())

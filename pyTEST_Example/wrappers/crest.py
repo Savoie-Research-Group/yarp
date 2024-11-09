@@ -53,10 +53,12 @@ class CREST:
         if crest_path is None: crest_path = os.popen('which crest').read().rstrip()
 
         # crest calculation basic command
-        self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
+        # Zhao's note: after experimenting, "-opt" keyword seems broken in crest-3, but available in crest-2
+        self.command = f'{crest_path} {self.input_geo} {self.lot} {self.charge} {self.unpair} -nozs -T {self.nproc} '
+        #self.command = f'{crest_path} {self.input_geo} -xname {xtb_path} -opt {opt_level} {self.charge} {self.unpair} {self.lot} -nozs -T {self.nproc} '
         if quick_mode: self.command += f'-{quick_mode} '
         if self.solvent: self.command += self.solvent
-        print(f"CREST COMMAND: {self.command}\n")
+        
     def generate_xcontrol(self, distance_constraints=[], cartesian_constraints=[], force_constant=0.5):
         """
         Generate an XTB input file with constraints
@@ -124,6 +126,8 @@ class CREST:
         env = os.environ.copy()
         env['OMP_NUM_THREADS'] = str(self.nproc)
         result = subprocess.run(f"{self.command} > {self.output}", shell=True, env=env, capture_output=True, text=True)
+        print(f"command: {self.command}\n")
+
         os.chdir(current_path)
 
         return result
@@ -135,9 +139,12 @@ class CREST:
         # load in crest output
         if os.path.isfile(self.output) is False: return False
 
-        try: lines = open(self.output, 'r', encoding="utf-8").readlines()
+        try: 
+            lines = open(self.output, 'r', encoding="utf-8").readlines()
+
         except:
             print(f"{self.output} is failed to read. please check it!")
+
             return False
 
         for n_line, line in enumerate(reversed(lines)):

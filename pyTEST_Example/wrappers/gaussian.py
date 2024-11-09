@@ -2,23 +2,28 @@
 # Author: Qiyuan Zhao (zhaoqy1996@gmail.com)
 
 import subprocess
-import os,sys
+import os,sys, glob
 import time
 import numpy as np
 
 sys.path.append('/'.join(os.path.abspath(__file__).split('/')[:-2]))
 from yarp.input_parsers import xyz_parse
 from constants import Constants
-from utils import xyz_write
+from utils import xyz_write, add_mix_basis_for_atom
+
+#from calculator import Calculator
+
+import re
 
 class Gaussian:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B3LYP/6-31G*', jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
+    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B3LYP/6-31G*', mix_basis=False, mix_lot=[], jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
                  solvent=False, dielectric=0.0,solvation_model='PCM', dispersion=False):
         """
         Initialize an Gaussian job class
         input_geo: a xyz file containing the input geometry
         work_folder: working directory for running the gaussian task
-        jobtype: can be single (e.g., "OPT") or multiple jobs (e.g., "OPT FREQ") or with additional specification (e.g., "OPT=(TS, CALCALL, NOEIGEN, maxcycles=100)")
+        jobtype: can be single (e.g., "OPT") or multiple jobs (e.g., "OPT FREQ") or with additional specification (e.g., "OPT=(TS, CALCALL, NOEIGEN, maxcycles=400)") # Zhao's note: originally 100 step, changed to 400
+        ***: fulltz is added as a method to "correct" energies from using mix-basis-set
         lot: Level of theory, e.g., "B3LYP/TZVP"
         mem: unit in MB, per core
         solvent: if False, will not call solvation model, otherwise specify water, THF, etc.
@@ -29,17 +34,23 @@ class Gaussian:
         self.gjf          = f'{work_folder}/{jobname}.gjf'
         self.jobtype      = jobtype
         self.lot          = lot
+        self.chkfile      = ""
         self.nproc        = int(nproc)
         self.mem          = int(mem)
+        # mix basis set information #
+        self.mix_basis    = mix_basis
+        self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
+        print(f"mix_lot: {self.mix_lot}\n")
+        self.mix_summary  = dict()
         self.jobname      = jobname
         self.output       = f'{work_folder}/{jobname}.out'
         self.additional   = False
-        self.dielectric = float(dielectric)
-        self.dispersion=dispersion
+        self.dielectric   = float(dielectric)
+        self.dispersion   = dispersion
         if solvent=="read":
             self.solvation = f"SCRF=(Read)"
         elif solvent:
-            self.solvation = f"SCRF=({solvation_model}, solvent={solvent})"
+            self.solvation = f"SCRF=({solvation_model}, Solvent={solvent})" #Capitalize "S"!
         else:
             self.solvation = False
             
@@ -51,20 +62,51 @@ class Gaussian:
         self.natoms = len(elements)
         self.elements = elements
         self.geometry = geometry
-        self.charge=int(charge)
+        self.charge   =int(charge)
         self.multiplicity=int(multiplicity)
         self.xyz = f'{charge} {multiplicity}\n'
         for ind in range(len(elements)):
             self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}\n'
         self.xyz += '\n'
 
+    ###################################################################
+    # add_mix_basis_for_atom function for Gaussian                    #
+    # will return a small list: [basis-set, index], e.g. [STO-3G, 1]  #
+    # we will have a summary dict: {STO-3G: [1,2,3,4], def2TZVP: [1]} #
+    # index will be added to the summary list                         #
+    ###################################################################
+    def Process_atom_mix_basis(self, atom_info):
+        if atom_info == '': return
+        basis = atom_info[0]
+        if not basis in self.mix_summary:
+            self.mix_summary[basis] = [atom_info[1]]
+        else:
+            self.mix_summary[basis].append(atom_info[1])
+
+    def write_gaussian_specific_basis_set(self, f):
+        for basis_set in self.mix_summary.keys():
+            #f.write("****\n")
+            for index in self.mix_summary[basis_set]:
+                f.write(f"{index+1} ") #Gaussian is fortran-based, index starts from 1
+            f.write("0\n")
+            f.write(f"{basis_set}\n")
+            f.write("****\n")
+
     def generate_input(self, constraints=[]):
         """
         Create an Gaussian job script for given settings
         """
+        # check if the current file "self.gjf" exist, if the don't, don't continue/restart#
+        gjf_exist = False
+        if os.path.exists(self.gjf): gjf_exist = True
+
         with open(self.gjf, "w") as f:
             f.write(f"%NProcShared={self.nproc}\n")
             f.write(f"%Mem={self.mem*self.nproc}MB\n")
+            restart_string = ""
+            if not self.chkfile == "" and gjf_exist:
+                f.write(f"%Chk={self.chkfile}\n")
+                restart_string = ", Restart"
             if self.dispersion:
                 command = f"#{self.lot} EmpiricalDispersion=GD3 "
             else:
@@ -73,13 +115,13 @@ class Gaussian:
                 command += f" {self.solvation}"
             # jobtype settings
             if self.jobtype.lower()=="opt":
-                if self.natoms==1: command += f"Int=UltraFine Opt=(maxcycles=300) SCF=QC\n\n"
-                else: command += f"Opt=(maxcycles=300) Int=UltraFine SCF=QC Freq\n\n"
+                if self.natoms==1: command += f"Int=UltraFine Opt=(maxcycles=400{restart_string}) SCF=QC\n\n"
+                else: command += f"Opt=(maxcycles=400{restart_string}) Int=UltraFine SCF=QC Freq\n\n"
             elif self.jobtype.lower()=="tsopt":
-                command+=f" OPT=(TS, CALCALL, NOEIGEN, maxcycles=300) Freq\n\n"
+                command+=f" OPT=(TS, CALCALL, NOEIGEN, maxcycles=400{restart_string}) Freq\n\n"
             elif self.jobtype.lower()=='irc':
-                command+=f" IRC=(LQA, recorrect=never, CalcFC, maxpoints=100, Stepsize=10, maxcycles=300, Report=Cartesians)\n\n"
-            elif self.jobtype.lower()=='copt':
+                command+=f" IRC=(LQA{restart_string}, recorrect=never, CalcFC, maxpoints=400, Stepsize=10, maxcycles=400, Report=Cartesians)\n\n"
+            elif self.jobtype.lower()=='copt': #052824-Zhao's note: maybe delete this? since we can add -1 into the xyz region?
                 command+=f" Opt geom=connectivity\n\n"
                 # add constraints as the following form:
                 # C -1 x y z
@@ -88,16 +130,33 @@ class Gaussian:
                 # H  0 x y z
                 # constraint on C and fully optimize on H
                 self.xyz=f"{self.charge} {self.multiplicity}\n"
+                print(f"Generating constraint: {constraints}\n")
                 for count_i, i in enumerate(self.elements):
+                    extra_term = ""
+                    # check constraints
                     if count_i in constraints:
-                        self.xyz+=f"{i:<3} -1 {self.geometry[count_i][0]:^12.8f} {self.geometry[count_i][3]:^12.8f} {self.geometry[count_i][2]:^12.8f}\n"
+                        extra_term = "-1"
+                    self.xyz+=f"{i:<3} {extra_term} {self.geometry[count_i][0]:^12.8f} {self.geometry[count_i][1]:^12.8f} {self.geometry[count_i][2]:^12.8f}\n"
                 self.xyz+="\n"
+            elif self.jobtype.lower()=='fulltz':
+                command+=f" Freq\n\n"
+
             f.write(command)
             f.write(f"{self.jobname} {self.jobtype}\n\n")
             f.write(self.xyz)    
             if self.solvation and self.dielectric>0.0:
                 f.write("solventname=newsolvent\n")
                 f.write(f"eps={self.dielectric}\n\n")
+            # check atom mix basis set
+            if self.mix_basis and not self.jobtype.lower()=='irc': # for IRC currently ignore the mix basis set because of syntax reason
+                # check by element or check by index
+                for count_i, element in enumerate(self.elements):
+                    mix_basis_summary = {}
+                    atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
+                    self.Process_atom_mix_basis(atom_mix_basis)
+                self.write_gaussian_specific_basis_set(f)
+                f.write("\n\n")
+
     def execute(self):
         """
         Execute a Gaussian calculation using the runtime flags
@@ -170,23 +229,35 @@ class Gaussian:
         # identify the position of the final frequencies
         for count, line in enumerate(reversed(lines)):
             if 'imaginary frequencies (negative' in line:
+                print(f"line: {line}")
                 N_imag = int(line.split()[1])
                 imag_line = len(lines) - count - 1
                 break
         
         if N_imag == 0: 
             return [], N_imag
-        else:
-            freq_line = lines[imag_line+9].split()
-            imag_freq = [float(freq_line[ind+2]) for ind in range(N_imag)]
-            return imag_freq, N_imag
+        #Zhao's note: not stable code, here is a better one
+        # Start enumerating from the line after "negative Sign"
+        for i, line in enumerate(lines[imag_line:], start=imag_line):
+            if "Frequencies --" in line:
+                # Extract the first float from the line containing "Frequencies --"
+                frequency_values = re.findall(r"-?\d+\.\d+", line)
+                if frequency_values:
+                    imag_freq.append(float(frequency_values[0]))
+            if len(imag_freq) >= N_imag: break
+
+            #freq_line = lines[imag_line+9].split()
+            #imag_freq = [float(freq_line[ind+2]) for ind in range(N_imag)]
+        return imag_freq, N_imag
         
     def is_TS(self) -> bool:
         """
         Check if this is a ture transition state after TS optimization 
         """
         imag_freq, N_imag = self.get_imag_freq()
-        if N_imag == 1 and abs(imag_freq[0]) > 10: return True
+        print(f"imag_freq: {imag_freq}\n")
+        print(f"N_imag: {N_imag}\n")
+        if N_imag == 1 and abs(imag_freq[0]) > 5: return True
         else: return False
 
     def get_final_structure(self):
@@ -243,10 +314,22 @@ class Gaussian:
 
         # initialize imag_freq mode
         mode = []
-        for count in range(imag_line+14,imag_line+self.natoms+14):
-            fields = lines[count].split()
-            mode += [[float(fields[2]),float(fields[3]),float(fields[4])]]
-        
+        #Zhao's note: not stable code, here is a better one
+        # Start enumerating from the line after "negative Sign"
+        # reads "Frequencies --" first, then stops at second "Frequencies --"
+        # also check if number of entries == 11 and all entries are numeric
+        Frequencies_found = False
+        for i, line in enumerate(lines[imag_line:], start=imag_line):
+            if Frequencies_found and "Frequencies --" in line: break
+            elif "Frequencies --" in line:
+                Frequencies_found = True
+                continue
+            else:
+                fields = lines[count].split()
+                if Frequencies_found and len(fields) == 11 and all(isinstance(float(item), float) for item in fields):
+                    mode += [[float(fields[2]),float(fields[3]),float(fields[4])]]
+        #for count in range(imag_line+14,imag_line+self.natoms+14):
+        #    fields = lines[count].split()
         return np.array(mode)
         
     def analyze_IRC(self, return_internal=False):
@@ -340,3 +423,39 @@ class Gaussian:
         # parse thermal properties from output
         SPE=zero_E-ZPE_corr
         return SPE
+
+    def new_opt_geometry(self) -> bool:
+        if os.path.isfile(self.output) is False: return False
+        # load orca output file
+        lines = open(self.output, 'r', encoding="ISO-8859-1").readlines()
+        # identify the position of the final geometry
+        for i, line in enumerate(reversed(lines)):
+            if 'GEOMETRY OPTIMIZATION CYCLE' in line:
+                #Check if the final cycle is not 1
+                cycle = int(line.split()[4])
+                if(cycle > 1):
+                    return True # The found cycle number is not 1, new geometry is found
+                break
+        return False
+
+    def check_restart(self, use_chk):
+        if use_chk:
+            chk_files = glob.glob(os.path.join(self.work_folder, '*.chk'))
+            #if there are multiple chk_files in a folder, report and terminate (confusing!)
+            if len(chk_files) > 1:
+                print(f"There CANNOT be MORE THAN 1 chk files in {self.work_folder}! CHECK!!!", flush = True)
+                exit()
+            # Check if there are any .chk files
+            if chk_files:
+                # Get the latest file by modification time
+                latest_file = max(chk_files, key=os.path.getmtime)
+                print(f"The latest .chk file is: {latest_file}")
+                self.chkfile = latest_file
+            else:
+                print(f"no chk files. Cannot restart\n")
+                return
+        else:
+            # read latest xyz file
+            if not self.calculation_terminated_normally():
+                tempE, tempG = self.get_final_structure()
+                geometry = tempG

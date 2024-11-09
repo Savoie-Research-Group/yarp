@@ -8,10 +8,8 @@ n_break: 1 # Indicate the number of breaking bonds
 form_all: False # Forming all possible bonds (matters for lone paired electrons (oxygen, sulfur, and other similar atoms)) (default: 0) 
 lewis_criteria: 5.0 # the criteria to find the products
 ff:            uff        # force field for driving the reaction coordinate           
-crest: crest
 lot: gfn2
 crest_quick: False
-xtb: xtb
 method: crest
 enumeration: False # if you only have reactant, you will need to do enumeration. Ohterwise, you need to provide reaction geometry.
 n_conf: 5
@@ -20,6 +18,8 @@ strategy: 2
 nprocs: 1
 c_nprocs: 1
 mem: 1 # in GB
+#xtb: {conda_path}/xtb
+xtb: xtb
 crest: {conda_path}/crest
 opt_level: vtight
 crest_quick: False

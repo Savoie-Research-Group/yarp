@@ -51,6 +51,8 @@ def rxn_setYAML(current_path, model_path, gsm_path, conda_path):
     with open('parameters.yaml', 'w') as file: file.write(filedata)
 
 def rxn_xtb():
+    subprocess.call("cat parameters.yaml", shell=True)
+    #exit()
     subprocess.call("python main_xtb.py parameters.yaml", shell=True)
     subprocess.call("cat RESULT/IRC-record.txt", shell=True)
 

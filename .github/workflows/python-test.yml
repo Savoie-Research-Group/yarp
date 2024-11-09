@@ -34,7 +34,7 @@ jobs:
         #conda install -y conda-forge::crest
         pip install --force-reinstall 'scikit-learn==1.3.0'
         pip install --force-reinstall 'numpy==1.24.4'
-        conda install -y conda-forge::xtb
+        #conda install -y conda-forge::xtb
         conda install -y conda-forge::crest=2.12
         unset CONDA_ALWAYS_YES
         pip install .

@@ -986,6 +986,12 @@ def read_crest_in_class(rxns, scratch_crest):
     for i in conf_inchi:
         if not(os.path.isfile(f"{scratch_crest}/{i}/crest_conformers.xyz")): continue
         elements, geos = xyz_parse(f"{scratch_crest}/{i}/crest_conformers.xyz", multiple=True)
+        with open(f"{scratch_crest}/{i}/{i}-crest.out", 'r') as file:
+        #Read the content of the file
+            file_content = file.read()
+            #Print the content
+            print(f"FILE: {scratch_crest}/{i}/{i}-crest.out\n")
+            print(f"{file_content}")
         for count_j, j in enumerate(rxns):
             if j.product_inchi in i:
                 for count_k, k in enumerate(geos):

@@ -18,7 +18,8 @@ strategy: 2
 nprocs: 1
 c_nprocs: 1
 mem: 1 # in GB
-xtb: {conda_path}/xtb
+#xtb: {conda_path}/xtb
+xtb: xtb
 crest: {conda_path}/crest
 opt_level: vtight
 crest_quick: False

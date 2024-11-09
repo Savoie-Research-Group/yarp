@@ -66,8 +66,11 @@ class Calculator:
         # CREST, used for 'crest' #
         if(package == "CREST"):
             crest_path = None
+            xtb_path   = None
             if not args['crest'] == "crest":
                 crest_path = args['crest']
+            if not args['xtb'] == "xtb":
+                xtb_path   = args['xtb']
             JOB = CREST(input_geo=self.input_geo,
                         work_folder=self.work_folder,
                         lot=self.xtb_lot,
@@ -79,6 +82,7 @@ class Calculator:
                         solvation_model=args['low_solvation_model'],
                         charge=self.charge,
                         multiplicity=self.multiplicity,
+                        xtb_path=xtb_path,
                         crest_path=crest_path)
             if args["crest_quick"]: JOB.add_command(additional='-rthr 0.1 -ewin 8 ')
             if len(constraints) > 0:

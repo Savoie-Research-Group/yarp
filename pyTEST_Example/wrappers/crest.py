@@ -137,15 +137,17 @@ class CREST:
         # load in crest output
         if os.path.isfile(self.output) is False: return False
 
-        try: lines = open(self.output, 'r', encoding="utf-8").readlines()
-        except:
-            print(f"{self.output} is failed to read. please check it!")
+        try: 
+            lines = open(self.output, 'r', encoding="utf-8").readlines()
             with open(f"{self.output}", 'r') as file:
             #Read the content of the file
                 file_content = file.read()
                 #Print the content
                 print(f"FILE: {self.output}\n")
                 print(f"{file_content}")
+
+        except:
+            print(f"{self.output} is failed to read. please check it!")
 
             return False
 

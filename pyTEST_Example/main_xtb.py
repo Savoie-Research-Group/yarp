@@ -984,14 +984,14 @@ def conf_crest(rxns, logging_queue):
 def read_crest_in_class(rxns, scratch_crest):
     conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
     for i in conf_inchi:
-        if not(os.path.isfile(f"{scratch_crest}/{i}/crest_conformers.xyz")): continue
-        elements, geos = xyz_parse(f"{scratch_crest}/{i}/crest_conformers.xyz", multiple=True)
         with open(f"{scratch_crest}/{i}/{i}-crest.out", 'r') as file:
         #Read the content of the file
             file_content = file.read()
             #Print the content
             print(f"FILE: {scratch_crest}/{i}/{i}-crest.out\n")
             print(f"{file_content}")
+        if not(os.path.isfile(f"{scratch_crest}/{i}/crest_conformers.xyz")): continue
+        elements, geos = xyz_parse(f"{scratch_crest}/{i}/crest_conformers.xyz", multiple=True)
         for count_j, j in enumerate(rxns):
             if j.product_inchi in i:
                 for count_k, k in enumerate(geos):

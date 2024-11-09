@@ -56,6 +56,10 @@ jobs:
                #echo $(pwd)
                $CONDA/bin/xtb --version
                $CONDA/bin/crest --version
+
+               cd $home/crest-test
+               $CONDA/bin/crest HGCIXCUEYOPUTN.xyz -xname -opt vtight -chrg 0 -uhf 0 -gfn2 -nozs -T 1
+               asd
                #pysis --version
                # test Organometallics
                #obabel --version

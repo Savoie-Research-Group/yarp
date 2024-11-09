@@ -31,11 +31,11 @@ jobs:
         pip install 'xgboost==1.7.6'
         pip install 'h5py==3.9.0'
         pip install pysisyphus
-        #conda install -y conda-forge::crest
+        conda install -y conda-forge::crest
         pip install --force-reinstall 'scikit-learn==1.3.0'
         pip install --force-reinstall 'numpy==1.24.4'
         conda install -y conda-forge::xtb
-        conda install -y conda-forge::crest=2.12
+        #conda install -y conda-forge::crest=2.12
         unset CONDA_ALWAYS_YES
         pip install .
         # CHECK
@@ -57,9 +57,10 @@ jobs:
                $CONDA/bin/xtb --version
                $CONDA/bin/crest --version
 
-               cd $home/crest-test
-               $CONDA/bin/crest HGCIXCUEYOPUTN.xyz -xname -opt vtight -chrg 0 -uhf 0 -gfn2 -nozs -T 1
-               asd
+               # test crest #
+               #cd $home/crest-test
+               #$CONDA/bin/crest HGCIXCUEYOPUTN.xyz -xname -opt vtight -chrg 0 -uhf 0 -gfn2 -nozs -T 1
+               #asd
                #pysis --version
                # test Organometallics
                #obabel --version

@@ -65,6 +65,9 @@ class Calculator:
     def Setup(self, package, args, constraints=[], bond_change = []):
         # CREST, used for 'crest' #
         if(package == "CREST"):
+            crest_path = None
+            if not args['crest'] == "crest":
+                crest_path = args['crest']
             JOB = CREST(input_geo=self.input_geo,
                         work_folder=self.work_folder,
                         lot=self.xtb_lot,
@@ -75,7 +78,8 @@ class Calculator:
                         solvent=args['solvent'],
                         solvation_model=args['low_solvation_model'],
                         charge=self.charge,
-                        multiplicity=self.multiplicity)
+                        multiplicity=self.multiplicity,
+                        crest_path=crest_path)
             if args["crest_quick"]: JOB.add_command(additional='-rthr 0.1 -ewin 8 ')
             if len(constraints) > 0:
                     JOB.add_command(distance_constraints = constraints)

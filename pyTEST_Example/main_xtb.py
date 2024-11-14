@@ -577,6 +577,8 @@ def run_gsm_by_pysis(rxns, logging_queue):
         key=[j for j in i.rxn_conf.keys()]
         print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
         for j in key:
+            name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
+            write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
             print(f"key: {j}\n")
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
@@ -1025,7 +1027,7 @@ def run_enumeration(input_mol, args=dict()):
     print(f"{len(products)} cleaned products after find_lewis() filtering")
     rxn=[]
     for count_i, i in enumerate(products):
-        R=reaction(reactant, i, args=args, opt=True)
+        R=reaction(reactant, i, args=args, opt_P=True)
         rxn.append(R)
     return rxn
 

@@ -5,41 +5,60 @@ This is an object-oriented refactoring of yarp methodology to be compatible with
 1. https://www.nature.com/articles/s43588-021-00101-3
 2. https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00081
 
-Documentation:
-
-1. Installation:
-1.1 Anaconda is recommended and you can get YARP repository by:
-
-         git clone https://github.com/Savoie-Research-Group/yarp.git
-
-1.2 Build the YARP environment and install required packages by:
-    
-    cd yarp
-    conda env create -f env.yaml
-
-1.3 Install yarp package by:
-    
-    conda activate yarp
-    pip install .
-
-1.4 Create pysis cmd by:
-    
-    vi ~/.pysisyphusrc
-    
-and in .pysisyphusrc file add:
-    
-    [xtb]
-    cmd=xtb
+# 1. Installation:
+* 1.1 Anaconda is recommended and you can get YARP repository by:
+```
+git clone https://github.com/Savoie-Research-Group/yarp.git
+```
+* 1.2 Build the YARP environment and install required packages by:
+```
+cd yarp
+conda env create -f env_linux.yaml
+```
+* 1.3 Install yarp package by:
+```
+conda activate classy-yarp
+pip install .
+```
+* 1.4 Create pysis cmd by:
+```   
+vi ~/.pysisyphusrc
+``` 
+and in `.pysisyphusrc` file add:
+```
+[xtb]
+cmd=xtb
+```
 Finally, save and quit this file.
 
-2. How to run yarp:
+# 2. Test Your Installation
+* 2.1 First install pytest via:
+```
+pip install pytest
+```
 
-2.1 YARP class:
-    In yarp/yarp folder, several functions are shown, the bond-electron matrix and reaction enumeration are generated via these functions. More details are shown in yarp/examples/reaction.py 
+* 2.2 Do a simple test (few seconds) that reads the structure of Fe(CO)<sub>5</sub> and returns the **bond-electron matrix**:
+```
+cd examples/
+pytest -s
+```
+* 2.3 Then do a more complicated test (10 mins) that runs **YARP-xTB** that includes **geometry optimization**, **conformational sampling**, **joint optimization**, **Grow-String Method (GSM)**, **Berny optimization**, and **IRC**
+```
+cd pyTEST_Example/
+pytest -s
+```
 
-2.2 reaction class:
-    All calculations, including conformational sampling, GSM, and TS characterization, are In yarp/reaction folder. In yarp/reaction/main_xtb.py, the workflow are shown. To run main_xtb.py we need a parameters.yaml file. To build a parameters.yaml file, we will need:
-    
+# 3. How YARP Works:
+
+* 3.1 YARP class:
+    * In yarp/yarp folder, several functions are shown
+    * the bond-electron matrix and reaction enumeration are generated via these functions. More details are shown in `yarp/examples/reaction.py` 
+
+* 3.2 Reaction class:
+    * All calculations, including conformational sampling, GSM, and TS characterization, are In `yarp/reaction` folder.
+    * In `yarp/reaction/main_xtb.py`, the workflow are shown. To run `main_xtb.py` we need a `parameters.yaml` file.
+    * To build a `parameters.yaml` file, we will need:
+```
     input: [reaction folder or reaction file] # it could be a folder (store several xyz, mol, or smiles files) or a xyz, mol, or smiles file.
     scratch: [a path you want to store result]
     reaction_data: [a pickle file] # a pickle to store and load the result
@@ -64,9 +83,10 @@ Finally, save and quit this file.
     multiplicity: [integer] # multiplicity for your system.
     model_path: [your yarp path/reaction/bin] # models we need for yarp.
     gsm_inp: [your yarp path/reaction/bin/inpfileq] # growing string method bin file.
+```
+More details could be found in `parameters.yaml`.
 
-More details could be found in parameters.yaml.
-
-As the parameter file is created, you can run yarp by:
-
-      python main_xtb.py [your parameter yaml file]
+* 3.3 As the `parameter.yaml` file is created, you can run yarp by:
+```
+python main_xtb.py [your parameter yaml file]
+```

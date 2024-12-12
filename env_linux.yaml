@@ -1,0 +1,19 @@
+```
+name: classy-yarp
+channels:
+ - defaults
+ - conda-forge
+dependencies:
+ - defaults::python=3.9
+ - defaults::pandas
+ - defaults::xgboost
+ - defaults::pip
+ - conda-forge::xtb
+ - conda-forge::openbabel
+ - conda-forge::crest
+ - conda-forge::ase
+ - pip:
+   - pysisyphus
+   - rdkit
+   - scikit-learn==1.3.2
+```

@@ -24,11 +24,30 @@ from wrappers.gsm import GSM
 from calculator import Calculator
 
 # YARP methodology by Hsuan-Hao Hsu, Zhao Li, Qiyuan Zhao, and Brett M. Savoie
+
+
 def initialize(args):
+    """
+    This function initializes YARP class variables with user set parameters.
+
+    Parameters
+    ----------
+    args: dict
+            A dictionary generated from the input yaml file provided by the command line:
+            `python main_xtb.py parameters.yaml`
+
+    Yields
+    ------
+    args: dict
+            A modified dictionary that now has all default YARP parameters set.
+    """
+
     keys=[i for i in args.keys()]
+
     if "input" not in keys:
         print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
         exit()
+
     if 'XTB_OPT_Calculator' not in keys:
         args['XTB_OPT_Calculator'] = "PYSIS"
     if 'GSM_Calculator' not in keys:
@@ -41,45 +60,63 @@ def initialize(args):
     else:
         args['SSM'] = bool(args['SSM'])
 
+    # Set location for YARP output files
     if "scratch" not in keys:
         args["scratch"]=f"{os.getcwd()}/yarp_run"
+    
+    # Set up implicit solvation (default is to not use any solvation)
     if "low_solvation" not in keys:
         args["low_solvation"]=False
         args["low_solvation_model"]="alpb"
         args["solvent"]=False
         args["solvation_model"]="CPCM"
     else:
+        # ERM: How on earth is this supposed to be formatted in the input file????
         args["low_solvation_model"], args["solvent"]=args['low_solvation'].split('/')
 
     #Zhao's note: pysis absolute path (user can provide this in yaml file)#
-
     if not ("pysis_path" in keys):
         args["pysis_path"] = "" # Using default
 
+    # ERM: what does method do?
     if "method" not in keys:
         args["method"]="crest"
+    
+    # Provide previously completed YARP data, otherwise create new pickle file
     if "reaction_data" not in keys: args["reaction_data"]="reaction.p"
+    
+    # ERM: what are these?
     if "form_all" not in keys: args["form_all"]=False
     if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
+
+    # Provide commands needed to execute CREST and xTB subprocesses
     if "crest" not in keys: args["crest"]="crest"
     if "xtb" not in keys: args["xtb"]="xtb"
+
+    # Set molecular charge and multiplicity
     if "charge" not in keys:
         print("WARNING: Charge is not provided. Use neutral species (charge=0) as default...")
         args["charge"]=0
     if "multiplicity" not in keys:
         print("WARNING: Multiplicity is not provided. Use closed-shell species (multiplicity=1) as default...")
         args["multiplicity"]=1
+    
+    # Turn on/off product enumeration routine (default is ON)
     if "enumeration" not in keys:
         args["enumeration"]=True
+    
     if "n_break" not in keys:
         args["n_break"]=2
     else: args["n_break"]=int(args['n_break'])
+    
     if "strategy" not in keys:
         args["strategy"]=2
     else: args["strategy"]=int(args["strategy"])
+    
     if "n_conf" not in keys:
         args["n_conf"]=3
     else: args["n_conf"]=int(args["n_conf"])
+    
     #accepting either "nprocs" or "xtb_nprocs"#
     if "xtb_nprocs" in keys:
         args["xtb_nprocs"]=int(args["xtb_nprocs"])
@@ -159,6 +196,8 @@ def initialize(args):
 def main(args:dict):
     #Zhao's note: add this function to avoid recusionerror (reaches max)
     sys.setrecursionlimit(10000)
+
+    # Initialize from input yaml file
     args, logger, logging_queue=initialize(args)
     print(f"""Welcome to
                 __   __ _    ____  ____  
@@ -175,8 +214,11 @@ def main(args:dict):
     else:
         mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
     
+    # Look for previously completed YARP data and load if there. Otherwise, create new pickle file
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
+
+        # Assign (possibly overwrite) arguments from input yaml file to each reaction object
         for rxn in rxns: rxn.args=args
     
     print("-----------------------")
@@ -254,6 +296,17 @@ def main(args:dict):
     return
 
 def run_irc_by_xtb(rxns, logging_queue):
+    """
+    This function runs IRC calculation for each reaction contained in the reaction data pickle file.
+
+    Parameters
+    ----------
+
+
+    Yields
+    ------
+
+    """
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]

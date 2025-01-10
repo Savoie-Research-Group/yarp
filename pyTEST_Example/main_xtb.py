@@ -40,14 +40,27 @@ def initialize(args):
     ------
     args: dict
             A modified dictionary that now has all default YARP parameters set.
+            This will be accessed later on when calling various subroutines in main().
+    
+    logger: (no idea - ERM)
+
+    logging_queue: (no idea - ERM)
+
+
+    ERM thoughts:
+    - Could we set this up as a separate class file? Maybe `read_input.py`?
+    - And maybe it should go in the yarp core directory, so that everyone uses the same input file format.
+    - I think it would also be good to put in some print statements here to let the user know what YARP will be doing.
     """
 
     keys=[i for i in args.keys()]
 
+    # If user didn't provide starting molecules, YARP ain't doing squat
     if "input" not in keys:
         print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
         exit()
 
+    # PYSIS is needed to run xTB and growing string methods (ERM: apparently...)
     if 'XTB_OPT_Calculator' not in keys:
         args['XTB_OPT_Calculator'] = "PYSIS"
     if 'GSM_Calculator' not in keys:
@@ -55,6 +68,7 @@ def initialize(args):
 
     # GSM or SSM #
     # must use the GSM calculator #
+    # ERM: Is SSM not implemented? Or is GSM just the better option?
     if "SSM" not in keys:
         args['SSM'] = False
     else:
@@ -78,17 +92,14 @@ def initialize(args):
     if not ("pysis_path" in keys):
         args["pysis_path"] = "" # Using default
 
-    # ERM: what does method do?
+    # Select method to use for conformational sampling (CREST or RDKit)
+    # ERM: Can we pick a better variable name? YARP is using a lot of "methods" ...
     if "method" not in keys:
         args["method"]="crest"
     
     # Provide previously completed YARP data, otherwise create new pickle file
     if "reaction_data" not in keys: args["reaction_data"]="reaction.p"
     
-    # ERM: what are these?
-    if "form_all" not in keys: args["form_all"]=False
-    if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
-
     # Provide commands needed to execute CREST and xTB subprocesses
     if "crest" not in keys: args["crest"]="crest"
     if "xtb" not in keys: args["xtb"]="xtb"
@@ -104,25 +115,38 @@ def initialize(args):
     # Turn on/off product enumeration routine (default is ON)
     if "enumeration" not in keys:
         args["enumeration"]=True
+
+    # Break/form all possible bonds during product enumeration (default is OFF)
+    if "form_all" not in keys: args["form_all"]=False
     
+    # Choose how many bonds to break/form during product enumeration (default is b2f2)
+    # ERM: This does not seem to allow for b2f1 type enumerations, should we add n_form? Can default to n_form = n_break
     if "n_break" not in keys:
         args["n_break"]=2
     else: args["n_break"]=int(args['n_break'])
+
+    # Set Lewis bond criteria for filtering out duplicate enumerated products
+    if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
     
+    # ERM: Something to do with starting from either a product or a reactant...? What does the default of 2 mean????
     if "strategy" not in keys:
         args["strategy"]=2
     else: args["strategy"]=int(args["strategy"])
     
+    # ERM: This doesn't seem to be used anywhere...?
     if "n_conf" not in keys:
         args["n_conf"]=3
     else: args["n_conf"]=int(args["n_conf"])
-    
+
+    # Set the number of CPUs used by xTB (default is serial)
     #accepting either "nprocs" or "xtb_nprocs"#
     if "xtb_nprocs" in keys:
         args["xtb_nprocs"]=int(args["xtb_nprocs"])
     elif "nprocs" in keys:
         args["xtb_nprocs"]=int(args['nprocs'])
     else: args["xtb_nprocs"]=1
+
+    # Set the number of CPUs used by CREST (default is serial)
     #accepting either "crest_nprocs" or "c_nprocs"#
     if "crest_nprocs" in keys:
         args["crest_nprocs"]=int(args["crest_nprocs"])
@@ -130,10 +154,17 @@ def initialize(args):
         args["crest_nprocs"]=int(args['c_nprocs'])
     else: args["crest_nprocs"]=1
 
+    # Set the memory (in GB) to be used
+    # ERM: Used by what? Great question, at least CREST, and some chirality finder? 
+    # Not sure how this translates to the memory YARP needs per CPU, but that would be nice to figure out
     if "mem" not in keys:
         args["mem"]=1
+    
+    # ERM: What is this? Doesn't seem to be used?
     if "restart" not in keys:
         args["restart"]=False
+    
+    # Set paths to output files for specific subroutines
     args["scratch_xtb"]=f"{args['scratch']}/xtb_run"
     args["scratch_crest"]=f"{args['scratch']}/conformer"
     args["conf_output"]=f"{args['scratch']}/rxn_conf"
@@ -151,6 +182,7 @@ def initialize(args):
         args['crest_path'] = args['crest_path'] + "crest"
 
     #Zhao's note: add user defined constraints based on atom index (starting from 1)
+    # ERM: Ah! Is this related to that "strategy" variable?
     R_constraints = []
     P_constraints = []
 
@@ -174,14 +206,18 @@ def initialize(args):
     args['reactant_dist_constraint'] = R_constraints
     args['product_dist_constraint']  = P_constraints
 
+    # ERM: Add a debug flag to control if these are printed out?
     print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
     print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
 
+    # Chirality of molecules
+    # ERM: Do we only care about chirality for TS optimizations? Not reaction network exploration?
     if not 'reactant_chiral_center' in keys:
         args['reactant_chiral_center'] = 'None'
     if not 'product_chiral_center'  in keys:
         args['product_chiral_center']  = 'None'
 
+    # Set up the magical logger that will run all of the YARP stuff
     logging_path = os.path.join(args["scratch"], "YARPrun.log")
     logging_queue = mp.Manager().Queue(999)
     logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
@@ -191,14 +227,17 @@ def initialize(args):
     logger = logging.getLogger("main")
     logger.addHandler(QueueHandler(logging_queue))
     logger.setLevel(logging.INFO)
+
+
     return args, logger, logging_queue
 
 def main(args:dict):
-    #Zhao's note: add this function to avoid recusionerror (reaches max)
+    #Zhao's note: add this function to avoid recursion error (reaches max)
     sys.setrecursionlimit(10000)
 
-    # Initialize from input yaml file
+    # Initialize all the YARP machinery from input yaml file
     args, logger, logging_queue=initialize(args)
+
     print(f"""Welcome to
                 __   __ _    ____  ____  
                 \ \ / // \  |  _ \|  _ \ 
@@ -207,18 +246,20 @@ def main(args:dict):
                   |_/_/   \_\_| \_\_|
                           // Yet Another Reaction Program
         """)
-    if os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.smi") is True: # Read smiles in
+    
+    # Set up mol variable to hold starter molecule(s)
+    if os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.smi") is True: # Read SMILES
         mol=[i.split('\n')[0] for i in open(args["input"], 'r+').readlines()]
-    elif os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.xyz") is True:
+    elif os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.xyz") is True: # Read XYZ
         mol=[args["input"]]
-    else:
+    else: # Read directory (XYZ or MOL???)
         mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
     
     # Look for previously completed YARP data and load if there. Otherwise, create new pickle file
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
 
-        # Assign (possibly overwrite) arguments from input yaml file to each reaction object
+        # Assign (possibly overwrite) YARP settings to each reaction object
         for rxn in rxns: rxn.args=args
     
     print("-----------------------")
@@ -226,12 +267,15 @@ def main(args:dict):
     print("------Enumeration------")
     print("-----------------------")
     
-    if args["enumeration"]: 
+    if args["enumeration"]:
+        # Perform enumeration for each user-provided molecule
         for i in mol: rxns=run_enumeration(i, args=args)
     elif os.path.isfile(args["reaction_data"]) is False:
+        # ERM: What is happening here???
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
-    
+
+    # Assign unique IDs to each reaction?
     inchi_array=[]
     for i in rxns:
         if i.reactant_inchi not in inchi_array: inchi_array.append(i.reactant_inchi)
@@ -242,6 +286,7 @@ def main(args:dict):
         idx=inchi_dict[inchi]
         i.id=idx
         inchi_dict[inchi]=idx+1
+
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
@@ -1057,19 +1102,43 @@ def read_crest_in_class(rxns, scratch_crest):
     return rxns
 
 def run_enumeration(input_mol, args=dict()):
+    """
+    This function performs product enumeration on a given molecule.
+
+    Parameters
+    ----------
+    input_mol : str
+        The input molecule file in ??? format. Could be SMILES, XYZ, or MOL?
+    
+    args : dict
+        YARP parameters set by user.
+
+    Yields
+    ------
+    rxn : list
+        All enumerated reactions from input molecule.
+
+    """
+    
+    # Extract product enumeration parameters
+    # ERM: Should these parameters be printed out here maybe?
     nb=args["n_break"]
     form_all=args["form_all"]
     criteria=args["lewis_criteria"]
     reactant=yp.yarpecule(input_mol)
     mol=yp.yarpecule(input_mol)
+
     print("Do the reaction enumeration on molecule: {} ({})".format(mol.hash,input_mol))
-    name=input_mol.split('/')[-1].split('.')[0]
+    name=input_mol.split('/')[-1].split('.')[0] # ERM: this isn't used anywhere
+
     # break bonds
     break_mol=list(yp.break_bonds(mol, n=nb))
-    
-    if form_all: products=yp.form_bonds_all(break_mol)
-    else: products=yp.form_n_bonds(break_mol, n=nb)
 
+    # form bonds
+    if form_all: products=yp.form_bonds_all(break_mol)
+    else: products=yp.form_n_bonds(break_mol, n=nb) # ERM: This function needs documented!
+
+    # Remove duplicate products using Lewis bond criteria
     products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<2.0] 
     product=[]
     for _ in products:
@@ -1078,13 +1147,32 @@ def run_enumeration(input_mol, args=dict()):
         else: product.append(_)
     products=product
     print(f"{len(products)} cleaned products after find_lewis() filtering")
+
+    # Store enumerated products in reaction object and return
     rxn=[]
     for count_i, i in enumerate(products):
         R=reaction(reactant, i, args=args, opt_P=True)
         rxn.append(R)
+
     return rxn
 
 def read_rxns(input_mol, args={}):
+    """
+    Wonder what this function does?
+
+    Parameters
+    ----------
+    input_mol : str
+        The input molecule file in ??? format. Could be SMILES, XYZ, or MOL?
+    
+    args : dict
+        YARP parameters set by user.
+
+    Yields
+    ------
+    R : ???
+
+    """
     print(f"Read in reaction: {input_mol}")
     elements, geo= xyz_parse(input_mol, multiple=True)
     xyz_write(".tmp_R.xyz", elements[0], geo[0])

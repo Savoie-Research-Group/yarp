@@ -563,8 +563,21 @@ def is_frag_ethenone(i,adj_mat,elements):
     else:
         return False
 
-# Returns a matrix of graphical separations for all nodes in a graph defined by the inputted adjacency matrix 
 def graph_seps(adj_mat_0):
+    """
+    Returns a matrix of graphical separations for all nodes in a graph defined by the inputted adjacency matrix
+    
+    Parameters
+    ----------
+    adj_mat_0 : array
+            This array is indexed to the atoms in the `yarpecule` and has a one at row i and column j if there is 
+            a bond (of any kind) between the i-th and j-th atoms.
+
+    Returns
+    ----------
+    seps : NDArray
+            What is the final shape of this matrix? (ERM)
+    """
 
     # Create a new name for the object holding A**(N), initialized with A**(1)
     adj_mat = deepcopy(adj_mat_0)

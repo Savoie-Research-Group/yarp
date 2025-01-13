@@ -51,6 +51,7 @@ def initialize(args):
     - Could we set this up as a separate class file? Maybe `read_input.py`?
     - And maybe it should go in the yarp core directory, so that everyone uses the same input file format.
     - I think it would also be good to put in some print statements here to let the user know what YARP will be doing.
+    - Missing arguement? `args["opt"]` is used in `reaction.rxn_conf_generation()`, but not set here.
     """
 
     keys=[i for i in args.keys()]
@@ -128,12 +129,12 @@ def initialize(args):
     # Set Lewis bond criteria for filtering out duplicate enumerated products
     if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
     
-    # ERM: Something to do with starting from either a product or a reactant...? What does the default of 2 mean????
+    # Control conformer generation strategy in reaction object
     if "strategy" not in keys:
         args["strategy"]=2
     else: args["strategy"]=int(args["strategy"])
     
-    # ERM: This doesn't seem to be used anywhere...?
+    # Set number of conformers to generate for each reaction object
     if "n_conf" not in keys:
         args["n_conf"]=3
     else: args["n_conf"]=int(args["n_conf"])
@@ -271,7 +272,7 @@ def main(args:dict):
         # Perform enumeration for each user-provided molecule
         for i in mol: rxns=run_enumeration(i, args=args)
     elif os.path.isfile(args["reaction_data"]) is False:
-        # ERM: What is happening here???
+        # ERM: Is this only triggered when providing a directory of molecules? For TS-opt only?
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
 
@@ -291,6 +292,7 @@ def main(args:dict):
     print("------Second Step------")
     print("Conformational Sampling")
     print("-----------------------")
+
     if args["method"]=='rdkit':
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif args["method"]=='crest':
@@ -352,13 +354,16 @@ def run_irc_by_xtb(rxns, logging_queue):
     ------
 
     """
+    # Set up user-set parameters from one of the reaction objects
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
-    irc_jobs=dict()
 
+
+    irc_jobs=dict()
     selected_Calculator = "PYSIS"
+
     for count, rxn in enumerate(rxns):
         key=[j for j in rxn.TS_xtb.keys()]
         for j in key:
@@ -453,6 +458,24 @@ def run_irc_by_xtb(rxns, logging_queue):
     return rxns
 
 def run_opt_by_xtb(rxns, logging_queue, logger):
+
+    """
+    Optimize geometries of reactants and products for each reaction object using xTB.
+
+    Parameters
+    ----------
+    rxns: list
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM), also it's not used in this function
+
+    Yields
+    ------
+    rxns: list
+
+    """
+    
     args=rxns[0].args
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
@@ -537,6 +560,24 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
     return rxns
 
 def conf_by_crest(rxns, logging_queue, logger):
+
+    """
+    Generate conformers using CREST for each reaction contained in the reaction data pickle file.
+
+    Parameters
+    ----------
+    rxns: list
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+
+    """
+
     rxns=run_opt_by_xtb(rxns, logging_queue, logger)
 
     #exit()
@@ -1158,29 +1199,34 @@ def run_enumeration(input_mol, args=dict()):
 
 def read_rxns(input_mol, args={}):
     """
-    Wonder what this function does?
+    Reads in two XYZ files, reactant and product, and returns a reaction object.
 
     Parameters
     ----------
     input_mol : str
-        The input molecule file in ??? format. Could be SMILES, XYZ, or MOL?
+        Path to directory containing reactant and product XYZ files.
     
     args : dict
         YARP parameters set by user.
 
     Yields
     ------
-    R : ???
+    R : Reaction object
 
     """
+    # Read in reactant and product XYZ files
     print(f"Read in reaction: {input_mol}")
     elements, geo= xyz_parse(input_mol, multiple=True)
+    
+    # Convert to yarpecule objects
     xyz_write(".tmp_R.xyz", elements[0], geo[0])
     reactant=yp.yarpecule(".tmp_R.xyz", canon=False)
     os.system('rm .tmp_R.xyz')
     xyz_write(".tmp_P.xyz", elements[1], geo[1])
     product=yp.yarpecule(".tmp_P.xyz", canon=False)
     os.system('rm .tmp_P.xyz')
+    
+    # Create reaction object and return
     R=reaction(reactant, product, args=args, opt_R=False, opt_P=False)
     return R
 

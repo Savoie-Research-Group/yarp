@@ -30,6 +30,9 @@ class Calculator:
         each one will be translated to the corresponding string accepted by the chosen calculator
         """
         keys=[i for i in args.keys()]
+
+        self.verbose = args['verbose']
+
         if not 'dft_mix_basis' in keys:
             args['dft_mix_basis'] = []
         if not 'dft_mix_lot' in keys:
@@ -58,9 +61,10 @@ class Calculator:
         self.solvation_model = args["solvation_model"]
         self.grid        = 2
         self.writedown_xyz   = True
-        print(f"self.lot: {self.lot}\n")
-        print(f"self.mix_basis: {self.mix_basis}\n")
-        print(f"self.mix_lot:   {self.mix_lot}\n")
+        if args['verbose']:
+            print(f"self.lot: {self.lot}\n")
+            print(f"self.mix_basis: {self.mix_basis}\n")
+            print(f"self.mix_lot:   {self.mix_lot}\n")
 
     def Setup(self, package, args, constraints=[], bond_change = []):
         # CREST, used for 'crest' #
@@ -102,7 +106,8 @@ class Calculator:
                       solvent=args['solvent'], 
                       solvation_model=args['low_solvation_model'], 
                       SSM = args["SSM"], 
-                      bond_change = bond_change)
+                      bond_change = bond_change, 
+                      verbose = self.verbose)
             JOB.prepare_job()
             return JOB
         # PYSIS: used for geo optimization, ts-optimization (xtb), gsm (jobtype=string, coord_type="cart"), irc (jobtype=irc)#
@@ -198,7 +203,8 @@ class Calculator:
                             mix_lot=self.mix_lot,
                             charge=self.charge,
                             multiplicity=self.multiplicity, solvent=self.solvent, solvation_model=self.solvation_model,
-                            dielectric=self.dielectric, dispersion=self.dispersion)
+                            dielectric=self.dielectric, dispersion=self.dispersion,
+                            verbose = self.verbose)
 
             JOB.check_restart(use_chk = True)
             if(self.jobtype=="copt"):

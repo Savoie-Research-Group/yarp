@@ -26,6 +26,11 @@ from calculator import Calculator
 
 def main(args:dict):
     keys = [i for i in args.keys()]
+
+    if "verbose" not in keys:
+        args['verbose'] = False
+    else: args['verbose'] = bool(args['verbose'])
+
     if args["solvation"]: args["solvation_model"], args["solvent"]=args["solvation"].split('/')
     else: args["solvation_model"], args["solvent"]="CPCM", False
     args["scratch_dft"]=f'{args["scratch"]}/DFT'
@@ -84,7 +89,8 @@ def main(args:dict):
             adj_diff_RP=np.abs(rxns[count].product.adj_mat - rxns[count].reactant.adj_mat)
             # Get the elements that are non-zero #
             RP_diff_Atoms = np.where(adj_diff_RP.any(axis=1))[0]
-            print(f"Atoms {RP_diff_Atoms} have changed between reactant/product\n")
+            if args['verbose']:
+                print(f"Atoms {RP_diff_Atoms} have changed between reactant/product\n")
             rxns[count].args['Reactive_Atoms'] = RP_diff_Atoms
         treat_mix_lot_metal_firstLayer(rxns[count].args, i.reactant.elements, i.reactant.geo)
         treat_mix_lot_metal_firstLayer(rxns[count].args, i.product.elements,  i.product.geo)
@@ -260,11 +266,12 @@ def run_dft_tsopt(rxns):
         elif args["skip_low_TS"] is True: key=[i for i in rxn.TS_guess.keys()]
         elif args["skip_low_IRC"] is True: key=[i for i in rxn.TS_xtb.keys()]
         else: key=[i for i in rxn.IRC_xtb.keys() if rxn.IRC_xtb[i]["type"]=="Intended" or rxn.IRC_xtb[i]["type"]=="P_unintended"]
-        print(f"TSOPT: Checking COPT Keys: {key}\n")
+        if args['verbose']:
+            print(f"TSOPT: Checking COPT Keys: {key}\n")
         for ind in key:
             rxn_ind=f"{rxn.reactant_inchi}_{rxn.id}_{ind}"
             wf=f"{scratch_dft}/{rxn.reactant_inchi}_{rxn.id}_{ind}"
-            print(f"rxn_index: {rxn_ind}\n", flush = True)
+            if args["verbose"]: print(f"rxn_index: {rxn_ind}\n", flush = True)
 
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{rxn_ind}.xyz"
@@ -362,9 +369,10 @@ def run_dft_tsopt(rxns):
                     rxns[count].TS_dft[dft_lot][conf_i]["thermal"]=dft_opt.get_thermal()
                     rxns[count].TS_dft[dft_lot][conf_i]["SPE"]=dft_opt.get_energy()
                     rxns[count].TS_dft[dft_lot][conf_i]["imag_mode"]=dft_opt.get_imag_freq_mode()
-                    print(f"SPE: {rxns[count].TS_dft[dft_lot][conf_i]['SPE']}\n")
-                    print(f"GibbsFreeEnergy: {rxns[count].TS_dft[dft_lot][conf_i]['thermal']['GibbsFreeEnergy']}\n")
-                    print(f"imag_mode: {rxns[count].TS_dft[dft_lot][conf_i]['imag_mode']}\n")
+                    if args['verbose']:
+                        print(f"SPE: {rxns[count].TS_dft[dft_lot][conf_i]['SPE']}\n")
+                        print(f"GibbsFreeEnergy: {rxns[count].TS_dft[dft_lot][conf_i]['thermal']['GibbsFreeEnergy']}\n")
+                        print(f"imag_mode: {rxns[count].TS_dft[dft_lot][conf_i]['imag_mode']}\n")
         elif not dft_opt.calculation_terminated_normally():
             print(f"TSOPT/FullTZ fails for {i}, Please Check!\n")
         elif not dft_opt.is_TS():
@@ -401,12 +409,12 @@ def FullTZCorrection(opt_jobs, args, stable_conf = ""):
 
     # RP FullTZ 
     key=[i for i in opt_jobs.keys()]
-    print(f"Redo FullTZ: Checking TS_dft Keys: {key}\n")
+    if args['verbose']: print(f"Redo FullTZ: Checking TS_dft Keys: {key}\n")
     for ind in key:
         orca_opt=opt_jobs[ind]
         rxn_ind=ind
         wf=f"{scratch_dft}/{rxn_ind}"
-        print(f"rxn_index: {rxn_ind}\n", flush = True)
+        if args['verbose']: print(f"rxn_index: {rxn_ind}\n", flush = True)
 
         ele, geo=orca_opt.get_final_structure()
 
@@ -437,8 +445,9 @@ def FullTZCorrection(opt_jobs, args, stable_conf = ""):
 
         opt_jobs[rxn_ind]=dft_job
         if dft_job.calculation_terminated_normally() is False: running_jobs.append(rxn_ind)
-        print(f"Checked dft_job: {opt_jobs}\n")
-        print(f"Going to run: {running_jobs}\n")
+        if args['verbose']:
+            print(f"Checked dft_job: {opt_jobs}\n")
+            print(f"Going to run: {running_jobs}\n")
 
     if len(running_jobs)>0:
         n_submit=len(running_jobs)//int(args["dft_njobs"])
@@ -650,10 +659,10 @@ def is_alpha_and_numeric(s):
 
 #Zhao's note: a function that automatically checks the multiplicity based on the number of electrons#
 #Check if the total electron compatible with imposed multiplicity, if not, return the lowest multiplicity
-def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge):
+def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge, verbose = False):
     return_multiplicity = Imposed_multiplicity
     total_electron = sum([el_to_an[E.lower()] for E in Elements]) + net_charge
-    print(f"molecule: {inchi}, Total electron: {total_electron}\n")
+    if verbose: print(f"molecule: {inchi}, Total electron: {total_electron}\n")
     #Get the lowest possible multiplicity#
     lowest_multi = total_electron % 2 + 1
     #if(abs(Imposed_multiplicity - lowest_multi) % 2 > 0):
@@ -678,7 +687,7 @@ def run_dft_opt(rxns):
         adj_diff_RP=np.abs(rxns[0].product.adj_mat - rxns[0].reactant.adj_mat)
         # Get the elements that are non-zero #
         non_zero_row_indices = np.where(adj_diff_RP.any(axis=1))[0]
-        print(f"Atoms {non_zero_row_indices} have changed between reactant/product\n")
+        if args['verbose']: print(f"Atoms {non_zero_row_indices} have changed between reactant/product\n")
         
     #exit()
 
@@ -701,7 +710,7 @@ def run_dft_opt(rxns):
                     index_position = E.index(NEWMiXbASiS[0])
                     NEWMiXbASiS[0] = ''.join(i for i in NEWMiXbASiS[0] if not i.isdigit()) + str(index_position)
                 mix_basis_dict[separated_key].append(NEWMiXbASiS)
-            print(f"mix_basis_dict: {mix_basis_dict}\n")
+            if args['verbose']: print(f"mix_basis_dict: {mix_basis_dict}\n")
         #Finally, eliminate the numbers in E and put it back into inchi_dict[inchi]
         E = [''.join(i for i in a if not i.isdigit()) for a in E]
         inchi_dict[separated_key][0] = E
@@ -716,12 +725,12 @@ def run_dft_opt(rxns):
             #Zhao's note: add charge
             if bool(rxn.reactant_conf) is True and "-" not in rxn.reactant_inchi:
                 stable_conf[rxn.reactant_inchi]=[rxn.reactant.elements, rxn.reactant_conf[0], args["charge"]]
-                print(f"reactant_inchi GEO: {rxn.reactant_conf[0]}\n", flush = True)
+                if args['verbose']: print(f"reactant_inchi GEO: {rxn.reactant_conf[0]}\n", flush = True)
 
         if rxn.product_inchi not in stable_conf.keys():
             if bool(rxn.product_conf) is True and "-" not in rxn.product_inchi:
                 stable_conf[rxn.product_inchi]=[rxn.product.elements, rxn.product_conf[0], args["charge"]]
-                print(f"product_inchi GEO: {rxn.product_conf[0]}\n", flush = True)
+                if args['verbose']: print(f"product_inchi GEO: {rxn.product_conf[0]}\n", flush = True)
 
     # collect inchi from reaction classes
     all_inchi=dict()
@@ -802,7 +811,7 @@ def run_dft_opt(rxns):
                 E, G, _ = opt_job[inchi].get_stable_conformer()
                 Q = inchi_dict[inchi][2]
                 stable_conf[inchi]=[E, G, Q]
-                print(f"{inchi} CREST stable\n")
+                if args["verbose"]: print(f"{inchi} CREST stable\n")
 
     #exit()
 
@@ -825,7 +834,7 @@ def run_dft_opt(rxns):
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{inchi}.xyz"
             xyz_write(inp_xyz, E, G)
-            print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
+            if args['verbose']: print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
 
             Input = Calculator(args)
             Input.input_geo   = inp_xyz
@@ -866,7 +875,7 @@ def run_dft_opt(rxns):
 
         dft_dict=dict()
         for dft_job in dft_job_list:
-            print(f"dft job name: {dft_job.jobname}\n", flush = True)
+            if args["verbose"]: print(f"dft job name: {dft_job.jobname}\n", flush = True)
             jobtype_name = "-OPT"
             if(args['dft_fulltz_level_correction']):
                 jobtype_name = "-FullTZ"
@@ -878,7 +887,7 @@ def run_dft_opt(rxns):
                 CONVERGE = True
 
             if CONVERGE:
-                print(f"{inchi} OPT converged\n", flush = True)
+                if args['verbose']: print(f"{inchi} OPT converged\n", flush = True)
                 imag_freq, _=dft_job.get_imag_freq()
                 if len(imag_freq) > 0:
                     print("WARNING: imaginary frequency identified for molecule {inchi}...")
@@ -932,13 +941,14 @@ def run_dft_opt(rxns):
 def find_all_seps(rxns, args):
     inchi_dict=dict()
     for rxn in rxns:
-        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R")
+        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R", verbose = args['verbose'])
         key=[i for i in tmp_dict.keys()]
 
-        original_r_inchi = return_inchikey(rxn.reactant)
+        original_r_inchi = return_inchikey(rxn.reactant, verbose = args['verbose'])
 
-        print(f"reactant key: {key}\n")
-        print(f"original_r_inchi: {original_r_inchi}\n")
+        if args['verbose']:
+            print(f"reactant key: {key}\n")
+            print(f"original_r_inchi: {original_r_inchi}\n")
 
         reactant_separable = False
         product_separable  = False
@@ -953,8 +963,8 @@ def find_all_seps(rxns, args):
         n_reactant_inchi = len(inchi_dict)
 
         if rxn.args["backward_DE"]:
-            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P")
-            original_p_inchi = return_inchikey(rxn.product)
+            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P", verbose = args['verbose'])
+            original_p_inchi = return_inchikey(rxn.product, verbose = args['verbose'])
 
             key=[i for i in tmp_dict.keys()]
             for i in key:

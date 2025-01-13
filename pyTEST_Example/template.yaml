@@ -1,3 +1,4 @@
+verbose: False
 # Note that a bimolecular reaction is recommended to use .xyz or .mol file
 # Enumetation part
 #input:  {current_path}/reaction_xyz/DA.xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles

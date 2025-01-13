@@ -9,7 +9,7 @@ from yarp.input_parsers import xyz_parse
 from constants import Constants
 
 class GSM:
-    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb', SSM = False, bond_change = []):
+    def __init__(self, input_geo, input_file, work_folder=os.getcwd(), method= 'xtb',lot="gfn2", jobname='gsmjob', jobid=1, nprocs=1, charge=0, multiplicity=1, solvent=False, solvation_model='alpb', SSM = False, bond_change = [], verbose = False):
         """
         Initialize a GSM job class
         input_geo: a xyz file containing the input geometry of reactant and product
@@ -24,6 +24,8 @@ class GSM:
            4. tm2orca.py, ograd_xtb, gscreate and qend are for xTB and QChem, please do not touch them.        
 
         """
+        self.verbose      = verbose
+
         self.input_geo    = input_geo
         self.input_file   = input_file
         self.work_folder  = work_folder
@@ -93,21 +95,21 @@ class GSM:
             os.system(f'cp {self.source_path}/scripts/tm2orca.py {self.work_folder}/scratch')
             os.system(f'cp {self.source_path}/bin/gsm.orca {self.work_folder}')
             os.system(f'cp {self.input_file} {self.work_folder}/inpfileq')
-            print(f"Finish preparing working environment for GSM-xTB job {self.jobname}")
+            if self.verbose: print(f"Finish preparing working environment for GSM-xTB job {self.jobname}")
         elif self.method.lower() == 'orca':
             self.write_ograd()
             os.system(f'cp {self.source_path}/bin/gsm.orca {self.work_folder}')
             os.system(f'cp {self.input_file} {self.work_folder}')
             #os.system(f'cp {self.input_file} {self.work_folder}/inpfileq')
             #os.system(f'cp {self.source_path}/scripts/tm2orca.py {self.work_folder}/scratch')
-            print(f"Finish preparing working environment for GSM-Orca job {self.jobname}")
+            if self.verbose: print(f"Finish preparing working environment for GSM-Orca job {self.jobname}")
         elif self.method.lower() == 'qchem':
             self.write_ograd()
             os.system(f'cp {self.source_path}/scripts/qstart {self.work_folder}')
             os.system(f'cp {self.source_path}/scripts/qend {self.work_folder}')
             os.system(f'cp {self.source_path}/bin/gsm.qchem {self.work_folder}')
             os.system(f'cp {self.input_file} {self.work_folder}')
-            print(f"Finish preparing working environment for GSM-QChem job {self.jobname}")
+            if self.verbose: print(f"Finish preparing working environment for GSM-QChem job {self.jobname}")
         else:
             print("Current version only supports xTB/Orca/QChem as QC Engines, other packages will be added in the future")
 
@@ -189,15 +191,16 @@ class GSM:
         for line in reversed(lines):
             if 'string E (kcal/mol)' in line:# and 'kcal' in line:
                 energies = [float(i) for i in line.split()[3:]]
-                print(f"string E (kcal/mol) line: {line}\n", flush = True)
-                print("Found string E (kcal/mol)\n", flush = True)
+                if self.verbose: 
+                    print(f"string E (kcal/mol) line: {line}\n", flush = True)
+                    print("Found string E (kcal/mol)\n", flush = True)
                 break
             #if 'V_profile:' in line:
             #    energies = [float(i) for i in line.split()[1:]]
             #    print(f"V_profile line: {line}\n", flush = True)
             #    print("Found V_profile!\n", flush = True)
             #    break
-        print(f"energies: {energies}\n", flush = True)
+        if self.verbose: print(f"energies: {energies}\n", flush = True)
         if len(energies) == 0: return False
         
         # check energies

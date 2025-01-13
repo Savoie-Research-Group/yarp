@@ -17,7 +17,7 @@ import re
 
 class Gaussian:
     def __init__(self, input_geo, work_folder=os.getcwd(), lot='B3LYP/6-31G*', mix_basis=False, mix_lot=[], jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
-                 solvent=False, dielectric=0.0,solvation_model='PCM', dispersion=False):
+                 solvent=False, dielectric=0.0,solvation_model='PCM', dispersion=False, verbose = False):
         """
         Initialize an Gaussian job class
         input_geo: a xyz file containing the input geometry
@@ -29,6 +29,8 @@ class Gaussian:
         solvent: if False, will not call solvation model, otherwise specify water, THF, etc.
         solvation_model: select from PCM, CPCM, SMD
         """
+        self.verbose      = verbose
+
         self.input_geo    = input_geo
         self.work_folder  = work_folder
         self.gjf          = f'{work_folder}/{jobname}.gjf'
@@ -40,7 +42,7 @@ class Gaussian:
         # mix basis set information #
         self.mix_basis    = mix_basis
         self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
-        print(f"mix_lot: {self.mix_lot}\n")
+        if verbose: print(f"mix_lot: {self.mix_lot}\n")
         self.mix_summary  = dict()
         self.jobname      = jobname
         self.output       = f'{work_folder}/{jobname}.out'
@@ -130,7 +132,7 @@ class Gaussian:
                 # H  0 x y z
                 # constraint on C and fully optimize on H
                 self.xyz=f"{self.charge} {self.multiplicity}\n"
-                print(f"Generating constraint: {constraints}\n")
+                if verbose: print(f"Generating constraint: {constraints}\n")
                 for count_i, i in enumerate(self.elements):
                     extra_term = ""
                     # check constraints
@@ -229,7 +231,7 @@ class Gaussian:
         # identify the position of the final frequencies
         for count, line in enumerate(reversed(lines)):
             if 'imaginary frequencies (negative' in line:
-                print(f"line: {line}")
+                if self.verbose: print(f"line: {line}")
                 N_imag = int(line.split()[1])
                 imag_line = len(lines) - count - 1
                 break
@@ -255,8 +257,9 @@ class Gaussian:
         Check if this is a ture transition state after TS optimization 
         """
         imag_freq, N_imag = self.get_imag_freq()
-        print(f"imag_freq: {imag_freq}\n")
-        print(f"N_imag: {N_imag}\n")
+        if self.verbose: 
+            print(f"imag_freq: {imag_freq}\n")
+            print(f"N_imag: {N_imag}\n")
         if N_imag == 1 and abs(imag_freq[0]) > 5: return True
         else: return False
 
@@ -449,10 +452,10 @@ class Gaussian:
             if chk_files:
                 # Get the latest file by modification time
                 latest_file = max(chk_files, key=os.path.getmtime)
-                print(f"The latest .chk file is: {latest_file}")
+                if self.verbose: print(f"The latest .chk file is: {latest_file}")
                 self.chkfile = latest_file
             else:
-                print(f"no chk files. Cannot restart\n")
+                self.verbose: print(f"no chk files. Cannot restart\n")
                 return
         else:
             # read latest xyz file

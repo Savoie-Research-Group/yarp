@@ -25,19 +25,19 @@ from utils import *
 from yarp.taffi_functions import table_generator, xyz_write
 from yarp.find_lewis import find_lewis
 
-def generate_rxn_conf_FIX(rxn, logging_queue):
+def generate_rxn_conf_FIX(rxn, logging_queue, verbose = False):
         #rxn, logging_queue = input_data
         rxn.rxn_conf_generation(logging_queue)
-        print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
+        if verbose: print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
         #input_data_list[i] = (rxn, logging_queue)
     #return rxn
 
-def generate_rxn_conf(input_data_list):
+def generate_rxn_conf(input_data_list, verbose = False):
     rxn_list = []
     for i, input_data in enumerate(input_data_list):
         rxn, logging_queue = input_data
         rxn.rxn_conf_generation(logging_queue)
-        print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
+        if verbose: print(f"input: {input_data}, rxn: {rxn}, rxn.rxn_conf: {rxn.rxn_conf.keys()}\n")
         input_data_list[i] = (rxn, logging_queue)
         rxn_list.append(rxn)
     return rxn_list
@@ -268,7 +268,7 @@ def print_all_elements(diccct):
         for attribute, value in diccct.__dict__.items():
             print(f"{attribute}: {value}")
 
-def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
+def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False):
     #Zhao's note: pass the total charge as well #
     ''' Function to separate molecules and return a dictionary of each segment '''
     #Zhao's note: add charge for each molecule into the mols dict#
@@ -284,7 +284,7 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
     # take the first one bond_mat
     bond_mat = bond_mat[0]
 
-    #print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
+    if verbose: print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
 
     for i in range(len(gs)):
         if i not in loop_ind:
@@ -297,8 +297,8 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
     for group in groups:
         # parse element and geometry of each fragment
         N_atom = len(group)
-        #for ind in group:
-        #    print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
+        for ind in group:
+            if verbose: print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
         #Zhao's note: might consider return "Element + index" for better control
         frag_E = [E[ind] for ind in group]
         frag_G = np.zeros([N_atom,3])
@@ -307,9 +307,11 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
         group_bond_mat = [bond_mat[a] for a in group]
         group_formal = return_formals(group_bond_mat, frag_E)
         frag_Charge = int(sum(group_formal))
-        print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n")
-        #print(f"group_bond_mat is {group_bond_mat}\n")
-        #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
+
+        if verbose: 
+            print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n")
+            #print(f"group_bond_mat is {group_bond_mat}\n")
+            #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
 
         for count_i,i in enumerate(group):
             frag_G[count_i,:] = G[i,:]
@@ -334,9 +336,9 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep'):
         #Zhao's note: take the first 14 letters
         inchikey = inchikey[:14]
         os.system("mv .tmp.mol " + inchikey + ".mol")
-        print(f"mol inchikey is {inchikey}\n")
+        if verbose: print(f"mol inchikey is {inchikey}\n")
         original_inchi = return_inchikey(molecule)
-        print(f"original RP molecule inchi is {original_inchi}\n")
+        if verbose: print(f"original RP molecule inchi is {original_inchi}\n")
         #exit()
         #Zhao's note: consider return "Element + index" for better control
         frag_E = [E[ind]+str(ind) for ind in group]

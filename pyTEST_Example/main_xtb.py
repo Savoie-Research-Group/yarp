@@ -26,6 +26,10 @@ from calculator import Calculator
 # YARP methodology by Hsuan-Hao Hsu, Zhao Li, Qiyuan Zhao, and Brett M. Savoie
 def initialize(args):
     keys=[i for i in args.keys()]
+    if "verbose" not in keys:
+        args['verbose'] = False
+    else: args['verbose'] = bool(args['verbose'])
+
     if "input" not in keys:
         print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
         exit()
@@ -132,7 +136,7 @@ def initialize(args):
             exit()
         for a in range(0, int(len(inp_list) / 3)):
             arg_list = [int(inp_list[a * 3]), int(inp_list[a * 3 + 1]), float(inp_list[a * 3 + 2])]
-            print(f"P_constraints: {arg_list}\n")
+            if args["verbose"]: print(f"P_constraints: {arg_list}\n")
             P_constraints.append(arg_list)
     args['reactant_dist_constraint'] = R_constraints
     args['product_dist_constraint']  = P_constraints
@@ -373,11 +377,13 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
 
         R_constraint.extend(args['reactant_dist_constraint'])
         P_constraint.extend(args['product_dist_constraint'])
-        print(f"R_constraint: {R_constraint}\n")
-        print(f"P_constraint: {P_constraint}\n")
 
-        print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
-        print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
+        if args['verbose']:
+            print(f"R_constraint: {R_constraint}\n")
+            print(f"P_constraint: {P_constraint}\n")
+
+            print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
+            print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
 
         # SETUP CALCULATION #
         selected_Calculator = args['XTB_OPT_Calculator']
@@ -454,9 +460,10 @@ def conf_by_crest(rxns, logging_queue, logger):
     thread=nprocs//c_nprocs
     print(rxns)
     for rxn in rxns:
-        print(rxn)
-        print(f"product_inchi:  {rxn.product_inchi}\n")
-        print(f"reactant_inchi: {rxn.reactant_inchi}\n")
+        if args["verbose"]:
+            print(rxn)
+            print(f"product_inchi:  {rxn.product_inchi}\n")
+            print(f"reactant_inchi: {rxn.reactant_inchi}\n")
         R_constraint=return_metal_constraint(rxn.reactant)
         P_constraint=return_metal_constraint(rxn.product)
 
@@ -485,7 +492,7 @@ def conf_by_crest(rxns, logging_queue, logger):
                 #if len(P_constraint) > 0:
                 #    crest_job.add_command(distance_constraints = P_constraint)
 
-                print(f"CREST JOB: {crest_job}\n")
+                if args['verbose']: print(f"CREST JOB: {crest_job}\n")
                 if not crest_job.calculation_terminated_normally(): crest_job_list.append(crest_job)
         if args["strategy"]!=1:
             if rxn.reactant_inchi not in inchi_list:
@@ -508,11 +515,13 @@ def conf_by_crest(rxns, logging_queue, logger):
                 Input.nproc=c_nprocs
                 crest_job=Input.Setup("CREST", args, R_constraint)
 
-                print(f"CREST JOB: {crest_job}\n")
+                if args["verbose"]: print(f"CREST JOB: {crest_job}\n")
                 if not crest_job.calculation_terminated_normally(): crest_job_list.append(crest_job)
     input_job_list=[(crest_job, logging_queue) for crest_job in crest_job_list]
-    print(f"crest_job_list: {crest_job_list}\n")
-    print(f"input_job_list: {input_job_list}\n")
+
+    if args["verbose"]:
+        print(f"crest_job_list: {crest_job_list}\n")
+        print(f"input_job_list: {input_job_list}\n")
     #exit()
     Parallel(n_jobs=thread)(delayed(run_crest)(*task) for task in input_job_list)
     rxns=read_crest_in_class(rxns, scratch_crest)
@@ -556,7 +565,7 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
     tsopt_job_list = check_dup_ts_pysis(tsopt_job_list, logger)
     for tsopt_job in tsopt_job_list:
         TSE, TSG = tsopt_job.get_final_ts()
-        print(f"tsopt_job: {tsopt_job}, TSG: {TSG}\n")
+        if args['verbose']: print(f"tsopt_job: {tsopt_job}, TSG: {TSG}\n")
         ind=tsopt_job.jobname
         ind=ind.split('_')
         inchi, idx, conf_i=ind[0], int(ind[1]), int(ind[2])
@@ -579,7 +588,7 @@ def run_gsm_by_pysis(rxns, logging_queue):
         for j in key:
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
-            print(f"key: {j}\n")
+            if args["verbose"]: print(f"key: {j}\n")
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             rxn_folder.append(wf)
@@ -589,12 +598,12 @@ def run_gsm_by_pysis(rxns, logging_queue):
             #Zhao's debug: get bond mat for reactant/product confs
             rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
             pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
-
-            print(f"rconf_adj: {rconf_adj}\n")
-            print(f"pconf_adj: {pconf_adj}\n")
+            if args['verbose']:
+                print(f"rconf_adj: {rconf_adj}\n")
+                print(f"pconf_adj: {pconf_adj}\n")
 
             rows, cols = np.where(rconf_adj != pconf_adj)
-            print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
+            if args['verbose']: print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
 
             react_adj = rconf_adj - pconf_adj
             break_rows, break_cols = np.where(react_adj > 0)
@@ -610,9 +619,10 @@ def run_gsm_by_pysis(rxns, logging_queue):
             bond_changes = []; bond_changes.extend(add_bonds); bond_changes.extend(break_bonds);
             all_conf_bond_changes.append(bond_changes)
 
-            print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
-            print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
-            print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
+            if args["verbose"]:
+                print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
+                print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
+                print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
     gsm_thread=min(nprocs, len(rxn_folder))
     gsm_jobs={}
     
@@ -636,7 +646,7 @@ def run_gsm_by_pysis(rxns, logging_queue):
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
 
-    print(f"gsm_job_list: {gsm_job_list}, input_job_list: {input_job_list}\n")
+    if args['verbose']: print(f"gsm_job_list: {gsm_job_list}, input_job_list: {input_job_list}\n")
 
     if(args['GSM_Calculator'] == "PYSIS"): Parallel(n_jobs=gsm_thread)(delayed(run_pysis)(*task) for task in input_job_list)
     elif(args['GSM_Calculator'] == "GSM"): Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
@@ -646,8 +656,9 @@ def run_gsm_by_pysis(rxns, logging_queue):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
         elif os.path.isfile(f"{gsm_job.work_folder}/splined_hei.xyz") is True:
-            print(f"GSM job {gsm_job.work_folder} exist\n")
-            print(f"GSM job {gsm_job.jobname} is coverged!")
+            if args["verbose"]: 
+                print(f"GSM job {gsm_job.work_folder} exist\n")
+                print(f"GSM job {gsm_job.jobname} is coverged!")
             TSE, TSG=xyz_parse(f"{gsm_job.work_folder}/splined_hei.xyz")
             # Read guess TS into reaction class
             ind=gsm_job.jobname
@@ -674,11 +685,13 @@ def run_gsm_by_xtb(rxns, logging_queue):
             rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
             pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
 
-            print(f"rconf_adj: {rconf_adj}\n")
-            print(f"pconf_adj: {pconf_adj}\n")
+            if args['verbose']:
+                print(f"rconf_adj: {rconf_adj}\n")
+                print(f"pconf_adj: {pconf_adj}\n")
 
             rows, cols = np.where(rconf_adj != pconf_adj)
-            print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
+            if args['verbose']:
+                print(f"rconf_adj - pconf_adj: rows: {rows}, cols: {cols} \n")
 
             react_adj = rconf_adj - pconf_adj
             break_rows, break_cols = np.where(react_adj > 0)
@@ -694,9 +707,10 @@ def run_gsm_by_xtb(rxns, logging_queue):
             bond_changes = []; bond_changes.extend(add_bonds); bond_changes.extend(break_bonds);
             all_conf_bond_changes.append(bond_changes)
 
-            print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
-            print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
-            print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
+            if args['verbose']:
+                print(f"break bonds: rows: {break_rows}, cols: {break_cols}\n")
+                print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
+                print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
 
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
@@ -767,9 +781,9 @@ def select_rxn_conf(rxns, logging_queue):
                     rg = geo[0]
                     pg = geo[1]
                     rxns[rxni].rxn_conf[j]={"R": rg, "P": pg}
-                    print(f"rxns[rxni].rxn_conf[j]: {rxns[rxni].rxn_conf[j]}\n")
+                    if args['verbose']: print(f"rxns[rxni].rxn_conf[j]: {rxns[rxni].rxn_conf[j]}\n")
             key=[j for j in rxns[rxni].rxn_conf.keys()]
-            print(f"rxn: {rxni}, rxn_name: {rxn_conf_name}, key: {key}\n")
+            if args['verbose']: print(f"rxn: {rxni}, rxn_name: {rxn_conf_name}, key: {key}\n")
     else:
         
         thread=min(nprocs, len(rxns))
@@ -783,7 +797,7 @@ def select_rxn_conf(rxns, logging_queue):
             chunks.append(input_data_list[startidx:endidx])
             startidx=endidx
         rxn_list = Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
-        print(f"rxn_list: {len(rxn_list)}\n")
+        if args['verbose']: print(f"rxn_list: {len(rxn_list)}\n")
 
         #rxns=modified_rxns
         
@@ -795,7 +809,7 @@ def select_rxn_conf(rxns, logging_queue):
                 key=[j for j in rxns[count].rxn_conf.keys()]
                 chunk_key=[j for j in rxn.rxn_conf.keys()]
                 count += 1
-                print(f"generate_rxn_conf DONE: rxn: {rxn}, rxn.rxn_conf.keys: {key}, chunk_key: {chunk_key}\n")
+                if args['verbose']: print(f"generate_rxn_conf DONE: rxn: {rxn}, rxn.rxn_conf.keys: {key}, chunk_key: {chunk_key}\n")
         #exit()
         '''
         count = 0
@@ -815,7 +829,7 @@ def select_rxn_conf(rxns, logging_queue):
 def read_crest_in_class_isomer(rxn, scratch_crest, name):
     #conf_inchi=[inchi for inchi in os.listdir(scratch_crest) if os.path.isdir(scratch_crest+'/'+inchi)]
     elements, geos = xyz_parse(f"{scratch_crest}/{name}/crest_conformers.xyz", multiple=True)
-    print(f"{name}, there are {len(geos)} conformers\n")
+    if args['verbose']: print(f"{name}, there are {len(geos)} conformers\n")
     if name.startswith("P"):
         current_conf = len(rxn.product_conf)
         for count_k, k in enumerate(geos):
@@ -829,7 +843,7 @@ def read_crest_in_class_isomer(rxn, scratch_crest, name):
 
 #Zhao's note: enumerate the chirality of interest for both reactant and product#
 def enumerate_chirality(rxns, logging_queue):
-    print(f"Enumerating CHIRALITY!!!\n")
+    if args['verbose']: print(f"Enumerating CHIRALITY!!!\n")
     chunks=[]
     input_rxns=[]
     args=rxns[0].args
@@ -848,8 +862,9 @@ def enumerate_chirality(rxns, logging_queue):
         R_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("reactant.mol")
         P_molecule_from_smiles = Prepare_mol_file_to_xyz_smiles_for_chiralEnum("product.mol")
 
-        print(f"Enumerate Reactant Isomers, Chiral Center: {Chem.FindMolChiralCenters(R_molecule_from_smiles)}\n")
-        print(f"Enumerate Product Isomers, Chiral Center: {Chem.FindMolChiralCenters(P_molecule_from_smiles)}\n")
+        if arg['verbose']:
+            print(f"Enumerate Reactant Isomers, Chiral Center: {Chem.FindMolChiralCenters(R_molecule_from_smiles)}\n")
+            print(f"Enumerate Product Isomers, Chiral Center: {Chem.FindMolChiralCenters(P_molecule_from_smiles)}\n")
         R_Isomers = Generate_Isomers(R_molecule_from_smiles, R_chiral_center)
         P_Isomers = Generate_Isomers(P_molecule_from_smiles, P_chiral_center)
         Write_Isomers(R_Isomers, "R_Isomer")
@@ -899,7 +914,7 @@ def enumerate_chirality(rxns, logging_queue):
                 with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
                     first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
                     obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
-                    print(f"Reactant Isomer name: {filename}, smiles: {obabel_smiles}\n")
+                    if args['verbose']: print(f"Reactant Isomer name: {filename}, smiles: {obabel_smiles}\n")
 
         for filename in os.listdir(args['scratch_xtb']):
             if filename.startswith("P_Isomer-") and filename.endswith(".xyz"):
@@ -907,12 +922,13 @@ def enumerate_chirality(rxns, logging_queue):
                 with open(f"{args['scratch_xtb']}/{filename.split()[0]}.smi", 'r') as f:
                     first_line = f.readline().strip()   # Read the first line and strip any leading/trailing whitespace
                     obabel_smiles = first_line.split()[0]  # Split the line based on whitespace and get the first element
-                    print(f"Product Isomer name: {filename}, smiles: {obabel_smiles}\n")
+                    if args['verbose']: print(f"Product Isomer name: {filename}, smiles: {obabel_smiles}\n")
         ########################################################
         # RUN CREST on the MOLECULE with ENUMERATED CHIRALITY ##
         ########################################################
-        print(f"Before Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
-        print(f"Before Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
+        if args['verbose']:
+            print(f"Before Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+            print(f"Before Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
         CREST_list = ['P_Isomer-0', 'R_Isomer-0']
         xtb_nprocs=args["xtb_nprocs"]
         crest_nprocs=args["crest_nprocs"]
@@ -940,8 +956,10 @@ def enumerate_chirality(rxns, logging_queue):
 
         for cjob in CREST_list:
             rxn = read_crest_in_class_isomer(rxn, scratch_crest, cjob)
-        print(f"After Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
-        print(f"After Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
+
+        if args['verbose']:
+            print(f"After Enum Isomer, it has {len(rxn.reactant_conf)} reactant confs\n", flush = True)
+            print(f"After Enum Isomer, it has {len(rxn.product_conf)} product confs\n", flush = True)
     return rxns
 
 def conf_crest(rxns, logging_queue):

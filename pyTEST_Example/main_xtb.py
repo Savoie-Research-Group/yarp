@@ -302,6 +302,7 @@ def main(args:dict):
     if not (args['reactant_chiral_center'] == 'None' and args['product_chiral_center'] == 'None'):
         rxns = enumerate_chirality(rxns, logging_queue)
 
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
 
@@ -309,23 +310,35 @@ def main(args:dict):
     print("-------Third Step------")
     print("Conformation Generation")
     print("-----------------------")
+    
     rxns=select_rxn_conf(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    
     print("-----------------------")
     print("-------Forth Step------")
     print("-Growing String Method-")
     print("-----------------------")
+
     rxns=run_gsm_by_pysis(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     #Zhao's note: option to skip xtb pysis + IRC
     #Just run DFT after xtb-GSM
+    # ERM: is this a "nice to have one day?" or is it an option now?
+    
     print("-----------------------")
     print("-------Fifth Step------")
     print("------Berny TS Opt-----")
     print("-----------------------")
+    
     rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
 
@@ -333,25 +346,37 @@ def main(args:dict):
     print("-------Sixth Step------")
     print("-----IRC Calculation---")
     print("-----------------------")
+
     rxns=run_irc_by_xtb(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    
     print("-----------------------")
     print("-----print result------")
     print("-----------------------")
+    
     rxns=analyze_outputs(rxns)
+    # ERM: I'll figure out exactly what this prints later...
+    
     return
 
 def run_irc_by_xtb(rxns, logging_queue):
     """
-    This function runs IRC calculation for each reaction contained in the reaction data pickle file.
+    Validate TS geometries via IRC calculations using xTB.
 
     Parameters
     ----------
-
+    rxns: list
+        List of reaction objects
+    
+    logging_queue: (no idea - ERM)
 
     Yields
     ------
+    rxns: list
+        List of reaction objects, now with validated TS geometries from IRC
 
     """
     # Set up user-set parameters from one of the reaction objects
@@ -360,10 +385,9 @@ def run_irc_by_xtb(rxns, logging_queue):
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
 
-
+    # Get a list of IRC jobs to run
     irc_jobs=dict()
     selected_Calculator = "PYSIS"
-
     for count, rxn in enumerate(rxns):
         key=[j for j in rxn.TS_xtb.keys()]
         for j in key:
@@ -382,6 +406,8 @@ def run_irc_by_xtb(rxns, logging_queue):
             irc_jobs[rxn_ind]=pysis_job
 
     irc_job_list=[irc_jobs[ind] for ind in sorted(irc_jobs.keys())]
+    
+    # Run IRC jobs in parallel
     irc_thread=min(nprocs, len(irc_job_list))
     input_job_list=[(irc_job, logging_queue, args["pysis_wt"]) for irc_job in irc_job_list]
     Parallel(n_jobs=irc_thread)(delayed(run_pysis)(*task) for task in input_job_list)
@@ -560,7 +586,6 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
     return rxns
 
 def conf_by_crest(rxns, logging_queue, logger):
-
     """
     Generate conformers using CREST for each reaction contained in the reaction data pickle file.
 
@@ -659,10 +684,31 @@ def conf_by_crest(rxns, logging_queue, logger):
     return rxns
 
 def run_ts_opt_by_xtb(rxns, logging_queue, logger):
+    """
+    Run low-level TS optimization using xTB
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects, now with xTB optimized TS geometries
+
+    """
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
+
+    # Get a list of TS optimization jobs to run
     tsopt_jobs=dict()
     for count_i, i in enumerate(rxns):
         key=[j for j in i.TS_guess.keys()]
@@ -702,26 +748,52 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
         for count, rxn in enumerate(rxns):
             if rxn.reactant_inchi in inchi and rxn.id == idx:
                 rxns[count].TS_xtb[conf_i]=TSG
+    
     return rxns
 
 def run_gsm_by_pysis(rxns, logging_queue):
+    """
+    Run growing string method on each reaction object
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects, each now featuring GSM results!
+
+    """
+
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     rxn_folder=[]
     all_conf_bond_changes = [] # for SSM (needs bond change information)
+    # ERM: so we *can* run SSM then???
+    
     # write the reaction xyz to conf_output for follwoing GSM calculation
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
         print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
+        
         for j in key:
+            
+
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
             print(f"key: {j}\n")
+            
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             rxn_folder.append(wf)
+            
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/R.xyz", i.reactant.elements, i.rxn_conf[j]["R"])
             xyz_write(f"{wf}/P.xyz", i.reactant.elements, i.rxn_conf[j]["P"])
@@ -804,11 +876,18 @@ def run_gsm_by_xtb(rxns, logging_queue):
     scratch=args["scratch"]
     # write the reaction xyz to conf_output for follwoing GSM calculation
     all_conf_bond_changes = []
+    
+    # iterate through all reaction objects
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
+        
+        # iterate through all conformers for each reaction object
         for j in key:
+
+            # write conformers to an XYZ file
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
+            
             #Zhao's debug: get bond mat for reactant/product confs
             rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
             pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
@@ -837,17 +916,21 @@ def run_gsm_by_xtb(rxns, logging_queue):
             print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
             print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
 
+    # get a list of all XYZ file names in the conf_output directory
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
     gsm_jobs={}
 
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_confs):
+        
+        # make a folder for given XYZ file generated from reaction object conformers
         rxn_ind = rxn.split('.xyz')[0]
         wf = f"{scratch}/{rxn_ind}"
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz = f"{conf_output}/{rxn}"
 
+        # prep GSM job objects (but don't run yet???)
         gsm_job = GSM(input_geo=inp_xyz,input_file=args['gsm_inp'],work_folder=wf,method='xtb', lot=args["lot"], jobname=rxn_ind, jobid=count, charge=args['charge'],\
                       multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['low_solvation_model'], SSM = do_SSM, bond_change = all_conf_bond_changes[count])
         gsm_job.prepare_job()
@@ -855,10 +938,15 @@ def run_gsm_by_xtb(rxns, logging_queue):
 
     # Create a process pool with gsm_thread processes
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
+    
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
     Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
-    tsopt_jobs={}
+    # ERM: ^-- again, how does this work??????
+
+    tsopt_jobs={} # ERM: not used
+
+    # Check outcomes of GSM jobs
     for count, gsm_job in enumerate(gsm_job_list):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
@@ -873,6 +961,7 @@ def run_gsm_by_xtb(rxns, logging_queue):
             for count_i, i in enumerate(rxns):
                 if i.reactant_inchi==inchi and i.id==idx:
                     rxns[count_i].TS_guess[conf_i]=TSG
+    
     return rxns
 
 def count_xyz_files_with_string(search_string, directory='.'):
@@ -886,16 +975,37 @@ def count_xyz_files_with_string(search_string, directory='.'):
     return len(matching_files)
 
 def select_rxn_conf(rxns, logging_queue):
+    """
+    Generate conformers for each reaction
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects with conformers generated
+    """
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
+    
+
     if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
-        # read confs #
+        
+        # read in previously computed conformers
         for rxni, i in enumerate(rxns):
             #key=[j for j in i.rxn_conf.keys()]
+            
             rxns[rxni].rxn_conf = dict()
             rxn_conf_name = f"{i.reactant_inchi}_{i.id}_"
+            
             Number_confs  = count_xyz_files_with_string(rxn_conf_name, conf_output)
             for j in range(0,Number_confs):
                 #print(f"number of confs: {Number_confs}, j: {j}\n")
@@ -907,25 +1017,31 @@ def select_rxn_conf(rxns, logging_queue):
                     pg = geo[1]
                     rxns[rxni].rxn_conf[j]={"R": rg, "P": pg}
                     print(f"rxns[rxni].rxn_conf[j]: {rxns[rxni].rxn_conf[j]}\n")
+            
             key=[j for j in rxns[rxni].rxn_conf.keys()]
             print(f"rxn: {rxni}, rxn_name: {rxn_conf_name}, key: {key}\n")
     else:
-        
+        # Generate new conformers for each reaction
+
         thread=min(nprocs, len(rxns))
         chunk_size=len(rxns)//thread
         remainder=len(rxns)%thread
         input_data_list=[(rxn, logging_queue) for rxn in rxns]
         chunks=[]
         startidx=0
+        
         for i in range(thread):
             endidx=startidx+chunk_size+(1 if i < remainder else 0)
             chunks.append(input_data_list[startidx:endidx])
             startidx=endidx
+        
+        # ERM: I guess this is generating conformers in parallel, but what function is being called here????
         rxn_list = Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
         print(f"rxn_list: {len(rxn_list)}\n")
 
         #rxns=modified_rxns
         
+        # print stuff out now
         #for i in rxns: i.rxn_conf_generate(logging_queue)
         count = 0
         for c, chunk in enumerate(rxn_list):
@@ -1231,6 +1347,9 @@ def read_rxns(input_mol, args={}):
     return R
 
 def write_reaction(elements, RG, PG, filename="reaction.xyz"):
+    """
+    Perhaps this writes out the reactant and product structures into a single XYZ file?
+    """
     out=open(filename, 'w+')
     out.write("{}\n\n".format(len(elements)))
     for count_i, i in enumerate(elements):

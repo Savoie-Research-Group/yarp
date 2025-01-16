@@ -855,7 +855,7 @@ def return_model_rxn(reaction, depth=1):
     bond_form=[]
     return
 
-def return_inchikey(molecule):
+def return_inchikey(molecule, verbose = False):
     """
     Generate the InChIKey for a given molecule using OpenBabel.
     
@@ -867,8 +867,6 @@ def return_inchikey(molecule):
     -------
     inchikey : str
     """
-
-
     E=molecule.elements
     G=molecule.geo
     bond_mat=molecule.bond_mats[0]
@@ -903,7 +901,7 @@ def return_inchikey(molecule):
         
         mol_write_yp(".tmp.mol", mol)
 
-        print(os.popen('cat .tmp.mol').read())
+        if verbose: print(os.popen('cat .tmp.mol').read())
 
         mol=next(pybel.readfile("mol", ".tmp.mol"))
         try:

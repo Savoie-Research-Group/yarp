@@ -37,8 +37,10 @@ class reaction:
     n_conf: number of conformers to generate. (default: 0)
     
     """
-    def __init__(self, reactant, product, args=dict(), opt_R=False, opt_P=True):
+    def __init__(self, reactant, product, args=dict(), opt_R=False, opt_P=True, verbose = False):
         
+        self.verbose = verbose
+
         self.reactant=reactant
         self.product=product
         self.args=args
@@ -213,17 +215,16 @@ class reaction:
 
         tmp_rxn_dict=dict()
         count=0
-        print(self.reactant_inchi)
-        
+        if self.verbose: print(self.reactant_inchi)
         if bool(self.product_conf)==False and self.args["strategy"]!=0:
             logger.info("Warning: No conformers for product. Just use input geometry")
-            print("Warning: No conformers for product. Just use input geometry")
+            if self.verbose: print("Warning: No conformers for product. Just use input geometry")
             self.product_conf[0]=self.product.geo
             #print(self.product.elements)
             #print(self.product_conf[0])
         if bool(self.reactant_conf)==False and self.args["strategy"]!=1:
             logger.info("Warning: No conformers for reactant. Just use input geometry")
-            print("Warning: No conformers for reactant. Just use input geometry")
+            if self.verbose: print("Warning: No conformers for reactant. Just use input geometry")
             self.reactant_conf[0]=self.reactant.geo
             #print(self.reactant.elements)
             #print(self.reactant_conf[0])
@@ -250,7 +251,7 @@ class reaction:
             #print(f"conf_ind: {conf_ind}, conf_entry['G']: {conf_entry['G']}\n")
             #print(f"bond_mat: {conf_entry['bond_mat_r']}, Gr: {Gr}\n")
             if len(Gr)==0 or len(Gr)!=len(conf_entry["G"]):
-                print("Falied to optimize")
+                if self.verbose: print("Falied to optimize")
                 logger.info("Falied to optimize")
                 continue
             tmp_xyz_p = f"{self.args['scratch_xtb']}/{job_id}_p.xyz"

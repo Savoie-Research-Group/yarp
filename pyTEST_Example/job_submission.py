@@ -85,9 +85,6 @@ class SLURM_Job:
             f.write(f"#SBATCH --ntasks-per-node={self.ppn}\n")
             f.write(f"#SBATCH --mem {self.mem*self.ppn}MB\n")
 
-            #print(f"length of self.email: {len(self.email)}\n", flush = True)
-            #print(f"SLURM Email: {self.email}\n", flush = True)
-
             if len(self.email) > 0:
                 f.write(f"#SBATCH --mail-user={self.email}\n")
                 f.write(f"#SBATCH --mail-type=BEGIN,END,FAIL\n")

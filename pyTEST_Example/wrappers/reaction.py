@@ -31,8 +31,10 @@ class reaction:
 
     product: yarpecule class for product
 
-    opt_P: perform initial geometry optimization on product  side. (default: False)
+    opt_P: perform initial geometry optimization on product  side. (default: True)
     opt_R: perform initial geometry optimization on reactant side. (default: False)
+
+    n_conf: number of conformers to generate. (default: 0)
     
     """
     def __init__(self, reactant, product, args=dict(), opt_R=False, opt_P=True, verbose = False):
@@ -42,13 +44,18 @@ class reaction:
         self.reactant=reactant
         self.product=product
         self.args=args
+
+        # Set export path for conformer generation
         if "scratch_crest" in args.keys(): self.conf_path=self.args["scratch_crest"]
         else: self.conf_path="conformer"
+        
+        # Set number of conformers to generate
         if "n_conf" in args.keys():
             n_conf=self.args["n_conf"]
             self.n_conf=self.args["n_conf"]
         else:
             self.n_conf=0
+        
         # safe check
         for count_i, i in enumerate(reactant.elements): reactant.elements[count_i]=i.capitalize()
         for count_i, i in enumerate(product.elements): product.elements[count_i]=i.capitalize()
@@ -56,21 +63,30 @@ class reaction:
             if i != product.elements[count_i]:
                 print("Fatal error: reactant and product are not same. Please check the input.....")
                 exit()
+        
+        # initial geometry optimization of reactant/product
         if opt_R: self.reactant=geometry_opt(self.reactant)
         if opt_P: self.product=geometry_opt(self.product)
+        
         self.reactant_xtb_opt=dict()
         self.product_xtb_opt=dict()
+
         self.reactant_dft_opt=dict()
         self.product_dft_opt=dict()
+
         self.reactant_conf=dict()
         self.product_conf=dict()
+
         self.reactant_energy=dict()
         self.product_energy=dict()
+
         self.reactant_inchi=return_inchikey(self.reactant)
         self.product_inchi=return_inchikey(self.product)
+
         self.reactant_smiles=return_smi_yp(self.reactant)
         self.reactant_smiles=return_smi_yp(self.product)
-        self.rxn_conf=dict()
+
+        self.rxn_conf=dict() # ERM: what is this???? stores reactant/product conformer(s), I guess????
         self.id=0
         self.TS_guess=dict()
         self.TS_xtb=dict()
@@ -85,7 +101,25 @@ class reaction:
         if os.path.isdir(self.conf_path) is False: os.system('mkdir {}'.format(self.conf_path))
 
         self.hash=f"{reactant.hash}-{product.hash}"
+    
     def conf_rdkit(self):
+        """
+        Generate conformers for reaction object using RDKit
+
+        Applies args["strategy"] to determine which side to generate conformers for
+        - strategy = 0: generate conformers for reactant only
+        - strategy = 1: generate conformers for product only
+        - strategy = 2: generate conformers for both reactant and product
+
+        Parameters
+        ----------
+        self: reaction object
+
+        Returns
+        -------
+        None
+        """
+
         if self.args["strategy"]==0 or self.args["strategy"]==2:
             if os.path.isdir('{}/{}'.format(self.conf_path, self.reactant_inchi)) is False: os.system('mkdir {}/{}'.format(self.conf_path, self.reactant_inchi))
             if os.path.isfile('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi)) is False:
@@ -112,6 +146,7 @@ class reaction:
                 _, geo=xyz_parse('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.reactant_inchi), multiple=True)
                 for count_i, i in enumerate(geo):
                     self.reactant_conf[count_i]=i
+        
         if self.args["strategy"]==1 or self.args["strategy"]==2:
             if os.path.isdir('{}/{}'.format(self.conf_path, self.product_inchi)) is False: os.system('mkdir {}/{}'.format(self.conf_path, self.product_inchi))
             if os.path.isfile('{}/{}/rdkit_conf.xyz'.format(self.conf_path, self.product_inchi)) is False:
@@ -139,23 +174,43 @@ class reaction:
                 for count_i, i in enumerate(geo):
                     self.product_conf[count_i]=i
 
+        # ERM: no return statement???
+
     def rxn_conf_generation(self, logging_queue):
+        """
+        Generate conformers using ML model?
+
+        Applies args["strategy"] to determine... something...
+
+        Parameters
+        ----------
+        self: reaction object
+
+        logging_queue: ???
+
+        Returns
+        -------
+        None
+        """
+
         # set up logger
         logger = logging.getLogger("main")
         # Add handler only if it doesn't already exist
         if not logger.hasHandlers():
             logger.addHandler(QueueHandler(logging_queue))
             logger.setLevel(logging.INFO)
+        
+        # Set up job id for this reaction
         job_id=f"{self.reactant_inchi}_{self.id}"
 
-        RG=self.reactant.geo
+        RG=self.reactant.geo # ERM: not used
         RE=self.reactant.elements
-        R_adj=self.reactant.adj_mat
+        R_adj=self.reactant.adj_mat # ERM: not used
         R_bond_mats=self.reactant.bond_mats
 
-        PG=self.product.geo
-        PE=self.product.elements
-        P_adj=self.product.adj_mat
+        PG=self.product.geo # ERM: not used
+        PE=self.product.elements # ERM: not used
+        P_adj=self.product.adj_mat # ERM: not used
         P_bond_mats=self.product.bond_mats
 
         tmp_rxn_dict=dict()
@@ -173,6 +228,7 @@ class reaction:
             self.reactant_conf[0]=self.reactant.geo
             #print(self.reactant.elements)
             #print(self.reactant_conf[0])
+        
         # Create a dictionary to store the conformers and product/reactant bond mat.
         if self.args["strategy"]!=0:
             for i in self.product_conf.keys():
@@ -182,9 +238,11 @@ class reaction:
             for i in self.reactant_conf.keys():
                 tmp_rxn_dict[count]={"E": RE, "bond_mat_r": P_bond_mats[0], "G": deepcopy(self.reactant_conf[i]), 'direct': "F"}
                 count=count+1
+        
         # load ML model to find conformers
         if len(tmp_rxn_dict)>3*self.n_conf: model=pickle.load(open(os.path.join(self.args['model_path'],'rich_model.sav'), 'rb'))
         else: model=pickle.load(open(os.path.join(self.args['model_path'],'poor_model.sav'), 'rb'))
+        
         ind_list, pass_obj_values=[], []
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
@@ -202,6 +260,7 @@ class reaction:
             tmp_xyz_r = f"{self.args['scratch_xtb']}/{job_id}_r.xyz"
             xyz_write(tmp_xyz_r,conf_entry['E'],conf_entry['G'])
             logger.info(f"{self.args['scratch_xtb']}/{job_id}_r.xyz")
+            
             # calculate indicator
             #logger.info(f"{len(conf_entry['E'])}")
             #logger.info(f"{len(conf_entry['G'])}")
@@ -213,15 +272,19 @@ class reaction:
             io.write(tmp_xyz_p,product)
             _,Gr_opt = xyz_parse(tmp_xyz_p)
             indicators_opt = return_indicator(conf_entry['E'],conf_entry['G'],Gr_opt,namespace=f'tmp_{job_id}')
+            
             # if applying ase minimize_rotation_and_translation will increase the intended probability, use the rotated geometry
             if model.predict_proba(indicators)[0][1] < model.predict_proba(indicators_opt)[0][1]: indicators, Gr = indicators_opt, Gr_opt
+            
             # check whether the channel is classified as intended and check uniqueness
             if model.predict_proba(indicators)[0][1] > 0.0 and check_duplicate(indicators,ind_list,thresh=0.025):
                 ind_list.append(indicators)
                 pass_obj_values.append((model.predict_proba(indicators)[0][0],deepcopy(conf_entry['G']),Gr,deepcopy(conf_entry['direct'])))
+            
             # remove tmp file
             if os.path.isfile(tmp_xyz_r): os.remove(tmp_xyz_r)
             if os.path.isfile(tmp_xyz_p): os.remove(tmp_xyz_p)
+        
         pass_obj_values=sorted(pass_obj_values, key=lambda x: x[0])
         N_conf=0
         for item in pass_obj_values:

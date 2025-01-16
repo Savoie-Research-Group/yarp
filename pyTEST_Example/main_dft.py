@@ -25,18 +25,23 @@ from analyze_functions import apply_IRC_model
 from calculator import Calculator
 
 def main(args:dict):
+
     keys = [i for i in args.keys()]
 
+    # ERM: initialization routines again.... can we set this up rigorously elsewhere?
     if "verbose" not in keys:
         args['verbose'] = False
     else: args['verbose'] = bool(args['verbose'])
 
     if args["solvation"]: args["solvation_model"], args["solvent"]=args["solvation"].split('/')
     else: args["solvation_model"], args["solvent"]="CPCM", False
+    
     args["scratch_dft"]=f'{args["scratch"]}/DFT'
     args["scratch_crest"]=f'{args["scratch"]}/conformer'
     if os.path.isdir(args["scratch"]) is False: os.mkdir(args["scratch"])
     if os.path.isdir(args["scratch_dft"]) is False: os.mkdir(args["scratch_dft"])
+    
+    # ERM: will script error out properly if no reaction data is provided?
     if args["reaction_data"] is None: args["reaction_data"]=args["scratch"]+"/reaction.p"
 
     #Zhao's note: for CREST (Reactant/Product)
@@ -64,6 +69,7 @@ def main(args:dict):
     args['mem'] = float(args['mem'])
     args['dft_nprocs'] = int(args['dft_nprocs'])
     args['dft_ppn'] = int(args['dft_ppn'])
+    
     # Zhao's note: process mix_basis input keywords in the yaml file
     if "dft_mix_basis" in keys:
         process_mix_basis_input(args)
@@ -78,9 +84,11 @@ def main(args:dict):
     else:
         args['dft_TS_Active_Atoms'] = bool(args['dft_TS_Active_Atoms'])
 
+    # ERM: Ah! Good, it does exist, but shouldn't this be like the first thing to check?
     if os.path.exists(args["reaction_data"]) is False:
         print("No reactions are provided for refinement....")
         exit()
+    
     rxns=load_rxns(args["reaction_data"])
     for count, i in enumerate(rxns):
         rxns[count].args=args

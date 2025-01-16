@@ -398,15 +398,33 @@ def Write_Isomers(isomers, name):
 
 def geometry_opt(molecule):
     '''
-    geometry optimization on yarp class
+    Perform UFF level geometry optimization on YARP molecule
+
+    Parameters:
+    ----------
+    molecule : yarpecule object
+            molecule to be optimized 
+
+    Returns
+    -------
+    molecule : yarpecule object
+            optimized molecule
     '''
+
+    # Write yarpecule object to a temporary mol file
     mol_file='.tmp.mol'
     mol_write_yp(mol_file, molecule, append_opt=False)
+    
+    # Use openbabel to perform geometry optimization
     mol=next(pybel.readfile("mol", mol_file))
     mol.localopt(forcefield='uff')
+    
+    # Convert mol file to yarpecule object, delete mol file and return yarpecule
     for count_i, i in enumerate(molecule.geo):
         molecule.geo[count_i]=mol.atoms[count_i].coords
+    
     os.system("rm {}".format(mol_file))
+    
     return molecule
 
 def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
@@ -838,12 +856,23 @@ def return_model_rxn(reaction, depth=1):
     return
 
 def return_inchikey(molecule, verbose = False):
+    """
+    Generate the InChIKey for a given molecule using OpenBabel.
+    
+    Parameters
+    ----------
+    molecule : yarpecule object
+
+    Returns
+    -------
+    inchikey : str
+    """
     E=molecule.elements
     G=molecule.geo
     bond_mat=molecule.bond_mats[0]
-    q=molecule.q
-    gs=graph_seps(molecule.adj_mat)
+    q=molecule.q # ERM: not used
 
+    gs=graph_seps(molecule.adj_mat)
     #print(f"molecule.adj_mat: {molecule.adj_mat}\n")
     #print(f"gs: {gs}\n")
 
@@ -856,7 +885,8 @@ def return_inchikey(molecule, verbose = False):
             loop_ind += new_group
             groups+=[new_group]
     inchikey=[]
-    mol=copy.deepcopy(molecule)
+    
+    mol=copy.deepcopy(molecule) # <-- ERM: is this repetitive with the below for loop?
     #Zhao's note: this seems to generate quite different inchikey if you write to xyz file, need to see why#
     #They do result in different inchikeys, must be the bonding info, consider changing it in sep_mols
     for group in groups:
@@ -866,7 +896,9 @@ def return_inchikey(molecule, verbose = False):
         mol.bond_mats=[bond_mat[group][:, group]]
         mol.geo=np.zeros([N_atom, 3])
         mol.adj_mat=adj_mat[group][:, group]
+        
         for count_i, i in enumerate(group): mol.geo[count_i, :]=G[i, :]
+        
         mol_write_yp(".tmp.mol", mol)
 
         if verbose: print(os.popen('cat .tmp.mol').read())
@@ -880,6 +912,8 @@ def return_inchikey(molecule, verbose = False):
             continue
         inchikey+=[inchi]
         os.system("rm .tmp.mol")
+    
+    
     if len(inchikey)==0:
         return "ERROR"
     elif len(groups) == 1:

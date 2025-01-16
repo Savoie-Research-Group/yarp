@@ -24,7 +24,36 @@ from wrappers.gsm import GSM
 from calculator import Calculator
 
 # YARP methodology by Hsuan-Hao Hsu, Zhao Li, Qiyuan Zhao, and Brett M. Savoie
+
+
 def initialize(args):
+    """
+    This function initializes YARP class variables with user set parameters.
+
+    Parameters
+    ----------
+    args: dict
+            A dictionary generated from the input yaml file provided by the command line:
+            `python main_xtb.py parameters.yaml`
+
+    Yields
+    ------
+    args: dict
+            A modified dictionary that now has all default YARP parameters set.
+            This will be accessed later on when calling various subroutines in main().
+    
+    logger: (no idea - ERM)
+
+    logging_queue: (no idea - ERM)
+
+
+    ERM thoughts:
+    - Could we set this up as a separate class file? Maybe `read_input.py`?
+    - And maybe it should go in the yarp core directory, so that everyone uses the same input file format.
+    - I think it would also be good to put in some print statements here to let the user know what YARP will be doing.
+    - Missing arguement? `args["opt"]` is used in `reaction.rxn_conf_generation()`, but not set here.
+    """
+
     keys=[i for i in args.keys()]
     if "verbose" not in keys:
         args['verbose'] = False
@@ -33,6 +62,8 @@ def initialize(args):
     if "input" not in keys:
         print("KEY ERROR: NO INPUT REACTANTS OR REACTIONS. Exit....")
         exit()
+
+    # PYSIS is needed to run xTB and growing string methods (ERM: apparently...)
     if 'XTB_OPT_Calculator' not in keys:
         args['XTB_OPT_Calculator'] = "PYSIS"
     if 'GSM_Calculator' not in keys:
@@ -40,56 +71,85 @@ def initialize(args):
 
     # GSM or SSM #
     # must use the GSM calculator #
+    # ERM: Is SSM not implemented? Or is GSM just the better option?
     if "SSM" not in keys:
         args['SSM'] = False
     else:
         args['SSM'] = bool(args['SSM'])
 
+    # Set location for YARP output files
     if "scratch" not in keys:
         args["scratch"]=f"{os.getcwd()}/yarp_run"
+    
+    # Set up implicit solvation (default is to not use any solvation)
     if "low_solvation" not in keys:
         args["low_solvation"]=False
         args["low_solvation_model"]="alpb"
         args["solvent"]=False
         args["solvation_model"]="CPCM"
     else:
+        # ERM: How on earth is this supposed to be formatted in the input file????
         args["low_solvation_model"], args["solvent"]=args['low_solvation'].split('/')
 
     #Zhao's note: pysis absolute path (user can provide this in yaml file)#
-
     if not ("pysis_path" in keys):
         args["pysis_path"] = "" # Using default
 
+    # Select method to use for conformational sampling (CREST or RDKit)
+    # ERM: Can we pick a better variable name? YARP is using a lot of "methods" ...
     if "method" not in keys:
         args["method"]="crest"
+    
+    # Provide previously completed YARP data, otherwise create new pickle file
     if "reaction_data" not in keys: args["reaction_data"]="reaction.p"
-    if "form_all" not in keys: args["form_all"]=False
-    if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
+    
+    # Provide commands needed to execute CREST and xTB subprocesses
     if "crest" not in keys: args["crest"]="crest"
     if "xtb" not in keys: args["xtb"]="xtb"
+
+    # Set molecular charge and multiplicity
     if "charge" not in keys:
         print("WARNING: Charge is not provided. Use neutral species (charge=0) as default...")
         args["charge"]=0
     if "multiplicity" not in keys:
         print("WARNING: Multiplicity is not provided. Use closed-shell species (multiplicity=1) as default...")
         args["multiplicity"]=1
+    
+    # Turn on/off product enumeration routine (default is ON)
     if "enumeration" not in keys:
         args["enumeration"]=True
+
+    # Break/form all possible bonds during product enumeration (default is OFF)
+    if "form_all" not in keys: args["form_all"]=False
+    
+    # Choose how many bonds to break/form during product enumeration (default is b2f2)
+    # ERM: This does not seem to allow for b2f1 type enumerations, should we add n_form? Can default to n_form = n_break
     if "n_break" not in keys:
         args["n_break"]=2
     else: args["n_break"]=int(args['n_break'])
+
+    # Set Lewis bond criteria for filtering out duplicate enumerated products
+    if "lewis_criteria" not in keys: args["lewis_criteria"]=0.0
+    
+    # Control conformer generation strategy in reaction object
     if "strategy" not in keys:
         args["strategy"]=2
     else: args["strategy"]=int(args["strategy"])
+    
+    # Set number of conformers to generate for each reaction object
     if "n_conf" not in keys:
         args["n_conf"]=3
     else: args["n_conf"]=int(args["n_conf"])
+
+    # Set the number of CPUs used by xTB (default is serial)
     #accepting either "nprocs" or "xtb_nprocs"#
     if "xtb_nprocs" in keys:
         args["xtb_nprocs"]=int(args["xtb_nprocs"])
     elif "nprocs" in keys:
         args["xtb_nprocs"]=int(args['nprocs'])
     else: args["xtb_nprocs"]=1
+
+    # Set the number of CPUs used by CREST (default is serial)
     #accepting either "crest_nprocs" or "c_nprocs"#
     if "crest_nprocs" in keys:
         args["crest_nprocs"]=int(args["crest_nprocs"])
@@ -97,10 +157,17 @@ def initialize(args):
         args["crest_nprocs"]=int(args['c_nprocs'])
     else: args["crest_nprocs"]=1
 
+    # Set the memory (in GB) to be used
+    # ERM: Used by what? Great question, at least CREST, and some chirality finder? 
+    # Not sure how this translates to the memory YARP needs per CPU, but that would be nice to figure out
     if "mem" not in keys:
         args["mem"]=1
+    
+    # ERM: What is this? Doesn't seem to be used?
     if "restart" not in keys:
         args["restart"]=False
+    
+    # Set paths to output files for specific subroutines
     args["scratch_xtb"]=f"{args['scratch']}/xtb_run"
     args["scratch_crest"]=f"{args['scratch']}/conformer"
     args["conf_output"]=f"{args['scratch']}/rxn_conf"
@@ -118,6 +185,7 @@ def initialize(args):
         args['crest_path'] = args['crest_path'] + "crest"
 
     #Zhao's note: add user defined constraints based on atom index (starting from 1)
+    # ERM: Ah! Is this related to that "strategy" variable?
     R_constraints = []
     P_constraints = []
 
@@ -141,14 +209,18 @@ def initialize(args):
     args['reactant_dist_constraint'] = R_constraints
     args['product_dist_constraint']  = P_constraints
 
+    # ERM: Add a debug flag to control if these are printed out?
     print(f"reactant_dist_constraint: {args['reactant_dist_constraint']}\n")
     print(f"product_dist_constraint:  {args['product_dist_constraint']}\n")
 
+    # Chirality of molecules
+    # ERM: Do we only care about chirality for TS optimizations? Not reaction network exploration?
     if not 'reactant_chiral_center' in keys:
         args['reactant_chiral_center'] = 'None'
     if not 'product_chiral_center'  in keys:
         args['product_chiral_center']  = 'None'
 
+    # Set up the magical logger that will run all of the YARP stuff
     logging_path = os.path.join(args["scratch"], "YARPrun.log")
     logging_queue = mp.Manager().Queue(999)
     logger_p = mp.Process(target=logger_process, args=(logging_queue, logging_path), daemon=True)
@@ -158,12 +230,17 @@ def initialize(args):
     logger = logging.getLogger("main")
     logger.addHandler(QueueHandler(logging_queue))
     logger.setLevel(logging.INFO)
+
+
     return args, logger, logging_queue
 
 def main(args:dict):
-    #Zhao's note: add this function to avoid recusionerror (reaches max)
+    #Zhao's note: add this function to avoid recursion error (reaches max)
     sys.setrecursionlimit(10000)
+
+    # Initialize all the YARP machinery from input yaml file
     args, logger, logging_queue=initialize(args)
+
     print(f"""Welcome to
                 __   __ _    ____  ____  
                 \ \ / // \  |  _ \|  _ \ 
@@ -172,15 +249,20 @@ def main(args:dict):
                   |_/_/   \_\_| \_\_|
                           // Yet Another Reaction Program
         """)
-    if os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.smi") is True: # Read smiles in
+    
+    # Set up mol variable to hold starter molecule(s)
+    if os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.smi") is True: # Read SMILES
         mol=[i.split('\n')[0] for i in open(args["input"], 'r+').readlines()]
-    elif os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.xyz") is True:
+    elif os.path.isfile(args["input"]) and fnmatch.fnmatch(args["input"], "*.xyz") is True: # Read XYZ
         mol=[args["input"]]
-    else:
+    else: # Read directory (XYZ or MOL???)
         mol=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, '*.xyz') or fnmatch.fnmatch(i, '*.mol')]
     
+    # Look for previously completed YARP data and load if there. Otherwise, create new pickle file
     if os.path.isfile(args["reaction_data"]) is True:
         rxns=pickle.load(open(args["reaction_data"], 'rb'))
+
+        # Assign (possibly overwrite) YARP settings to each reaction object
         for rxn in rxns: rxn.args=args
     
     print("-----------------------")
@@ -188,12 +270,15 @@ def main(args:dict):
     print("------Enumeration------")
     print("-----------------------")
     
-    if args["enumeration"]: 
+    if args["enumeration"]:
+        # Perform enumeration for each user-provided molecule
         for i in mol: rxns=run_enumeration(i, args=args)
     elif os.path.isfile(args["reaction_data"]) is False:
+        # ERM: Is this only triggered when providing a directory of molecules? For TS-opt only?
         rxns=[]
         for i in mol: rxns.append(read_rxns(i, args=args))
-    
+
+    # Assign unique IDs to each reaction?
     inchi_array=[]
     for i in rxns:
         if i.reactant_inchi not in inchi_array: inchi_array.append(i.reactant_inchi)
@@ -204,10 +289,12 @@ def main(args:dict):
         idx=inchi_dict[inchi]
         i.id=idx
         inchi_dict[inchi]=idx+1
+
     print("-----------------------")
     print("------Second Step------")
     print("Conformational Sampling")
     print("-----------------------")
+
     if args["method"]=='rdkit':
         for count_i, i in enumerate(rxns): rxns[count_i].conf_rdkit()
     elif args["method"]=='crest':
@@ -217,6 +304,7 @@ def main(args:dict):
     if not (args['reactant_chiral_center'] == 'None' and args['product_chiral_center'] == 'None'):
         rxns = enumerate_chirality(rxns, logging_queue)
 
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
 
@@ -224,23 +312,35 @@ def main(args:dict):
     print("-------Third Step------")
     print("Conformation Generation")
     print("-----------------------")
+    
     rxns=select_rxn_conf(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    
     print("-----------------------")
     print("-------Forth Step------")
     print("-Growing String Method-")
     print("-----------------------")
+
     rxns=run_gsm_by_pysis(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
     #Zhao's note: option to skip xtb pysis + IRC
     #Just run DFT after xtb-GSM
+    # ERM: is this a "nice to have one day?" or is it an option now?
+    
     print("-----------------------")
     print("-------Fifth Step------")
     print("------Berny TS Opt-----")
     print("-----------------------")
+    
     rxns=run_ts_opt_by_xtb(rxns, logging_queue, logger)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
 
@@ -248,22 +348,47 @@ def main(args:dict):
     print("-------Sixth Step------")
     print("-----IRC Calculation---")
     print("-----------------------")
+
     rxns=run_irc_by_xtb(rxns, logging_queue)
+    
+    # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
+    
     print("-----------------------")
     print("-----print result------")
     print("-----------------------")
+    
     rxns=analyze_outputs(rxns)
+    # ERM: I'll figure out exactly what this prints later...
+    
     return
 
 def run_irc_by_xtb(rxns, logging_queue):
+    """
+    Validate TS geometries via IRC calculations using xTB.
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+    
+    logging_queue: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects, now with validated TS geometries from IRC
+
+    """
+    # Set up user-set parameters from one of the reaction objects
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
-    irc_jobs=dict()
 
+    # Get a list of IRC jobs to run
+    irc_jobs=dict()
     selected_Calculator = "PYSIS"
     for count, rxn in enumerate(rxns):
         key=[j for j in rxn.TS_xtb.keys()]
@@ -283,6 +408,8 @@ def run_irc_by_xtb(rxns, logging_queue):
             irc_jobs[rxn_ind]=pysis_job
 
     irc_job_list=[irc_jobs[ind] for ind in sorted(irc_jobs.keys())]
+    
+    # Run IRC jobs in parallel
     irc_thread=min(nprocs, len(irc_job_list))
     input_job_list=[(irc_job, logging_queue, args["pysis_wt"]) for irc_job in irc_job_list]
     Parallel(n_jobs=irc_thread)(delayed(run_pysis)(*task) for task in input_job_list)
@@ -359,6 +486,24 @@ def run_irc_by_xtb(rxns, logging_queue):
     return rxns
 
 def run_opt_by_xtb(rxns, logging_queue, logger):
+
+    """
+    Optimize geometries of reactants and products for each reaction object using xTB.
+
+    Parameters
+    ----------
+    rxns: list
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM), also it's not used in this function
+
+    Yields
+    ------
+    rxns: list
+
+    """
+    
     args=rxns[0].args
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
@@ -445,6 +590,23 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
     return rxns
 
 def conf_by_crest(rxns, logging_queue, logger):
+    """
+    Generate conformers using CREST for each reaction contained in the reaction data pickle file.
+
+    Parameters
+    ----------
+    rxns: list
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+
+    """
+
     rxns=run_opt_by_xtb(rxns, logging_queue, logger)
 
     #exit()
@@ -529,10 +691,31 @@ def conf_by_crest(rxns, logging_queue, logger):
     return rxns
 
 def run_ts_opt_by_xtb(rxns, logging_queue, logger):
+    """
+    Run low-level TS optimization using xTB
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    logger: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects, now with xTB optimized TS geometries
+
+    """
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
+
+    # Get a list of TS optimization jobs to run
     tsopt_jobs=dict()
     for count_i, i in enumerate(rxns):
         key=[j for j in i.TS_guess.keys()]
@@ -572,26 +755,51 @@ def run_ts_opt_by_xtb(rxns, logging_queue, logger):
         for count, rxn in enumerate(rxns):
             if rxn.reactant_inchi in inchi and rxn.id == idx:
                 rxns[count].TS_xtb[conf_i]=TSG
+    
     return rxns
 
 def run_gsm_by_pysis(rxns, logging_queue):
+    """
+    Run growing string method on each reaction object
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects, each now featuring GSM results!
+
+    """
+
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
     scratch=args["scratch"]
     rxn_folder=[]
     all_conf_bond_changes = [] # for SSM (needs bond change information)
+    # ERM: so we *can* run SSM then???
+    
     # write the reaction xyz to conf_output for follwoing GSM calculation
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
         print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
+        
         for j in key:
+            
+
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
             if args["verbose"]: print(f"key: {j}\n")
             rxn_ind=f"{i.reactant_inchi}_{i.id}_{j}"
             wf=f"{scratch}/{rxn_ind}"
             rxn_folder.append(wf)
+            
             if os.path.isdir(wf) is False: os.mkdir(wf)
             xyz_write(f"{wf}/R.xyz", i.reactant.elements, i.rxn_conf[j]["R"])
             xyz_write(f"{wf}/P.xyz", i.reactant.elements, i.rxn_conf[j]["P"])
@@ -676,11 +884,18 @@ def run_gsm_by_xtb(rxns, logging_queue):
     scratch=args["scratch"]
     # write the reaction xyz to conf_output for follwoing GSM calculation
     all_conf_bond_changes = []
+    
+    # iterate through all reaction objects
     for i in rxns:
         key=[j for j in i.rxn_conf.keys()]
+        
+        # iterate through all conformers for each reaction object
         for j in key:
+
+            # write conformers to an XYZ file
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
+            
             #Zhao's debug: get bond mat for reactant/product confs
             rconf_adj = table_generator(i.reactant.elements, i.rxn_conf[j]["R"])
             pconf_adj = table_generator(i.product.elements,  i.rxn_conf[j]["P"])
@@ -712,17 +927,21 @@ def run_gsm_by_xtb(rxns, logging_queue):
                 print(f"add bonds: rows: {add_rows}, cols: {add_cols} \n")
                 print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
 
+    # get a list of all XYZ file names in the conf_output directory
     rxn_confs=[rxn for rxn in os.listdir(conf_output) if rxn[-4:]=='.xyz']
     gsm_thread=min(nprocs, len(rxn_confs))
     gsm_jobs={}
 
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_confs):
+        
+        # make a folder for given XYZ file generated from reaction object conformers
         rxn_ind = rxn.split('.xyz')[0]
         wf = f"{scratch}/{rxn_ind}"
         if os.path.isdir(wf) is False: os.mkdir(wf)
         inp_xyz = f"{conf_output}/{rxn}"
 
+        # prep GSM job objects (but don't run yet???)
         gsm_job = GSM(input_geo=inp_xyz,input_file=args['gsm_inp'],work_folder=wf,method='xtb', lot=args["lot"], jobname=rxn_ind, jobid=count, charge=args['charge'],\
                       multiplicity=args['multiplicity'], solvent=args['solvent'], solvation_model=args['low_solvation_model'], SSM = do_SSM, bond_change = all_conf_bond_changes[count])
         gsm_job.prepare_job()
@@ -730,10 +949,15 @@ def run_gsm_by_xtb(rxns, logging_queue):
 
     # Create a process pool with gsm_thread processes
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
+    
     # Run the tasks in parallel
     input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
     Parallel(n_jobs=gsm_thread)(delayed(run_gsm)(*task) for task in input_job_list)
-    tsopt_jobs={}
+    # ERM: ^-- again, how does this work??????
+
+    tsopt_jobs={} # ERM: not used
+
+    # Check outcomes of GSM jobs
     for count, gsm_job in enumerate(gsm_job_list):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
@@ -748,6 +972,7 @@ def run_gsm_by_xtb(rxns, logging_queue):
             for count_i, i in enumerate(rxns):
                 if i.reactant_inchi==inchi and i.id==idx:
                     rxns[count_i].TS_guess[conf_i]=TSG
+    
     return rxns
 
 def count_xyz_files_with_string(search_string, directory='.'):
@@ -761,16 +986,37 @@ def count_xyz_files_with_string(search_string, directory='.'):
     return len(matching_files)
 
 def select_rxn_conf(rxns, logging_queue):
+    """
+    Generate conformers for each reaction
+
+    Parameters
+    ----------
+    rxns: list
+        List of reaction objects
+
+    logging_queue: (no idea - ERM)
+
+    Yields
+    ------
+    rxns: list
+        List of reaction objects with conformers generated
+    """
+    
     args=rxns[0].args
     conf_output=args["conf_output"]
     nprocs=args["xtb_nprocs"]
+    
+
     if os.path.isdir(conf_output) is True and len(os.listdir(conf_output))>0:
         print("Reaction conformation sampling has already been done in the target folder, skip this step...")
-        # read confs #
+        
+        # read in previously computed conformers
         for rxni, i in enumerate(rxns):
             #key=[j for j in i.rxn_conf.keys()]
+            
             rxns[rxni].rxn_conf = dict()
             rxn_conf_name = f"{i.reactant_inchi}_{i.id}_"
+            
             Number_confs  = count_xyz_files_with_string(rxn_conf_name, conf_output)
             for j in range(0,Number_confs):
                 #print(f"number of confs: {Number_confs}, j: {j}\n")
@@ -785,22 +1031,27 @@ def select_rxn_conf(rxns, logging_queue):
             key=[j for j in rxns[rxni].rxn_conf.keys()]
             if args['verbose']: print(f"rxn: {rxni}, rxn_name: {rxn_conf_name}, key: {key}\n")
     else:
-        
+        # Generate new conformers for each reaction
+
         thread=min(nprocs, len(rxns))
         chunk_size=len(rxns)//thread
         remainder=len(rxns)%thread
         input_data_list=[(rxn, logging_queue) for rxn in rxns]
         chunks=[]
         startidx=0
+        
         for i in range(thread):
             endidx=startidx+chunk_size+(1 if i < remainder else 0)
             chunks.append(input_data_list[startidx:endidx])
             startidx=endidx
+        
+        # ERM: I guess this is generating conformers in parallel, but what function is being called here????
         rxn_list = Parallel(n_jobs=thread)(delayed(generate_rxn_conf)(chunk) for chunk in chunks)
         if args['verbose']: print(f"rxn_list: {len(rxn_list)}\n")
 
         #rxns=modified_rxns
         
+        # print stuff out now
         #for i in rxns: i.rxn_conf_generate(logging_queue)
         count = 0
         for c, chunk in enumerate(rxn_list):
@@ -1022,19 +1273,43 @@ def read_crest_in_class(rxns, scratch_crest):
     return rxns
 
 def run_enumeration(input_mol, args=dict()):
+    """
+    This function performs product enumeration on a given molecule.
+
+    Parameters
+    ----------
+    input_mol : str
+        The input molecule file in ??? format. Could be SMILES, XYZ, or MOL?
+    
+    args : dict
+        YARP parameters set by user.
+
+    Yields
+    ------
+    rxn : list
+        All enumerated reactions from input molecule.
+
+    """
+    
+    # Extract product enumeration parameters
+    # ERM: Should these parameters be printed out here maybe?
     nb=args["n_break"]
     form_all=args["form_all"]
     criteria=args["lewis_criteria"]
     reactant=yp.yarpecule(input_mol)
     mol=yp.yarpecule(input_mol)
+
     print("Do the reaction enumeration on molecule: {} ({})".format(mol.hash,input_mol))
-    name=input_mol.split('/')[-1].split('.')[0]
+    name=input_mol.split('/')[-1].split('.')[0] # ERM: this isn't used anywhere
+
     # break bonds
     break_mol=list(yp.break_bonds(mol, n=nb))
-    
-    if form_all: products=yp.form_bonds_all(break_mol)
-    else: products=yp.form_n_bonds(break_mol, n=nb)
 
+    # form bonds
+    if form_all: products=yp.form_bonds_all(break_mol)
+    else: products=yp.form_n_bonds(break_mol, n=nb) # ERM: This function needs documented!
+
+    # Remove duplicate products using Lewis bond criteria
     products=[_ for _ in products if _.bond_mat_scores[0]<=criteria and sum(np.abs(_.fc))<2.0] 
     product=[]
     for _ in products:
@@ -1043,25 +1318,52 @@ def run_enumeration(input_mol, args=dict()):
         else: product.append(_)
     products=product
     print(f"{len(products)} cleaned products after find_lewis() filtering")
+
+    # Store enumerated products in reaction object and return
     rxn=[]
     for count_i, i in enumerate(products):
         R=reaction(reactant, i, args=args, opt_P=True)
         rxn.append(R)
+
     return rxn
 
 def read_rxns(input_mol, args={}):
+    """
+    Reads in two XYZ files, reactant and product, and returns a reaction object.
+
+    Parameters
+    ----------
+    input_mol : str
+        Path to directory containing reactant and product XYZ files.
+    
+    args : dict
+        YARP parameters set by user.
+
+    Yields
+    ------
+    R : Reaction object
+
+    """
+    # Read in reactant and product XYZ files
     print(f"Read in reaction: {input_mol}")
     elements, geo= xyz_parse(input_mol, multiple=True)
+    
+    # Convert to yarpecule objects
     xyz_write(".tmp_R.xyz", elements[0], geo[0])
     reactant=yp.yarpecule(".tmp_R.xyz", canon=False)
     os.system('rm .tmp_R.xyz')
     xyz_write(".tmp_P.xyz", elements[1], geo[1])
     product=yp.yarpecule(".tmp_P.xyz", canon=False)
     os.system('rm .tmp_P.xyz')
+    
+    # Create reaction object and return
     R=reaction(reactant, product, args=args, opt_R=False, opt_P=False)
     return R
 
 def write_reaction(elements, RG, PG, filename="reaction.xyz"):
+    """
+    Perhaps this writes out the reactant and product structures into a single XYZ file?
+    """
     out=open(filename, 'w+')
     out.write("{}\n\n".format(len(elements)))
     for count_i, i in enumerate(elements):

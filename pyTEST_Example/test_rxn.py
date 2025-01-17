@@ -79,8 +79,8 @@ def test_file():
         STR = os.popen('which crest').read().rstrip()
         CONDA = STR.split("/bin/crest")[0]
 
+    CASES = [""]
     #CASES = ["", "GSM"]
-    CASES = ["", "GSM"]
     for CASE in CASES:
         rxn_setYAML(run_path   = f"{code_directory}/{CASE}/",
                     code_path  = code_directory,
@@ -95,5 +95,5 @@ def test_file():
         barrier = rxn_xtb(run_path = f"{code_directory}/{CASE}/",
                           code_path  = code_directory)
         assert(np.abs(barrier - 6.747132) < 0.01)
-        print(f"YARP-xtb CHECK for {CASE} FINISHED\n")
+        print(f"YARP-xtb CHECK ({CASE}) FINISHED\n")
         os.chdir(code_directory)

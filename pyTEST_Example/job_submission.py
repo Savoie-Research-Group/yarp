@@ -312,3 +312,51 @@ class SLURM_Job:
             except OSError:
                 pass
     '''
+
+class QSE_job:
+    """
+    Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.
+
+    Planning Notes
+    --------------
+
+    We will need to use the job arrays feature to submit multiple jobs at once,
+    rather than submitting each job individually. Need to figure out how this works still.
+
+    Submission of jobs must be done on a frontend login node at ND-CRC. Therefore,
+    we are limited to only execute the job submission script for 1 hour wall time.
+    Need to add a routine for limiting walltime, so we don't get shutdown by the CRC staff.
+
+    Currently, we just want to be able to submit ORCA and Gaussian DFT jobs.
+    xTB, CREST,
+
+    Attributes
+    ----------
+    queue : str
+        Queue to submit job requests to. Default is general CPU queue at ND-CRC (long).
+        Eventually, this should probably be the Savoie group's specific queue at ND-CRC.
+        There's also a GPU queue, but YARP is for CPUs right now, not GPUs.
+
+    parallel_mode : str
+        Option to select SMP (default) or MPI parallelization.
+        MPI parallelization at ND-CRC is reserved for jobs that require the use of more than one compute node.
+        We're probably only ever going to use SMP, I imagine.
+
+    ncpus : int
+        Number of CPUs used to parallelize across for each QSE job instance.
+
+    job_array_tasks : int
+        Number of tasks to submit to the job array.
+
+    """
+
+    # Constructor
+    def __init__(self, queue="long", parallel_mode="smp", ncpus=1, job_array_tasks=3):
+
+            # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
+            self.parallel_mode = parallel_mode
+            self.ncpus = ncpus
+            self.queue = queue
+            self.job_array_tasks = job_array_tasks
+
+            # Optional inputs (time, memory, etc.)

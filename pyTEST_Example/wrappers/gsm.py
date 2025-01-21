@@ -76,9 +76,9 @@ class GSM:
             os.mkdir(f'{self.work_folder}/scratch')
             
         # copy input geometry to scratch
-        os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial{self.jobid:04d}.xyz')
-        #os.system(f'cp {self.input_geo} {self.work_folder}/scratch/initial0001.xyz')
-       
+        os.system(f'cp {self.input_geo[0]} {self.work_folder}/scratch/initial{self.jobid:04d}.xyz') # reactant
+        if(self.SSM == False): # GSM requires R + P
+            os.system(f'cat {self.input_geo[1]} >> {self.work_folder}/scratch/initial{self.jobid:04d}.xyz') # product
         if(self.SSM == True):
             with open(f'{self.work_folder}/ISOMERS{self.jobid:04d}','a') as f:
             #with open(f'{self.work_folder}/ISOMERS0001','a') as f:

@@ -47,13 +47,7 @@ jobs:
     - name: Run pytest
       run: |
                home=$(pwd)
-               cd /opt/hostedtoolcache/Python/3.9.20/x64/bin/
-               ls
                echo $CONDA
-               #cd $CONDA/bin
-               
-               #ls
-               #echo $(pwd)
                $CONDA/bin/xtb --version
                $CONDA/bin/crest --version
 

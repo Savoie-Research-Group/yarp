@@ -4,6 +4,8 @@ from wrappers.crest    import *
 from wrappers.orca     import *
 from wrappers.gaussian import *
 
+from wrappers.gsm      import *
+
 # Zhao's note: function that checks and re-runs FullTZ numerical frequency calculations #
 # If a job needs to restart, add the keyword and overwrite the job #
 def CheckFullTZRestart(dft_job, args):

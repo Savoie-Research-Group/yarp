@@ -647,12 +647,6 @@ def conf_by_crest(rxns, logging_queue, logger):
                 Input.jobtype="crest"
                 Input.nproc=c_nprocs
                 crest_job=Input.Setup("CREST", args, P_constraint)
-                #crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
-                #        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
-                #if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
-
-                #if len(P_constraint) > 0:
-                #    crest_job.add_command(distance_constraints = P_constraint)
 
                 if args['verbose']: print(f"CREST JOB: {crest_job}\n")
                 if not crest_job.calculation_terminated_normally(): crest_job_list.append(crest_job)
@@ -664,12 +658,7 @@ def conf_by_crest(rxns, logging_queue, logger):
                 inp_xyz=f"{wf}/{rxn.reactant_inchi}.xyz"
                 if bool(rxn.reactant_xtb_opt) is False: xyz_write(inp_xyz, rxn.reactant.elements, rxn.reactant.geo)
                 else: xyz_write(inp_xyz, rxn.reactant_xtb_opt["E"], rxn.reactant_xtb_opt["G"])
-                #crest_job=CREST(input_geo=inp_xyz, work_folder=wf, lot=args["lot"], nproc=c_nprocs, mem=mem, quick_mode=args['crest_quick'], opt_level=args['opt_level'],\
-                #        solvent=args['solvent'], solvation_model=args['low_solvation_model'], charge=args['charge'], multiplicity=args['multiplicity'])
-                #if args["crest_quick"]: crest_job.add_command(additional='-rthr 0.1 -ewin 8 ')
 
-                #if len(R_constraint) > 0:
-                #    crest_job.add_command(distance_constraints = R_constraint)
                 Input = Calculator(args)
                 Input.input_geo=inp_xyz
                 Input.work_folder=wf
@@ -863,18 +852,24 @@ def run_gsm_by_pysis(rxns, logging_queue):
     for count, gsm_job in enumerate(gsm_job_list):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
-        elif os.path.isfile(f"{gsm_job.work_folder}/splined_hei.xyz") is True:
-            if args["verbose"]: 
-                print(f"GSM job {gsm_job.work_folder} exist\n")
-                print(f"GSM job {gsm_job.jobname} is coverged!")
-            TSE, TSG=xyz_parse(f"{gsm_job.work_folder}/splined_hei.xyz")
-            # Read guess TS into reaction class
-            ind=gsm_job.jobname
-            ind=ind.split('_')
-            inchi, idx, conf_i = ind[0], int(ind[1]), int(ind[2])
-            for count_i, i in enumerate(rxns):
-                if i.reactant_inchi==inchi and i.id==idx:
-                    rxns[count_i].TS_guess[conf_i]=TSG
+            continue
+        if(args['GSM_Calculator'] == "PYSIS"): 
+            if os.path.isfile(f"{gsm_job.work_folder}/splined_hei.xyz") is True:
+                if args["verbose"]: 
+                    print(f"GSM job {gsm_job.work_folder} exist\n")
+                    print(f"GSM job {gsm_job.jobname} is coverged!")
+                TSE, TSG=xyz_parse(f"{gsm_job.work_folder}/splined_hei.xyz")
+        elif(args['GSM_Calculator'] == "GSM"):
+            TSE, TSG=gsm_job.get_TS()
+
+        if args["verbose"]: print(f"TSG: {TSG}\n")
+        # Read guess TS into reaction class
+        ind=gsm_job.jobname
+        ind=ind.split('_')
+        inchi, idx, conf_i = ind[0], int(ind[1]), int(ind[2])
+        for count_i, i in enumerate(rxns):
+            if i.reactant_inchi==inchi and i.id==idx:
+                rxns[count_i].TS_guess[conf_i]=TSG
     return rxns
 
 def run_gsm_by_xtb(rxns, logging_queue):

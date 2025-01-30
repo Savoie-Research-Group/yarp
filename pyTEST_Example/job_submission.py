@@ -317,60 +317,85 @@ class QSE_jobs:
     """
     Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.
 
-    Planning Notes
-    --------------
-
-    We will need to use the job arrays feature to submit multiple jobs at once,
-    rather than submitting each job individually. Need to figure out how this works still.
-
-    Submission of jobs must be done on a frontend login node at ND-CRC. Therefore,
-    we are limited to only execute the job submission script for 1 hour wall time.
-    Need to add a routine for limiting walltime, so we don't get shutdown by the CRC staff.
-
-    Currently, we just want to be able to submit ORCA and Gaussian DFT jobs.
-    xTB, CREST,
-
-    Attributes (need to update!)
+    Attributes
     ----------
+    jobname : str
+        Flag to control whether QSE submission script is generated to run ORCA, CREST, or
+        some other package. Currently only accepts "ORCA" or "CREST".
+
+    module : str
+        Command line input to load external software.
+        For example, if ORCA job is wanted, this should be "module load orca".
+        Syntax will depend on the cluster system running on.
+        So we need to make this as flexible as possible.
+
+    submit_path : str
+        Directory from which submission script will be executed.
+        Defaults to current working directory.
+
     queue : str
         Queue to submit job requests to. Default is general CPU queue at ND-CRC (long).
         Eventually, this should probably be the Savoie group's specific queue at ND-CRC.
         There's also a GPU queue, but YARP is for CPUs right now, not GPUs.
 
-    parallel_mode : str
-        Option to select SMP (default) or MPI parallelization.
-        MPI parallelization at ND-CRC is reserved for jobs that require the use of more than one compute node.
-        We're probably only ever going to use SMP, I imagine.
-
     ncpus : int
         Number of CPUs used to parallelize across for each QSE job instance.
+        Defaults to 1 CPU.
 
     ntasks : int
-        Number of tasks to submit to the job array.
+        Number of tasks contained in the job array.
+        Defaults to 1 task.
+
+    email : str
+        Email to send "abort, begin, end" updates to for submitted jobs.
+        Default is to not include this in submission script.
+
+    script_file : str
+        Path to QSE submission script.
+
+    job_id : ???
+        Holder for QSE job ID generated after submission.
+
+    Planning Notes
+    --------------
+    How do I documment the class functions?
+
+    Have most things figured out for ORCA. Not yet set up for CREST/Gaussian.
+    CREST is a priority. Gaussian will happen when it happens.
+
+    Submission of jobs must be done on a frontend login node at ND-CRC. Therefore,
+    we are limited to only execute the job submission script for 1 hour wall time.
+    Need to add a routine for limiting walltime, so we don't get shutdown by the CRC staff.
+    UPDATE: Turns out the 1 hour wall time is a soft limit set by the CRC staff.
+    This is therefore an optional "nice to have", rather than a necessity.
 
     """
 
     # Constructor
-    def __init__(self, jobname = "job", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
+    def __init__(self, jobname = "ORCA", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
         self.queue = queue
         self.ntasks = ntasks
 
-        self.time = time
         self.jobname = jobname # will be either ORCA or CREST
+        self.module = module # line needed to load the necessary software
         self.submit_path = submit_path # assumes input files have already been generated in this location!
-        self.script_file = os.path.join(submit_path, jobname+'.submit')
 
-        #Zhao's note: add Email notification
         self.email = email
 
+        # Derived attributes
+        self.script_file = os.path.join(submit_path, jobname+'.submit')
         self.job_id = None
 
     def prepare_submission_script(self):
         """
         Create a QSE submission script based on inputs from class initialization
+
+        To-Do's:
+        - Figure out what orca input files will be named
+        - Figure out how crest executable line will read
         """
 
         with open(self.script_file, "w") as f:
@@ -388,39 +413,69 @@ class QSE_jobs:
                 f.write(f"#$ -t 1-{self.ntasks}\n")
 
             f.write(f"#$ -N {self.jobname}\n")
-            f.write(f"#SBATCH --output={self.jobname}.out\n")
-            f.write(f"#SBATCH --error={self.jobname}.err\n")
 
             if len(self.email) > 0:
                 f.write(f"#$ -M {self.email}\n")
                 f.write(f"#$ -m abe\n")
 
+            # Discard standard output/error to prevent garbage file accumulation
+            # This will be collected later for each job task
+            f.write(f"#$ -o /dev/null\n")
+            f.write(f"#$ -e /dev/null\n")
+
             # Collect info on compute resources
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
+            f.write("base_dir=$(pwd)")
 
             # Collect a list of folders to iterate through
             f.write("mapfile -t folder_array < <(find . -maxdepth 1 -type d ! -name '.' -exec basename {} \;)\n")
 
+            # Open a "does this directory exist?" bash conditional
+            f.write('if [ -d "${folder_array[$SGE_TASK_ID-1]}" ]; then\n')
+
+            # Redirect output and error to the appropriate folder
+            f.write('    exec > "${folder_array[$SGE_TASK_ID-1]}/output.log" 2> "${folder_array[$SGE_TASK_ID-1]}/error.log"\n')
+
+            # Change to folder of interest
+            f.write("cd ${folder_array[$SGE_TASK_ID-1]}\n")
+
             # Put in script body according to jobname input
             if self.jobname == "ORCA" :
                 # Put in module load commands
-                f.write(f"module load {self.module}") # ERM: make this a user-input!
-            else if self.jobname == "CREST" :
-                # CREST stuff
+                f.write(f"{self.module}")
+                # Set up full path to ORCA for paralleliztion runs
+                f.write("orca=$(which orca)\n")
+                # Execute ORCA input file
+                # ERM: Need to figure out what these files will be named!!!
+                f.write("$orca orca.inp > orca.out\n")
+            elif self.jobname == "CREST" :
+                # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
+                f.write("CREST stuff\n")
             else:
                 # Throw a runtime error
+                raise RuntimeError("QSE class currently only supports CREST and ORCA job submissions!")
+
+            # Return to previous folder
+            f.write('cd "$base_dir"\n')
+
+            # Close the "does this directory exist?" bash conditional
+            f.write('else\n')
+            f.write('    echo "Error: Directory ${folder_array[$SGE_TASK_ID-1]} does not exist" > "error_job_${JOB_ID}_task_${SGE_TASK_ID}.log"\n')
+            f.write('fi\n')
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")
-
-
 
     def submit(self):
         """
         Submit a QSE job array using the previously built script file 
 
         Save job IDs to class variable for access later
+
+        To-do's:
+        - update jobID parsing to distinguish between base job number and task ID
+        - figure out a good default to use for self.job_id initialization
         """
         current_dir = os.getcwd()
 
@@ -435,24 +490,5 @@ class QSE_jobs:
         os.chdir(current_dir)
 
         # save job ID somehow....
-        self.job_id = output.stdout.split()[-1] # need to modify this!
+        self.job_id = output.stdout.split()[-1] # need to modify this!??
 
-    # def create_orca_jobs(self, orca_job_list, parallel=False, orcapath=None):
-    #     """
-    #     Generate orca jobs
-    #     NOTE:  a list of orca job objects needs to be provided
-    #     """
-    #     self.create_job_head()
-    #     self.setup_orca_script()
-        
-    #     with open(self.script_file, "a") as f:
-    #         for orcajob in orca_job_list:
-    #             f.write("\n# cd into the submission directory\n")
-    #             f.write(f"cd {orcajob.work_folder}\n\n")
-    #             if orcapath is None: orcapath = '/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca'
-    #             if parallel: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} &\n\n")
-    #             else: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} \n\n")
-                
-    #         f.write("wait\n")
-
-    #     self.create_job_bottom()

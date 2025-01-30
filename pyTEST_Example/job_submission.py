@@ -313,7 +313,7 @@ class SLURM_Job:
                 pass
     '''
 
-class QSE_job:
+class QSE_jobs:
     """
     Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.
 
@@ -330,7 +330,7 @@ class QSE_job:
     Currently, we just want to be able to submit ORCA and Gaussian DFT jobs.
     xTB, CREST,
 
-    Attributes
+    Attributes (need to update!)
     ----------
     queue : str
         Queue to submit job requests to. Default is general CPU queue at ND-CRC (long).
@@ -345,18 +345,114 @@ class QSE_job:
     ncpus : int
         Number of CPUs used to parallelize across for each QSE job instance.
 
-    job_array_tasks : int
+    ntasks : int
         Number of tasks to submit to the job array.
 
     """
 
     # Constructor
-    def __init__(self, queue="long", parallel_mode="smp", ncpus=1, job_array_tasks=3):
+    def __init__(self, jobname = "job", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
 
-            # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
-            self.parallel_mode = parallel_mode
-            self.ncpus = ncpus
-            self.queue = queue
-            self.job_array_tasks = job_array_tasks
+        # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
+        self.ncpus = ncpus
+        self.queue = queue
+        self.ntasks = ntasks
 
-            # Optional inputs (time, memory, etc.)
+        self.time = time
+        self.jobname = jobname # will be either ORCA or CREST
+        self.submit_path = submit_path # assumes input files have already been generated in this location!
+        self.script_file = os.path.join(submit_path, jobname+'.submit')
+
+        #Zhao's note: add Email notification
+        self.email = email
+
+        self.job_id = None
+
+    def prepare_submission_script(self):
+        """
+        Create a QSE submission script based on inputs from class initialization
+        """
+
+        with open(self.script_file, "w") as f:
+            # Make script header with QSE-style resource requests
+            f.write("#!/bin/bash\n")
+            
+            # Specify CPUs and compute queue
+            f.write(f"#$ -pe smp {self.ncpus}\n") # ERM: for now, it's SMP or bust
+            f.write(f"#$ -q {self.queue}\n")
+
+            # Set up job array for multi-job submissions (default is only 1 job submission)
+            if self.ntasks == 1 :
+                f.write("#$ -t 1\n")
+            else :
+                f.write(f"#$ -t 1-{self.ntasks}\n")
+
+            f.write(f"#$ -N {self.jobname}\n")
+            f.write(f"#SBATCH --output={self.jobname}.out\n")
+            f.write(f"#SBATCH --error={self.jobname}.err\n")
+
+            if len(self.email) > 0:
+                f.write(f"#$ -M {self.email}\n")
+                f.write(f"#$ -m abe\n")
+
+            # Collect info on compute resources
+            f.write("echo Running on host `hostname`\n")
+            f.write("echo Start Time is `date`\n\n")
+
+            # Collect a list of folders to iterate through
+            f.write("mapfile -t folder_array < <(find . -maxdepth 1 -type d ! -name '.' -exec basename {} \;)\n")
+
+            # Put in script body according to jobname input
+            if self.jobname == "ORCA" :
+                # Put in module load commands
+                f.write(f"module load {self.module}") # ERM: make this a user-input!
+            else if self.jobname == "CREST" :
+                # CREST stuff
+            else:
+                # Throw a runtime error
+
+            # Make script footer
+            f.write("\necho End Time is `date`\n\n")
+
+
+
+    def submit(self):
+        """
+        Submit a QSE job array using the previously built script file 
+
+        Save job IDs to class variable for access later
+        """
+        current_dir = os.getcwd()
+
+        # go into the job.submit folder to submit the job
+        os.chdir('/'.join(self.script_file.split('/')[:-1]))
+        
+        # Execute job submission via qsub
+        command = f"qsub {self.script_file}"
+        output = subprocess.run(command, shell=True, capture_output=True, text=True)
+        
+        # go back to current dir
+        os.chdir(current_dir)
+
+        # save job ID somehow....
+        self.job_id = output.stdout.split()[-1] # need to modify this!
+
+    # def create_orca_jobs(self, orca_job_list, parallel=False, orcapath=None):
+    #     """
+    #     Generate orca jobs
+    #     NOTE:  a list of orca job objects needs to be provided
+    #     """
+    #     self.create_job_head()
+    #     self.setup_orca_script()
+        
+    #     with open(self.script_file, "a") as f:
+    #         for orcajob in orca_job_list:
+    #             f.write("\n# cd into the submission directory\n")
+    #             f.write(f"cd {orcajob.work_folder}\n\n")
+    #             if orcapath is None: orcapath = '/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca'
+    #             if parallel: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} &\n\n")
+    #             else: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} \n\n")
+                
+    #         f.write("wait\n")
+
+    #     self.create_job_bottom()

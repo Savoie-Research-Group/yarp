@@ -31,19 +31,6 @@ class RxnProcess:
         print(f"TSOPT: Checking TSOPT Keys: {self.conformer_key}\n")
         for conf_i in key:
             self.conformers.append(ConformerProcess(self.rxn, conf_i))
-    def get_current_status(self):
-        return self.status
-
-    def advance_step(self):
-        if self.current_step < len(self.steps):
-            step_info = self.steps[self.current_step]
-            print(f"Submitting {step_info['name']} for {self.reaction}...")
-            # 模拟提交作业（您可以替换为实际的作业提交逻辑）
-            print(f"{step_info['name']} submitted for {self.reaction}.")
-            self.status = step_info["next_status"]
-            self.current_step += 1
-        else:
-            print(f"All steps completed for {self.reaction}!")
 
 class ConformerProcess:
     def __init__(self, rxn, conformer_id):

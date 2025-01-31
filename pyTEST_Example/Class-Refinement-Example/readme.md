@@ -20,3 +20,9 @@
       * if dead, it will restart the job
       * If the process is dead and beyond saving, this Conformer will be ignored and there is no further action
         * :memo: NOTE: for example, if a TS conformer has multiple imag frequencies, this TS conformer will not do IRC
+## New python scripts introduced
+  * `DFT_class.py` : defines Rxn and conformer class for the DFT calculation
+  * `tsopt.py` : define the TSOPT process (DFT level)
+  * `irc.py` : defines the IRC process (DFT level)
+  * `class_main_dft.py` : class refactoring of `main_dft.py` (WIP)
+  * `class_refinement.py` : class refactoring of `TS_refinement.py` (tested on Purdue Negishi cluster)

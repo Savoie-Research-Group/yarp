@@ -47,7 +47,7 @@ coverage.xml
 .pytest_cache/
 cover/
 RESULT/
-*.p
+#*.p
 
 # Sphinx documentation
 docs/_build/

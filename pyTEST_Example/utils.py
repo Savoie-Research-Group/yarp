@@ -156,6 +156,9 @@ def compare_lists(list1, list2):
 #the index is needed to have precise control 
 
 def treat_mix_lot_metal_firstLayer(args, elements, geometry):
+    args['verbose'] = False # DEBUG
+    verbose = args['verbose']
+
     if args['dft_mix_firstlayer']:
         first_layer_index = []
         # get adj_mat for TS
@@ -169,7 +172,7 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
                 metal_ind.extend(args['Reactive_Atoms'])
                 #metal_ind.unique()
                 metal_ind = list(dict.fromkeys(metal_ind))
-                print(f"TZ indices: {metal_ind}\n")
+                if verbose: print(f"TZ indices: {metal_ind}\n")
         if len(metal_ind) == 0: return
         # get 1st layer
         counter = 0
@@ -216,9 +219,10 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         alnum_element.extend(not_alnum_element)
         args['dft_mix_lot'] = alnum_element
 
-        print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
+        if verbose: print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
 
 def process_mix_basis_input(args):
+
     args['dft_mix_basis'] = bool(args['dft_mix_basis'])
     if args['dft_mix_basis']:
         dft_mix_lot = []
@@ -274,7 +278,7 @@ def read_wait_for_last_jobs():
     print("All previous jobs are finished\n")
 '''
 
-def add_mix_basis_for_atom(element, index, mix_lot, package):
+def add_mix_basis_for_atom(element, index, mix_lot, package, verbose = False):
 
     found = False
     count = 0
@@ -311,7 +315,7 @@ def add_mix_basis_for_atom(element, index, mix_lot, package):
 
         if package == "ORCA": mix_info = f"newgto {mix_lot[count][1]} end"
         elif package == "Gaussian": mix_info = [mix_lot[count][1], index]
-        print(f"mix_information: {mix_info}\n", flush = True)
+        if verbose: print(f"mix_information: {mix_info}\n", flush = True)
         return mix_info
     else:
         return ''

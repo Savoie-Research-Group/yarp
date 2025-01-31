@@ -33,6 +33,8 @@ class Calculator:
         """
         keys=[i for i in args.keys()]
 
+        args['verbose'] = False # DEBUG
+
         self.verbose = args['verbose']
 
         if not 'dft_mix_basis' in keys:

@@ -358,6 +358,8 @@ class QSE_jobs:
 
     Planning Notes
     --------------
+    IMPORTANT: Need to improve robustness of the ORCA input/output file formatting!!!
+
     How do I documment the class functions?
 
     Have most things figured out for ORCA. Not yet set up for CREST/Gaussian.
@@ -448,7 +450,7 @@ class QSE_jobs:
                 f.write("orca=$(which orca)\n")
                 # Execute ORCA input file
                 # ERM: Need to figure out what these files will be named!!!
-                f.write("$orca orca.inp > orca.out\n")
+                f.write("$orca orcajob.in > orcajob.out\n")
             elif self.jobname == "CREST" :
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
                 f.write("CREST stuff\n")

@@ -1,9 +1,9 @@
 # Note that a bimolecular reaction is recommended to use .xyz or .mol file
 # input reaction/reactant
-input: /scratch/negishi/li1724/112224-HS-TS/TEST-258
+input: /scratch/negishi/li1724/013125-yarp/yarp/pyTEST_Example/Class-Refinement-Example/reaction_xyz/
 
 # output folder for yarp
-scratch: /scratch/negishi/li1724/112224-HS-TS/RESULT/TEST-258
+scratch: /scratch/negishi/li1724/013125-yarp/yarp/pyTEST_Example/Class-Refinement-Example/
 
 # the dictionary for result (reaction class)
 reaction_data: 0.p

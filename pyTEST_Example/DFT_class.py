@@ -28,9 +28,11 @@ class RxnProcess:
         elif args["skip_low_IRC"] is True: key=[i for i in rxn.TS_xtb.keys()]
         else: key=[i for i in rxn.IRC_xtb.keys() if rxn.IRC_xtb[i]["type"]=="Intended" or rxn.IRC_xtb[i]["type"]=="P_unintended"]
         self.conformer_key = key
-        print(f"TSOPT: Checking TSOPT Keys: {self.conformer_key}\n")
+        if args['verbose']: print(f"TSOPT: Checking TSOPT Keys: {self.conformer_key}\n")
         for conf_i in key:
             self.conformers.append(ConformerProcess(self.rxn, conf_i))
+    def get_current_status(self):
+        return self.status
 
 class ConformerProcess:
     def __init__(self, rxn, conformer_id):
@@ -43,20 +45,21 @@ class ConformerProcess:
             {"name": "IRC_Analysis",    "next_status": "Complete"}
         ]
 
+        self.SUBMIT_JOB = True
+
         self.TSOPT = TSOPT(self.rxn, self.conformer_id)
         self.IRC = IRC(self.rxn, self.conformer_id)
 
     # for these processes, it is a class, and there is a FLAG (status)
     # the flag will tell whether the job is submitted/finished with error/finished with result
-    # if finished with error : then this conformer is terminated, no further action
+    # if finished with error : then this conformer is terminated
     # if finished with result: continue to the next process
     # if submitted: check if the job is finished, if not, wait
 
     def run_TSOPT(self):
-        #if not self.status == "Initialized":
-        #    print(f"self.status: {self.status}\n")
-        #    print(f"SKIP CHECKING TSOPT for {self.TSOPT.rxn_ind}, STATUS: {self.TSOPT.FLAG}\n")
-        #    return;
+        if self.TSOPT.rxn_ind == None:
+            self.TSOPT.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
+
         print(f"{self.TSOPT.rxn_ind}: Initial TSOPT STATUS: {self.TSOPT.FLAG}\n")
 
         # Initialize the TSOPT variable if this variable is accessed for the first time
@@ -83,11 +86,14 @@ class ConformerProcess:
             self.status = "TS_optimization"
             print(f"TSOPT NOT DONE for {self.TSOPT.rxn_ind}!\n")
             self.TSOPT.Prepare_Submit()
-            self.TSOPT.Submit()
+            if self.SUBMIT_JOB: self.TSOPT.Submit()
 
         print(f"{self.TSOPT.rxn_ind}: Final TSOPT STATUS: {self.TSOPT.FLAG}\n")
 
     def run_IRC(self):
+        if self.IRC.rxn_ind == None:
+            self.IRC.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
+
         # THis process needs to start if TSOPT has found the TS
         if not self.TSOPT.FLAG == "Finished with Result": return
         print(f"{self.IRC.rxn_ind}: Initial IRC STATUS: {self.IRC.FLAG}\n")
@@ -116,7 +122,7 @@ class ConformerProcess:
             self.status = "IRC_Analysis"
             print(f"IRC NOT DONE for {self.IRC.rxn_ind}\n")
             self.IRC.Prepare_Submit()
-            self.IRC.Submit()
+            if self.SUBMIT_JOB: self.IRC.Submit()
         
         print(f"{self.IRC.rxn_ind}: Final IRC STATUS: {self.IRC.FLAG}\n")
         #exit()

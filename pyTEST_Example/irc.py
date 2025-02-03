@@ -25,8 +25,8 @@ class IRC:
         else: dft_lot=args["dft_lot"]
         self.dft_lot = dft_lot
 
-        if self.rxn_ind == None:
-            self.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{ind}"
+        #if self.rxn_ind == None:
+        #    self.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{ind}"
 
         self.wf=f"{scratch_dft}/{self.rxn_ind}"
         self.inp_xyz=f"{self.wf}/{self.rxn_ind}-TS.xyz"

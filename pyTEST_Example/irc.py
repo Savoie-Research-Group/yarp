@@ -1,6 +1,6 @@
 import os
 from utils import *
-from calculator import Calculator
+from calculator import *
 
 from job_submission import *
 class IRC:
@@ -23,6 +23,9 @@ class IRC:
 
         if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
         else: dft_lot=args["dft_lot"]
+        # for dft_lot here, convert ORCA/Other calculator to Gaussian
+        # for example: def2-SVP --> def2SVP
+        dft_lot = convert_orca_to_gaussian(dft_lot)
         self.dft_lot = dft_lot
 
         #if self.rxn_ind == None:
@@ -33,7 +36,7 @@ class IRC:
 
         #print(f"self.inp_xyz: {self.inp_xyz}\n")
 
-        xyz_write(self.inp_xyz, self.rxn.reactant.elements, self.rxn.TS_dft[dft_lot][ind]["geo"])
+        xyz_write(self.inp_xyz, self.rxn.reactant.elements, self.rxn.TS_dft[self.dft_lot][ind]["geo"])
 
         self.FLAG = "Initialized"
 

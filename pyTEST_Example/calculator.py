@@ -6,6 +6,18 @@ from wrappers.gaussian import *
 
 from wrappers.gsm      import *
 
+def convert_orca_to_gaussian(orca_basis: str) -> str:
+    """
+    Convert ORCA-style basis set notation to Gaussian-style notation.
+    
+    :param orca_basis: Basis set name in ORCA format (e.g., 'def2-SVP')
+    :return: Converted basis set name in Gaussian format (e.g., 'def2SVP')
+    """
+    # Remove hyphens to match Gaussian's format
+    gaussian_basis = orca_basis.replace("-", "")
+    
+    return gaussian_basis
+
 # Zhao's note: function that checks and re-runs FullTZ numerical frequency calculations #
 # If a job needs to restart, add the keyword and overwrite the job #
 def CheckFullTZRestart(dft_job, args):

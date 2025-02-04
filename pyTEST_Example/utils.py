@@ -20,97 +20,6 @@ from wrappers.xtb      import *
 
 from scipy.spatial.distance import cdist
 
-'''
-from wrappers.pysis    import *
-from wrappers.orca     import *
-from wrappers.gaussian import *
-from wrappers.crest    import *
-########################################
-# Calculator for xTB/DFT Calculations  #
-# Supported software:                  #
-# xTB, Pysis, ORCA, Gaussian           #
-########################################
-class Calculator:
-    def __init__(self, args):
-        """
-        Initialize an DFT input class
-        a wrapper for DFT input keywords 
-        including charge, multiplicity, solvation, level of theory, etc.
-        different calculator uses different syntax for jobtype, this class takes in a unified name set
-        the class will take: opt, tsopt, copt, irc, gsm, ... (all small cases)
-        each one will be translated to the corresponding string accepted by the chosen calculator
-        """
-        self.input_geo   = ""
-        self.work_folder = os.getcwd()
-        self.xtb_lot     = args["lot"]
-        self.lot         = args["dft_lot"]
-        self.jobtype     = 'OPT'
-        self.nproc       = int(args["dft_nprocs"])
-        self.mem         = int(args["mem"]*1000)
-        self.mix_basis   = args['dft_mix_basis']
-        self.mix_lot     = args['dft_mix_lot']
-        self.jobname     = 'job'
-        self.charge      = args["charge"]
-        self.multiplicity= args["multiplicity"]
-        self.solvent     = args["solvent"]
-        self.dielectric  = args["dielectric"]
-        self.dispersion  = args["dispersion"]
-        self.solvation_model = args["solvation_model"]
-        self.grid        = 2
-        self.writedown_xyz   = True
-        print(f"self.lot: {self.lot}\n")
-        print(f"self.mix_basis: {self.mix_basis}\n")
-        print(f"self.mix_lot:   {self.mix_lot}\n")
-
-    def Setup(self, package, args, constraints=[]):
-        # PYSIS: used for geo optimization, ts-optimization (xtb), gsm (jobtype=string, coord_type="cart"), irc (jobtype=irc)#
-        if(package == "PYSIS"):
-            if(self.jobtype == 'gsm'):
-                self.jobtype = 'string'
-            alpb=args["solvent"]
-            gbsa=args["solvent"]
-            if(args["low_solvation_model"].lower()=='alpb'):
-                gbsa=False
-            else:
-                alpb=False
-            JOB = PYSIS(input_geo=self.input_geo, 
-                        work_folder=self.work_folder, 
-                        pysis_dir=args["pysis_path"], 
-                        jobname=self.jobname, 
-                        jobtype=self.jobtype, 
-                        nproc=self.nproc, 
-                        charge=self.charge, 
-                        multiplicity=self.multiplicity, 
-                        alpb=alpb,
-                        gbsa=gbsa)
-            if('opt' in self.jobtype): #gsm or irc don't need hessian keywords, opt and tsopt need them
-                JOB.generate_input(calctype='xtb', hess=True, hess_step=1)
-            elif('string' in self.jobtype):
-                JOB.generate_input(calctype='xtb')
-            elif('irc' in self.jobtype):
-                if os.path.isfile(f"{self.work_folder}/ts_final_hessian.h5"): 
-                    JOB.generate_input(calctype="xtb", hess_init=f"{self.work_folder}/ts_final_hessian.h5")
-                else: JOB.generate_input(calctype='xtb')
-            JOB.generate_constraints(distance_constraints = constraints)
-            
-        elif(package=="XTB"):
-            if(self.jobtype == 'opt'):
-                self.jobtype = ['opt']
-            else:
-                print(f"XTB wrapper can only do geometry optimization ('opt')!\n")
-                exit()
-            JOB =  XTB(input_geo=self.input_geo, 
-                        work_folder=self.work_folder,
-                        lot=self.xtb_lot, 
-                        jobtype=["opt"],
-                        solvent=args["solvent"], 
-                        solvation_model=args["low_solvation_model"],
-                        jobname=self.jobname, 
-                        charge=args["charge"], 
-                        multiplicity=args["multiplicity"])
-            JOB.add_command(distance_constraints=constraints)
-'''
-
 #################################################################
 # Add Mix Basis Set (available in ORCA and Gaussian)            #
 # For ORCA: add specific basis set info to the end of the atom  #
@@ -156,8 +65,6 @@ def compare_lists(list1, list2):
 #the index is needed to have precise control 
 
 def treat_mix_lot_metal_firstLayer(args, elements, geometry):
-    args['verbose'] = False # DEBUG
-    verbose = args['verbose']
 
     if args['dft_mix_firstlayer']:
         first_layer_index = []
@@ -172,7 +79,7 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
                 metal_ind.extend(args['Reactive_Atoms'])
                 #metal_ind.unique()
                 metal_ind = list(dict.fromkeys(metal_ind))
-                if verbose: print(f"TZ indices: {metal_ind}\n")
+                if args['verbose']: print(f"TZ indices: {metal_ind}\n")
         if len(metal_ind) == 0: return
         # get 1st layer
         counter = 0
@@ -219,7 +126,7 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         alnum_element.extend(not_alnum_element)
         args['dft_mix_lot'] = alnum_element
 
-        if verbose: print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
+        if args['verbose']: print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
 
 def process_mix_basis_input(args):
 
@@ -245,38 +152,6 @@ def process_mix_basis_input(args):
     if(not args['dft_mix_basis'] and args['dft_fulltz_level_correction']):
         print(f"Not Using Mix (TZ/DZ/SZ) Basis Sets, but TZ Correction used, What are you using it for???\n")
         raise RuntimeError("Please change your input file!!!")
-
-'''
-#Zhao's note: a function for yarp-dft to wait for the dft-jobs that are launched by the previous yarp-dft run
-#for example, the previous yarp-dft launched 2 TSOPT job and died, the 2 TSOPT jobs are still running 
-#now, if you start a new yarp-dft run, it will wait until those 2 TSOPT jobs are dead.
-#jobs will be written to a text file "last_jobs.txt", the text file will tell what jobs are currently running 
-def read_wait_for_last_jobs():
-    print("checking for unfinished jobs from the previous run\n")
-    file_path = 'last_jobs.txt'
-    if not os.path.exists(file_path): return
-    with open(file_path, 'r') as file:
-        # Use list comprehension to convert each line to an integer
-        job_ids = [int(line.strip()) for line in file]
-
-    # Now 'numbers' contains the integers as a list
-    print(f"unfinished job_ids are: {job_ids}\n")
-    print(f"Checking for jobs that are still undone...\n")
-    print(f"Need to wait\n")
-
-    slurm_jobs = []
-    for job_id in job_ids:
-        slurm_job = SLURM_Job()
-        slurm_job.job_id = job_id
-        if slurm_job.status() == 'FINISHED':
-            continue
-        print(f"Unfinished job: {job_id}\n")
-        slurm_jobs.append(slurm_job)
-
-    #Monitor these jobs#
-    monitor_jobs(slurm_jobs)
-    print("All previous jobs are finished\n")
-'''
 
 def add_mix_basis_for_atom(element, index, mix_lot, package, verbose = False):
 

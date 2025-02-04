@@ -62,7 +62,7 @@ def main(args:dict):
         if args['verbose']: print(f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
         # process all the conformers
         for conf in dft_rxn.conformers:
-            conf.SUBMIT_JOB = False
+            conf.SUBMIT_JOB = False # Prepare job submission script, but do not submit
 
             conf.rxn.args = args
             conf.TSOPT.args = args

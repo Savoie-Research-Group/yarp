@@ -1,6 +1,6 @@
 import os
 from utils import *
-from calculator import Calculator
+from calculator import *
 
 from job_submission import *
 class TSOPT:
@@ -22,6 +22,9 @@ class TSOPT:
         scratch_dft=args["scratch_dft"]
         if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
         else: dft_lot=args["dft_lot"]
+        # for dft_lot here, convert ORCA/Other calculator to Gaussian
+        # for example: def2-SVP --> def2SVP
+        dft_lot = convert_orca_to_gaussian(dft_lot)
         self.dft_lot = dft_lot
         if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
         # Load TS from reaction class and prepare TS jobs

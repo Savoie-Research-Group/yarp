@@ -16,19 +16,25 @@ input : str
     Path to either an XYZ file or a folder filled with XYZ files
     TO-DO: add error if missing from input
 
+scratch : str
+    Folder that output files will be placed
+    TO-DO: add default if missing from input
+
 dft_lot : str
     Level of theory (lot) desired to run density functional theory (DFT) at.
     TO-DO: what are acceptable inputs here????
     dft_lot: wB97X D4 def2-TZVP # the functional and basis set for DFT
     TO-DO: add default if missing from input
 
-scratch : str
-    Folder that output files will be placed
-    TO-DO: add default if missing from input
-
 package : str
     Software package (ORCA, Gaussian) to perform DFT with.
     Currently only ORCA is available!
+
+dft_njobs : int
+    Number of DFT jobs to be submitted.
+    TO-DO: figure out the nuance of this interaction with "running_jobs"
+    This will not always be the actual number of jobs submitted?
+    Should this be removed? Why what this originally here?
 
 dft_nprocs : int
     Number of CPUs available for each DFT calculation.
@@ -36,13 +42,8 @@ dft_nprocs : int
 mem : int
     Memory (in GB) available for each DFT calculation.
 
-charge : int
-    Overall charge of molecule(s).
-    This will be applied to all molecules in a batch submission.
-
-multiplicity : int
-    Spin multiplicity of molecule(s).
-    This will be applied to all molecules in a batch submission.
+hess_recalc : int
+    Controls how often ORCA recalculates the Hessian?
 
 solvent : ?????
     Turn implicit solvation on/off
@@ -56,10 +57,13 @@ dielectric : float
     Dielectric constant for implicit solvation.
     Modify this to match the solvent of choice.
 
-dft_njobs : int
-    Number of DFT jobs to be submitted.
-    TO-DO: figure out the nuance of this interaction with "running_jobs"
-    This will not always be the actual number of jobs submitted?
+charge : int
+    Overall charge of molecule(s).
+    This will be applied to all molecules in a batch submission.
+
+multiplicity : int
+    Spin multiplicity of molecule(s).
+    This will be applied to all molecules in a batch submission.
 """
 
 import sys
@@ -77,7 +81,7 @@ from utils import xyz_write
 from wrappers.orca import ORCA
 from job_submission import QSE_jobs
 
-def main(args):
+def main(args): # TO-DO: use yaml to robustly handle input from args
 
     # Read energies and atomic cartesian coordinates (geometries) of input XYZ files into a dictionary
     TS_dict=dict()
@@ -111,7 +115,11 @@ def main(args):
     job_list = dict()
     running_jobs = []
 
+    job_file_name = f"TSOPT"
+
     for i in TS_dict.keys():
+        print(f"Processing {i}")
+
         # Create a folder associated with each input file name
         wf = os.path.join(scratch, i)
         os.makedirs(wf, exist_ok=True)
@@ -128,7 +136,7 @@ def main(args):
                 work_folder = wf,
                 nproc = int(args["dft_nprocs"]),
                 mem = int(args["mem"])*1000,
-                jobname = f"{i}-TSOPT",
+                jobname = job_file_name,
                 jobtype = "OptTS Freq",
                 lot = args["dft_lot"],
                 charge = args["charge"],
@@ -136,7 +144,7 @@ def main(args):
                 solvent = args["solvent"],
                 solvation_model = args["solvation_model"],
                 dielectric = args["dielectric"],
-                writedown_xyz = True
+                writedown_xyz = False
             )
 
             # Generate input file
@@ -148,33 +156,29 @@ def main(args):
             job_list[i]=dft_job
 
             # Check if a completed job is present before adding to the list of jobs to run
-            if dft_job.calculation_terminated_normally() is False: running_jobs.append(i)
+            if dft_job.calculation_terminated_normally() is False:
+                print(f"Adding job {i} to the queue to be run!")
+                running_jobs.append(i)
         else :
             raise RuntimeError("It's ORCA or bust right now my friend, sorry!")
 
-    # Conditional tree to submit DFT jobs after checking for already completed jobs
-    if len(running_jobs) > 1 :
-        # Do something clever to determine how many jobs to submit
-        # TO-DO: figure out this black magic!
-        n_jobs = len(running_jobs) // int(args["dft_njobs"])
-        if len(running_jobs) % int(args["dft_njobs"]) > 0 :
-            n_jobs += 1
+    n_jobs = len(running_jobs)
 
-        # Generate a single QSE job array submission script for all DFT jobs to be submitted
-        all_dft_jobs = QSE_jobs(
-            jobname = args["package"],
-            module = "module load orca", # TO-DO: make this a user input
-            submit_path = scratch, # QSE script is at same level as all XYZ repos!
-            queue = "long",
-            ncpus = int(args["dft_nprocs"]),
-            ntasks = n_jobs,
-        )
-        all_dft_jobs.prepare_submission_script()
+    print(f"Running {n_jobs} jobs!")
+    # Generate a single QSE job array submission script for all DFT jobs to be submitted
+    all_dft_jobs = QSE_jobs(
+        package = args["package"],
+        jobname = job_file_name,
+        module = "module load orca\n", # TO-DO: make this a user input
+        submit_path = scratch, # QSE script is at same level as all XYZ repos!
+        queue = "long",
+        ncpus = int(args["dft_nprocs"]),
+        ntasks = n_jobs
+    )
+    all_dft_jobs.prepare_submission_script()
 
-        # Submit stuff to the queue! (ERM: turn on after testing out whether things generate properly)
-        # all_dft_jobs.submit()
-    else:
-        print("Looks like you've already done all the TS optimizations!")
+    # Submit stuff to the queue! (ERM: turn on after testing out whether things generate properly)
+    all_dft_jobs.submit()
 
     return
 

@@ -374,14 +374,15 @@ class QSE_jobs:
     """
 
     # Constructor
-    def __init__(self, jobname = "ORCA", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
+    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
         self.queue = queue
         self.ntasks = ntasks
 
-        self.jobname = jobname # will be either ORCA or CREST
+        self.jobname = jobname
+        self.package = package
         self.module = module # line needed to load the necessary software
         self.submit_path = submit_path # assumes input files have already been generated in this location!
 
@@ -428,7 +429,7 @@ class QSE_jobs:
             # Collect info on compute resources
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
-            f.write("base_dir=$(pwd)")
+            f.write("base_dir=$(PWD)\n")
 
             # Collect a list of folders to iterate through
             f.write("mapfile -t folder_array < <(find . -maxdepth 1 -type d ! -name '.' -exec basename {} \;)\n")
@@ -443,15 +444,17 @@ class QSE_jobs:
             f.write("cd ${folder_array[$SGE_TASK_ID-1]}\n")
 
             # Put in script body according to jobname input
-            if self.jobname == "ORCA" :
+            if self.package == "ORCA" :
+                f.write("echo Loading ORCA\n")
                 # Put in module load commands
                 f.write(f"{self.module}")
                 # Set up full path to ORCA for paralleliztion runs
                 f.write("orca=$(which orca)\n")
                 # Execute ORCA input file
                 # ERM: Need to figure out what these files will be named!!!
-                f.write("$orca orcajob.in > orcajob.out\n")
-            elif self.jobname == "CREST" :
+                f.write(f"echo Executing ORCA job from $PWD\n")
+                f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
+            elif self.package == "CREST" :
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
                 f.write("CREST stuff\n")
             else:
@@ -479,18 +482,14 @@ class QSE_jobs:
         - update jobID parsing to distinguish between base job number and task ID
         - figure out a good default to use for self.job_id initialization
         """
+        os.chdir(self.submit_path)
         current_dir = os.getcwd()
-
-        # go into the job.submit folder to submit the job
-        os.chdir('/'.join(self.script_file.split('/')[:-1]))
+        print(f"Submitting jobs from {current_dir}")
         
         # Execute job submission via qsub
         command = f"qsub {self.script_file}"
         output = subprocess.run(command, shell=True, capture_output=True, text=True)
         
-        # go back to current dir
-        os.chdir(current_dir)
-
         # save job ID somehow....
-        self.job_id = output.stdout.split()[-1] # need to modify this!??
+        # self.job_id = output.stdout.split()[-1] # need to modify this!??
 

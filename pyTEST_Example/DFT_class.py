@@ -5,7 +5,7 @@ class RxnProcess:
     def __init__(self, rxn):
         self.rxn  = rxn
         self.args = self.rxn.args
-        self.status = "Initialized"  # 初始状态
+        self.status = "Initialized" 
         self.steps = [
             {"name": "RP_optimization", "next_status": "Complete"}
         ]
@@ -14,6 +14,10 @@ class RxnProcess:
         self.conformer_key = []
 
         self.conformers = []
+
+        # Reactant - Product classes
+        self.molecules  = []
+
     def get_TS_conformers(self):
         rxn  = self.rxn
         args = self.args
@@ -33,6 +37,51 @@ class RxnProcess:
             self.conformers.append(ConformerProcess(self.rxn, conf_i))
     def get_current_status(self):
         return self.status
+
+    def separate_Reactant_Product(self):
+        args = self.args
+        rxn = self.rxn
+        inchi_dict=dict()
+
+        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R", verbose = args['verbose'])
+
+        key=[i for i in tmp_dict.keys()]
+
+        original_r_inchi = return_inchikey(rxn.reactant, verbose = args['verbose'])
+
+        if args['verbose']:
+            print(f"reactant key: {key}\n")
+            print(f"original_r_inchi: {original_r_inchi}\n")
+
+        reactant_separable = False
+        product_separable  = False
+        n_reactant_inchi = 0
+        for i in key:
+            if i not in inchi_dict.keys():
+                inchi_dict[i]=tmp_dict[i]
+                #Zhao's note: take the string before the "-"?
+                #temp = inchi_dict[i].split('-')
+                #inchi_dict[i] = temp[0]
+        reactant_separable = len(inchi_dict) > 1
+        n_reactant_inchi = len(inchi_dict)
+
+        if rxn.args["backward_DE"]:
+            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P", verbose = args['verbose'])
+            original_p_inchi = return_inchikey(rxn.product, verbose = args['verbose'])
+
+            key=[i for i in tmp_dict.keys()]
+            for i in key:
+                if i not in inchi_dict.keys():
+                    inchi_dict[i]=tmp_dict[i]
+                    #Zhao's note: take the string before the "-"?
+                    #temp = inchi_dict[i].split('-')
+                    #inchi_dict[i] = temp[0]
+            product_separable = (len(inchi_dict) - n_reactant_inchi) > 1
+
+        for inchi in inchi_dict.keys():
+            self.molecules.append(OPT(self.rxn, inchi))
+
+        return reactant_separable, product_separable, inchi_dict
 
 class ConformerProcess:
     def __init__(self, rxn, conformer_id):
@@ -125,4 +174,3 @@ class ConformerProcess:
             if self.SUBMIT_JOB: self.IRC.Submit()
         
         print(f"{self.IRC.rxn_ind}: Final IRC STATUS: {self.IRC.FLAG}\n")
-        #exit()

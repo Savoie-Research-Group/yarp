@@ -165,16 +165,24 @@ def main(args): # TO-DO: use yaml to robustly handle input from args
     n_jobs = len(running_jobs)
 
     print(f"Running {n_jobs} jobs!")
-    # Generate a single QSE job array submission script for all DFT jobs to be submitted
-    all_dft_jobs = QSE_jobs(
-        package = args["package"],
-        jobname = job_file_name,
-        module = "module load orca\n", # TO-DO: make this a user input
-        submit_path = scratch, # QSE script is at same level as all XYZ repos!
-        queue = "long",
-        ncpus = int(args["dft_nprocs"]),
-        ntasks = n_jobs
-    )
+
+    if args["scheduler"] == "QSE" :
+        # Generate a single QSE job array submission script for all DFT jobs to be submitted
+        all_dft_jobs = QSE_jobs(
+            package = args["package"],
+            jobname = job_file_name,
+            module = "module load orca\n", # TO-DO: make this a user input
+            submit_path = scratch, # QSE script is at same level as all XYZ repos!
+            queue = "long",
+            ncpus = int(args["dft_nprocs"]),
+            ntasks = n_jobs
+        )
+    elif args["scheduler"] == "condor" :
+        all_dft_jobs = "bob"
+        raise RuntimeError("Condor is a work in progress!")
+    else :
+        raise RuntimeError("Sorry, only QSE or condor are valid entries in scheduler!")
+
     all_dft_jobs.prepare_submission_script()
 
     # Submit stuff to the queue! (ERM: turn on after testing out whether things generate properly)

@@ -9,59 +9,50 @@ conda activate classy-yarp
 python TS_refine.py parameters.yaml
 ```
 
-Tags to include in parameters.yaml:
------------------------------------
+Relevant options to include in parameters.yaml:
+-----------------------------------------------
 
 input : str
-    Path to either an XYZ file or a folder filled with XYZ files
-    TO-DO: add error if missing from input
+    Path to either an XYZ file or a folder filled with XYZ files.
+    This must be provided, or else the code will not run!
 
-scratch : str
-    Folder that output files will be placed
-    TO-DO: add default if missing from input
+scratch : str (default scratch)
+    Folder that output files will be placed in.
 
-dft_lot : str
+dft_lot : str (default wB97X D4 def2-TZVP)
     Level of theory (lot) desired to run density functional theory (DFT) at.
-    TO-DO: what are acceptable inputs here????
-    dft_lot: wB97X D4 def2-TZVP # the functional and basis set for DFT
-    TO-DO: add default if missing from input
+    For ORCA, please provide the following format:
+    "[functional] [dispersion correction] [basis set]"
 
-package : str
+package : str (default ORCA)
     Software package (ORCA, Gaussian) to perform DFT with.
     Currently only ORCA is available!
 
-dft_njobs : int
-    Number of DFT jobs to be submitted.
-    TO-DO: figure out the nuance of this interaction with "running_jobs"
-    This will not always be the actual number of jobs submitted?
-    Should this be removed? Why what this originally here?
-
-dft_nprocs : int
+dft_nprocs : int (default 1)
     Number of CPUs available for each DFT calculation.
 
-mem : int
+mem : int (default 2)
     Memory (in GB) available for each DFT calculation.
+    NOTE: this is not incorporated into QSE submission scripts!
 
-hess_recalc : int
+hess_recalc : int (default 1)
     Controls how often ORCA recalculates the Hessian?
 
-solvent : ?????
+solvent : bool (default False)
     Turn implicit solvation on/off
-    TO-DO: figure out what this should look like!
 
-solvation_model : str
+solvation_model : str (default CPCM)
     Keyword for ORCA solvent model.
-    TO-DO: describe how to find eligible inputs here.
 
-dielectric : float
+dielectric : float (default 0.0)
     Dielectric constant for implicit solvation.
     Modify this to match the solvent of choice.
 
-charge : int
+charge : int (default 0)
     Overall charge of molecule(s).
     This will be applied to all molecules in a batch submission.
 
-multiplicity : int
+multiplicity : int (default 1)
     Spin multiplicity of molecule(s).
     This will be applied to all molecules in a batch submission.
 """
@@ -81,44 +72,65 @@ from utils import xyz_write
 from wrappers.orca import ORCA
 from job_submission import QSE_jobs
 
-def main(args): # TO-DO: use yaml to robustly handle input from args
+
+def main(args):
+
+    print("Hi there! Let's optimize some transition states using DFT in YARP!")
+
+    input = str(args.get("input"))
+    if input is None or input == "None":
+        raise RuntimeError(
+            "The 'input' field is missing from the supplied YAML file. Can't do much without some molecules!")
+    print(f"  * Molecule files will be read from {input}")
 
     # Read energies and atomic cartesian coordinates (geometries) of input XYZ files into a dictionary
-    TS_dict=dict()
-    
-    if os.path.isfile(args["input"]):
+    TS_dict = dict()
+
+    if os.path.isfile(input):
         # For a single XYZ file
-        energy, geom = xyz_parse(args["input"])
-        TS_dict[args["input"].split("/")[-1].split(".")[0]] = dict() # store XYZ filename
-        TS_dict[args["input"].split("/")[-1].split(".")[0]]["E"] = energy
-        TS_dict[args["input"].split("/")[-1].split(".")[0]]["TSG"] = geom
+        energy, geom = xyz_parse(input)
+        # store XYZ filename
+        TS_dict[input.split("/")[-1].split(".")[0]] = dict()
+        TS_dict[input.split("/")[-1].split(".")[0]]["E"] = energy
+        TS_dict[input.split("/")[-1].split(".")[0]]["TSG"] = geom
     else:
         # For a directory of multiple XYZ files
-        xyz_files = [args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, "*.xyz")]
+        xyz_files = [input+"/" +
+                     i for i in os.listdir(input) if fnmatch.fnmatch(i, "*.xyz")]
         for i in xyz_files:
             energy, geom = xyz_parse(i)
-            TS_dict[i.split("/")[-1].split(".")[0]] = dict() # store XYZ filename
+            # store XYZ filename
+            TS_dict[i.split("/")[-1].split(".")[0]] = dict()
             TS_dict[i.split("/")[-1].split(".")[0]]["E"] = energy
             TS_dict[i.split("/")[-1].split(".")[0]]["TSG"] = geom
-    
-    # Set up location to put output files
-    scratch = args["scratch"]
-    os.makedirs(scratch, exist_ok=True)
 
-    # Read in DFT level of theory (lot) from input file
-    # Join phrases together if multiple words are provided
-    # ERM: only needed for Gaussian???? comment out for now :(
-    # if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
-    # else: dft_lot=args["dft_lot"]
+    # Set up location to put output files
+    scratch = args.get("scratch", "scratch")
+    os.makedirs(scratch, exist_ok=True)
+    print(f"  * Output files will be placed in {scratch}")
+    print("-***-")
 
     # Set up DFT input files for each TS object
+    print("Initializing DFT job files:")
     job_list = dict()
     running_jobs = []
 
+    package = str(args. get("package", "ORCA"))
     job_file_name = f"TSOPT"
+    nproc = int(args.get("dft_nprocs", 1))
+    mem = int(args.get("mem", 2)) * 1000
+    job_mode = str(args.get("job_mode", "OptTS Freq"))
+    level_of_theory = str(args.get("dft_lot", "wB97X D4 def2-TZVP"))
+    charge = int(args.get("charge", 0))
+    multiplicity = int(args.get("multiplicity", 1))
+    solvent = bool(args.get("solvent", False))
+    solv_model = str(args.get("solvation_model", "CPCM"))
+    dielectric = float(args.get("dielectric", 0.0))
+
+    hess_recalc = int(args.get("hess_recalc", 1))
 
     for i in TS_dict.keys():
-        print(f"Processing {i}")
+        print(f"  - Processing {i}")
 
         # Create a folder associated with each input file name
         wf = os.path.join(scratch, i)
@@ -129,66 +141,79 @@ def main(args): # TO-DO: use yaml to robustly handle input from args
         xyz_write(xyz_file, TS_dict[i]["E"], TS_dict[i]["TSG"])
 
         # Conditional tree for different DFT packages
-        if args["package"] == "ORCA":
+        if package == "ORCA":
             # Initialize ORCA class object
             dft_job = ORCA(
-                input_geo = xyz_file,
-                work_folder = wf,
-                nproc = int(args["dft_nprocs"]),
-                mem = int(args["mem"])*1000,
-                jobname = job_file_name,
-                jobtype = "OptTS Freq",
-                lot = args["dft_lot"],
-                charge = args["charge"],
-                multiplicity = args["multiplicity"],
-                solvent = args["solvent"],
-                solvation_model = args["solvation_model"],
-                dielectric = args["dielectric"],
-                writedown_xyz = False
+                input_geo=xyz_file,
+                work_folder=wf,
+                nproc=nproc,
+                mem=mem,
+                jobname=job_file_name,
+                jobtype=job_mode,
+                lot=level_of_theory,
+                charge=charge,
+                multiplicity=multiplicity,
+                solvent=solvent,
+                solvation_model=solv_model,
+                dielectric=dielectric,
+                writedown_xyz=False
             )
 
             # Generate input file
-            dft_job.generate_geometry_settings(hess = True, hess_step = int(args["hess_recalc"]))
+            dft_job.generate_geometry_settings(
+                hess=True, hess_step=hess_recalc)
             dft_job.generate_input()
 
             # Save ORCA object for use later
             # ERM: Do I need to use this later, actually????
-            job_list[i]=dft_job
+            job_list[i] = dft_job
 
             # Check if a completed job is present before adding to the list of jobs to run
             if dft_job.calculation_terminated_normally() is False:
-                print(f"Adding job {i} to the queue to be run!")
+                print(f"    * Adding job {i} to the queue to be run!")
                 running_jobs.append(i)
-        else :
+            else:
+                print(
+                    f"    * Job {i} has already been run! Excluding from the queue.")
+        else:
             raise RuntimeError("It's ORCA or bust right now my friend, sorry!")
 
     n_jobs = len(running_jobs)
 
-    print(f"Running {n_jobs} jobs!")
+    print("-***-")
+    print(f"By my calculations, we've got {n_jobs} to run!")
 
-    if args["scheduler"] == "QSE" :
+    scheduler = str(args.get("scheduler", "QSE"))
+    if scheduler == "QSE":
         # Generate a single QSE job array submission script for all DFT jobs to be submitted
         all_dft_jobs = QSE_jobs(
-            package = args["package"],
-            jobname = job_file_name,
-            module = "module load orca\n", # TO-DO: make this a user input
-            submit_path = scratch, # QSE script is at same level as all XYZ repos!
-            queue = "long",
-            ncpus = int(args["dft_nprocs"]),
-            ntasks = n_jobs
+            package=args["package"],
+            jobname=job_file_name,
+            module="module load orca\n",  # TO-DO: make this a user input
+            submit_path=scratch,  # QSE script is at same level as all XYZ repos!
+            queue="long",
+            ncpus=int(args["dft_nprocs"]),
+            ntasks=n_jobs
         )
-    elif args["scheduler"] == "condor" :
+    elif scheduler == "condor":
         all_dft_jobs = "bob"
         raise RuntimeError("Condor is a work in progress!")
-    else :
-        raise RuntimeError("Sorry, only QSE or condor are valid entries in scheduler!")
+    else:
+        raise RuntimeError(
+            "Sorry, only QSE or condor are valid entries in scheduler!")
 
+    print("  - Preparing submission script(s)")
     all_dft_jobs.prepare_submission_script()
 
     # Submit stuff to the queue! (ERM: turn on after testing out whether things generate properly)
+    print("  - Submitting jobs to the queue!")
     all_dft_jobs.submit()
 
+    print("-***-")
+    print("Alrighty, I am signing off now! Hope all goes well with the jobs that are running!")
+
     return
+
 
 if __name__ == "__main__":
     parameters = sys.argv[1]

@@ -16,7 +16,7 @@ from utils import *
 from constants import Constants
 from job_submission import *
 from job_mapping import *
-from conf import separate_mols
+#from conf import separate_mols
 from wrappers.gaussian import Gaussian
 
 from analyze_functions import apply_IRC_model
@@ -60,9 +60,22 @@ def main(args:dict):
         dft_rxn.args = args
 
         if args['verbose']: print(f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
+
+        # Calculate Reactant/Product Lowest Energies
+        dft_rxn.separate_Reactant_Product()
+
+        for count, mol in enumerate(dft_rxn.inchi_dict.keys()):
+            #dft_rxn.molecules.append(OPT(dft_rxn.rxn, mol, dft_rxn.inchi_dict[mol]))
+            dft_rxn.molecules[count].Initialize()
+            dft_rxn.molecules[count].Prepare_Input()
+            print(f"dft_rxn.molecules: {dft_rxn.molecules}\n")
+        exit()
+        
+
         # process all the conformers
         for conf in dft_rxn.conformers:
             conf.SUBMIT_JOB = False # Prepare job submission script, but do not submit
+            #conf.SUBMIT_JOB = True
 
             conf.rxn.args = args
             conf.TSOPT.args = args

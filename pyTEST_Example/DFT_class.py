@@ -1,6 +1,9 @@
 from tsopt import *
 from irc import *
 
+from opt import *
+from conf import separate_mols
+
 class RxnProcess:
     def __init__(self, rxn):
         self.rxn  = rxn
@@ -45,6 +48,9 @@ class RxnProcess:
 
         tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R", verbose = args['verbose'])
 
+        print(f"tmp_dict: {tmp_dict}\n")
+        #exit()
+
         key=[i for i in tmp_dict.keys()]
 
         original_r_inchi = return_inchikey(rxn.reactant, verbose = args['verbose'])
@@ -79,10 +85,14 @@ class RxnProcess:
             product_separable = (len(inchi_dict) - n_reactant_inchi) > 1
 
         for inchi in inchi_dict.keys():
-            self.molecules.append(OPT(self.rxn, inchi))
+            self.molecules.append(OPT(self.rxn, inchi, inchi_dict[inchi]))
+        print(f"inchi_dict: {inchi_dict}\n")
 
-        return reactant_separable, product_separable, inchi_dict
-
+        self.inchi_dict = inchi_dict
+        self.reactant_separable = reactant_separable
+        self.product_separable  = product_separable
+        #return reactant_separable, product_separable, inchi_dict
+    
 class ConformerProcess:
     def __init__(self, rxn, conformer_id):
         self.rxn = rxn

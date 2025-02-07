@@ -3,27 +3,80 @@ from utils import *
 from calculator import *
 
 from job_submission import *
+
+def is_alpha_and_numeric(s):
+    # Check if the string is alphanumeric and not purely alpha or numeric
+    return s.isalnum() and not s.isalpha() and not s.isdigit()
+
+#Zhao's note: a function that automatically checks the multiplicity based on the number of electrons#
+#Check if the total electron compatible with imposed multiplicity, if not, return the lowest multiplicity
+def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge, verbose = False):
+    return_multiplicity = Imposed_multiplicity
+    total_electron = sum([el_to_an[E.lower()] for E in Elements]) + net_charge
+    if verbose: print(f"molecule: {inchi}, Total electron: {total_electron}\n")
+    #Get the lowest possible multiplicity#
+    lowest_multi = total_electron % 2 + 1
+    #if(abs(Imposed_multiplicity - lowest_multi) % 2 > 0):
+    #    print(f"the imposed multiplicity {Imposed_multiplicity} does not agree with lowest multiplicity {lowest_multi}\n")
+    return_multiplicity = lowest_multi
+    return return_multiplicity
+
 class OPT:
-    def __init__(self, rxn, index):
+    def __init__(self, rxn, inchi, Inchi_dict):
         self.rxn  = rxn  # Reaction-specific data
         self.args = rxn.args     # Shared parameters for all reactions
-        self.index= index # reaction conformer index
+        #self.index= index # reaction conformer index
         self.dft_job = None
         self.submission_job = None
         self.FLAG = None
     
         self.rxn_ind = None
+        self.inchi   = inchi
+        self.inchi_dict = Inchi_dict
+
+        print(f"self.inchi_dict : {self.inchi_dict}\n")
 
     def Initialize(self, verbose = False):
         args= self.args
-        ind = self.index
+        dft_folder=args["scratch_dft"]
+        inchi = self.inchi
+
+        #ind = self.index
         opt_jobs=dict()
-        E, G, Q=stable_conf[inchi]
-        Mol_Mult = check_multiplicity(inchi, E, args["multiplicity"], Q)
+        E = self.inchi_dict[0]
+        G = self.inchi_dict[1]
+        Q = self.inchi_dict[2]
+        self.Q = Q
+        #Zhao's note: for mix-basis set, if molecule is separable, the atom indices you want to apply mix-basis-set on might not be there in separated mols, so you need to do a check#
+        #For this reason, the elements we returned in inchi_dict are with indices from molecules before the separation#
+        #for each molecule, a set of mix-basis-set will be copied and checked#
+        mix_basis_dict = None
+        if(args['dft_mix_basis']):
+            mix_basis_dict = []
+            # for those in dft_mix_lot with indices, check whether they exist, if not, eliminate
+            for MiXbASiS in args['dft_mix_lot']:
+                if is_alpha_and_numeric(MiXbASiS[0]) and not MiXbASiS[0] in E:
+                    continue
+                #find the current index of the atom we want to apply mix-basis in the molecule
+                #replace the old index with new ones
+                NEWMiXbASiS = copy.deepcopy(MiXbASiS)
+                if is_alpha_and_numeric(NEWMiXbASiS[0]):
+                    index_position = E.index(NEWMiXbASiS[0])
+                    NEWMiXbASiS[0] = ''.join(i for i in NEWMiXbASiS[0] if not i.isdigit()) + str(index_position)
+                mix_basis_dict.append(NEWMiXbASiS)
+            print(f"mix_basis_dict: {mix_basis_dict}\n")
+        self.mix_basis_dict = mix_basis_dict
+        #Finally, eliminate the numbers in E and put it back into inchi_dict[inchi]
+        E = [''.join(i for i in a if not i.isdigit()) for a in E]
+        
+        print(f"E: {E}, G: {G}, Q: {Q}\n")
+
+        self.multiplicity = check_multiplicity(inchi, E, args["multiplicity"], Q)
         wf=f"{dft_folder}/{inchi}"
+        self.wf = wf
         if os.path.isdir(wf) is False: os.mkdir(wf)
 
-        inp_xyz=f"{wf}/{inchi}.xyz"
+        inp_xyz=f"{wf}/{inchi}.xyz" ; self.inp_xyz = inp_xyz
         xyz_write(inp_xyz, E, G)
         if args['verbose']: print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
 
@@ -39,10 +92,12 @@ class OPT:
         Input.work_folder = self.wf
         Input.jobname     = f"{inchi}-OPT"
         Input.jobtype     = "opt"
-        Input.mix_lot     = mix_basis_dict[inchi]
-        Input.charge      = Q
-        Input.multiplicity= Mol_Mult
+        Input.mix_lot     = self.mix_basis_dict
+        Input.charge      = self.Q
+        Input.multiplicity= self.multiplicity
         dft_job           = Input.Setup(self.args['package'], self.args)
+
+        self.dft_job = dft_job
 
     def Prepare_Submit(self):
         args = self.args

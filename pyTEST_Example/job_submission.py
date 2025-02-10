@@ -447,7 +447,7 @@ class QSE_jobs:
             if self.package == "ORCA" :
                 f.write("    echo Loading ORCA\n")
                 # Put in module load commands
-                f.write(f"{self.module}")
+                f.write(f"    {self.module}")
                 # Set up full path to ORCA for paralleliztion runs
                 f.write("    orca=$(which orca)\n")
                 # Execute ORCA input file
@@ -603,7 +603,7 @@ class CONDOR_jobs:
             if self.package == "ORCA" :
                 f.write("    echo Loading ORCA\n")
                 # Put in module load commands
-                f.write(f"{self.module}")
+                f.write(f"    {self.module}")
                 # Set up full path to ORCA for paralleliztion runs
                 f.write("    orca=$(which orca)\n")
                 # Execute ORCA input file

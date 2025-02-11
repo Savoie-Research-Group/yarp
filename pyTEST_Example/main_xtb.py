@@ -550,7 +550,7 @@ def run_opt_by_xtb(rxns, logging_queue, logger):
             if R_inchi not in opt_jobs.keys():
                 wf=f"{scratch}/xtb_run/{R_inchi}"
                 if os.path.isdir(wf) is False: os.mkdir(wf)
-                xyz_write(f"{wf}/{R_inchi}-init.xyz", PE, PG)
+                xyz_write(f"{wf}/{R_inchi}-init.xyz", RE, RG)
                 print(wf)
 
                 Input.input_geo=f"{wf}/{R_inchi}-init.xyz"

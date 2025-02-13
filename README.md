@@ -5,7 +5,7 @@
 * `DFT_Class.py` also contains information about job scheduling and restarting. 
 
 
-YARP: Yet Another Reaction Program for Automated Reaction Exploration
+# YARP: Yet Another Reaction Program for Automated Reaction Exploration
 
 This is an object-oriented refactoring of yarp methodology to be compatible with general reaction-discovery workflows. YARP is a repository that explore the reaction network for a given set of molecules (reactants). YARP consists of construction of bond-electron matrix, product enumeration, reaction conformational sampling, transition state (TS) localization by growing string method (GSM), and TS characterization by Berny optimzation and IRC calculation. More details could be found on:
 

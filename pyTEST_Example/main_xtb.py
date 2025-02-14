@@ -68,6 +68,14 @@ def initialize(args):
         args['XTB_OPT_Calculator'] = "PYSIS"
     if 'GSM_Calculator' not in keys:
         args['GSM_Calculator'] = "PYSIS"
+    
+    # This keyword can be chosen from the following: 
+    # 1. xTB: using xTB for joint optimization, bonds are fed to xTB as constraints
+    # 2. Classical: using UFF, the original method
+    # 3. None: skip this function, use just the reactant/product geometries
+    if 'JointOptimizationMethod' not in [i for i in args.keys()]:
+            args['JointOptimizationMethod'] = "Classical"
+    print(f"DOING {args['JointOptimizationMethod']} as the joint optimization method")
 
     # GSM or SSM #
     # must use the GSM calculator #

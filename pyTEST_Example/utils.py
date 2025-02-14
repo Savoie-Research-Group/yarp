@@ -314,47 +314,45 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
     bond_mat: the bond electron matrix for reactant or product
     q: the charge state
     '''
-    tmp_xyz_file=f".{filename}.xyz"
-    tmp_inp_file=f".{filename}.inp"
+    tmp_xyz_file=f"{filename}.xyz"
+    tmp_inp_file=f"{filename}.inp"
     bond=return_bond_info(bond_mat)
     length=[]
     constraints=[]
     xyz_write(tmp_xyz_file, elements, geo)
     for i in bond: length.append(el_radii[elements[i[0]]]+el_radii[elements[i[1]]])
     for count_i, i in enumerate(bond): constraints+=[(i[0]+1, i[1]+1, length[count_i])]
-    #print("A")
-    optjob = XTB(input_geo=tmp_xyz_file,work_folder='.',jobtype=['opt'],jobname='opt',charge=q) 
+
+    optjob = XTB(input_geo=tmp_xyz_file,work_folder='.',jobtype=['opt'],jobname=f"opt-{filename}",charge=q)
     optjob.add_command(distance_constraints=constraints, force_constant=1.0)
     optjob.execute()
-    # print(optjob.optimization_success())  
-    if optjob.optimization_success():
+    # print(optjob.optimization_success())
+    if optjob.relaxed_optimization_success():
         _, Gr = optjob.get_final_structure()
         print(Gr)
     else:
-        print("XTB fails to locate reactant/product pair for this conformer.")
+        print("xTB Run fails: cannot locate reactant/product pair for this conformer.")
         return []
     adj_mat_o = bondmat_to_adjmat(bond_mat)
     adj_mat_n = table_generator(elements, Gr)
-    
+
     try:
         files=[i for i in os.listdir(".") if fnmatch.fnmatch(i, f".{filename}*")]
         for i in files: os.remove(i)
     except:
         pass
 
+    return Gr
+    # Zhao's note: may want to skip the bond matrix check, if we are doing joint optimization, then we are assigning reactant bmat to product, they should NOT match.
+    # As long as xTB simulation does not fail, it should return the geometry
+    '''
     if np.abs(adj_mat_o-adj_mat_n).sum() == 0:
-        return G            
+        return G
     else:
-       print("XTB fails to locate reactant/product pair for this conformer.")
-       return []   
-# def generate_xtb_constraint(bond, length, filename=".tmp.inp")
-def return_bond_info(mat):
-    info=[]
-    for i in range(len(mat)-1):
-        for j in range(i+1, len(mat)):
-            if mat[i][j]>0:
-                info+=[(i, j)]
-    return info
+        print("xTB adjacency matrix fails: cannot locate reactant/product pair for this conformer.")
+        return []
+    '''
+
 def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=1000,filename='tmp',constraints=[]):
     ''' 
     Apply openbabel to perform force field geometry optimization 

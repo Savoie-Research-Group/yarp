@@ -247,9 +247,16 @@ class reaction:
         for conf_ind, conf_entry in tmp_rxn_dict.items():
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
-            Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
-            #print(f"conf_ind: {conf_ind}, conf_entry['G']: {conf_entry['G']}\n")
-            #print(f"bond_mat: {conf_entry['bond_mat_r']}, Gr: {Gr}\n")
+            if self.args['JointOptimizationMethod'] == "xTB":
+                Gr = opt_geo_xtb(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'], q = 0, filename=f"JO-{conf_ind}")
+            elif self.args['JointOptimizationMethod'] == "Classical":
+                Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
+            else: # just use the reactant/product geometries
+                if(tmp_rxn_dict[conf_ind]['direct'] == 'F'):
+                    Gr = deepcopy(PG)
+                elif(tmp_rxn_dict[conf_ind]['direct'] == 'B'):
+                    Gr = deepcopy(RG)
+
             if len(Gr)==0 or len(Gr)!=len(conf_entry["G"]):
                 if self.verbose: print("Falied to optimize")
                 logger.info("Falied to optimize")

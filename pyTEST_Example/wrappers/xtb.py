@@ -189,7 +189,14 @@ class XTB:
                 return E, G
                     
         return False
-    
+
+    def fully_relaxed_optimization_success(self) -> bool:
+        """
+        Check if the optimization converges
+        """
+        if not self.optimization_converged(): return False
+        return True
+
     # A opt success function that uses a relaxed criteria
     def relaxed_optimization_success(self) -> bool:
         """

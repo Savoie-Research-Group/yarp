@@ -327,7 +327,10 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
     optjob.add_command(distance_constraints=constraints, force_constant=1.0)
     optjob.execute()
     # print(optjob.optimization_success())
-    if optjob.relaxed_optimization_success():
+    # fully-relaxed: check if the simulation converged
+    # relaxed: check if converged, and also structure don't change
+    #if optjob.relaxed_optimization_success():
+    if optjob.fully_relaxed_optimization_success():
         _, Gr = optjob.get_final_structure()
         print(Gr)
     else:

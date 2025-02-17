@@ -37,6 +37,7 @@ class PYSIS:
         self.multiplicity = multiplicity
         self.alpb         = alpb
         self.gbsa         = gbsa
+        self.nodes        = 15
         # Zhao's note: some special fix since the pysis in Classy-yarp repo doesn't work
         self.pysis_dir    = pysis_dir
         # create work folder
@@ -131,7 +132,7 @@ class PYSIS:
         elif self.jobtype.lower()=="string":
             if method is None: method='gs'
             with open(f'{self.pysis_input}', 'a') as f:
-                f.write(f'cos:\n type: {method}\n max_nodes: 9\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
+                f.write(f'cos:\n type: {method}\n max_nodes: {self.nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
                 f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
         else:
@@ -374,4 +375,111 @@ class PYSIS:
             elements, geometries = xyz_parse(IRC_traj_xyz, multiple=True)
             for count_i, i in enumerate(elements): traj.append((i, geometries[count_i]))
             return E, G1, G2, TSG, barrier_left / Constants.kcal2kJ, barrier_right / Constants.kcal2kJ, traj
+
+    # Pysis writes image with highest energy in splined_hei.xyz
+    # but sometimes image in splined_hei.xyz may be at the head/tail of the string
+    # and there might be a local maximum in the middle of the string
+    # we add this following fxns to check for this
+    def extract_energies_from_xyz_file(self, filepath):
+        """
+        Extract energies from a series of XYZ file blocks.
         
+        Each XYZ block is expected to start with a line indicating the number of atoms,
+        followed by a line containing the energy value (with possible trailing commas or spaces),
+        then the atomic coordinates.
+        
+        Parameters:
+            filepath (str): The path to the XYZ file.
+        
+        Returns:
+            list of float: A list of energy values extracted from the file.
+        """
+        energies = []
+        with open(filepath, 'r') as file:
+            lines = file.readlines()
+        
+        i = 0
+        while i < len(lines):
+            # Skip empty lines
+            current_line = lines[i].strip()
+            if not current_line:
+                i += 1
+                continue
+
+            try:
+                num_atoms = int(current_line)
+            except ValueError:
+                print(f"Warning: Expected atom count at line {i+1}, got: '{current_line}'")
+                i += 1
+                continue
+
+            # Check if there is a second line for energy
+            if i + 1 < len(lines):
+                energy_line = lines[i + 1].strip().rstrip(',')
+                # Get the first token (the energy value)
+                try:
+                    energy_token = energy_line.split()[0]
+                    #print(f"filepath: {filepath}\n")
+                    #print(f"energy_line: {energy_line}\n")
+                    energy = float(energy_token)
+                    energies.append(energy)
+                except:
+                    energies.append(np.nan)
+                    print(f"Warning: Could not parse energy from line {i+2}: '{lines[i+1].strip()}'")
+            
+            # Move to the next block: current header (atom count) + energy line + atom lines
+            i += num_atoms + 2
+
+        return energies
+
+    def find_highest_energy_index(self, energies, only_middle_images = False):
+        """
+        Finds the index of the highest energy among the energies list, excluding
+        the first and last entries.
+        
+        Parameters:
+            energies (list of float): List of energy values.
+        
+        Returns:
+            int: The index (in the original list) where the highest energy is found,
+                 excluding the first and last energies. Returns None if the list is too short.
+        """
+        if len(energies) < 3:
+            print("Not enough energy values to exclude the first and last entries.")
+            return None
+        
+        # Work on the middle energies (excluding first and last)
+        middle_energies = energies
+        if(only_middle_images): middle_energies = energies[1:-1]
+        max_middle_energy = max(middle_energies)
+        # Get the index in the sliced list, then adjust it back to the full list index.
+        max_index = middle_energies.index(max_middle_energy) + 1
+        return max_index
+
+    def get_strings(self):
+        """
+        Get the final optimized string of images
+        """
+        strings_xyz = f'{self.work_folder}/final_geometries.trj'
+        if os.path.exists(strings_xyz):
+            elements, geometries = xyz_parse(strings_xyz,multiple=True)
+            mol=[]
+            for count_i, i in enumerate(elements):
+                mol.append((i, geometries[count_i]))
+            return mol
+        else:
+            return False
+
+    def get_TS_from_string(self, only_middle_images = False):
+        if not self.get_strings(): return False, []
+        images   = self.get_strings()
+        energies = self.extract_energies_from_xyz_file(f'{self.work_folder}/final_geometries.trj')
+        hi = self.find_highest_energy_index(energies, only_middle_images = only_middle_images)
+        # Also check energy from spline_hei.xyz, check if they equal
+        spline_hei_energy = self.extract_energies_from_xyz_file(f'{self.work_folder}/splined_hei.xyz')
+        if(energies[hi] != spline_hei_energy[0]):
+            print(f"WARNING: Pysis thinks first or last image is TS\nCheck final_geometries.trj and splined_hei.xyz", flush = True)
+        # extract the image and element
+        elements, geometry = images[hi]
+
+        return elements, geometry

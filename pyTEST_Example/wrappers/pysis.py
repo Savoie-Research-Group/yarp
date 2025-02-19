@@ -456,6 +456,53 @@ class PYSIS:
         max_index = middle_energies.index(max_middle_energy) + 1
         return max_index
 
+    def find_local_maxima(self, energies):
+        maxima = []
+        
+        for i in range(1, len(energies) - 1):
+            if energies[i] > energies[i - 1] and energies[i] > energies[i + 1]:
+                maxima.append(i)
+        
+        return maxima
+
+    def analyze_slopes(self, energies, maxima):
+        slopes = {}
+        max_combined_count = 0
+        max_index = None
+        
+        for max_idx in maxima:
+            left_slope = (energies[max_idx] - energies[max_idx - 1])
+            right_slope = (energies[max_idx + 1] - energies[max_idx])
+            
+            left_count = 0
+            for i in range(max_idx - 1, -1, -1):
+                if energies[i] < energies[i + 1]:
+                    left_count += 1
+                else:
+                    break
+            
+            right_count = 0
+            for i in range(max_idx + 1, len(energies) - 1):
+                if energies[i] > energies[i + 1]:
+                    right_count += 1
+                else:
+                    break
+            
+            combined_count = left_count + right_count
+            if combined_count > max_combined_count:
+                max_combined_count = combined_count
+                max_index = max_idx
+            
+            slopes[max_idx] = {
+                'left_slope': left_slope, 
+                'right_slope': right_slope,
+                'left_monotonic_count': left_count,
+                'right_monotonic_count': right_count,
+                'combined_count': combined_count
+            }
+
+        return slopes, max_index, max_combined_count
+
     def get_strings(self):
         """
         Get the final optimized string of images
@@ -470,16 +517,33 @@ class PYSIS:
         else:
             return False
 
+    # Zhao's note:
+    # read both images from final_geometries.trj and splined_hei.xyz
+    # first get TS guess from final_geometries.trj, then compared with splined_hei.xyz
+    # if no good TS guess from final_geometries.trj, use splined_hei.xyz instead
     def get_TS_from_string(self, only_middle_images = False):
         if not self.get_strings(): return False, []
         images   = self.get_strings()
         energies = self.extract_energies_from_xyz_file(f'{self.work_folder}/final_geometries.trj')
-        hi = self.find_highest_energy_index(energies, only_middle_images = only_middle_images)
+
+        # find local maxima from final_geometries.trj
+        # get number of monotonically increasing (to the left) and decreasing (to the right) for each maxima
+        # the one with more left + right points will be the chosen TS guess
+        maxima = self.find_local_maxima(energies)
+        slopes, max_index, max_combined_count = self.analyze_slopes(energies, maxima)
+
         # Also check energy from spline_hei.xyz, check if they equal
         spline_hei_energy = self.extract_energies_from_xyz_file(f'{self.work_folder}/splined_hei.xyz')
-        if(energies[hi] != spline_hei_energy[0]):
-            print(f"WARNING: Pysis thinks first or last image is TS\nCheck final_geometries.trj and splined_hei.xyz", flush = True)
-        # extract the image and element
-        elements, geometry = images[hi]
+
+
+        if max_index is not None:
+            if(energies[max_index] != spline_hei_energy[0]):
+                print(f"WARNING: Pysis thinks first or last image is TS", flush = True)
+                print(f"Check final_geometries.trj and splined_hei.xyz!", flush = True)
+            # extract the image and element
+            elements, geometry = images[max_index]
+        else:
+            print(f"WARNING: final_geometries.trj has no good maximum, check your GSM run!", flush = True)
+            elements, geometry = xyz_parse(f'{self.work_folder}/splined_hei.xyz')
 
         return elements, geometry

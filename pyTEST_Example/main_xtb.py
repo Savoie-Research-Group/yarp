@@ -69,6 +69,10 @@ def initialize(args):
     if 'GSM_Calculator' not in keys:
         args['GSM_Calculator'] = "PYSIS"
 
+    # Turn off Crest constraints
+    if 'Crest_Constraints' not in [i for i in args.keys()]:
+        args['Crest_Constraints'] = True
+
     # This keyword can be chosen from the following: 
     # 1. xTB: using xTB for joint optimization, bonds are fed to xTB as constraints
     # 2. Classical: using UFF, the original method
@@ -325,7 +329,6 @@ def main(args:dict):
     print("-----------------------")
     
     rxns=select_rxn_conf(rxns, logging_queue)
-    
     # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -336,7 +339,6 @@ def main(args:dict):
     print("-----------------------")
 
     rxns=run_gsm_by_pysis(rxns, logging_queue)
-    
     # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -643,6 +645,10 @@ def conf_by_crest(rxns, logging_queue, logger):
         R_constraint.extend(args['reactant_dist_constraint'])
         P_constraint.extend(args['product_dist_constraint'])
 
+        if not args['Crest_Constraints']:
+            R_constraint = []
+            P_constraint = []
+
         if args["strategy"]!=0:
             if rxn.product_inchi not in inchi_list:
                 wf=f"{scratch_crest}/{rxn.product_inchi}"
@@ -791,7 +797,6 @@ def run_gsm_by_pysis(rxns, logging_queue):
         print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
         
         for j in key:
-            
 
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
@@ -833,7 +838,6 @@ def run_gsm_by_pysis(rxns, logging_queue):
                 print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
     gsm_thread=min(nprocs, len(rxn_folder))
     gsm_jobs={}
-    
     selected_calculator = args['GSM_Calculator']
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_folder):

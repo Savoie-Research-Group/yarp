@@ -306,7 +306,7 @@ def geometry_opt(molecule):
     
     return molecule
 
-def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
+def opt_geo_xtb(elements, geo, bond_mat, q=0, work_folder = '.', filename='tmp'):
     '''
     Apply xTB to find product/reactant geometry from reactant/product geometry.
     elements: the elements for geo (a list)
@@ -314,8 +314,9 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
     bond_mat: the bond electron matrix for reactant or product
     q: the charge state
     '''
-    tmp_xyz_file=f"{filename}.xyz"
-    tmp_inp_file=f"{filename}.inp"
+    if os.path.exists(work_folder) is False: os.makedirs(work_folder)
+    tmp_xyz_file=f"{work_folder}/{filename}.xyz"
+    tmp_inp_file=f"{work_folder}/{filename}.inp"
     bond=return_bond_info(bond_mat)
     length=[]
     constraints=[]
@@ -323,14 +324,15 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
     for i in bond: length.append(el_radii[elements[i[0]]]+el_radii[elements[i[1]]])
     for count_i, i in enumerate(bond): constraints+=[(i[0]+1, i[1]+1, length[count_i])]
 
-    optjob = XTB(input_geo=tmp_xyz_file,work_folder='.',jobtype=['opt'],jobname=f"opt-{filename}",charge=q)
+    optjob = XTB(input_geo=tmp_xyz_file, work_folder=work_folder, jobtype=['opt'],jobname=f"opt-{filename}",charge=q)
     optjob.add_command(distance_constraints=constraints, force_constant=1.0)
-    optjob.execute()
+    if not optjob.calculation_terminated_normally():
+        optjob.execute()
     # print(optjob.optimization_success())
     # fully-relaxed: check if the simulation converged
     # relaxed: check if converged, and also structure don't change
-    #if optjob.relaxed_optimization_success():
     if optjob.fully_relaxed_optimization_success():
+    #if optjob.relaxed_optimization_success():
         _, Gr = optjob.get_final_structure()
         print(Gr)
     else:
@@ -356,6 +358,14 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
         return []
     '''
 
+# def generate_xtb_constraint(bond, length, filename=".tmp.inp")
+def return_bond_info(mat):
+    info=[]
+    for i in range(len(mat)-1):
+        for j in range(i+1, len(mat)):
+            if mat[i][j]>0:
+                info+=[(i, j)]
+    return info
 def opt_geo(elements,geo,bond_mat,q=0,ff='mmff94',step=1000,filename='tmp',constraints=[]):
     ''' 
     Apply openbabel to perform force field geometry optimization 

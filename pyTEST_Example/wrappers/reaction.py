@@ -248,7 +248,7 @@ class reaction:
             # apply force-field optimization
             # apply xTB-restrained optimization soon!
             if self.args['JointOptimizationMethod'] == "xTB":
-                Gr = opt_geo_xtb(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'], q = 0, filename=f"JO-{conf_ind}")
+                Gr = opt_geo_xtb(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'], q = 0, work_folder = f"{self.args['scratch']}/joint_opt", filename=f"JO-{conf_ind}")
             elif self.args['JointOptimizationMethod'] == "Classical":
                 Gr = opt_geo(conf_entry['E'],conf_entry['G'],conf_entry['bond_mat_r'],ff=self.args['ff'],step=100,filename=f'tmp_{job_id}')
             else: # just use the reactant/product geometries
@@ -310,7 +310,11 @@ class reaction:
 
                 optjob.execute()
 
-                if optjob.optimization_success():
+                # fully-relaxed: check if the simulation converged
+                # relaxed: check if converged, and also structure don't change
+                #if optjob.optimization_success():
+                #if optjob.relaxed_optimization_success():
+                if optjob.fully_relaxed_optimization_success():
                     _, Gr = optjob.get_final_structure()
                 else:
                     #logger.info(f"xtb geometry optimization fails for the other end of {job_id} (conf: {conf_ind}), will use force-field optimized geometry for instead")

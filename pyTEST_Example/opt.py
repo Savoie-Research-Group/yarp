@@ -28,6 +28,7 @@ class OPT:
         #self.index= index # reaction conformer index
         self.dft_job = None
         self.submission_job = None
+        self.SUBMIT_JOB = False
         self.FLAG = None
     
         self.rxn_ind = None
@@ -80,6 +81,12 @@ class OPT:
         xyz_write(inp_xyz, E, G)
         if args['verbose']: print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
 
+        # for dft_lot here, convert ORCA/Other calculator to Gaussian
+        # for example: def2-SVP --> def2SVP
+        if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
+        dft_lot = convert_orca_to_gaussian(dft_lot)
+        self.dft_lot = dft_lot
+
         self.FLAG = "Initialized"
 
     def Prepare_Input(self):
@@ -92,6 +99,7 @@ class OPT:
         Input.work_folder = self.wf
         Input.jobname     = f"{inchi}-OPT"
         Input.jobtype     = "opt"
+        Input.lot         = self.dft_lot
         Input.mix_lot     = self.mix_basis_dict
         Input.charge      = self.Q
         Input.multiplicity= self.multiplicity
@@ -102,7 +110,7 @@ class OPT:
     def Prepare_Submit(self):
         args = self.args
 
-        slurmjob=SLURM_Job(jobname=f"OPT.{i}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
+        slurmjob=SLURM_Job(jobname=f"OPT.{self.inchi}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
 
         if args["package"]=="ORCA": slurmjob.create_orca_jobs([self.dft_job])
         elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([self.dft_job])

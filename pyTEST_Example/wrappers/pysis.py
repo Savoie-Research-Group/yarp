@@ -37,7 +37,8 @@ class PYSIS:
         self.multiplicity = multiplicity
         self.alpb         = alpb
         self.gbsa         = gbsa
-        self.nodes        = 15
+        #self.nodes        = 15
+        self.nodes        = 50
         # Zhao's note: some special fix since the pysis in Classy-yarp repo doesn't work
         self.pysis_dir    = pysis_dir
         # create work folder
@@ -113,7 +114,7 @@ class PYSIS:
         if self.jobtype.lower() == 'tsopt':
             if method is None: method = 'rsprfo'
             with open(f'{self.pysis_input}','a') as f:
-                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 50\n')
+                if hess: f.write(f'tsopt:\n type: {method}\n do_hess: True\n hessian_recalc: {hess_step}\n thresh: {thresh}\n max_cycles: 300\n')
                 else: f.write(f'tsopt:\n type: {method}\n do_hess: False\n thresh: {thresh}\n max_cycles: 300\n')
         # For IRC calculation
         elif self.jobtype.lower()== 'irc':
@@ -503,6 +504,32 @@ class PYSIS:
 
         return slopes, max_index, max_combined_count
 
+    # Zhao's note: sometimes there are no local maxima, but only inflection points where the change in slopes changes
+    # if no local maxima is found, then we find those points with inflection points
+    # also exclude inflection points that are concave down
+    # for the concave up ones, pick the one with the highest change in slope
+    def find_inflection_points(self, energies):
+        slopes = [energies[i] - energies[i - 1] for i in range(1, len(energies))]
+        slope_changes = [slopes[i] - slopes[i - 1] for i in range(1, len(slopes))]
+        inflection_points = []
+        max_slope_change = 0
+        max_inflection_index = None
+        
+        for i in range(1, len(slope_changes)):
+            change_before = abs(slope_changes[i - 1])
+            change_after = abs(slope_changes[i])
+            total_change = change_before + change_after
+            
+            if (slope_changes[i] > 0 and slope_changes[i - 1] < 0) or (slope_changes[i] < 0 and slope_changes[i - 1] > 0):
+                # Exclude concave down inflection points (second derivative negative to positive only)
+                if slope_changes[i - 1] < 0 and slope_changes[i] > 0:
+                    inflection_points.append((i, total_change))
+                    if total_change > max_slope_change:
+                        max_slope_change = total_change
+                        max_inflection_index = i
+        
+        return inflection_points, max_inflection_index, max_slope_change
+
     def get_strings(self):
         """
         Get the final optimized string of images
@@ -530,20 +557,24 @@ class PYSIS:
         # get number of monotonically increasing (to the left) and decreasing (to the right) for each maxima
         # the one with more left + right points will be the chosen TS guess
         maxima = self.find_local_maxima(energies)
-        slopes, max_index, max_combined_count = self.analyze_slopes(energies, maxima)
+        if maxima: # if there are local maxima, then calculate the slopes, get the one with largest slope
+            slopes, max_index, max_combined_count = self.analyze_slopes(energies, maxima)
+        else: # if no local maxima, find the ones with highest change in slope (inflection points)
+            inflection_points, max_index, max_slope_change = self.find_inflection_points(energies)
 
         # Also check energy from spline_hei.xyz, check if they equal
         spline_hei_energy = self.extract_energies_from_xyz_file(f'{self.work_folder}/splined_hei.xyz')
 
-
         if max_index is not None:
+            if not maxima: print(f"No maxima found, use inflection points instead\n", flush = True)
             if(energies[max_index] != spline_hei_energy[0]):
                 print(f"WARNING: Pysis thinks first or last image is TS", flush = True)
                 print(f"Check final_geometries.trj and splined_hei.xyz!", flush = True)
             # extract the image and element
             elements, geometry = images[max_index]
         else:
-            print(f"WARNING: final_geometries.trj has no good maximum, check your GSM run!", flush = True)
+            print(f"WARNING: final_geometries.trj has no good maximum or even inflection points, check your GSM run!", flush = True)
+            print(f"use structure in splined_hei.xyz given by Pysis instead", flush = True)
             elements, geometry = xyz_parse(f'{self.work_folder}/splined_hei.xyz')
 
         return elements, geometry

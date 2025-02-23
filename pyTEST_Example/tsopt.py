@@ -1,8 +1,8 @@
 import os
 from utils import *
 from calculator import *
-
 from job_submission import *
+
 class TSOPT:
     def __init__(self, rxn, index):
         self.rxn  = rxn  # Reaction-specific data
@@ -26,7 +26,7 @@ class TSOPT:
         # for example: def2-SVP --> def2SVP
         dft_lot = convert_orca_to_gaussian(dft_lot)
         self.dft_lot = dft_lot
-        if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
+        #if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
         # Load TS from reaction class and prepare TS jobs
         # Four cases:
         # 1. skip_low_IRC: read TS_xtb.
@@ -57,7 +57,11 @@ class TSOPT:
         Input = Calculator(self.args)
         Input.input_geo   = self.inp_xyz
         Input.work_folder = self.wf
+        Input.lot         = self.dft_lot
+        print(self.args['dft_mix_lot'])
+        Input.mix_lot     = [[a[0], convert_orca_to_gaussian(a[1])] for a  in self.args['dft_mix_lot']]
         Input.jobname     = f"{self.rxn_ind}-TSOPT"
+
         Input.jobtype     = "tsopt"
         self.dft_job      = Input.Setup(self.args['package'], self.args)
 

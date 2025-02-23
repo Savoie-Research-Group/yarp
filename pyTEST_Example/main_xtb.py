@@ -856,7 +856,7 @@ def run_gsm_by_pysis(rxns, logging_queue):
     # Create a process pool with gsm_thread processes
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
     # Run the tasks in parallel
-    input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
+    input_job_list = [(gsm_job, logging_queue, args["pysis_wt"]) for gsm_job in gsm_job_list]
 
     if args['verbose']: print(f"gsm_job_list: {gsm_job_list}, input_job_list: {input_job_list}\n")
 

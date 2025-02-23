@@ -189,7 +189,37 @@ class XTB:
                 return E, G
                     
         return False
-        
+
+    def fully_relaxed_optimization_success(self) -> bool:
+        """
+        Check if the optimization converges
+        """
+        if not self.optimization_converged(): return False
+        return True
+
+    # A opt success function that uses a relaxed criteria
+    def relaxed_optimization_success(self) -> bool:
+        """
+        Check if the optimization converges and the structure does not change
+        """
+        if not self.optimization_converged(): return False
+        E, G = xyz_parse(self.input_geo)
+        _, optG = self.get_final_structure()
+        adj_mat_i = table_generator(E, G)
+        adj_mat_o = table_generator(E, optG)
+        if np.sum(abs(adj_mat_i-adj_mat_o)) != 0:
+            print(f"old/new adj_mat doesn't agree\n")
+            rows, cols = np.where(adj_mat_i != adj_mat_o)
+            contain_metal = [E[rows[ind]] in el_metals or E[cols[ind]] in el_metals for ind in range(len(rows))]
+            # original: if there is one atom that the change in bond-mat does not involve metal, then fails
+            # relaxed criteria: if there is one bond that the change in bond-mat involves metal, then good
+            if True in contain_metal:
+                return True
+            else:
+                return False
+        else:
+            return True
+
     def optimization_success(self) -> bool:
         """
         Check if the optimization converges and the structure does not change

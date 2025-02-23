@@ -69,6 +69,21 @@ def initialize(args):
     if 'GSM_Calculator' not in keys:
         args['GSM_Calculator'] = "PYSIS"
 
+    # Turn off Crest constraints
+    if 'Crest_Constraints' not in [i for i in args.keys()]:
+        args['Crest_Constraints'] = True
+
+    # This keyword can be chosen from the following: 
+    # 1. xTB: using xTB for joint optimization, bonds are fed to xTB as constraints
+    # 2. Classical: using UFF, the original method
+    # 3. None: skip this function, use just the reactant/product geometries
+    if 'JointOptimizationMethod' not in [i for i in args.keys()]:
+            args['JointOptimizationMethod'] = "Classical"
+    print(f"DOING {args['JointOptimizationMethod']} as the joint optimization method")
+
+    if 'String_use_only_middle_images' not in [i for i in args.keys()]:
+        args['String_use_only_middle_images'] = False
+
     # GSM or SSM #
     # must use the GSM calculator #
     # ERM: Is SSM not implemented? Or is GSM just the better option?
@@ -314,7 +329,6 @@ def main(args:dict):
     print("-----------------------")
     
     rxns=select_rxn_conf(rxns, logging_queue)
-    
     # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -325,7 +339,6 @@ def main(args:dict):
     print("-----------------------")
 
     rxns=run_gsm_by_pysis(rxns, logging_queue)
-    
     # dump data from this stage to pickle file
     with open(args["reaction_data"], "wb") as f:
         pickle.dump(rxns, f)
@@ -632,6 +645,10 @@ def conf_by_crest(rxns, logging_queue, logger):
         R_constraint.extend(args['reactant_dist_constraint'])
         P_constraint.extend(args['product_dist_constraint'])
 
+        if not args['Crest_Constraints']:
+            R_constraint = []
+            P_constraint = []
+
         if args["strategy"]!=0:
             if rxn.product_inchi not in inchi_list:
                 wf=f"{scratch_crest}/{rxn.product_inchi}"
@@ -780,7 +797,6 @@ def run_gsm_by_pysis(rxns, logging_queue):
         print(f"rxn: {i}, i.rxn_conf.keys: {key}\n")
         
         for j in key:
-            
 
             name=f"{conf_output}/{i.reactant_inchi}_{i.id}_{j}.xyz"
             write_reaction(i.reactant.elements, i.rxn_conf[j]["R"], i.rxn_conf[j]["P"], filename=name)
@@ -822,7 +838,6 @@ def run_gsm_by_pysis(rxns, logging_queue):
                 print(f"conf: {j}, all_conf_bond_changes: {bond_changes}\n")
     gsm_thread=min(nprocs, len(rxn_folder))
     gsm_jobs={}
-    
     selected_calculator = args['GSM_Calculator']
     # preparing and running GSM-xTB
     for count, rxn in enumerate(rxn_folder):
@@ -841,7 +856,7 @@ def run_gsm_by_pysis(rxns, logging_queue):
     # Create a process pool with gsm_thread processes
     gsm_job_list = [gsm_jobs[ind] for ind in sorted(gsm_jobs.keys())]
     # Run the tasks in parallel
-    input_job_list = [(gsm_job, logging_queue) for gsm_job in gsm_job_list]
+    input_job_list = [(gsm_job, logging_queue, args["pysis_wt"]) for gsm_job in gsm_job_list]
 
     if args['verbose']: print(f"gsm_job_list: {gsm_job_list}, input_job_list: {input_job_list}\n")
 
@@ -853,12 +868,24 @@ def run_gsm_by_pysis(rxns, logging_queue):
         if gsm_job.calculation_terminated_normally() is False:
             print(f'GSM job {gsm_job.jobname} fails to converge, please check this reaction...')
             continue
-        if(args['GSM_Calculator'] == "PYSIS"): 
+        if(args['GSM_Calculator'] == "PYSIS"):
+            # splined_hei.xyz is the file written by pysisyphus that has the supposed TS image in the string
+            # things can be tricky if this TS image is at the head/tail of the string
+            # we add an additional check to see if the splined_hei.xyz image is not head/tail
+            # if not, the user can choose whether to use the local minimum in the middle of the string or head/tail
+            '''
             if os.path.isfile(f"{gsm_job.work_folder}/splined_hei.xyz") is True:
-                if args["verbose"]: 
+                if args["verbose"]:
                     print(f"GSM job {gsm_job.work_folder} exist\n")
                     print(f"GSM job {gsm_job.jobname} is coverged!")
                 TSE, TSG=xyz_parse(f"{gsm_job.work_folder}/splined_hei.xyz")
+            '''
+            if os.path.isfile(f"{gsm_job.work_folder}/final_geometries.trj") is True:
+                if args["verbose"]:
+                    print(f"GSM job {gsm_job.work_folder} exist\n")
+                    print(f"GSM job {gsm_job.jobname} is coverged!")
+                TSE, TSG = gsm_job.get_TS_from_string(only_middle_images = args['String_use_only_middle_images'])
+
         elif(args['GSM_Calculator'] == "GSM"):
             TSE, TSG=gsm_job.get_TS()
 

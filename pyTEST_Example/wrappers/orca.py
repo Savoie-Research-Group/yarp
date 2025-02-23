@@ -46,6 +46,10 @@ class ORCA:
         self.additional   = False
         self.dielectric    = float(dielectric)
         self.solvation = False
+
+        self.charge = charge
+        self.multiplicity = multiplicity
+
         if solvent=="read":
             self.solvation = f"{solvation_model}"
         elif solvent:
@@ -474,9 +478,9 @@ class ORCA:
         if not self.calculation_terminated_normally() and self.new_opt_geometry():
             tempE, tempG = self.get_final_structure()
 
-            self.xyz = f'*xyz {charge} {multiplicity}\n'
+            self.xyz = f'*xyz {self.charge} {self.multiplicity}\n'
             for ind, element in enumerate(tempE):
-                self.xyz += f'{elements[ind]:<3} {geometry[ind][0]:^12.8f} {geometry[ind][1]:^12.8f} {geometry[ind][2]:^12.8f}'
+                self.xyz += f'{tempE[ind]:<3} {tempG[ind][0]:^12.8f} {tempG[ind][1]:^12.8f} {tempG[ind][2]:^12.8f}'
                 if self.mix_basis:
                     # check by element or check by index
                     self.xyz += add_mix_basis_for_atom(element, ind, self.mix_lot, "ORCA")

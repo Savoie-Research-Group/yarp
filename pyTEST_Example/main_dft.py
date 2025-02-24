@@ -679,13 +679,27 @@ def check_multiplicity(inchi, Elements, Imposed_multiplicity, net_charge, verbos
     return return_multiplicity
 
 def run_dft_opt(rxns):
+    """
+    This function optimizes the reactants and products
+    of all reaction object contained within
+    the input rxns list object.
+
+    Optimizations are carried out at the DFT level.
+    """
+    # Load in user-input settings
     args=rxns[0].args
+
+    # Set up folders for conformer search (CREST) and R/P optimization (DFT)
     crest_folder=args["scratch_crest"]
     dft_folder=args["scratch_dft"]
     if os.path.isdir(crest_folder) is False: os.mkdir(crest_folder)
-    if os.path.isdir(dft_folder) is False: os.mkdir(dft_folder)
+    if os.path.isdir(dft_folder) is False: os.mkdir(dft_folder) # duplicated in main... (-ERM)
+    
+    # Something to track stable conformers?
     stable_conf=dict()
+
     #Zhao's note: consider adding a boolean here, indicating whether reactant/product is separable#
+    # ERM: what does separable mean???
     reactant_separable, product_separable, inchi_dict=find_all_seps(rxns, args)
     key=[i for i in inchi_dict.keys()]
 
@@ -725,6 +739,7 @@ def run_dft_opt(rxns):
 
     #exit()
 
+    # ERM: What exactly is "stable_conf"??? Why is this sorting step necessary?
     for rxn in rxns:
         rxn.reactant_dft_opt = dict()
         rxn.product_dft_opt = dict()
@@ -741,11 +756,17 @@ def run_dft_opt(rxns):
                 if args['verbose']: print(f"product_inchi GEO: {rxn.product_conf[0]}\n", flush = True)
 
     # collect inchi from reaction classes
-    all_inchi=dict()
+    all_inchi=dict() # ERM: This is never used...
     # collect missing DFT energy
     missing_dft=[]
+
+    # Set up the DFT level of theory (LOT)
+    # ERM: If the user doesn't provide this, do we have a default setting?
+    # Or should we throw a runtime error and tell them to put this into the input?
     if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
     else: dft_lot=args["dft_lot"]
+    
+    # What is happening here???????????
     inchi_key=[i for i in inchi_dict.keys()]
     for rxn in rxns:
         if dft_lot not in rxn.reactant_dft_opt.keys():
@@ -761,9 +782,11 @@ def run_dft_opt(rxns):
     for i in missing_dft:
         if i not in stable_conf.keys():
             missing_conf.append(i)
+    
     # prepare for submitting job
     print(missing_dft)
-    njobs=int(args["dft_njobs"])
+    njobs=int(args["dft_njobs"]) # ERM: needs a default setting, or to throw a runtime error
+    # need to feed this njobs into QSE!!! Or just count up folders???
 
     opt_job = dict()
 
@@ -779,7 +802,7 @@ def run_dft_opt(rxns):
                 wf=f'{crest_folder}/{inchi}'
                 if os.path.isdir(wf) is False: os.mkdir(wf)
                 inp_xyz=f"{wf}/{inchi}.xyz"
-                xyz_write(inp_xyz, E, G)
+                xyz_write(inp_xyz, E, G) # ERM: Does this mean we are writing over the XYZ file of a completed inchi repo?
 
                 Input = Calculator(args)
                 Input.input_geo    = inp_xyz
@@ -790,6 +813,7 @@ def run_dft_opt(rxns):
                 #Input.nproc        = int(args["c_nprocs"])
                 crest_job          = Input.Setup("CREST", args)
 
+                # Only need to run CREST for inchi folders that haven't already ran it!
                 if not crest_job.calculation_terminated_normally(): CREST_job_list.append(crest_job)
                 opt_job[inchi] = crest_job
 
@@ -799,7 +823,11 @@ def run_dft_opt(rxns):
         slurm_jobs=[]
 
         for i in range(n_submit):
+            # ERM: Why is the DFT wt (wait time??) and ppn (what is this???) used here in CREST?????????
             slurmjob=SLURM_Job(jobname=f'CREST.{i}', ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"])*1000, email=args["email_address"])
+            
+            # ERM: What is going on here?????????? How many folders are being generated????
+            # Only need to run CREST for inchi folders that haven't already ran it!?
             endidx=min(startidx+njobs, len(CREST_job_list))
             slurmjob.create_crest_jobs([job for job in CREST_job_list[startidx:endidx]])
             slurmjob.submit()
@@ -831,7 +859,9 @@ def run_dft_opt(rxns):
         # Prepare DFT Input #
         #####################
         opt_job = dict()
-
+        
+        # ERM: So there should always be the same set of folders/jobs for CREST as for DFT?
+        # Set up DFT input files
         for inchi in missing_dft:
 
             if inchi not in stable_conf.keys(): continue
@@ -841,7 +871,7 @@ def run_dft_opt(rxns):
             wf=f"{dft_folder}/{inchi}"
             if os.path.isdir(wf) is False: os.mkdir(wf)
             inp_xyz=f"{wf}/{inchi}.xyz"
-            xyz_write(inp_xyz, E, G)
+            xyz_write(inp_xyz, E, G) # ERM: Write XYZ from earlier conformer step????
             if args['verbose']: print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
 
             Input = Calculator(args)
@@ -856,7 +886,8 @@ def run_dft_opt(rxns):
 
             if not dft_job.calculation_terminated_normally(): dft_job_list.append(dft_job)
             opt_job[inchi] = dft_job
-
+        
+        # Submit DFT jobs to SLURM
         n_submit=len(dft_job_list)//int(args["dft_njobs"])
         if len(dft_job_list)%int(args["dft_njobs"])>0: n_submit+=1
         startidx=0

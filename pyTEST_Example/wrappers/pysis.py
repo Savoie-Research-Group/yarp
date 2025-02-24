@@ -26,7 +26,7 @@ class PYSIS:
         """
         self.input_geo    = input_geo
         self.work_folder  = work_folder
-        self.pysis_input  = os.path.join(work_folder, f'{jobname}_input.yaml')
+        self.pysis_input  = os.path.join(work_folder, f'{jobname}-{jobtype}_input.yaml')
         self.output       = os.path.join(work_folder, f'{jobname}-{jobtype}.out')
         self.nproc        = int(nproc)
         self.mem          = int(mem)

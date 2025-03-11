@@ -20,97 +20,6 @@ from wrappers.xtb      import *
 
 from scipy.spatial.distance import cdist
 
-'''
-from wrappers.pysis    import *
-from wrappers.orca     import *
-from wrappers.gaussian import *
-from wrappers.crest    import *
-########################################
-# Calculator for xTB/DFT Calculations  #
-# Supported software:                  #
-# xTB, Pysis, ORCA, Gaussian           #
-########################################
-class Calculator:
-    def __init__(self, args):
-        """
-        Initialize an DFT input class
-        a wrapper for DFT input keywords 
-        including charge, multiplicity, solvation, level of theory, etc.
-        different calculator uses different syntax for jobtype, this class takes in a unified name set
-        the class will take: opt, tsopt, copt, irc, gsm, ... (all small cases)
-        each one will be translated to the corresponding string accepted by the chosen calculator
-        """
-        self.input_geo   = ""
-        self.work_folder = os.getcwd()
-        self.xtb_lot     = args["lot"]
-        self.lot         = args["dft_lot"]
-        self.jobtype     = 'OPT'
-        self.nproc       = int(args["dft_nprocs"])
-        self.mem         = int(args["mem"]*1000)
-        self.mix_basis   = args['dft_mix_basis']
-        self.mix_lot     = args['dft_mix_lot']
-        self.jobname     = 'job'
-        self.charge      = args["charge"]
-        self.multiplicity= args["multiplicity"]
-        self.solvent     = args["solvent"]
-        self.dielectric  = args["dielectric"]
-        self.dispersion  = args["dispersion"]
-        self.solvation_model = args["solvation_model"]
-        self.grid        = 2
-        self.writedown_xyz   = True
-        print(f"self.lot: {self.lot}\n")
-        print(f"self.mix_basis: {self.mix_basis}\n")
-        print(f"self.mix_lot:   {self.mix_lot}\n")
-
-    def Setup(self, package, args, constraints=[]):
-        # PYSIS: used for geo optimization, ts-optimization (xtb), gsm (jobtype=string, coord_type="cart"), irc (jobtype=irc)#
-        if(package == "PYSIS"):
-            if(self.jobtype == 'gsm'):
-                self.jobtype = 'string'
-            alpb=args["solvent"]
-            gbsa=args["solvent"]
-            if(args["low_solvation_model"].lower()=='alpb'):
-                gbsa=False
-            else:
-                alpb=False
-            JOB = PYSIS(input_geo=self.input_geo, 
-                        work_folder=self.work_folder, 
-                        pysis_dir=args["pysis_path"], 
-                        jobname=self.jobname, 
-                        jobtype=self.jobtype, 
-                        nproc=self.nproc, 
-                        charge=self.charge, 
-                        multiplicity=self.multiplicity, 
-                        alpb=alpb,
-                        gbsa=gbsa)
-            if('opt' in self.jobtype): #gsm or irc don't need hessian keywords, opt and tsopt need them
-                JOB.generate_input(calctype='xtb', hess=True, hess_step=1)
-            elif('string' in self.jobtype):
-                JOB.generate_input(calctype='xtb')
-            elif('irc' in self.jobtype):
-                if os.path.isfile(f"{self.work_folder}/ts_final_hessian.h5"): 
-                    JOB.generate_input(calctype="xtb", hess_init=f"{self.work_folder}/ts_final_hessian.h5")
-                else: JOB.generate_input(calctype='xtb')
-            JOB.generate_constraints(distance_constraints = constraints)
-            
-        elif(package=="XTB"):
-            if(self.jobtype == 'opt'):
-                self.jobtype = ['opt']
-            else:
-                print(f"XTB wrapper can only do geometry optimization ('opt')!\n")
-                exit()
-            JOB =  XTB(input_geo=self.input_geo, 
-                        work_folder=self.work_folder,
-                        lot=self.xtb_lot, 
-                        jobtype=["opt"],
-                        solvent=args["solvent"], 
-                        solvation_model=args["low_solvation_model"],
-                        jobname=self.jobname, 
-                        charge=args["charge"], 
-                        multiplicity=args["multiplicity"])
-            JOB.add_command(distance_constraints=constraints)
-'''
-
 #################################################################
 # Add Mix Basis Set (available in ORCA and Gaussian)            #
 # For ORCA: add specific basis set info to the end of the atom  #
@@ -156,6 +65,7 @@ def compare_lists(list1, list2):
 #the index is needed to have precise control 
 
 def treat_mix_lot_metal_firstLayer(args, elements, geometry):
+
     if args['dft_mix_firstlayer']:
         first_layer_index = []
         # get adj_mat for TS
@@ -169,7 +79,7 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
                 metal_ind.extend(args['Reactive_Atoms'])
                 #metal_ind.unique()
                 metal_ind = list(dict.fromkeys(metal_ind))
-                print(f"TZ indices: {metal_ind}\n")
+                if args['verbose']: print(f"TZ indices: {metal_ind}\n")
         if len(metal_ind) == 0: return
         # get 1st layer
         counter = 0
@@ -216,9 +126,10 @@ def treat_mix_lot_metal_firstLayer(args, elements, geometry):
         alnum_element.extend(not_alnum_element)
         args['dft_mix_lot'] = alnum_element
 
-        print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
+        if args['verbose']: print(f"args[dft_mix_lot]: {args['dft_mix_lot']}\n", flush = True)
 
 def process_mix_basis_input(args):
+
     args['dft_mix_basis'] = bool(args['dft_mix_basis'])
     if args['dft_mix_basis']:
         dft_mix_lot = []
@@ -242,39 +153,7 @@ def process_mix_basis_input(args):
         print(f"Not Using Mix (TZ/DZ/SZ) Basis Sets, but TZ Correction used, What are you using it for???\n")
         raise RuntimeError("Please change your input file!!!")
 
-'''
-#Zhao's note: a function for yarp-dft to wait for the dft-jobs that are launched by the previous yarp-dft run
-#for example, the previous yarp-dft launched 2 TSOPT job and died, the 2 TSOPT jobs are still running 
-#now, if you start a new yarp-dft run, it will wait until those 2 TSOPT jobs are dead.
-#jobs will be written to a text file "last_jobs.txt", the text file will tell what jobs are currently running 
-def read_wait_for_last_jobs():
-    print("checking for unfinished jobs from the previous run\n")
-    file_path = 'last_jobs.txt'
-    if not os.path.exists(file_path): return
-    with open(file_path, 'r') as file:
-        # Use list comprehension to convert each line to an integer
-        job_ids = [int(line.strip()) for line in file]
-
-    # Now 'numbers' contains the integers as a list
-    print(f"unfinished job_ids are: {job_ids}\n")
-    print(f"Checking for jobs that are still undone...\n")
-    print(f"Need to wait\n")
-
-    slurm_jobs = []
-    for job_id in job_ids:
-        slurm_job = SLURM_Job()
-        slurm_job.job_id = job_id
-        if slurm_job.status() == 'FINISHED':
-            continue
-        print(f"Unfinished job: {job_id}\n")
-        slurm_jobs.append(slurm_job)
-
-    #Monitor these jobs#
-    monitor_jobs(slurm_jobs)
-    print("All previous jobs are finished\n")
-'''
-
-def add_mix_basis_for_atom(element, index, mix_lot, package):
+def add_mix_basis_for_atom(element, index, mix_lot, package, verbose = False):
 
     found = False
     count = 0
@@ -311,7 +190,7 @@ def add_mix_basis_for_atom(element, index, mix_lot, package):
 
         if package == "ORCA": mix_info = f"newgto {mix_lot[count][1]} end"
         elif package == "Gaussian": mix_info = [mix_lot[count][1], index]
-        print(f"mix_information: {mix_info}\n", flush = True)
+        if verbose: print(f"mix_information: {mix_info}\n", flush = True)
         return mix_info
     else:
         return ''
@@ -427,7 +306,7 @@ def geometry_opt(molecule):
     
     return molecule
 
-def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
+def opt_geo_xtb(elements, geo, bond_mat, q=0, work_folder = '.', filename='tmp'):
     '''
     Apply xTB to find product/reactant geometry from reactant/product geometry.
     elements: the elements for geo (a list)
@@ -435,39 +314,50 @@ def opt_geo_xtb(elements, geo, bond_mat, q=0, filename='tmp'):
     bond_mat: the bond electron matrix for reactant or product
     q: the charge state
     '''
-    tmp_xyz_file=f".{filename}.xyz"
-    tmp_inp_file=f".{filename}.inp"
+    if os.path.exists(work_folder) is False: os.makedirs(work_folder)
+    tmp_xyz_file=f"{work_folder}/{filename}.xyz"
+    tmp_inp_file=f"{work_folder}/{filename}.inp"
     bond=return_bond_info(bond_mat)
     length=[]
     constraints=[]
     xyz_write(tmp_xyz_file, elements, geo)
     for i in bond: length.append(el_radii[elements[i[0]]]+el_radii[elements[i[1]]])
     for count_i, i in enumerate(bond): constraints+=[(i[0]+1, i[1]+1, length[count_i])]
-    #print("A")
-    optjob = XTB(input_geo=tmp_xyz_file,work_folder='.',jobtype=['opt'],jobname='opt',charge=q) 
+
+    optjob = XTB(input_geo=tmp_xyz_file, work_folder=work_folder, jobtype=['opt'],jobname=f"opt-{filename}",charge=q)
     optjob.add_command(distance_constraints=constraints, force_constant=1.0)
-    optjob.execute()
-    # print(optjob.optimization_success())  
-    if optjob.optimization_success():
+    if not optjob.calculation_terminated_normally():
+        optjob.execute()
+    # print(optjob.optimization_success())
+    # fully-relaxed: check if the simulation converged
+    # relaxed: check if converged, and also structure don't change
+    if optjob.fully_relaxed_optimization_success():
+    #if optjob.relaxed_optimization_success():
         _, Gr = optjob.get_final_structure()
         print(Gr)
     else:
-        print("XTB fails to locate reactant/product pair for this conformer.")
+        print("xTB Run fails: cannot locate reactant/product pair for this conformer.")
         return []
     adj_mat_o = bondmat_to_adjmat(bond_mat)
     adj_mat_n = table_generator(elements, Gr)
-    
+
     try:
         files=[i for i in os.listdir(".") if fnmatch.fnmatch(i, f".{filename}*")]
         for i in files: os.remove(i)
     except:
         pass
 
+    return Gr
+    # Zhao's note: may want to skip the bond matrix check, if we are doing joint optimization, then we are assigning reactant bmat to product, they should NOT match.
+    # As long as xTB simulation does not fail, it should return the geometry
+    '''
     if np.abs(adj_mat_o-adj_mat_n).sum() == 0:
-        return G            
+        return G
     else:
-       print("XTB fails to locate reactant/product pair for this conformer.")
-       return []   
+        print("xTB adjacency matrix fails: cannot locate reactant/product pair for this conformer.")
+        return []
+    '''
+
 # def generate_xtb_constraint(bond, length, filename=".tmp.inp")
 def return_bond_info(mat):
     info=[]

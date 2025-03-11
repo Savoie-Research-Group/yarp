@@ -329,8 +329,9 @@ class Gaussian:
                 continue
             else:
                 fields = lines[count].split()
-                if Frequencies_found and len(fields) == 11 and all(isinstance(float(item), float) for item in fields):
-                    mode += [[float(fields[2]),float(fields[3]),float(fields[4])]]
+                if Frequencies_found and len(fields) == 11: 
+                    if all(isinstance(item, float) for item in fields):
+                        mode += [[float(fields[2]),float(fields[3]),float(fields[4])]]
         #for count in range(imag_line+14,imag_line+self.natoms+14):
         #    fields = lines[count].split()
         return np.array(mode)

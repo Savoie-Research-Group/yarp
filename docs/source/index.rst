@@ -32,16 +32,12 @@ Take a look at the `license`_ or open an `issue`_.
 Modules
 =======
 .. toctree::
-   installation
-   usage
-   yarpecule
-   find_lewis
-   enum
-   hashes
-   sieve
-   input_parsers
-   properties
-   taffi_functions   
-   :maxdepth: 1
+
+   :maxdepth: 2
    :numbered:
    :caption: Contents:
+
+   
+   README
+   LICENSE
+   yarp

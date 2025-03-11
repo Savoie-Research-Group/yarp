@@ -43,6 +43,7 @@ extensions = [
     'sphinx_autodoc_typehints',
     'sphinx.ext.autosummary',
     'sphinx.ext.autosectionlabel',
+    'myst_parser',
 ]
 
 # Napoleon settings

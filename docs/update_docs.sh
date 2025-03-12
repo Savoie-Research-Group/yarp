@@ -3,6 +3,10 @@
 #and rebuilding the HTML documentation. It also converts the README.md and
 #LICENSE.md files to .rst format if they exist.
 #
+#NOTE: This script must be run from the 'docs' directory. YARP must be installed in the same environemtn as the dependencies.
+#
+#Usage: ./update_docs.sh
+#
 #Dependencies:
 #- sphinx (pip install sphinx)
 #- sphinx-apidoc (pip install sphinx-autodoc)

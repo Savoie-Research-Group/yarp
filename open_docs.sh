@@ -5,11 +5,11 @@
 cd "$(dirname "$0")"
 
 # Define the path to the built documentation
-DOC_PATH="build/html/index.html"
+DOC_PATH="docs/build/html/index.html"
 
 # Check if the documentation exists
 if [ -f "$DOC_PATH" ]; then
-    echo "Opening documentation..."
+    echo "Opening documentation...Welcome to YARP!"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         open "$DOC_PATH"  # macOS
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -20,7 +20,7 @@ if [ -f "$DOC_PATH" ]; then
         echo "Documentation is available at: $DOC_PATH"
     fi
 else
-    echo "Error: Documentation HTML file not found. Run 'make html' first."
+    echo "Error: Documentation HTML file not found. Run '/docs/update_docs.sh' first."
     exit 1
 fi
 

@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 
-Welcome to yarp documentation!
+Welcome to YARP!
 ======================================
 
 `yarp` is a python package with classes and functions that implement the yarp reaction exploration
@@ -29,15 +29,53 @@ Take a look at the `license`_ or open an `issue`_.
 .. _license: https://github.com/Savoie-Research-Group/yarp/blob/master/LICENSE.md
 .. _issue: https://github.com/Savoie-Research-Group/yarp/issues
 
-Modules
+Software Info
 =======
 .. toctree::
-
    :maxdepth: 2
-   :numbered:
-   :caption: Contents:
+   :caption: Licensing:
 
-   
-   README
    LICENSE
-   yarp
+   
+   
+Read Me & Usage
+=======
+.. toctree::
+   :maxdepth: 2
+   :caption: Read Me & Usage
+
+   README
+
+Modules
+=======
+
+Core Modules
+------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Core Modules
+
+   constants <yarp.constants>
+   enumerations <yarp.enum>
+   lewis_structure_finder <yarp.find_lewis>
+
+Utility Modules
+---------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Utility Modules
+
+   hash_utilities <yarp.hashes>
+   input_parsers <yarp.input_parsers>
+   miscellaneous <yarp.misc>
+
+Other Functionalities
+---------------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Other Functionalities
+
+   properties <yarp.properties>
+   sieve_module <yarp.sieve>
+   smiles_parser <yarp.smiles>
+   taffi_functions <yarp.taffi_functions>

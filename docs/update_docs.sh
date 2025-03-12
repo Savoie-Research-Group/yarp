@@ -39,8 +39,10 @@ elif [ -f "../README" ]; then
     echo "Converting README to README.rst..."
     pandoc ../README -o "$SOURCE_DIR/README.rst"
 fi
-
-if [ -f "../LICENSE" ]; then
+if [ -f "../LICENSE.md" ]; then
+    echo "Converting LICENSE.md to LICENSE.rst..."
+    pandoc ../LICENSE.md -o "$SOURCE_DIR/LICENSE.rst"
+elif [ -f "../LICENSE" ]; then
     echo "Converting LICENSE to LICENSE.rst..."
     pandoc ../LICENSE -o "$SOURCE_DIR/LICENSE.rst"
 fi

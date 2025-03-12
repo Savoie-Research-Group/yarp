@@ -20,7 +20,7 @@ algorithms in their own custom chemical workflows.
 
 
 Check out the :doc:`usage` section for further information, including how to
-:ref:`install <installation>` the project.
+:ref:`install <README>` the project.
 
 **This software is still work in progress. Use at your own risk.**
 
@@ -29,53 +29,53 @@ Take a look at the `license`_ or open an `issue`_.
 .. _license: https://github.com/Savoie-Research-Group/yarp/blob/master/LICENSE.md
 .. _issue: https://github.com/Savoie-Research-Group/yarp/issues
 
-Software Info
+--
 =======
 .. toctree::
    :maxdepth: 2
-   :caption: Licensing:
+   :caption: Licensing
 
    LICENSE
    
    
-Read Me & Usage
+--
 =======
 .. toctree::
    :maxdepth: 2
-   :caption: Read Me & Usage
+   :caption: Usage
 
    README
 
 Modules
 =======
 
-Core Modules
+--
 ------------
 .. toctree::
    :maxdepth: 2
    :caption: Core Modules
 
-   constants <yarp.constants>
-   enumerations <yarp.enum>
-   lewis_structure_finder <yarp.find_lewis>
+   constants.py <yarp.constants>
+   enum.py <yarp.enum>
+   find_lewis.py <yarp.find_lewis>
 
-Utility Modules
+--
 ---------------
 .. toctree::
    :maxdepth: 2
    :caption: Utility Modules
 
-   hash_utilities <yarp.hashes>
-   input_parsers <yarp.input_parsers>
-   miscellaneous <yarp.misc>
+   hashes.py <yarp.hashes>
+   input_parsers.py <yarp.input_parsers>
+   misc.py <yarp.misc>
 
-Other Functionalities
+--
 ---------------------
 .. toctree::
    :maxdepth: 2
    :caption: Other Functionalities
 
-   properties <yarp.properties>
-   sieve_module <yarp.sieve>
-   smiles_parser <yarp.smiles>
-   taffi_functions <yarp.taffi_functions>
+   properties.py <yarp.properties>
+   sieve.py <yarp.sieve>
+   smiles.py <yarp.smiles>
+   taffi_functions.py <yarp.taffi_functions>

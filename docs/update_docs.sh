@@ -10,6 +10,33 @@
 #- pandoc (brew install pandoc)
 #- (Optional) myst-parser (pip install myst-parser) for MyST markdown support
 #
+#Files that have to be manually updated as developmend proceeds:
+#- docs/source/conf.py
+#- docs/source/index.rst
+#- docs/source/overview.rst (To be created) ***Phase 2***
+#- docs/source/usage.rst (To be created)***Phase 2***
+#- docs/source/development.rst (To be created)***Phase 2***
+#- docs/source/contributing.rst (To be created)***Phase 2***
+#- docs/source/acknowledgements.rst (To be created)***Phase 2***
+#- docs/source/faq.rst (To be created)***Phase 2***
+#- docs/README.md
+#- docs/LICENSE.md
+
+# Files that automatically update:
+#- docs/source/README.rst
+#- docs/source/LICENSE.rst
+#- docs/source/yarp.rst
+#- docs/source/yarp.constants.rst
+#- docs/source/yarp.enums.rst
+#- docs/source/yarp.find_lewis.rst
+#- docs/source/yarp.hashes.rst
+#- docs/source/yarp.input_parsers.rst
+#- docs/source/yarp.misc.rst
+#- docs/source/yarp.properties.rst
+#- docs/source/yarp.sieve.rst
+#- docs/source/yarp.smiles.rst
+#- docs/source/yarp.taffi_functions.rst
+#- docs/source/yarp.yarpecule.rst
 
 #!/bin/bash
 

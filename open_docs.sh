@@ -20,7 +20,7 @@ if [ -f "$DOC_PATH" ]; then
         echo "Documentation is available at: $DOC_PATH"
     fi
 else
-    echo "Error: Documentation HTML file not found. Run '/docs/update_docs.sh' first."
+    echo "Error: Documentation HTML file not found. Run 'yarp/yarp/docs/update_docs.sh' first."
     exit 1
 fi
 

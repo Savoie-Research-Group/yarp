@@ -53,29 +53,24 @@ Modules
 ------------
 .. toctree::
    :maxdepth: 2
-   :caption: Core Modules
+   :caption: Core Modules (yarp/yarp/)
 
    constants.py <yarp.constants>
    enum.py <yarp.enum>
    find_lewis.py <yarp.find_lewis>
-
---
----------------
-.. toctree::
-   :maxdepth: 2
-   :caption: Utility Modules
-
    hashes.py <yarp.hashes>
    input_parsers.py <yarp.input_parsers>
    misc.py <yarp.misc>
+   properties.py <yarp.properties>
+   sieve.py <yarp.sieve>
+   smiles.py <yarp.smiles>
+   taffi_functions.py <yarp.taffi_functions>
+
 
 --
 ---------------------
 .. toctree::
    :maxdepth: 2
-   :caption: Other Functionalities
+   :caption: Index
 
-   properties.py <yarp.properties>
-   sieve.py <yarp.sieve>
-   smiles.py <yarp.smiles>
-   taffi_functions.py <yarp.taffi_functions>
+   yarp

@@ -14,6 +14,9 @@ def write_pickle(name, data):
 def DFT_Initialize(args):
     keys = [i for i in args.keys()]
 
+    if "scheduler" not in keys:
+        args['scheduler'] = 'SLURM'
+
     if "verbose" not in keys:
         args['verbose'] = False
     else:

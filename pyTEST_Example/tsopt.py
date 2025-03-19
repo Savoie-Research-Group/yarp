@@ -67,12 +67,18 @@ class TSOPT:
 
     def Prepare_Submit(self):
         args = self.args
-        slurmjob=SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*1000), email=args["email_address"])
 
-        if args["package"]=="ORCA": slurmjob.create_orca_jobs([self.dft_job])
-        elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([self.dft_job])
+        if args["scheduler"] == "SLURM":
+            slurmjob=SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"]*1000), email=args["email_address"])
 
-        self.submission_job = slurmjob
+            if args["package"]=="ORCA": slurmjob.create_orca_jobs([self.dft_job])
+            elif args["package"]=="Gaussian": slurmjob.create_gaussian_jobs([self.dft_job])
+
+            self.submission_job = slurmjob
+        elif args["scheduler"] == "QSE":
+            raise RuntimeError("Not implemented!")
+        else:
+            raise RuntimeError("Currently supported schedulers are SLURM and QSE!")
 
     def Submit(self):
         self.submission_job.submit()

@@ -80,8 +80,9 @@ class TSOPT:
         args = self.args
 
         if args["scheduler"] == "SLURM":
-            slurmjob = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(
-                args["mem"]*1000), email=args["email_address"])
+            slurmjob = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"],
+                                 partition=args["partition"], time=args["dft_wt"],
+                                 mem_per_cpu=int(args["mem"]*1000), email=args["email_address"])
 
             if args["package"] == "ORCA":
                 slurmjob.create_orca_jobs([self.dft_job])

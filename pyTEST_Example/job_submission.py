@@ -1,9 +1,8 @@
-#!/bin/env python                                                                                                                                                             
+#!/bin/env python
 # Author: Qiyuan Zhao (zhaoqy1996@gmail.com), Zhao Li
 
 import subprocess
 import os
-import time
 
 # for parallel parallel jobs (e.g., multiple jobs in parallel, each asks for multiple cpus), check the below contents to see if it works
 '''
@@ -16,8 +15,11 @@ wait
 '''
 # compared with directly call crest in each line
 
+
 class SLURM_Job:
-    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False, email = ""):
+    def __init__(self, submit_path='.', partition='standby', time=4,
+                 jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000,
+                 specify_array=False, email=""):
         """
         Initialize slurm job parameters
         Time needs to be specify in hours
@@ -32,7 +34,7 @@ class SLURM_Job:
         self.specify_array = specify_array
         self.script_file = os.path.join(submit_path, jobname+'.submit')
 
-        #Zhao's note: add Email notification
+        # Zhao's note: add Email notification
         self.email = email
 
     def submit(self):
@@ -43,22 +45,25 @@ class SLURM_Job:
         # go into the job.submit folder to submit the job
         os.chdir('/'.join(self.script_file.split('/')[:-1]))
         command = f"sbatch {self.script_file}"
-        output = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = subprocess.run(command, shell=True,
+                                capture_output=True, text=True)
         # go back to current dir
         os.chdir(current_dir)
         self.job_id = output.stdout.split()[-1]
-        
+
     def status(self):
         """
         Check the status of the SLURM job.
         """
         if hasattr(self, "job_id") is False:
-            print("Haven't submitted this job yet, can not check the status of this job...")
+            print(
+                "Haven't submitted this job yet, can not check the status of this job...")
             return "UNSUBMITTED"
 
         try:
             command = f"squeue -j {self.job_id} --noheader --format %T"
-            output = subprocess.run(command, shell=True, capture_output=True, text=True)
+            output = subprocess.run(
+                command, shell=True, capture_output=True, text=True)
             job_status = output.stdout.strip()
 
             if job_status == "":
@@ -76,7 +81,8 @@ class SLURM_Job:
         """
         with open(self.script_file, "w") as f:
             f.write("#!/bin/bash\n")
-            if self.specify_array: f.write(f"#SBATCH --array={self.specify_array}\n")
+            if self.specify_array:
+                f.write(f"#SBATCH --array={self.specify_array}\n")
             f.write(f"#SBATCH --job-name={self.jobname}\n")
             f.write(f"#SBATCH --output={self.jobname}.out\n")
             f.write(f"#SBATCH --error={self.jobname}.err\n")
@@ -92,14 +98,13 @@ class SLURM_Job:
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
 
-
     def create_job_bottom(self):
         """
         Print job finishing time
         """
         with open(self.script_file, "a") as f:
             f.write("\necho End Time is `date`\n\n")
-            
+
     def setup_orca_script(self):
         """
         Load in ORCA and OPENMPI
@@ -111,9 +116,11 @@ class SLURM_Job:
             f.write("module load intel-mkl\n")
             # f.write("module purge\n")
             f.write('export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH"\n')
-            f.write('export LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH"\n')
+            f.write(
+                'export LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH"\n')
             f.write('export PATH="/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH"\n')
-            f.write('export LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"\n\n')
+            f.write(
+                'export LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"\n\n')
 
     def setup_qchem_script(self):
         """
@@ -131,15 +138,20 @@ class SLURM_Job:
         """
         self.create_job_head()
         self.setup_orca_script()
-        
+
         with open(self.script_file, "a") as f:
             for orcajob in orca_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {orcajob.work_folder}\n\n")
-                if orcapath is None: orcapath = '/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca'
-                if parallel: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} &\n\n")
-                else: f.write(f"{orcapath} {orcajob.orca_input} > {orcajob.output} \n\n")
-                
+                if orcapath is None:
+                    orcapath = '/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca'
+                if parallel:
+                    f.write(
+                        f"{orcapath} {orcajob.orca_input} > {orcajob.output} &\n\n")
+                else:
+                    f.write(
+                        f"{orcapath} {orcajob.orca_input} > {orcajob.output} \n\n")
+
             f.write("wait\n")
 
         self.create_job_bottom()
@@ -156,8 +168,12 @@ class SLURM_Job:
             for qchemjob in qchem_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {qchemjob.work_folder}\n\n")
-                if parallel: f.write(f"qchem -nt {qchemjob.nproc} {qchemjob.qchem_input} > {qchemjob.output} &\n\n")
-                else: f.write(f"qchem -nt {qchemjob.nproc} {qchemjob.qchem_input} > {qchemjob.output}\n\n")
+                if parallel:
+                    f.write(
+                        f"qchem -nt {qchemjob.nproc} {qchemjob.qchem_input} > {qchemjob.output} &\n\n")
+                else:
+                    f.write(
+                        f"qchem -nt {qchemjob.nproc} {qchemjob.qchem_input} > {qchemjob.output}\n\n")
 
             f.write("wait\n")
 
@@ -174,7 +190,9 @@ class SLURM_Job:
                 f.write("# cd into the submission directory\n")
                 f.write(f"cd {job.work_folder}\n\n")
                 f.write(f"module load gaussian16/B.01\n")
-                if parallel: f.write(f"g16 < {job.gjf} > {job.output}.{job.nprocs}.out &\n")
+                if parallel:
+                    f.write(
+                        f"g16 < {job.gjf} > {job.output}.{job.nprocs}.out &\n")
                 else:
                     f.write(f"g16 < {job.gjf} > {job.output} &\n")
                 f.write("\nwait\n")
@@ -188,7 +206,8 @@ class SLURM_Job:
 
         # check input
         if self.ppn % gsm_thread != 0:
-            print(f"Make sure your total number of cpu (ppn={self.ppn}) is divisible by gsm thread")
+            print(
+                f"Make sure your total number of cpu (ppn={self.ppn}) is divisible by gsm thread")
             quit()
 
         self.create_job_head()
@@ -200,23 +219,24 @@ class SLURM_Job:
             f.write(f'ID=`printf "%0*d\\n" {gsm_thread} ${{item}}`\n')
 
             # set up orca/qchem path
-            if gsm_job_list[0].method.lower() =='orca': 
+            if gsm_job_list[0].method.lower() == 'orca':
                 self.setup_orca_script()
                 gsm_exe = 'gsm.orca'
-            elif gsm_job_list[0].method.lower() =='qchem': 
+            elif gsm_job_list[0].method.lower() == 'qchem':
                 self.setup_qchem_script()
                 gsm_exe = 'gsm.qchem'
             else:
                 # GFM-xTB use orca interface but is using xTB to generate pseudo-Orca files
                 gsm_exe = 'gsm.orca'
-                
+
             # set thread and load packages
             f.write(f"export OMP_NUM_THREADS={gsm_thread}\n")
-            f.write("module load intel-mkl\n\n") # a specific setting for bell 
+            f.write("module load intel-mkl\n\n")  # a specific setting for bell
 
             for gsmjob in gsm_job_list:
                 f.write(f'cd {gsmjob.work_folder}\n')
-                f.write(f"./{gsm_exe} ${{item}} {self.ppn//gsm_thread} > {gsmjob.output}\nwait\n\n")
+                f.write(
+                    f"./{gsm_exe} ${{item}} {self.ppn//gsm_thread} > {gsmjob.output}\nwait\n\n")
 
         self.create_job_bottom()
 
@@ -229,14 +249,19 @@ class SLURM_Job:
         with open(self.script_file, "a") as f:
 
             # set thread and load packages
-            f.write('export PATH="/depot/bsavoie/apps/anaconda3/envs/yarp/bin:$PATH"\n')
+            f.write(
+                'export PATH="/depot/bsavoie/apps/anaconda3/envs/yarp/bin:$PATH"\n')
 
             # set up GSM commands (only supports doing each task in sequential)
             for pysisjob in pysis_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {pysisjob.work_folder}\n\n")
-                if parallel: f.write(f"pysis {pysisjob.pysis_input} > {pysisjob.output} &\n\n")
-                else: f.write(f"pysis {pysisjob.pysis_input} > {pysisjob.output}\n\n")
+                if parallel:
+                    f.write(
+                        f"pysis {pysisjob.pysis_input} > {pysisjob.output} &\n\n")
+                else:
+                    f.write(
+                        f"pysis {pysisjob.pysis_input} > {pysisjob.output}\n\n")
 
         self.create_job_bottom()
 
@@ -248,12 +273,12 @@ class SLURM_Job:
 
         with open(self.script_file, "a") as f:
 
-            #Zhao's note: try fixing crest env
-            #add module load anaconda 
-            #conda activate <your current conda env>
-            #This is just a fix on Purdue's machine, you can turn it off#
-            #Zhao's note: purdue changed its default anaconda, switch!
-            #f.write(f"module load anaconda\n")
+            # Zhao's note: try fixing crest env
+            # add module load anaconda
+            # conda activate <your current conda env>
+            # This is just a fix on Purdue's machine, you can turn it off#
+            # Zhao's note: purdue changed its default anaconda, switch!
+            # f.write(f"module load anaconda\n")
             f.write(f"module load anaconda/2022.10-py39\n")
             f.write(f"conda activate copy-classy-yarp\n")
 
@@ -276,7 +301,7 @@ class SLURM_Job:
         self.create_job_head()
 
         with open(self.script_file, "a") as f:
-            for auto3djob in auto3d_job_list:                
+            for auto3djob in auto3d_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {auto3djob.work_folder}\n\n")
                 f.write(f"{auto3djob.command}\nwait\n\n")
@@ -290,9 +315,10 @@ class SLURM_Job:
         """
         self.create_job_head()
 
-        if work_folders is None: work_folders = ['.'] * len(python_commands)
+        if work_folders is None:
+            work_folders = ['.'] * len(python_commands)
         with open(self.script_file, "a") as f:
-            for jobid,python_command in enumerate(python_commands):
+            for jobid, python_command in enumerate(python_commands):
                 # first activate anaconda env
                 f.write(f"source activate {anaconda_env_name}\n\n")
                 f.write("\n# cd into the submission directory\n")
@@ -313,6 +339,7 @@ class SLURM_Job:
                 pass
     '''
 
+
 class QSE_job:
     """
     Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.
@@ -329,9 +356,8 @@ class QSE_job:
         Syntax will depend on the cluster system running on.
         So we need to make this as flexible as possible.
 
-    submit_path : str
-        Directory from which submission script will be executed.
-        Defaults to current working directory.
+    job_calculator : Calculator
+        Calculator class object that contains all the info of where job input files live.
 
     queue : str
         Queue to submit job requests to. Default is general CPU queue at ND-CRC (long).
@@ -349,7 +375,7 @@ class QSE_job:
     mem : int
         Memory (in MB) per CPU available for each QSE job instance.
         Defaults to 2000 MB (2 GB)
-    
+
     time : int
         Runtime limit (in hours) for each QSE job instance.
         Defaults to 4 hours.
@@ -382,7 +408,8 @@ class QSE_job:
     """
 
     # Constructor
-    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", job_calculator = None, queue = "long", ncpus = 1, mem = 2000, time = 4, ntasks = 1, email= ""):
+    def __init__(self, package="ORCA", jobname="JobSubmission", module="module load orca",
+                 job_calculator=None, queue="long", ncpus=1, mem=2000, time=4, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
@@ -393,13 +420,15 @@ class QSE_job:
 
         self.jobname = jobname
         self.package = package
-        self.module = module # line needed to load the necessary software
-        self.job_calculator = job_calculator # assumes input files have already been generated in this location!
+        self.module = module  # line needed to load the necessary software
+        # assumes input files have already been generated in this location!
+        self.job_calculator = job_calculator
 
         self.email = email
 
         # Derived attributes
-        self.script_file = os.path.join(job_calculator.work_folder, jobname+'.submit')
+        self.script_file = os.path.join(
+            job_calculator.work_folder, jobname+'.submit')
         self.job_id = None
 
     def prepare_submission_script(self):
@@ -414,19 +443,21 @@ class QSE_job:
         with open(self.script_file, "w") as f:
             # Make script header with QSE-style resource requests
             f.write("#!/bin/bash\n")
-            
+
             # Specify CPUs and compute queue
-            f.write(f"#$ -pe smp {self.ncpus}\n") # ERM: for now, it's SMP or bust
+            # ERM: for now, it's SMP or bust
+            f.write(f"#$ -pe smp {self.ncpus}\n")
             f.write(f"#$ -q {self.queue}\n")
 
             f.write(f"#$ -l h_rt={self.time}:00:00\n")
             f.write(f"#$ -l mem={self.mem}\n")
 
             # Set up job array for multi-job submissions (default is only 1 job submission)
-            if self.ntasks == 1 :
+            if self.ntasks == 1:
                 f.write("#$ -t 1\n")
-            else :
-                raise RuntimeError("We're not doing this batch job array submission, sorry.")
+            else:
+                raise RuntimeError(
+                    "We're not doing this batch job array submission, sorry.")
 
             f.write(f"#$ -N {self.jobname}\n")
 
@@ -442,9 +473,8 @@ class QSE_job:
             f.write("echo Start Time is `date`\n\n")
             f.write("base_dir=$(PWD)\n")
 
-
             # Put in script body according to jobname input
-            if self.package == "ORCA" :
+            if self.package == "ORCA":
                 f.write("echo Loading ORCA\n")
                 # Put in module load commands
                 f.write(f"{self.module}")
@@ -454,12 +484,13 @@ class QSE_job:
                 f.write(f"cd {self.job_calculator.work_folder}\n")
                 f.write(f"echo Executing ORCA job from $PWD\n")
                 f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
-            elif self.package == "CREST" :
+            elif self.package == "CREST":
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
                 f.write("CREST stuff\n")
             else:
                 # Throw a runtime error
-                raise RuntimeError("QSE class currently only supports CREST and ORCA job submissions!")
+                raise RuntimeError(
+                    "QSE class currently only supports CREST and ORCA job submissions!")
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")
@@ -477,11 +508,12 @@ class QSE_job:
         os.chdir(self.submit_path)
         current_dir = os.getcwd()
         print(f"Submitting jobs from {current_dir}")
-        
+
         # Execute job submission via qsub
         command = f"qsub {self.script_file}"
-        output = subprocess.run(command, shell=True, capture_output=True, text=True)
-        
+        output = subprocess.run(command, shell=True,
+                                capture_output=True, text=True)
+
         # save job ID somehow....
         # self.job_id = output.stdout.split()[-1] # need to modify this!??
 
@@ -547,7 +579,7 @@ class CONDOR_jobs:
     """
 
     # Constructor
-    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
+    def __init__(self, package="ORCA", jobname="JobSubmission", module="module load orca", submit_path=os.getcwd(), queue="long", ncpus=1, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
@@ -556,8 +588,9 @@ class CONDOR_jobs:
 
         self.jobname = jobname
         self.package = package
-        self.module = module # line needed to load the necessary software
-        self.submit_path = submit_path # assumes input files have already been generated in this location!
+        self.module = module  # line needed to load the necessary software
+        # assumes input files have already been generated in this location!
+        self.submit_path = submit_path
 
         self.email = email
 
@@ -592,7 +625,7 @@ class CONDOR_jobs:
             # f.write("    cd ${folder_array[$SGE_TASK_ID-1]}\n")
 
             # Put in script body according to jobname input
-            if self.package == "ORCA" :
+            if self.package == "ORCA":
                 f.write("    echo Loading ORCA\n")
                 # Put in module load commands
                 f.write(f"    {self.module}")
@@ -602,30 +635,29 @@ class CONDOR_jobs:
                 # ERM: Need to figure out what these files will be named!!!
                 f.write(f"    echo Executing ORCA job from $PWD\n")
                 f.write(f"    $orca {self.jobname}.in > {self.jobname}.out\n")
-            elif self.package == "CREST" :
+            elif self.package == "CREST":
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
                 f.write("    CREST stuff\n")
             else:
                 # Throw a runtime error
-                raise RuntimeError("QSE class currently only supports CREST and ORCA job submissions!")
+                raise RuntimeError(
+                    "QSE class currently only supports CREST and ORCA job submissions!")
 
             # Return to previous folder
             f.write('    cd "$base_dir"\n')
 
             # Close the "does this directory exist?" bash conditional
             f.write('else\n')
-            f.write('    echo "Error: Directory ${folder_array[$SGE_TASK_ID-1]} does not exist" > "error_job_${JOB_ID}_task_${SGE_TASK_ID}.log"\n')
+            f.write(
+                '    echo "Error: Directory ${folder_array[$SGE_TASK_ID-1]} does not exist" > "error_job_${JOB_ID}_task_${SGE_TASK_ID}.log"\n')
             f.write('fi\n')
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")
 
-
         with open(self.script_file, "w") as f:
             f.write("universe = vanilla\n")
             f.write("getenv = true\n")
-            
-
 
     def submit(self):
         """
@@ -640,11 +672,11 @@ class CONDOR_jobs:
         os.chdir(self.submit_path)
         current_dir = os.getcwd()
         print(f"Submitting jobs from {current_dir}")
-        
+
         # Execute job submission via qsub
         command = f"condor_submit {self.script_file}"
-        output = subprocess.run(command, shell=True, capture_output=True, text=True)
-        
+        output = subprocess.run(command, shell=True,
+                                capture_output=True, text=True)
+
         # save job ID somehow....
         # self.job_id = output.stdout.split()[-1] # need to modify this!??
-

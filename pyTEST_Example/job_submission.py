@@ -313,7 +313,7 @@ class SLURM_Job:
                 pass
     '''
 
-class QSE_jobs:
+class QSE_job:
     """
     Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.
 
@@ -346,6 +346,14 @@ class QSE_jobs:
         Number of tasks contained in the job array.
         Defaults to 1 task.
 
+    mem : int
+        Memory (in MB) per CPU available for each QSE job instance.
+        Defaults to 2000 MB (2 GB)
+    
+    time : int
+        Runtime limit (in hours) for each QSE job instance.
+        Defaults to 4 hours.
+
     email : str
         Email to send "abort, begin, end" updates to for submitted jobs.
         Default is to not include this in submission script.
@@ -374,10 +382,12 @@ class QSE_jobs:
     """
 
     # Constructor
-    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, ntasks = 1, email= ""):
+    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, mem = 2000, time = 4, ntasks = 1, email= ""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
+        self.mem = mem
+        self.time = time
         self.queue = queue
         self.ntasks = ntasks
 
@@ -409,11 +419,14 @@ class QSE_jobs:
             f.write(f"#$ -pe smp {self.ncpus}\n") # ERM: for now, it's SMP or bust
             f.write(f"#$ -q {self.queue}\n")
 
+            f.write(f"#$ -l h_rt={self.time}:00:00\n")
+            f.write(f"#$ -l mem={self.mem}\n")
+
             # Set up job array for multi-job submissions (default is only 1 job submission)
             if self.ntasks == 1 :
                 f.write("#$ -t 1\n")
             else :
-                f.write(f"#$ -t 1-{self.ntasks}\n")
+                raise RuntimeError("We're not doing this batch job array submission, sorry.")
 
             f.write(f"#$ -N {self.jobname}\n")
 
@@ -421,53 +434,32 @@ class QSE_jobs:
                 f.write(f"#$ -M {self.email}\n")
                 f.write(f"#$ -m abe\n")
 
-            # Discard standard output/error to prevent garbage file accumulation
-            # This will be collected later for each job task
-            f.write(f"#$ -o /dev/null\n")
-            f.write(f"#$ -e /dev/null\n")
+            f.write(f"#$ -o {self.jobname}.out\n")
+            f.write(f"#$ -e {self.jobname}.err\n")
 
             # Collect info on compute resources
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
             f.write("base_dir=$(PWD)\n")
 
-            # Collect a list of folders to iterate through
-            f.write("mapfile -t folder_array < <(find . -maxdepth 1 -type d ! -name '.' -exec basename {} \;)\n")
-
-            # Open a "does this directory exist?" bash conditional
-            f.write('if [ -d "${folder_array[$SGE_TASK_ID-1]}" ]; then\n')
-
-            # Redirect output and error to the appropriate folder
-            f.write('    exec > "${folder_array[$SGE_TASK_ID-1]}/output.log" 2> "${folder_array[$SGE_TASK_ID-1]}/error.log"\n')
-
-            # Change to folder of interest
-            f.write("    cd ${folder_array[$SGE_TASK_ID-1]}\n")
 
             # Put in script body according to jobname input
             if self.package == "ORCA" :
-                f.write("    echo Loading ORCA\n")
+                f.write("echo Loading ORCA\n")
                 # Put in module load commands
-                f.write(f"    {self.module}")
+                f.write(f"{self.module}")
                 # Set up full path to ORCA for paralleliztion runs
-                f.write("    orca=$(which orca)\n")
+                f.write("orca=$(which orca)\n")
                 # Execute ORCA input file
-                # ERM: Need to figure out what these files will be named!!!
-                f.write(f"    echo Executing ORCA job from $PWD\n")
-                f.write(f"    $orca {self.jobname}.in > {self.jobname}.out\n")
+                # f.write(f"cd {self.submit_path}")
+                f.write(f"echo Executing ORCA job from $PWD\n")
+                f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
             elif self.package == "CREST" :
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
-                f.write("    CREST stuff\n")
+                f.write("CREST stuff\n")
             else:
                 # Throw a runtime error
                 raise RuntimeError("QSE class currently only supports CREST and ORCA job submissions!")
-
-            # Return to previous folder
-            f.write('    cd "$base_dir"\n')
-
-            # Close the "does this directory exist?" bash conditional
-            f.write('else\n')
-            f.write('    echo "Error: Directory ${folder_array[$SGE_TASK_ID-1]} does not exist" > "error_job_${JOB_ID}_task_${SGE_TASK_ID}.log"\n')
-            f.write('fi\n')
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")

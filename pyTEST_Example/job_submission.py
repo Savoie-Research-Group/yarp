@@ -382,7 +382,7 @@ class QSE_job:
     """
 
     # Constructor
-    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", submit_path = os.getcwd(), queue = "long", ncpus = 1, mem = 2000, time = 4, ntasks = 1, email= ""):
+    def __init__(self, package = "ORCA", jobname = "JobSubmission", module = "module load orca", job_calculator = None, queue = "long", ncpus = 1, mem = 2000, time = 4, ntasks = 1, email= ""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus
@@ -394,12 +394,12 @@ class QSE_job:
         self.jobname = jobname
         self.package = package
         self.module = module # line needed to load the necessary software
-        self.submit_path = submit_path # assumes input files have already been generated in this location!
+        self.job_calculator = job_calculator # assumes input files have already been generated in this location!
 
         self.email = email
 
         # Derived attributes
-        self.script_file = os.path.join(submit_path, jobname+'.submit')
+        self.script_file = os.path.join(job_calculator.work_folder, jobname+'.submit')
         self.job_id = None
 
     def prepare_submission_script(self):
@@ -449,9 +449,9 @@ class QSE_job:
                 # Put in module load commands
                 f.write(f"{self.module}")
                 # Set up full path to ORCA for paralleliztion runs
-                f.write("orca=$(which orca)\n")
+                f.write("orca=$(which orca)\n\n")
                 # Execute ORCA input file
-                # f.write(f"cd {self.submit_path}")
+                f.write(f"cd {self.job_calculator.work_folder}\n")
                 f.write(f"echo Executing ORCA job from $PWD\n")
                 f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
             elif self.package == "CREST" :

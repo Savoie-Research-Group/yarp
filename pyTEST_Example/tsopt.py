@@ -91,7 +91,7 @@ class TSOPT:
             self.submission_job = slurmjob
         elif args["scheduler"] == "QSE":
             qsejob = QSE_job(package=args["package"], jobname=f"TSOPT.{self.rxn_ind}",
-                             module="module load orca", submit_path=os.getcwd(),
+                             module="module load orca", job_calculator=self.dft_job,
                              queue=args["partition"], ncpus=args["dft_nprocs"],
                              mem=int(args["mem"]*1000), time=args["dft_wt"],
                              ntasks=1, email=args["email_address"])

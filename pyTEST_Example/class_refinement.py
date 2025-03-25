@@ -82,6 +82,5 @@ def main(args: dict):
 
 
 if __name__ == "__main__":
-    parameters = sys.argv[1]
-    parameters = yaml.load(open(parameters, "r"), Loader=yaml.FullLoader)
+    parameters = yaml.safe_load(open(sys.argv[1], "r"))
     main(parameters)

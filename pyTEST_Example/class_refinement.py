@@ -12,11 +12,16 @@ from initialize import DFT_Initialize, load_pickle, write_pickle
 
 def main(args: dict):
 
+    # Process input and set some missing fields with default values
     DFT_Initialize(args)
+
+    if args.get("dry_run", False):
+        print("Dry run selected: No calculations will be submitted to the scheduler")
 
     xyz_files = [args["input"]+"/" +
                  i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, "*.xyz")]
 
+    # Either read in previously run calculations or generate new input files
     if os.path.isfile("REFINE.p"):
         dft_rxns = load_pickle("REFINE.p")
     else:
@@ -52,32 +57,41 @@ def main(args: dict):
     STATUS = []
 
     for count, dft_rxn in enumerate(dft_rxns):
-        # dft_rxn.get_TS_conformers()
         # overwrite the args
         dft_rxn.rxn.args = args
         dft_rxn.args = args
         if args['verbose']:
             print(
                 f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
+
         # process all the conformers
         for conf in dft_rxn.conformers:
-            conf.SUBMIT_JOB = False  # Prepare job submission script, but do not submit
+            print("-***-")
+            print(f"Processing reaction {conf.TSOPT.rxn_ind}")
+            if args.get("dry_run", False):
+                conf.SUBMIT_JOB = False  # Prepare job submission script, but do not submit
+            else:
+                conf.SUBMIT_JOB = True
 
             conf.rxn.args = args
             conf.TSOPT.args = args
             conf.IRC.args = args
 
             conf.run_TSOPT()
-            conf.run_IRC()
+            if args.get("do_irc", True):
+                conf.run_IRC()
+            else:
+                print("IRC validation of optimized TS turned off!")
 
             STATUS.append([conf.TSOPT.rxn_ind, conf.status,
                           conf.TSOPT.FLAG, conf.IRC.FLAG])
 
+    # tabulate and print status of TSOPT/IRC calcs
     table = tabulate(STATUS, headers=[
                      "RXN_CONF", "Status", "TSOPT-Status", "IRC-Status"], tablefmt="grid")
     print(table)
-    # write down a report of rxn, conformer, and status
 
+    # write down a report of rxn, conformer, and status
     write_pickle("REFINE.p", dft_rxns)
 
 

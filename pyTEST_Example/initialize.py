@@ -32,14 +32,20 @@ def DFT_Initialize(args):
         args["solvation_model"], args["solvent"] = args["solvation"].split('/')
     else:
         args["solvation_model"], args["solvent"] = "CPCM", False
+
+    if os.path.exists(args.get("scratch", "")) is False:
+        raise RuntimeError(
+            "Missing 'scratch' field to specify where output should go! Please provide!")
+
     args["scratch_dft"] = f'{args["scratch"]}/DFT'
     args["scratch_crest"] = f'{args["scratch"]}/conformer'
     if os.path.isdir(args["scratch"]) is False:
         os.mkdir(args["scratch"])
     if os.path.isdir(args["scratch_dft"]) is False:
         os.mkdir(args["scratch_dft"])
-    if args["reaction_data"] is None:
-        args["reaction_data"] = args["scratch"]+"/reaction.p"
+
+    args["reaction_data"] = args.get(
+        "reaction_data", args["scratch"]+"/reaction.p")
 
     # Zhao's note: for CREST (Reactant/Product)
     if "low_solvation" not in keys:
@@ -85,7 +91,8 @@ def DFT_Initialize(args):
     if os.path.exists(args["reaction_data"]) is False:
         print("No reactions are provided for refinement....")
         return
-        # exit()
+
+    # This code is untested, possibly? - ERM
     rxns = load_pickle(args["reaction_data"])
     for count, i in enumerate(rxns):
         rxns[count].args = args

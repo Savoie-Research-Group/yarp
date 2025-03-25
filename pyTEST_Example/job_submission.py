@@ -457,7 +457,7 @@ class QSE_job:
             f.write(f"#$ -q {self.queue}\n")
 
             f.write(f"#$ -l h_rt={self.time}:00:00\n")
-            f.write(f"#$ -l mem={self.mem}\n")
+            f.write(f"#$ -l h_vmem={self.mem}M\n")
 
             # Set up job array for multi-job submissions (default is only 1 job submission)
             if self.ntasks == 1:
@@ -512,17 +512,25 @@ class QSE_job:
         - update jobID parsing to distinguish between base job number and task ID
         - figure out a good default to use for self.job_id initialization
         """
-        os.chdir(self.submit_path)
         current_dir = os.getcwd()
-        print(f"Submitting jobs from {current_dir}")
+        os.chdir(self.job_calculator.work_folder)
+        print(f"Submitting jobs from {os.getcwd()}")
 
         # Execute job submission via qsub
         command = f"qsub {self.script_file}"
+        print(f"command: {command}")
         output = subprocess.run(command, shell=True,
                                 capture_output=True, text=True)
 
         # save job ID somehow....
-        # self.job_id = output.stdout.split()[-1] # need to modify this!??
+        self.job_id = output.stdout  # need to modify this!??
+        print(f"job ID: {self.job_id}")
+
+        print(f"STDOUT: {output.stdout}")
+        print(f"STDERR: {output.stderr}")
+
+        # go back to current dir
+        os.chdir(current_dir)
 
 
 class CONDOR_jobs:

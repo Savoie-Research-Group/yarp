@@ -92,7 +92,7 @@ def main(args: dict):
     print(table)
 
     # write down a report of rxn, conformer, and status
-    write_pickle("REFINE.p", dft_rxns)
+    write_pickle(args.get("scratch")+"/REFINE.p", dft_rxns)
 
 
 if __name__ == "__main__":

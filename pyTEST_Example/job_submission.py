@@ -114,7 +114,6 @@ class SLURM_Job:
             f.write("# set up env for Orca\n")
             f.write("module unload openmpi\n")
             f.write("module load intel-mkl\n")
-            # f.write("module purge\n")
             f.write('export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH"\n')
             f.write(
                 'export LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH"\n')
@@ -131,7 +130,7 @@ class SLURM_Job:
             f.write("\n# Load QChem\n")
             f.write("source /home/paulzim/qchem/trunk2022/paul.set.local0\n")
 
-    def create_orca_jobs(self, orca_job_list, parallel=False, orcapath=None):
+    def create_orca_jobs(self, orca_job_list, parallel=False):
         """
         Generate orca jobs
         NOTE:  a list of orca job objects needs to be provided
@@ -143,14 +142,13 @@ class SLURM_Job:
             for orcajob in orca_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {orcajob.work_folder}\n\n")
-                if orcapath is None:
-                    orcapath = '/depot/bsavoie/apps/orca_5_0_1_openmpi411/orca'
+                f.write("orca=$(which orca)")
                 if parallel:
                     f.write(
-                        f"{orcapath} {orcajob.orca_input} > {orcajob.output} &\n\n")
+                        f"$orca {orcajob.orca_input} > {orcajob.output} &\n\n")
                 else:
                     f.write(
-                        f"{orcapath} {orcajob.orca_input} > {orcajob.output} \n\n")
+                        f"$orca {orcajob.orca_input} > {orcajob.output} \n\n")
 
             f.write("wait\n")
 

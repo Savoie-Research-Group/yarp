@@ -19,7 +19,7 @@ wait
 class SLURM_Job:
     def __init__(self, submit_path='.', partition='standby', time=4,
                  jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000,
-                 specify_array=False, email=""):
+                 specify_array=False, email="", orca_module=None):
         """
         Initialize slurm job parameters
         Time needs to be specify in hours
@@ -33,6 +33,15 @@ class SLURM_Job:
         self.submit_path = submit_path
         self.specify_array = specify_array
         self.script_file = os.path.join(submit_path, jobname+'.submit')
+
+        # defaults set to work on Purdue clusters
+        # yes, this is awful, but hopefully it will be the least disruptive change possible - ERM
+        if orca_module is None:
+            orca_module = {}
+        self.orca_module_prereqs = orca_module.get(
+            "prereqs", "module unload openmpi \nmodule load intel-mkl \n")
+        self.orca_module_software = orca_module.get(
+            "software", "export PATH='/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH' \nexport LD_LIBRARY_PATH='/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH' \nexport PATH='/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH' \nexport LD_LIBRARY_PATH='/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH'\n")
 
         # Zhao's note: add Email notification
         self.email = email
@@ -110,16 +119,10 @@ class SLURM_Job:
         Load in ORCA and OPENMPI
         """
         with open(self.script_file, "a") as f:
-            f.write("\n# Load Orca\n")
-            f.write("# set up env for Orca\n")
-            f.write("module unload openmpi\n")
-            f.write("module load intel-mkl\n")
-            f.write('export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH"\n')
-            f.write(
-                'export LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH"\n')
-            f.write('export PATH="/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH"\n')
-            f.write(
-                'export LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"\n\n')
+            f.write("# Load prerequisites\n")
+            f.write(f"{self.orca_module_prereqs}\n")
+            f.write("# Load software\n")
+            f.write(f"{self.orca_module_software}\n")
 
     def setup_qchem_script(self):
         """
@@ -142,7 +145,7 @@ class SLURM_Job:
             for orcajob in orca_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {orcajob.work_folder}\n\n")
-                f.write("orca=$(which orca)")
+                f.write("orca=$(which orca)\n")
                 if parallel:
                     f.write(
                         f"$orca {orcajob.orca_input} > {orcajob.output} &\n\n")
@@ -406,7 +409,7 @@ class QSE_job:
     """
 
     # Constructor
-    def __init__(self, package="ORCA", jobname="JobSubmission", module="module load orca",
+    def __init__(self, package="ORCA", jobname="JobSubmission", module=None,
                  job_calculator=None, queue="long", ncpus=1, mem=2000, time=4, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
@@ -428,6 +431,12 @@ class QSE_job:
         self.script_file = os.path.join(
             job_calculator.work_folder, jobname+'.submit')
         self.job_id = None
+
+        if module is None:
+            module = {}
+        self.module_prereqs = module.get("prereqs", "")
+        self.module_software = module.get(
+            "software", "module load orca\n")
 
     def prepare_submission_script(self):
         """
@@ -467,20 +476,20 @@ class QSE_job:
             f.write(f"#$ -e {self.jobname}.err\n")
 
             # Collect info on compute resources
-            f.write("echo Running on host `hostname`\n")
+            f.write("\necho Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
-            f.write("base_dir=$(PWD)\n")
 
             # Put in script body according to jobname input
             if self.package == "ORCA":
-                f.write("echo Loading ORCA\n")
-                # Put in module load commands
-                f.write(f"{self.module}")
-                # Set up full path to ORCA for paralleliztion runs
+                f.write("# Load prerequisites\n")
+                f.write(f"{self.module_prereqs}\n")
+                f.write("# Load software\n")
+                f.write(f"{self.module_software}\n")
+                f.write("# Set up full path to ORCA for paralleliztion runs\n")
                 f.write("orca=$(which orca)\n\n")
-                # Execute ORCA input file
+
+                f.write("# Execute ORCA input file\n")
                 f.write(f"cd {self.job_calculator.work_folder}\n")
-                f.write(f"echo Executing ORCA job from $PWD\n")
                 f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
             elif self.package == "CREST":
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?

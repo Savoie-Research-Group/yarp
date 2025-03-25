@@ -84,7 +84,7 @@ class TSOPT:
             slurmjob = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"],
                                  partition=args["partition"], time=args["dft_wt"],
                                  mem_per_cpu=int(args["mem"]*1000), email=args["email_address"],
-                                 submit_path=self.dft_job.work_folder)
+                                 submit_path=self.dft_job.work_folder, orca_module=args.get("module", None))
 
             if args["package"] == "ORCA":
                 slurmjob.create_orca_jobs([self.dft_job])
@@ -94,7 +94,7 @@ class TSOPT:
             self.submission_job = slurmjob
         elif args["scheduler"] == "QSE":
             qsejob = QSE_job(package=args["package"], jobname=f"TSOPT.{self.rxn_ind}",
-                             module="module load orca", job_calculator=self.dft_job,
+                             module=args.get("module", None), job_calculator=self.dft_job,
                              queue=args["partition"], ncpus=args["dft_nprocs"],
                              mem=int(args["mem"]*1000), time=args["dft_wt"],
                              ntasks=1, email=args["email_address"])

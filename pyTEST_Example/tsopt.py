@@ -16,6 +16,7 @@ class TSOPT:
         self.rxn_ind = None
 
     # unsure if this is called properly; self.wf doesn't seem to take effect...
+    # Can we incorporate this into __init__()?
     def Initialize(self, verbose=False):
         args = self.args
         ind = self.index
@@ -82,7 +83,8 @@ class TSOPT:
         if args["scheduler"] == "SLURM":
             slurmjob = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"],
                                  partition=args["partition"], time=args["dft_wt"],
-                                 mem_per_cpu=int(args["mem"]*1000), email=args["email_address"])
+                                 mem_per_cpu=int(args["mem"]*1000), email=args["email_address"],
+                                 submit_path=self.dft_job.work_folder)
 
             if args["package"] == "ORCA":
                 slurmjob.create_orca_jobs([self.dft_job])

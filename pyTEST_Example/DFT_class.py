@@ -132,38 +132,47 @@ class ConformerProcess:
         if self.TSOPT.rxn_ind == None:
             self.TSOPT.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
 
-        print(f"{self.TSOPT.rxn_ind}: Initial TSOPT STATUS: {self.TSOPT.FLAG}\n")
+        print(f"{self.TSOPT.rxn_ind}: TSOPT STATUS: {self.TSOPT.FLAG}\n")
 
-        # Initialize the TSOPT variable if this variable is accessed for the first time
-        # if read from pickle, then skip this
         if self.TSOPT.FLAG in (None, "Initialized"):
+            print(f"No TSOPT job found; let's start from scratch:")
+            print(f"  - Initializing TSOPT job class")
             self.TSOPT.Initialize()
 
-        self.TSOPT.Prepare_Input()
+            print(f"  - Preparing TSOPT job input files")
+            self.TSOPT.Prepare_Input()
 
-        try:
-            print(
-                f"{self.TSOPT.rxn_ind}: TSOPT JOB STATUS: {self.TSOPT.submission_job.status()}\n")
-        except:
-            print(
-                f"{self.TSOPT.rxn_ind}: TSOPT JOB STATUS: NO JOB EXIST. DONE A WHILE AGO?\n")
-
-        if self.TSOPT.FLAG == "Submitted":  # submitted, check if the job is there, if so, wait
-            if not self.TSOPT.submission_job.status() == "FINISHED":  # not finished, job still running/in queue
-                return
-
-        if self.TSOPT.Done():
-            print(f"TSOPT DONE! for {self.TSOPT.rxn_ind}\n")
-            self.TSOPT.Read_Result()
-            self.status = "TS Completed"
-        else:
-            self.status = "TS_optimization"
-            print(f"TSOPT NOT DONE for {self.TSOPT.rxn_ind}!\n")
+            print(f"  - Submitting TSOPT job")
             self.TSOPT.Prepare_Submit()
+            self.status = "TS_optimization"
             if self.SUBMIT_JOB:
                 self.TSOPT.Submit()
+            else:
+                print(f"    * Just kidding! Submission has been turned off.")
+                print(
+                    f"      Set dry_run flag to False if you actually want to submit\n")
+        elif self.TSOPT.FLAG == "FINISHED":
+            print(f"TSOPT job is not currently running - let's check the status!")
 
-        print(f"{self.TSOPT.rxn_ind}: Final TSOPT STATUS: {self.TSOPT.FLAG}\n")
+            if self.TSOPT.Done():
+                print(f"  - TSOPT DONE! Reading results now")
+                self.TSOPT.Read_Result()
+                self.status = "TS Completed"
+            else:
+                self.status = "TS_optimization"
+                print(f"  - TSOPT NOT DONE! Re-submiting job now")
+                if self.SUBMIT_JOB:
+                    self.TSOPT.Submit()
+                else:
+                    print(f"    * Just kidding! Submission has been turned off.")
+                    print(
+                        f"      Set dry_run flag to False if you actually want to submit\n")
+        elif self.TSOPT.FLAG == "Submitted":
+            print(f"TSOPT job is ongoing - check back later!\n")
+        else:
+            print(f"Unrecognized status for TSOPT job! You might want to check it out.\n")
+
+        print(f"{self.TSOPT.rxn_ind}: UPDATED TSOPT STATUS: {self.TSOPT.FLAG}\n")
 
     def run_IRC(self):
         if self.IRC.rxn_ind == None:

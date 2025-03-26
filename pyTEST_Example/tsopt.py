@@ -15,7 +15,7 @@ class TSOPT:
 
         self.rxn_ind = None
 
-    # Ok, actually, this *is* being accessed: it's called in run_tsopt()!
+    # Ok, actually, this *is* being accessed: it's called in ConformerProcess.run_tsopt()!
     # Can we incorporate this into __init__()?
     def Initialize(self, verbose=False):
         args = self.args
@@ -68,7 +68,7 @@ class TSOPT:
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
         Input.lot = self.dft_lot
-        print(self.args['dft_mix_lot'])
+
         Input.mix_lot = [[a[0], convert_orca_to_gaussian(
             a[1])] for a in self.args['dft_mix_lot']]
         Input.jobname = f"{self.rxn_ind}-TSOPT"

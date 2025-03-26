@@ -534,11 +534,9 @@ class QSE_job:
         """
         current_dir = os.getcwd()
         os.chdir(self.job_calculator.work_folder)
-        print(f"Submitting jobs from {os.getcwd()}")
 
         # Execute job submission via qsub
         command = f"qsub {self.script_file}"
-        print(f"command: {command}")
         output = subprocess.run(command, shell=True,
                                 capture_output=True, text=True)
 

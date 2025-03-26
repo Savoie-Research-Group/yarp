@@ -472,9 +472,6 @@ class QSE_job:
                 f.write(f"#$ -M {self.email}\n")
                 f.write(f"#$ -m abe\n")
 
-            f.write(f"#$ -o {self.jobname}.out\n")
-            f.write(f"#$ -e {self.jobname}.err\n")
-
             # Collect info on compute resources
             f.write("\necho Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")

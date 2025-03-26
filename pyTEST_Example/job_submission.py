@@ -438,6 +438,30 @@ class QSE_job:
         self.module_software = module.get(
             "software", "module load orca\n")
 
+    def status(self):
+        """
+        Check the status of the QSE job.
+        """
+        if hasattr(self, "job_id") is False:
+            print(
+                "Haven't submitted this job yet, can not check the status of this job...")
+            return "UNSUBMITTED"
+
+        try:
+            command = f"qstat -j {self.job_id} | grep 'job_state' | awk {'print $NF'}"
+            output = subprocess.run(
+                command, shell=True, capture_output=True, text=True)
+            job_status = output.stdout.strip()
+
+            if job_status == "":
+                # Job ID not found, indicating the job has completed
+                return "FINISHED"
+            else:
+                # Common status: RUNNING and PENDING
+                return job_status
+        except:
+            return "UNKNOWN"
+
     def prepare_submission_script(self):
         """
         Create a QSE submission script based on inputs from class initialization
@@ -460,9 +484,7 @@ class QSE_job:
             f.write(f"#$ -l h_vmem={self.mem}M\n")
 
             # Set up job array for multi-job submissions (default is only 1 job submission)
-            if self.ntasks == 1:
-                f.write("#$ -t 1\n")
-            else:
+            if self.ntasks != 1:
                 raise RuntimeError(
                     "We're not doing this batch job array submission, sorry.")
 
@@ -520,12 +542,9 @@ class QSE_job:
         output = subprocess.run(command, shell=True,
                                 capture_output=True, text=True)
 
-        # save job ID somehow....
-        self.job_id = output.stdout  # need to modify this!??
-        print(f"job ID: {self.job_id}")
-
-        print(f"STDOUT: {output.stdout}")
-        print(f"STDERR: {output.stderr}")
+        # Example stdout expected here:
+        # Your job 1580968 ("TSOPT.586_0") has been submitted
+        self.job_id = output.stdout.split()[2]
 
         # go back to current dir
         os.chdir(current_dir)

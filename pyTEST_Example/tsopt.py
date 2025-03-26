@@ -15,22 +15,21 @@ class TSOPT:
 
         self.rxn_ind = None
 
-    # unsure if this is called properly; self.wf doesn't seem to take effect...
+    # Ok, actually, this *is* being accessed: it's called in run_tsopt()!
     # Can we incorporate this into __init__()?
     def Initialize(self, verbose=False):
         args = self.args
         ind = self.index
-        opt_jobs = dict()
-        running_jobs = []
         scratch_dft = args["scratch_dft"]
-        if len(args["dft_lot"].split()) > 1:
-            dft_lot = "/".join(args["dft_lot"].split())
-        else:
-            dft_lot = args["dft_lot"]
-        # for dft_lot here, convert ORCA/Other calculator to Gaussian
-        # for example: def2-SVP --> def2SVP
-        dft_lot = convert_orca_to_gaussian(dft_lot)
-        self.dft_lot = dft_lot
+
+        self.dft_lot = args.get("dft_lot", "PBE def2-SVP")
+        if args.get("package", "ORCA") == "GAUSSIAN":
+            # I feel like this should be on the user to provide the correct formatting for an external software package
+            # We can make some helpful runtime errors to screen poor Gaussian/ORCA formatting inputs?
+            # Or we ask the user for specific things (i.e. separate entries for basis set and functional)
+            # and then handle the formatting more robustly?
+            self.dft_lot = convert_orca_to_gaussian(self.dft_lot)
+
         # if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
         # Load TS from reaction class and prepare TS jobs
         # Four cases:

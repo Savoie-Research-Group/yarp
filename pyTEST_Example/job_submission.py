@@ -487,7 +487,8 @@ class QSE_job:
 
                 f.write("# Execute ORCA input file\n")
                 f.write(f"cd {self.job_calculator.work_folder}\n")
-                f.write(f"$orca {self.jobname}.in > {self.jobname}.out\n")
+                f.write(
+                    f"$orca {self.job_calculator.orca_input} > {self.job_calculator.output}\n")
             elif self.package == "CREST":
                 # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
                 f.write("CREST stuff\n")

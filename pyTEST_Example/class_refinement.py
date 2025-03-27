@@ -34,11 +34,13 @@ def main(args: dict):
             r = deepcopy(rxn)
             dft_process = RxnProcess(r)
             key = 0
-            dft_process.conformer_key = [key]
-            dft_process.conformers.append(ConformerProcess(r, key))
+
             E, G = xyz_parse(i)
             r.reactant.elements = E
             r.TS_xtb[key] = G
+
+            dft_process.conformer_key = [key]
+            dft_process.conformers.append(ConformerProcess(r, key))
 
             ext_name = os.path.basename(i)
             name = os.path.splitext(ext_name)[0]

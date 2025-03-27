@@ -66,8 +66,8 @@ class SLURM_Job:
         """
         if hasattr(self, "job_id") is False:
             print(
-                "Haven't submitted this job yet, can not check the status of this job...")
-            return "UNSUBMITTED"
+                "No job_id stored, cannot check the status of this job...")
+            return "NO JOB ID"
 
         try:
             command = f"squeue -j {self.job_id} --noheader --format %T"
@@ -77,10 +77,11 @@ class SLURM_Job:
 
             if job_status == "":
                 # Job ID not found, indicating the job has completed
-                return "FINISHED"
+                return "Finished"
             else:
                 # Common status: RUNNING and PENDING
-                return job_status
+                # Discard for the sake of uniformity
+                return "Submitted"
         except:
             return "UNKNOWN"
 
@@ -444,8 +445,8 @@ class QSE_job:
         """
         if hasattr(self, "job_id") is False:
             print(
-                "Haven't submitted this job yet, can not check the status of this job...")
-            return "UNSUBMITTED"
+                "No job_id stored, cannot check the status of this job...")
+            return "NO JOB ID"
 
         try:
             command = f"qstat -j {self.job_id} | grep 'job_state' | awk {'print $NF'}"
@@ -455,10 +456,11 @@ class QSE_job:
 
             if job_status == "":
                 # Job ID not found, indicating the job has completed
-                return "FINISHED"
+                return "Finished"
             else:
                 # Common status: RUNNING and PENDING
-                return job_status
+                # Discard for the sake of uniformity
+                return "Submitted"
         except:
             return "UNKNOWN"
 

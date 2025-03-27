@@ -5,65 +5,110 @@ from job_submission import *
 
 
 class TSOPT:
-    def __init__(self, rxn, index):
-        self.rxn = rxn  # Reaction-specific data
-        self.args = rxn.args     # Shared parameters for all reactions
-        self.index = index  # reaction conformer index
+    """
+    Class to manage the input file generation for and submission of transition state optimization calculations.
+
+    Parameters:
+    -----------
+    rxn : ???
+        reaction object read from pickle file
+
+    index : int
+        index for reaction conformer --> is always zero, I guess?
+
+    Attributes:
+    -----------
+
+    self.rxn : ???
+        reaction object read from pickle file
+
+    self.args : dict
+        YARP settings read from `parameters.yaml` file provided by user at runtime
+
+    self.index : int
+        index for reaction conformer --> is always zero, I guess?
+
+    self.dft_job : ORCA/CREST/GAUSSIAN/etc... class (see pyTEST_Example/wrappers)
+        wrapper object to control the generation of the DFT calculation input files
+
+    self.submission_job :  either SLURM_job or QSE_job class object
+        wrapper object to control the interface with external job scheduler
+
+    self.FLAG : str
+        Attribute that reflects the status of the current TSOPT instance.
+         - Initialized: starting XYZ structure has been selected, but no input files generated yet
+         - 
+
+    self.rxn_ind : str
+        Label applied to uniquely identify the reaction that files are associated with.
+        Combination of self.rxn.reactant_inchi, self.rxn.id, and self.ind
+
+    self.dft_lot : str
+        Level of theory used to run DFT calculation.
+        Basis set is optionally formatted for compatibility with Gaussian.
+
+    self.wf : str
+        Path to repository where TS optimization calculation will be executed in.
+        A directory is created here, if it doesn't already exist.
+
+    self.inp_xyz : str
+        Path to generated XYZ file that will be the starting geometry to run TS optimization on
+
+    """
+
+    def __init__(self, rxn, index, verbose=True):
+        self.rxn = rxn
+        self.args = rxn.args
+        self.index = index
         self.dft_job = None
         self.submission_job = None
-        self.FLAG = None
 
-        self.rxn_ind = None
+        scratch_dft = self.args["scratch_dft"]
 
-    # Ok, actually, this *is* being accessed: it's called in ConformerProcess.run_tsopt()!
-    # Can we incorporate this into __init__()?
-    def Initialize(self, verbose=False):
-        args = self.args
-        ind = self.index
-        scratch_dft = args["scratch_dft"]
-
-        self.dft_lot = args.get("dft_lot", "PBE def2-SVP")
-        if args.get("package", "ORCA") == "GAUSSIAN":
+        self.dft_lot = self.args.get("dft_lot", "PBE def2-SVP")
+        if self.args.get("package", "ORCA") == "GAUSSIAN":
             # I feel like this should be on the user to provide the correct formatting for an external software package
             # We can make some helpful runtime errors to screen poor Gaussian/ORCA formatting inputs?
             # Or we ask the user for specific things (i.e. separate entries for basis set and functional)
             # and then handle the formatting more robustly?
             self.dft_lot = convert_orca_to_gaussian(self.dft_lot)
 
-        # if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
-        # Load TS from reaction class and prepare TS jobs
-        # Four cases:
-        # 1. skip_low_IRC: read TS_xtb.
-        # 2. skip_low_TS: read TS_guess.
-        # 3. constriaed_ts: read constrained_TS
-        # 3. Otherwise, read the intended TS.
-        if self.rxn_ind == None:
-            self.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{ind}"
-        self.wf = f"{scratch_dft}/{self.rxn_ind}"
+        # Set reaction index label
+        self.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.index}"
         if verbose:
             print(f"rxn_index: {self.rxn_ind}\n", flush=True)
 
+        # Generate working folder
+        self.wf = f"{scratch_dft}/{self.rxn_ind}"
         if os.path.isdir(self.wf) is False:
             os.mkdir(self.wf)
+
+        # Generate initial guess structure for TS opt as an XYZ file
         self.inp_xyz = f"{self.wf}/{self.rxn_ind}.xyz"
-        if args["constrained_TS"] is True:
+        if self.args["constrained_TS"] is True:
             xyz_write(self.inp_xyz, self.rxn.reactant.elements,
-                      self.rxn.constrained_TS[ind])
-        elif args["skip_low_TS"] is True:
+                      self.rxn.constrained_TS[self.index])
+        elif self.args["skip_low_TS"] is True:
             xyz_write(self.inp_xyz, self.rxn.reactant.elements,
-                      self.rxn.TS_guess[ind])
-        elif args["skip_low_IRC"] is True:
+                      self.rxn.TS_guess[self.index])
+        elif self.args["skip_low_IRC"] is True:
             xyz_write(self.inp_xyz, self.rxn.reactant.elements,
-                      self.rxn.TS_xtb[ind])
+                      self.rxn.TS_xtb[self.index])
         else:
             xyz_write(self.inp_xyz, self.rxn.reactant.elements,
-                      self.rxn.TS_xtb[ind])
+                      self.rxn.TS_xtb[self.index])
+
         self.FLAG = "Initialized"
 
     def Prepare_Input(self):
-        #####################
-        # Prepare DFT Input #
-        #####################
+        """
+        Set up input files to run DFT TSOPT calculation.
+        Involves a call to Calculator() class.
+
+        Modified attributes:
+        --------------------
+        self.dft_job : set to whatever comes out out Calculator.Setup() --> depends on 'package' field set by user
+        """
         Input = Calculator(self.args)
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
@@ -77,6 +122,13 @@ class TSOPT:
         self.dft_job = Input.Setup(self.args['package'], self.args)
 
     def Prepare_Submit(self):
+        """
+        Generate submission scripts to send ORCA or Gaussian jobs to external scheduler (SLURM or QSE)
+
+        Modified attributes:
+        --------------------
+        self.submission_job : initialized as either SLURM_job or QSE_job class object
+        """
         args = self.args
 
         if args["scheduler"] == "SLURM":
@@ -106,11 +158,29 @@ class TSOPT:
                 "Currently supported schedulers are SLURM and QSE!")
 
     def Submit(self):
+        """
+        Submit DFT job to external scheduler
+
+        Modified attributes:
+        --------------------
+        self.FLAG : set to "Submitted"
+        """
         self.submission_job.submit()
 
         print(f"Submitted TSOPT job for {self.rxn_ind}\n")
 
         self.FLAG = "Submitted"
+
+    def check_running_job(self):
+        """
+        See if a previously submitted job is still running
+
+        Modified attributes:
+        --------------------
+        self.FLAG : update to reflect the current job status
+        """
+
+        self.FLAG = self.submission_job.status()
 
     def Done(self):
         FINISH = False
@@ -120,7 +190,7 @@ class TSOPT:
 
     def Read_Result(self):
 
-        self.FLAG = "Finished with Error"
+        self.FLAG = "TSOPT Error"
         if self.dft_job.calculation_terminated_normally() and self.dft_job.optimization_converged() and self.dft_job.is_TS():
             _, geo = self.dft_job.get_final_structure()
             if self.dft_lot not in self.rxn.TS_dft.keys():
@@ -137,4 +207,4 @@ class TSOPT:
 
             print(
                 f"rxn: {self.rxn_ind}, ts_dft SPE: {self.rxn.TS_dft[self.dft_lot][conf_i]['SPE']}\n")
-            self.FLAG = "Finished with Result"
+            self.FLAG = "TSOPT Completed"

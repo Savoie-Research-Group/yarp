@@ -107,6 +107,15 @@ class RxnProcess:
 
 
 class ConformerProcess:
+    """
+    self.status : str
+        I think I want to change this to basically mirror the TSOPT.FLAG/IRC.FLAG/RPOPT.FLAG status.
+        That way, there's only one set of labels to keep track of. Let's think about this more?
+
+    self.steps : dict
+        Currently un-used; not sure if it will be helpful...
+    """
+
     def __init__(self, rxn, conformer_id):
         self.rxn = rxn
         self.conformer_id = conformer_id
@@ -122,22 +131,17 @@ class ConformerProcess:
         self.TSOPT = TSOPT(self.rxn, self.conformer_id)
         self.IRC = IRC(self.rxn, self.conformer_id)
 
-    # for these processes, it is a class, and there is a FLAG (status)
-    # the flag will tell whether the job is submitted/finished with error/finished with result
-    # if finished with error : then this conformer is terminated
-    # if finished with result: continue to the next process
-    # if submitted: check if the job is finished, if not, wait
-
     def run_TSOPT(self):
-        if self.TSOPT.rxn_ind == None:
-            self.TSOPT.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
+        print(
+            f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}\n")
 
-        print(f"{self.TSOPT.rxn_ind}: TSOPT STATUS: {self.TSOPT.FLAG}\n")
+        # Look to see if submitted job has completed
+        if self.TSOPT.FLAG == "Submitted":
+            self.TSOPT.check_running_job()
 
-        if self.TSOPT.FLAG in (None, "Initialized"):
+        # Go through the rest of the possible status options
+        if self.TSOPT.FLAG == "Initialized":
             print(f"No TSOPT job found; let's start from scratch:")
-            print(f"  - Initializing TSOPT job class")
-            self.TSOPT.Initialize()
 
             print(f"  - Preparing TSOPT job input files")
             self.TSOPT.Prepare_Input()
@@ -151,7 +155,7 @@ class ConformerProcess:
                 print(f"    * Just kidding! Submission has been turned off.")
                 print(
                     f"      Set dry_run flag to False if you actually want to submit\n")
-        elif self.TSOPT.FLAG == "FINISHED":
+        elif self.TSOPT.FLAG == "Finished":
             print(f"TSOPT job is not currently running - let's check the status!")
 
             if self.TSOPT.Done():
@@ -172,7 +176,8 @@ class ConformerProcess:
         else:
             print(f"Unrecognized status for TSOPT job! You might want to check it out.\n")
 
-        print(f"{self.TSOPT.rxn_ind}: UPDATED TSOPT STATUS: {self.TSOPT.FLAG}\n")
+        print(
+            f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}\n")
 
     def run_IRC(self):
         if self.IRC.rxn_ind == None:

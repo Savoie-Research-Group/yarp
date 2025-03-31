@@ -84,6 +84,8 @@ class Calculator:
         self.grid = 2
         self.writedown_xyz = True
         if args['verbose']:
+            print("Hello from calculator.py --> __init__()")
+            print(f"self.jobname: {self.jobname}\n")
             print(f"self.lot: {self.lot}\n")
             print(f"self.mix_basis: {self.mix_basis}\n")
             print(f"self.mix_lot:   {self.mix_lot}\n")

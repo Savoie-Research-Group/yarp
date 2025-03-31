@@ -56,14 +56,13 @@ class TSOPT:
 
     """
 
-    def __init__(self, rxn, index, verbose=True):
+    def __init__(self, rxn, index):
         self.rxn = rxn
         self.args = rxn.args
         self.index = index
         self.dft_job = None
         self.submission_job = None
-
-        scratch_dft = self.args["scratch_dft"]
+        self.verbose = rxn.args.get("verbose", False)
 
         self.dft_lot = self.args.get("dft_lot", "PBE def2-SVP")
         if self.args.get("package", "ORCA") == "GAUSSIAN":
@@ -75,11 +74,32 @@ class TSOPT:
 
         # Set reaction index label
         self.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.index}"
-        if verbose:
-            print(f"rxn_index: {self.rxn_ind}\n", flush=True)
+        if self.verbose:
+            print("Hello from tsopt.py --> __init__()")
+            print(f"rxn_index: {self.rxn_ind}\n")
+
+        self.wf = None
+        self.inp_xyz = None
+
+        self.FLAG = "Initialized"
+
+    def Prepare_Input(self):
+        """
+        Generate a working directory and the initial XYZ file guess structure.
+        Set up input files to run DFT TSOPT calculation.
+        Involves a call to Calculator() class.
+
+        Modified attributes:
+        --------------------
+        self.wf : set to {self.args["scratch_dft"]}/{self.rxn_ind}
+
+        self.inp_xyz : set to {self.wf}/{self.rxn_ind}.xyz
+
+        self.dft_job : set to whatever comes out out Calculator.Setup() --> depends on 'package' field set by user
+        """
 
         # Generate working folder
-        self.wf = f"{scratch_dft}/{self.rxn_ind}"
+        self.wf = f"{self.args['scratch_dft']}/{self.rxn_ind}"
         if os.path.isdir(self.wf) is False:
             os.mkdir(self.wf)
 
@@ -98,17 +118,6 @@ class TSOPT:
             xyz_write(self.inp_xyz, self.rxn.reactant.elements,
                       self.rxn.TS_xtb[self.index])
 
-        self.FLAG = "Initialized"
-
-    def Prepare_Input(self):
-        """
-        Set up input files to run DFT TSOPT calculation.
-        Involves a call to Calculator() class.
-
-        Modified attributes:
-        --------------------
-        self.dft_job : set to whatever comes out out Calculator.Setup() --> depends on 'package' field set by user
-        """
         Input = Calculator(self.args)
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
@@ -117,6 +126,10 @@ class TSOPT:
         Input.mix_lot = [[a[0], convert_orca_to_gaussian(
             a[1])] for a in self.args['dft_mix_lot']]
         Input.jobname = f"{self.rxn_ind}-TSOPT"
+
+        if self.verbose:
+            print("Hello from tsopt.py --> prepare_input()")
+            print(f"rxn_index: {self.rxn_ind}\n")
 
         Input.jobtype = "tsopt"
         self.dft_job = Input.Setup(self.args['package'], self.args)

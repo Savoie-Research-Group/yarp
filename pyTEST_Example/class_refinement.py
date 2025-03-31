@@ -27,6 +27,10 @@ def main(args: dict):
     else:
         rxns = load_pickle("SINGLE_RXN.p")
         rxn = rxns[0]
+        print(f"rxn object is type: {type(rxn)}")
+        print(f"rxn.reactant object is type: {type(rxn.reactant)}")
+        print(f"rxn.args object is type: {type(rxn.args)}")
+        # exit()
         rxn.args = args
 
         dft_rxns = []
@@ -42,17 +46,20 @@ def main(args: dict):
             dft_process.conformer_key = [key]
             dft_process.conformers.append(ConformerProcess(r, key))
 
+            # Overwrite default naming convention of rxn_ind using input XYZ file names
             ext_name = os.path.basename(i)
             name = os.path.splitext(ext_name)[0]
 
-            rxn_ind = name
-
-            dft_process.conformers[0].TSOPT.rxn_ind = rxn_ind
-            dft_process.conformers[0].IRC.rxn_ind = rxn_ind
+            dft_process.conformers[0].TSOPT.rxn_ind = name
+            dft_process.conformers[0].IRC.rxn_ind = name
+            if args['verbose']:
+                print("Hello from class_refinement.py --> main() --> for xyz_files")
+                print(
+                    f"TSOPT rxn_ind: {dft_process.conformers[0].TSOPT.rxn_ind}, name: {name}\n")
+                print(
+                    f"IRC rxn_ind: {dft_process.conformers[0].IRC.rxn_ind}, name: {name}\n")
 
             dft_rxns.append(dft_process)
-            if args['verbose']:
-                print(f"rxn_ind: {rxn_ind}, name: {name}\n")
 
     # run TS optimization + IRC
     from tabulate import tabulate
@@ -63,8 +70,13 @@ def main(args: dict):
         dft_rxn.rxn.args = args
         dft_rxn.args = args
         if args['verbose']:
+            print("Hello from class_refinement.py --> main() --> for dft_rxns")
             print(
                 f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
+            print(
+                f"TSOPT rxn_ind: {dft_rxn.conformers[0].TSOPT.rxn_ind}")
+            print(
+                f"IRC rxn_ind: {dft_rxn.conformers[0].IRC.rxn_ind}")
 
         # process all the conformers
         for conf in dft_rxn.conformers:

@@ -9,7 +9,7 @@ DOC_PATH="docs/build/html/index.html"
 
 # Check if the documentation exists
 if [ -f "$DOC_PATH" ]; then
-    echo "Opening documentation...Welcome to YARP!"
+    echo "\nOpening documentation...Welcome to YARP!\n"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         open "$DOC_PATH"  # macOS
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then

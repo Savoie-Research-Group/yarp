@@ -9,19 +9,23 @@ from DFT_class import *
 
 from initialize import DFT_Initialize, load_pickle, write_pickle
 
+def main(args:dict):
 
-def main(args: dict):
-
-    # Process input and set some missing fields with default values
     DFT_Initialize(args)
+    print(args['write_memory_in_slurm_job'])
+    # finish laod initial TSs into a dict
+    scratch=args["scratch"]
+    if os.path.isdir(args["scratch"]) is False: os.mkdir(args["scratch"])
+    if len(args["dft_lot"].split()) > 1: dft_lot="/".join(args["dft_lot"].split())
+    else: dft_lot=args["dft_lot"]
+    #if "solvation" in args.keys(): args["solvation_model"], args["solvent"]=args["solvation"].split('/')
+    #else: args["solvation_model"], args["solvent"]="CPCM", False
+    args["scratch_dft"]=f'{args["scratch"]}'
+    if os.path.isdir(args["scratch"]) is False: os.mkdir(args["scratch"])
+    if os.path.isdir(args["scratch_dft"]) is False: os.mkdir(args["scratch_dft"])
 
-    if args.get("dry_run", False):
-        print("Dry run selected: No calculations will be submitted to the scheduler")
+    xyz_files=[args["input"]+"/"+i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, "*.xyz")]
 
-    xyz_files = [args["input"]+"/" +
-                 i for i in os.listdir(args["input"]) if fnmatch.fnmatch(i, "*.xyz")]
-
-    # Either read in previously run calculations or generate new input files
     if os.path.isfile("REFINE.p"):
         dft_rxns = load_pickle("REFINE.p")
     else:
@@ -30,7 +34,10 @@ def main(args: dict):
         print(f"rxn object is type: {type(rxn)}")
         print(f"rxn.reactant object is type: {type(rxn.reactant)}")
         print(f"rxn.args object is type: {type(rxn.args)}")
+<<<<<<< HEAD
+=======
         # exit()
+>>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
         rxn.args = args
 
         dft_rxns = []
@@ -38,8 +45,15 @@ def main(args: dict):
             r = deepcopy(rxn)
             dft_process = RxnProcess(r)
             key = 0
+<<<<<<< HEAD
+            dft_process.conformer_key = [key]
+            dft_process.conformers.append(ConformerProcess(r, key))
+            #dft_process.TS_xtb = dict()
+            E, G=xyz_parse(i)
+=======
 
             E, G = xyz_parse(i)
+>>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
             r.reactant.elements = E
             r.TS_xtb[key] = G
 
@@ -66,9 +80,11 @@ def main(args: dict):
     STATUS = []
 
     for count, dft_rxn in enumerate(dft_rxns):
+        #dft_rxn.get_TS_conformers()
         # overwrite the args
         dft_rxn.rxn.args = args
         dft_rxn.args = args
+        #if args['verbose']: print(f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
         if args['verbose']:
             print("Hello from class_refinement.py --> main() --> for dft_rxns")
             print(
@@ -82,6 +98,7 @@ def main(args: dict):
         for conf in dft_rxn.conformers:
             print("-***-")
             print(f"Processing reaction {conf.TSOPT.rxn_ind}")
+
             if args.get("dry_run", False):
                 conf.SUBMIT_JOB = False  # Prepare job submission script, but do not submit
             else:
@@ -92,23 +109,19 @@ def main(args: dict):
             conf.IRC.args = args
 
             conf.run_TSOPT()
-            if args.get("do_irc", True):
-                conf.run_IRC()
-            else:
-                print("IRC validation of optimized TS turned off!")
+            conf.run_IRC()
 
-            STATUS.append([conf.TSOPT.rxn_ind, conf.status,
-                          conf.TSOPT.FLAG, conf.IRC.FLAG])
+            STATUS.append([conf.TSOPT.rxn_ind, conf.status, conf.TSOPT.FLAG, conf.IRC.FLAG])
+    
+    #table = tabulate(STATUS, headers=["RXN_CONF", "Status", "TSOPT-Status", "IRC-Status"], tablefmt="grid")
+    #print(table)
 
-    # tabulate and print status of TSOPT/IRC calcs
-    table = tabulate(STATUS, headers=[
-                     "RXN_CONF", "Status", "TSOPT-Status", "IRC-Status"], tablefmt="grid")
-    print(table)
-
+    write_table_with_title(STATUS, title = "Transition State",
+                headers=["RXN_CONF", "Status", "TSOPT-Status", "IRC-Status"])
     # write down a report of rxn, conformer, and status
-    write_pickle(args.get("scratch")+"/REFINE.p", dft_rxns)
+    write_pickle("REFINE.p", dft_rxns)
 
-
-if __name__ == "__main__":
-    parameters = yaml.safe_load(open(sys.argv[1], "r"))
+if __name__=="__main__":
+    parameters = sys.argv[1]
+    parameters = yaml.load(open(parameters, "r"), Loader=yaml.FullLoader)
     main(parameters)

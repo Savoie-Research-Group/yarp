@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+import time
 
 # for parallel parallel jobs (e.g., multiple jobs in parallel, each asks for multiple cpus), check the below contents to see if it works
 '''
@@ -15,11 +16,8 @@ wait
 '''
 # compared with directly call crest in each line
 
-
 class SLURM_Job:
-    def __init__(self, submit_path='.', partition='standby', time=4,
-                 jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000,
-                 specify_array=False, email="", orca_module=None):
+    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False, email="", write_memory=True, orca_module=None):
         """
         Initialize slurm job parameters
         Time needs to be specify in hours
@@ -41,10 +39,12 @@ class SLURM_Job:
         self.orca_module_prereqs = orca_module.get(
             "prereqs", "module unload openmpi \nmodule load intel-mkl \n")
         self.orca_module_software = orca_module.get(
-            "software", "export PATH='/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH' \nexport LD_LIBRARY_PATH='/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH' \nexport PATH='/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH' \nexport LD_LIBRARY_PATH='/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH'\n")
+            "software", 'export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH" \nexport LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH" \nexport PATH="/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH" \nexport LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"\n')
 
         # Zhao's note: add Email notification
         self.email = email
+
+        self.write_memory = write_memory
 
     def submit(self):
         """
@@ -58,6 +58,7 @@ class SLURM_Job:
                                 capture_output=True, text=True)
         # go back to current dir
         os.chdir(current_dir)
+        print(f"output.stdout.split(): {output.stdout.split()}")
         self.job_id = output.stdout.split()[-1]
 
     def status(self):
@@ -99,11 +100,12 @@ class SLURM_Job:
             f.write(f"#SBATCH -A {self.partition}\n")
             f.write(f"#SBATCH --nodes={self.node}\n")
             f.write(f"#SBATCH --ntasks-per-node={self.ppn}\n")
-            f.write(f"#SBATCH --mem {self.mem*self.ppn}MB\n")
+            if self.write_memory:
+                f.write(f"#SBATCH --mem {self.mem*self.ppn}MB\n")
 
             if len(self.email) > 0:
                 f.write(f"#SBATCH --mail-user={self.email}\n")
-                f.write(f"#SBATCH --mail-type=BEGIN,END,FAIL\n")
+                f.write(f"#SBATCH --mail-type=END,FAIL\n")
             f.write(f"#SBATCH --time {self.time}:00:00\n\n")
             f.write("echo Running on host `hostname`\n")
             f.write("echo Start Time is `date`\n\n")
@@ -278,9 +280,9 @@ class SLURM_Job:
             # Zhao's note: try fixing crest env
             # add module load anaconda
             # conda activate <your current conda env>
-            # This is just a fix on Purdue's machine, you can turn it off#
+            #This is just a fix on Purdue's machine, you can turn it off#
             # Zhao's note: purdue changed its default anaconda, switch!
-            # f.write(f"module load anaconda\n")
+            #f.write(f"module load anaconda\n")
             f.write(f"module load anaconda/2022.10-py39\n")
             f.write(f"conda activate copy-classy-yarp\n")
 
@@ -340,8 +342,6 @@ class SLURM_Job:
             except OSError:
                 pass
     '''
-
-
 class QSE_job:
     """
     Base class to manage submission of external jobs to Univa Grid Engine (QSE) resource manager.

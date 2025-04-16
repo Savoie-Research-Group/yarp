@@ -3,6 +3,7 @@ import os
 import pickle
 from utils import *
 
+from calculator import convert_basis_set
 
 def load_pickle(rxns_pickle):
     rxns = pickle.load(open(rxns_pickle, 'rb'))
@@ -20,6 +21,11 @@ def DFT_Initialize(args):
     if "scheduler" not in keys:
         args['scheduler'] = 'SLURM'
 
+    if "dry_run" not in keys:
+        args['dry_run'] = False
+    else:
+        args['dry_run'] = bool(args['dry_run'])
+
     if "verbose" not in keys:
         args['verbose'] = False
     else:
@@ -33,17 +39,30 @@ def DFT_Initialize(args):
     else:
         args["solvation_model"], args["solvent"] = "CPCM", False
 
+    if "DFT_Folder" not in keys:
+        args["DFT_Folder"] = "DFT"
+
+    if len(args["dft_lot"].split()) > 1:
+        dft_lot = "/".join(args["dft_lot"].split())
+    else:
+        dft_lot = args["dft_lot"]
+    # for dft_lot here, convert ORCA/Other calculator to Gaussian
+    # for example: def2-SVP --> def2SVP
+    dft_lot = dft_lot.split(
+        '/')[0] + '/' + convert_basis_set(dft_lot.split('/')[1], args['package'])
+
+    args['dft_lot'] = dft_lot
+
     if os.path.exists(args.get("scratch", "")) is False:
         raise RuntimeError(
             "Missing 'scratch' field to specify where output should go! Please provide!")
 
-    args["scratch_dft"] = f'{args["scratch"]}/DFT'
+    args["scratch_dft"] = f'{args["scratch"]}/{args["DFT_Folder"]}'
     args["scratch_crest"] = f'{args["scratch"]}/conformer'
     if os.path.isdir(args["scratch"]) is False:
         os.mkdir(args["scratch"])
     if os.path.isdir(args["scratch_dft"]) is False:
         os.mkdir(args["scratch_dft"])
-
     args["reaction_data"] = args.get(
         "reaction_data", args["scratch"]+"/reaction.p")
 
@@ -71,9 +90,15 @@ def DFT_Initialize(args):
 
     # Zhao's note: convert arg['mem'] into float, then convert to int later #
     args['mem'] = float(args['mem'])
-    # why are there two of these???? - ERM
     args['dft_nprocs'] = int(args['dft_nprocs'])
     args['dft_ppn'] = int(args['dft_ppn'])
+
+    # Zhao's note: add special keyword for IRC to run on other partitions
+    if not 'irc_partition' in keys:
+        args['irc_partition'] = args['partition']
+    if not 'irc_wt' in keys:
+        args['irc_wt'] = args['dft_wt']
+
     # Zhao's note: process mix_basis input keywords in the yaml file
     if "dft_mix_basis" in keys:
         process_mix_basis_input(args)
@@ -88,11 +113,15 @@ def DFT_Initialize(args):
     else:
         args['dft_TS_Active_Atoms'] = bool(args['dft_TS_Active_Atoms'])
 
+    if not 'numhess' in keys:
+        args['numhess'] = False
+    else:
+        args['numhess'] = bool(args['numhess'])
+
     if os.path.exists(args["reaction_data"]) is False:
         print("No reactions are provided for refinement....")
         return
-
-    # This code is untested, possibly? - ERM
+        # exit()
     rxns = load_pickle(args["reaction_data"])
     for count, i in enumerate(rxns):
         rxns[count].args = args
@@ -103,19 +132,60 @@ def DFT_Initialize(args):
             # Get the elements that are non-zero #
             RP_diff_Atoms = np.where(adj_diff_RP.any(axis=1))[0]
             if (args['verbose']):
-                print(
-                    f"Atoms {RP_diff_Atoms} have changed between reactant/product\n")
+                for ATOM in RP_diff_Atoms:
+                    print(
+                        f"Atoms {i.reactant.elements[ATOM]}-{ATOM} have changed between reactant/product\n")
             rxns[count].args['Reactive_Atoms'] = RP_diff_Atoms
         treat_mix_lot_metal_firstLayer(
-            args, i.reactant.elements, i.reactant.geo)
+            rxns[count].args, i.reactant.elements, i.reactant.geo)
         treat_mix_lot_metal_firstLayer(
-            args, i.product.elements,  i.product.geo)
+            rxns[count].args, i.product.elements,  i.product.geo)
 
     # Run DFT optimization first to get DFT energy
     # print("Running DFT optimization")
     # print(rxns)
-    # Skip Reactant/Product to just run TS Optimization
-    if not 'rp_opt' in keys:
-        args['rp_opt'] = True
+
+    # Skip Reactant/Product Optimization
+    if not 'dft_run_rp' in keys:
+        # default, skip rp, sometimes you only need ts
+        args['dft_run_rp'] = False
     else:
-        args['rp_opt'] = bool(args['rp_opt'])
+        args['dft_run_rp'] = bool(args['dft_run_rp'])
+
+    # Skip TS Optimization
+    if not 'dft_run_ts' in keys:
+        # default, run ts, sometimes you only need ts
+        args['dft_run_ts'] = True
+    else:
+        args['dft_run_ts'] = bool(args['dft_run_ts'])
+
+    if not 'selected_conformers' in keys:
+        args['selected_conformers'] = []
+    else:
+        if isinstance(args['selected_conformers'], str):
+            args['selected_conformers'] = [
+                int(a) for a in args['selected_conformers'].split(',')]
+        else:
+            args['selected_conformers'] = [int(args['selected_conformers'])]
+
+    if not "write_memory_in_slurm_job" in keys:
+        args['write_memory_in_slurm_job'] = True
+    else:
+        args['write_memory_in_slurm_job'] = bool(
+            args['write_memory_in_slurm_job'])
+
+    # Whether to separate reactant/product if bi-molecular rxn
+    if not 'separate_reactant' in keys:
+        args['separate_reactant'] = True
+    else:
+        args['separate_reactant'] = bool(args['separate_reactant'])
+
+    if not 'separate_product' in keys:
+        args['separate_product'] = True
+    else:
+        args['separate_product'] = bool(args['separate_product'])
+
+    if 'Crest_NoRefTopology' not in [i for i in args.keys()]:
+        args['Crest_NoRefTopology'] = True
+    else:
+        args['Crest_NoRefTopology'] = bool(args['Crest_NoRefTopology'])

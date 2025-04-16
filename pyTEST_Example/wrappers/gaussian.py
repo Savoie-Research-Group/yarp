@@ -102,6 +102,24 @@ class Gaussian:
         gjf_exist = False
         if os.path.exists(self.gjf): gjf_exist = True
 
+        # Process Mix basis set
+        if self.mix_basis and not self.jobtype.lower()=='irc': # for IRC currently ignore the mix basis set because of syntax reason
+            print(f"self.mix_lot: {self.mix_lot}\n")
+            # check by element or check by index
+            functional        = self.lot.split('/')[0]
+            general_basis_set = self.lot.split('/')[-1]
+            # change basis set to be able to use mix-basis set
+            self.lot = functional + '/' + "gen"
+            for count_i, element in enumerate(self.elements):
+                mix_basis_summary = {}
+                atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
+                #atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
+                print(f"atom_mix_basis: {atom_mix_basis}")
+                # apply the general basis set to the atom
+                if atom_mix_basis == "": atom_mix_basis = [general_basis_set, count_i]
+                self.Process_atom_mix_basis(atom_mix_basis)
+            
+
         with open(self.gjf, "w") as f:
             f.write(f"%NProcShared={self.nproc}\n")
             f.write(f"%Mem={self.mem*self.nproc}MB\n")
@@ -150,14 +168,8 @@ class Gaussian:
                 f.write("solventname=newsolvent\n")
                 f.write(f"eps={self.dielectric}\n\n")
             # check atom mix basis set
-            if self.mix_basis and not self.jobtype.lower()=='irc': # for IRC currently ignore the mix basis set because of syntax reason
-                # check by element or check by index
-                for count_i, element in enumerate(self.elements):
-                    mix_basis_summary = {}
-                    atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
-                    self.Process_atom_mix_basis(atom_mix_basis)
-                self.write_gaussian_specific_basis_set(f)
-                f.write("\n\n")
+            self.write_gaussian_specific_basis_set(f)
+            f.write("\n\n")
 
     def execute(self):
         """

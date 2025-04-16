@@ -1,3 +1,4 @@
+import os
 from utils import *
 from calculator import *
 
@@ -16,20 +17,16 @@ class IRC:
 
         self.rxn_ind = None
 
+        self.dft_lot = self.args['dft_lot']
+
+        if self.dft_lot not in self.rxn.IRC_dft.keys():
+            self.rxn.IRC_dft[self.dft_lot] = dict()
+
     def Initialize(self):
         args = self.args
         ind = self.index
 
         scratch_dft = args["scratch_dft"]
-
-        if len(args["dft_lot"].split()) > 1:
-            dft_lot = "/".join(args["dft_lot"].split())
-        else:
-            dft_lot = args["dft_lot"]
-        # for dft_lot here, convert ORCA/Other calculator to Gaussian
-        # for example: def2-SVP --> def2SVP
-        dft_lot = convert_orca_to_gaussian(dft_lot)
-        self.dft_lot = dft_lot
 
         # if self.rxn_ind == None:
         #    self.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{ind}"
@@ -61,6 +58,8 @@ class IRC:
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
         Input.jobname = f"{self.rxn_ind}-IRC"
+        Input.mix_lot = [[a[0], convert_basis_set(
+            a[1], self.args['package'])] for a in self.args['dft_mix_lot']]
         Input.jobtype = "irc"
         # dft_job         = Input.Setup(args['package'], args)
         self.dft_job = Input.Setup(self.args['dft_irc_package'], self.args)
@@ -73,16 +72,25 @@ class IRC:
 
     def Prepare_Submit(self):
         args = self.args
-        slurmjob = SLURM_Job(jobname=f"IRC.{self.rxn_ind}", ppn=int(
-            args["dft_ppn"]), partition=args["partition"], time=args["dft_wt"],
-            mem_per_cpu=int(int(args["mem"])*1000), email=args["email_address"])
+        if args['scheduler'] == 'SLURM':
+            job = SLURM_Job(jobname=f"IRC.{self.rxn_ind}", ppn=int(args["dft_ppn"]), partition=args["irc_partition"], time=args["irc_wt"], mem_per_cpu=int(
+                int(args["mem"])*1000), email=args["email_address"], write_memory=args['write_memory_in_slurm_job'])
 
-        if args["dft_irc_package"] == "ORCA":
-            slurmjob.create_orca_jobs([self.dft_job])
-        elif args["dft_irc_package"] == "Gaussian":
-            slurmjob.create_gaussian_jobs([self.dft_job])
+            if args["dft_irc_package"] == "ORCA":
+                job.create_orca_jobs([self.dft_job])
+            elif args["dft_irc_package"] == "Gaussian":
+                job.create_gaussian_jobs([self.dft_job])
 
-        self.submission_job = slurmjob
+        elif args["scheduler"] == "QSE":
+            job = QSE_job(package=args["package"], jobname=f"IRC.{self.rxn_ind}",
+                 module=args.get("module", None), job_calculator=self.dft_job,
+                 queue=args["partition"], ncpus=args["dft_nprocs"],
+                 mem=int(args["mem"]*1000), time=args["dft_wt"],
+                 ntasks=1, email=args["email_address"])
+
+            job.prepare_submission_script()
+
+        self.submission_job = job
 
     def Submit(self):
         self.submission_job.submit()
@@ -90,6 +98,17 @@ class IRC:
         print(f"Submitted IRC job for {self.rxn_ind}\n")
 
         self.FLAG = "Submitted"
+
+    def check_running_job(self):
+        """
+        See if a previously submitted job is still running
+
+        Modified attributes:
+        --------------------
+        self.FLAG : update to reflect the current job status
+        """
+
+        self.FLAG = self.submission_job.status()
 
     def Read_Result(self):
         self.FLAG = "Finished with Error"
@@ -111,8 +130,6 @@ class IRC:
             return
         if job_success is False:
             return
-        if dft_lot not in rxn.IRC_dft.keys():
-            rxn.IRC_dft[dft_lot] = dict()
         rxn.IRC_dft[dft_lot][conf_i] = dict()
         rxn.IRC_dft[dft_lot][conf_i]["node"] = [G1, G2]
         rxn.IRC_dft[dft_lot][conf_i]["TS"] = TSG

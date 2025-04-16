@@ -40,7 +40,12 @@ class OPT:
         self.inchi = inchi
         self.inchi_dict = Inchi_dict
 
-        print(f"self.inchi_dict : {self.inchi_dict}\n")
+        if self.args["verbose"]:
+            print(f"self.inchi_dict : {self.inchi_dict}\n")
+        
+        self.dft_lot = self.args['dft_lot']
+        self.dft_dict = dict()
+        self.dft_dict[self.dft_lot] = {}
 
     def Initialize(self, verbose=False):
         args = self.args
@@ -76,8 +81,6 @@ class OPT:
         # Finally, eliminate the numbers in E and put it back into inchi_dict[inchi]
         E = [''.join(i for i in a if not i.isdigit()) for a in E]
 
-        print(f"E: {E}, G: {G}, Q: {Q}\n")
-
         self.multiplicity = check_multiplicity(
             inchi, E, args["multiplicity"], Q)
         wf = f"{dft_folder}/{inchi}"
@@ -89,14 +92,7 @@ class OPT:
         self.inp_xyz = inp_xyz
         xyz_write(inp_xyz, E, G)
         if args['verbose']:
-            print(f"inchi: {inchi}, mix_lot: {mix_basis_dict[inchi]}\n")
-
-        # for dft_lot here, convert ORCA/Other calculator to Gaussian
-        # for example: def2-SVP --> def2SVP
-        if len(args["dft_lot"].split()) > 1:
-            dft_lot = "/".join(args["dft_lot"].split())
-        dft_lot = convert_orca_to_gaussian(dft_lot)
-        self.dft_lot = dft_lot
+            print(f"inchi: {inchi}, mix_lot: {self.mix_basis_dict}\n")
 
         self.FLAG = "Initialized"
 
@@ -111,7 +107,8 @@ class OPT:
         Input.jobname = f"{inchi}-OPT"
         Input.jobtype = "opt"
         Input.lot = self.dft_lot
-        Input.mix_lot = self.mix_basis_dict
+        Input.mix_lot = [[a[0], convert_basis_set(
+            a[1], self.args['package'])] for a in self.mix_basis_dict]
         Input.charge = self.Q
         Input.multiplicity = self.multiplicity
         dft_job = Input.Setup(self.args['package'], self.args)
@@ -121,15 +118,24 @@ class OPT:
     def Prepare_Submit(self):
         args = self.args
 
-        slurmjob = SLURM_Job(jobname=f"OPT.{self.inchi}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(
-            args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"])
+        if args['scheduler'] == "SLURM":
+            job = SLURM_Job(jobname=f"OPT.{self.inchi}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(
+                args["mem"]*args["dft_nprocs"]/args["dft_ppn"]*1000), email=args["email_address"], write_memory=args['write_memory_in_slurm_job'])
 
-        if args["package"] == "ORCA":
-            slurmjob.create_orca_jobs([self.dft_job])
-        elif args["package"] == "Gaussian":
-            slurmjob.create_gaussian_jobs([self.dft_job])
+            if args["package"] == "ORCA":
+                job.create_orca_jobs([self.dft_job])
+            elif args["package"] == "Gaussian":
+                job.create_gaussian_jobs([self.dft_job])
 
-        self.submission_job = slurmjob
+        elif args["scheduler"] == "QSE":
+            job = QSE_job(package=args["package"], jobname=f"OPT.{self.inchi}",
+                 module=args.get("module", None), job_calculator=self.dft_job,
+                 queue=args["partition"], ncpus=args["dft_nprocs"],
+                 mem=int(args["mem"]*1000), time=args["dft_wt"],
+                 ntasks=1, email=args["email_address"])
+            job.prepare_submission_script()
+
+        self.submission_job = job
 
     def Submit(self):
         self.submission_job.submit()
@@ -137,6 +143,17 @@ class OPT:
         print(f"Submitted OPT job for {self.rxn_ind}\n")
 
         self.FLAG = "Submitted"
+
+    def check_running_job(self):
+        """
+        See if a previously submitted job is still running
+
+        Modified attributes:
+        --------------------
+        self.FLAG : update to reflect the current job status
+        """
+
+        self.FLAG = self.submission_job.status()
 
     def Done(self):
         FINISH = False
@@ -146,55 +163,23 @@ class OPT:
 
     def Read_Result(self):
 
+        inchi = self.inchi
+
         args = self.args
         rxn = self.rxn
+
         self.FLAG = "Finished with Error"
         if self.dft_job.calculation_terminated_normally() and self.dft_job.optimization_converged():
-            imag_freq, _ = dft_job.get_imag_freq()
+            imag_freq, _ = self.dft_job.get_imag_freq()
             _, geo = self.dft_job.get_final_structure()
 
-            SPE = dft_job.get_energy()
-            thermal = dft_job.get_thermal()
+            SPE = self.dft_job.get_energy()
+            thermal = self.dft_job.get_thermal()
             if len(imag_freq) > 0:
                 print(
-                    "WARNING: imaginary frequency identified for molecule {inchi}...")
+                    f"WARNING: imaginary frequency identified for molecule {inchi}...")
 
-            dft_dict[inchi] = dict()
-            dft_dict[inchi]["SPE"] = SPE
-            dft_dict[inchi]["thermal"] = thermal
-            dft_dict[inchi]["geo"] = G
-
-            if i in rxn.reactant_inchi:
-                if dft_lot not in rxns[count].reactant_dft_opt.keys():
-                    rxns[count].reactant_dft_opt[dft_lot] = dict()
-                if "SPE" not in rxns[count].reactant_dft_opt[dft_lot].keys():
-                    rxns[count].reactant_dft_opt[dft_lot]["SPE"] = 0.0
-                rxns[count].reactant_dft_opt[dft_lot]["SPE"] += dft_dict[i]["SPE"]
-                if "thermal" not in rxns[count].reactant_dft_opt[dft_lot].keys():
-                    rxns[count].reactant_dft_opt[dft_lot]["thermal"] = {}
-                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"] = 0.0
-                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"] = 0.0
-                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"] = 0.0
-                    rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"] = 0.0
-                rxns[count].reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"] += dft_dict[i]["thermal"]["GibbsFreeEnergy"]
-                rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Enthalpy"] += dft_dict[i]["thermal"]["Enthalpy"]
-                rxns[count].reactant_dft_opt[dft_lot]["thermal"]["InnerEnergy"] += dft_dict[i]["thermal"]["InnerEnergy"]
-                rxns[count].reactant_dft_opt[dft_lot]["thermal"]["Entropy"] += dft_dict[i]["thermal"]["Entropy"]
-            if rxn.product_inchi in dft_dict.keys() and rxn.args["backward_DE"]:
-                if dft_lot not in rxns[count].product_dft_opt.keys():
-                    rxns[count].product_dft_opt[dft_lot] = dict()
-                if "SPE" not in rxns[count].product_dft_opt[dft_lot].keys():
-                    rxns[count].product_dft_opt[dft_lot]["SPE"] = 0.0
-                rxns[count].product_dft_opt[dft_lot]["SPE"] += dft_dict[i]["SPE"]
-                if "thermal" not in rxns[count].product_dft_opt[dft_lot].keys():
-                    rxns[count].product_dft_opt[dft_lot]["thermal"] = {}
-                    rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"] = 0.0
-                    rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"] = 0.0
-                    rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"] = 0.0
-                    rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"] = 0.0
-                rxns[count].product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"] += dft_dict[i]["thermal"]["GibbsFreeEnergy"]
-                rxns[count].product_dft_opt[dft_lot]["thermal"]["Enthalpy"] += dft_dict[i]["thermal"]["Enthalpy"]
-                rxns[count].product_dft_opt[dft_lot]["thermal"]["InnerEnergy"] += dft_dict[i]["thermal"]["InnerEnergy"]
-                rxns[count].product_dft_opt[dft_lot]["thermal"]["Entropy"] += dft_dict[i]["thermal"]["Entropy"]
-
+            self.dft_dict[self.dft_lot]["SPE"] = SPE
+            self.dft_dict[self.dft_lot]["thermal"] = thermal
+            self.dft_dict[self.dft_lot]["geo"] = geo
             self.FLAG = "Finished with Result"

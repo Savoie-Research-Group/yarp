@@ -64,6 +64,42 @@ class TSOPT:
         self.submission_job = None
         self.verbose = rxn.args.get("verbose", False)
 
+<<<<<<< HEAD
+        self.rxn_ind = None
+
+        self.dft_lot = self.args['dft_lot']
+
+        if self.dft_lot not in self.rxn.TS_dft.keys():
+            self.rxn.TS_dft[self.dft_lot] = dict()
+
+        # Initialize the energies for this TSOPT Process #
+        conf_i = self.index
+        self.rxn.TS_dft[self.dft_lot][conf_i] = dict()
+        self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"] = {}
+        self.rxn.TS_dft[self.dft_lot][conf_i]["SPE"]=0.0
+        self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"]["GibbsFreeEnergy"]=0.0
+        self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"]["Enthalpy"]=0.0
+        self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"]["InnerEnergy"]=0.0
+        self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"]["Entropy"]=0.0
+    def Initialize(self, verbose=False):
+        args = self.args
+        ind = self.index
+        opt_jobs = dict()
+        running_jobs = []
+        scratch_dft = args["scratch_dft"]
+        # if args["constrained_TS"] is True: rxns=constrained_dft_geo_opt(rxns)
+        # Load TS from reaction class and prepare TS jobs
+        # Four cases:
+        # 1. skip_low_IRC: read TS_xtb.
+        # 2. skip_low_TS: read TS_guess.
+        # 3. constriaed_ts: read constrained_TS
+        # 3. Otherwise, read the intended TS.
+        if self.rxn_ind == None:
+            self.rxn_ind = f"{self.rxn.reactant_inchi}_{self.rxn.id}_{ind}"
+        self.wf = f"{scratch_dft}/{self.rxn_ind}"
+        if verbose:
+            print(f"rxn_index: {self.rxn_ind}\n", flush=True)
+=======
         self.dft_lot = self.args.get("dft_lot", "PBE def2-SVP")
         if self.args.get("package", "ORCA") == "GAUSSIAN":
             # I feel like this should be on the user to provide the correct formatting for an external software package
@@ -80,6 +116,7 @@ class TSOPT:
 
         self.wf = None
         self.inp_xyz = None
+>>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
 
         self.FLAG = "Initialized"
 
@@ -122,9 +159,10 @@ class TSOPT:
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
         Input.lot = self.dft_lot
-
-        Input.mix_lot = [[a[0], convert_orca_to_gaussian(
-            a[1])] for a in self.args['dft_mix_lot']]
+        print(self.args['dft_mix_lot'])
+        # convert basis set format
+        Input.mix_lot = [[a[0], convert_basis_set(
+            a[1], self.args['package'])] for a in self.args['dft_mix_lot']]
         Input.jobname = f"{self.rxn_ind}-TSOPT"
 
         if self.verbose:
@@ -143,32 +181,24 @@ class TSOPT:
         self.submission_job : initialized as either SLURM_job or QSE_job class object
         """
         args = self.args
-
         if args["scheduler"] == "SLURM":
-            slurmjob = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"],
-                                 partition=args["partition"], time=args["dft_wt"],
-                                 mem_per_cpu=int(args["mem"]*1000), email=args["email_address"],
-                                 submit_path=self.dft_job.work_folder, orca_module=args.get("module", None))
+            job = SLURM_Job(jobname=f"TSOPT.{self.rxn_ind}", ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(
+                args["mem"]*1000), email=args["email_address"], write_memory=args['write_memory_in_slurm_job'])
 
             if args["package"] == "ORCA":
-                slurmjob.create_orca_jobs([self.dft_job])
+                job.create_orca_jobs([self.dft_job])
             elif args["package"] == "Gaussian":
-                slurmjob.create_gaussian_jobs([self.dft_job])
+                job.create_gaussian_jobs([self.dft_job])
 
-            self.submission_job = slurmjob
         elif args["scheduler"] == "QSE":
-            qsejob = QSE_job(package=args["package"], jobname=f"TSOPT.{self.rxn_ind}",
-                             module=args.get("module", None), job_calculator=self.dft_job,
-                             queue=args["partition"], ncpus=args["dft_nprocs"],
-                             mem=int(args["mem"]*1000), time=args["dft_wt"],
-                             ntasks=1, email=args["email_address"])
-
+            job = QSE_job(package=args["package"], jobname=f"TSOPT.{self.rxn_ind}",
+                 module=args.get("module", None), job_calculator=self.dft_job,
+                 queue=args["partition"], ncpus=args["dft_nprocs"],
+                 mem=int(args["mem"]*1000), time=args["dft_wt"],
+                 ntasks=1, email=args["email_address"])
             qsejob.prepare_submission_script()
 
-            self.submission_job = qsejob
-        else:
-            raise RuntimeError(
-                "Currently supported schedulers are SLURM and QSE!")
+        self.submission_job = job
 
     def Submit(self):
         """
@@ -206,11 +236,8 @@ class TSOPT:
         self.FLAG = "TSOPT Error"
         if self.dft_job.calculation_terminated_normally() and self.dft_job.optimization_converged() and self.dft_job.is_TS():
             _, geo = self.dft_job.get_final_structure()
-            if self.dft_lot not in self.rxn.TS_dft.keys():
-                self.rxn.TS_dft[self.dft_lot] = dict()
             conf_i = self.index
             # if inchi in rxn.reactant_inchi and ind==rxn.id:
-            self.rxn.TS_dft[self.dft_lot][conf_i] = dict()
             self.rxn.TS_dft[self.dft_lot][conf_i]["geo"] = geo
             self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"] = self.dft_job.get_thermal(
             )

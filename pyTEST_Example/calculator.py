@@ -6,6 +6,33 @@ from wrappers.gaussian import *
 
 from wrappers.gsm import *
 
+# Dictionary for basis set name conversions
+basis_set_mapping = {
+    "sto-3g":      {"Gaussian": "STO-3G", "ORCA": "STO-3G"},
+    "def2-tzvp":   {"Gaussian": "def2TZVP", "ORCA": "def2-TZVP"},
+    "def2-svp":    {"Gaussian": "def2SVP", "ORCA": "def2-SVP"},
+    "6-31g":       {"Gaussian": "6-31g", "ORCA": "6-31g"},
+    "6-31g*":      {"Gaussian": "6-31g*", "ORCA": "6-31g(d)"},
+    "6-31g**":     {"Gaussian": "6-31g**", "ORCA": "6-31g(d,p)"},
+    "cc-pvdz":     {"Gaussian": "cc-pvdz", "ORCA": "cc-pvdz"},
+    "cc-pvtz":     {"Gaussian": "cc-pvtz", "ORCA": "cc-pvtz"},
+    "aug-cc-pvdz": {"Gaussian": "aug-cc-pvdz", "ORCA": "aug-cc-pvdz"},
+    "aug-cc-pvtz": {"Gaussian": "aug-cc-pvtz", "ORCA": "aug-cc-pvtz"}
+}
+
+# Function to convert basis set names
+
+
+def convert_basis_set(basis_set, to_program):
+    basis_set_lower = basis_set.lower()
+    if basis_set_lower in basis_set_mapping:
+        if to_program in basis_set_mapping[basis_set_lower]:
+            return basis_set_mapping[basis_set_lower][to_program]
+        else:
+            return f"Conversion not available for {from_program} to {to_program}."
+    else:
+        return f"Basis set {basis_set} not found in the mapping."
+
 
 def convert_orca_to_gaussian(orca_basis: str) -> str:
     """
@@ -114,6 +141,8 @@ class Calculator:
                         crest_path=crest_path)
             if args["crest_quick"]:
                 JOB.add_command(additional='-rthr 0.1 -ewin 8 ')
+            if args["Crest_NoRefTopology"]:
+                JOB.add_command(additional=' -noreftopo ')
             if len(constraints) > 0:
                 JOB.add_command(distance_constraints=constraints)
             return JOB
@@ -213,9 +242,10 @@ class Calculator:
                     JOB.generate_geometry_settings(
                         hess=False, constraints=constraints)
                 else:  # TSOPT#
-                    JOB.generate_geometry_settings(
-                        hess=True, hess_step=int(args["hess_recalc"]))
+                    JOB.generate_geometry_settings(hess=True, hess_step=int(
+                        args["hess_recalc"]), numhess=args['numhess'])
             if (self.jobtype == "IRC"):
+                JOB.check_autostart()
                 JOB.generate_irc_settings(max_iter=100)
             JOB.check_restart()
             JOB.generate_input()

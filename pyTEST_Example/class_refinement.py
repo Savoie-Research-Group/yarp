@@ -34,10 +34,6 @@ def main(args:dict):
         print(f"rxn object is type: {type(rxn)}")
         print(f"rxn.reactant object is type: {type(rxn.reactant)}")
         print(f"rxn.args object is type: {type(rxn.args)}")
-<<<<<<< HEAD
-=======
-        # exit()
->>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
         rxn.args = args
 
         dft_rxns = []
@@ -45,22 +41,13 @@ def main(args:dict):
             r = deepcopy(rxn)
             dft_process = RxnProcess(r)
             key = 0
-<<<<<<< HEAD
             dft_process.conformer_key = [key]
             dft_process.conformers.append(ConformerProcess(r, key))
             #dft_process.TS_xtb = dict()
             E, G=xyz_parse(i)
-=======
-
-            E, G = xyz_parse(i)
->>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
             r.reactant.elements = E
             r.TS_xtb[key] = G
 
-            dft_process.conformer_key = [key]
-            dft_process.conformers.append(ConformerProcess(r, key))
-
-            # Overwrite default naming convention of rxn_ind using input XYZ file names
             ext_name = os.path.basename(i)
             name = os.path.splitext(ext_name)[0]
 

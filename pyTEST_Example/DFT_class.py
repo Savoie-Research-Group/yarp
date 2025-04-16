@@ -276,15 +276,6 @@ class RxnProcess:
             self.rxn.TS_dft[dft_lot][conf_i]["Barrier"]["B"] = round(Back_barrier * 627.5095, 3)
         
 class ConformerProcess:
-    """
-    self.status : str
-        I think I want to change this to basically mirror the TSOPT.FLAG/IRC.FLAG/RPOPT.FLAG status.
-        That way, there's only one set of labels to keep track of. Let's think about this more?
-
-    self.steps : dict
-        Currently un-used; not sure if it will be helpful...
-    """
-
     def __init__(self, rxn, conformer_id):
         self.rxn = rxn
         self.conformer_id = conformer_id
@@ -294,8 +285,13 @@ class ConformerProcess:
         self.TSOPT = TSOPT(self.rxn, self.conformer_id)
         self.IRC = IRC(self.rxn, self.conformer_id)
 
+    # for these processes, it is a class, and there is a FLAG (status)
+    # the flag will tell whether the job is submitted/finished with error/finished with result
+    # if finished with error : then this conformer is terminated
+    # if finished with result: continue to the next process
+    # if submitted: check if the job is finished, if not, wait
+
     def run_TSOPT(self):
-<<<<<<< HEAD
         if self.TSOPT.rxn_ind == None:
             self.TSOPT.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
 
@@ -308,54 +304,6 @@ class ConformerProcess:
             if not self.TSOPT.submission_job.status() == "FINISHED": # not finished, job still running/in queue
                 return
         print(f"{self.TSOPT.rxn_ind}: Final TSOPT STATUS: {self.TSOPT.FLAG}\n")
-=======
-        print(
-            f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}\n")
-
-        # Look to see if submitted job has completed
-        if self.TSOPT.FLAG == "Submitted":
-            self.TSOPT.check_running_job()
-
-        # Go through the rest of the possible status options
-        if self.TSOPT.FLAG == "Initialized":
-            print(f"No TSOPT job found; let's start from scratch:")
-
-            print(f"  - Preparing TSOPT job input files")
-            self.TSOPT.Prepare_Input()
-
-            print(f"  - Submitting TSOPT job")
-            self.TSOPT.Prepare_Submit()
-            self.status = "TS_optimization"
-            if self.SUBMIT_JOB:
-                self.TSOPT.Submit()
-            else:
-                print(f"    * Just kidding! Submission has been turned off.")
-                print(
-                    f"      Set dry_run flag to False if you actually want to submit\n")
-        elif self.TSOPT.FLAG == "Finished":
-            print(f"TSOPT job is not currently running - let's check the status!")
-
-            if self.TSOPT.Done():
-                print(f"  - TSOPT DONE! Reading results now")
-                self.TSOPT.Read_Result()
-                self.status = "TS Completed"
-            else:
-                self.status = "TS_optimization"
-                print(f"  - TSOPT NOT DONE! Re-submiting job now")
-                if self.SUBMIT_JOB:
-                    self.TSOPT.Submit()
-                else:
-                    print(f"    * Just kidding! Submission has been turned off.")
-                    print(
-                        f"      Set dry_run flag to False if you actually want to submit\n")
-        elif self.TSOPT.FLAG == "Submitted":
-            print(f"TSOPT job is ongoing - check back later!\n")
-        else:
-            print(f"Unrecognized status for TSOPT job! You might want to check it out.\n")
-
-        print(
-            f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}\n")
->>>>>>> 3f3b2656dfb4aba6912a2ccaef07466a1f236faf
 
     def run_IRC(self):
         if self.IRC.rxn_ind == None:

@@ -33,6 +33,7 @@ def main(args: dict):
 
     STATUS = [] # reaction conformer (TSs) status
     RP_STATUS = [] # reactant / product status
+    IRC_STATUS = [] # IRC Barriers (if needed)
     for count, dft_rxn in enumerate(dft_rxns):
 
         dft_rxn.rxn.args = args
@@ -84,6 +85,13 @@ def main(args: dict):
                           conf.TSOPT.FLAG, conf.IRC.FLAG, 
                           dft_rxn.rxn.TS_dft[conf.TSOPT.dft_lot][conf.conformer_id]["Barrier"]["F"],
                           dft_rxn.rxn.TS_dft[conf.TSOPT.dft_lot][conf.conformer_id]["Barrier"]["B"]])
+            # Report IRC barriers #
+            if args.get("Summary_IRC_Stats", False):
+                print(conf.conformer_id)
+                print(conf.TSOPT.rxn_ind)
+                IRC_STATUS.append([conf.TSOPT.rxn_ind, conf.IRC.FLAG, 
+                    dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][0],
+                    dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][1]])
 
     if args['dft_run_ts']:
         write_table_with_title(STATUS, title = "Transition State",
@@ -93,6 +101,12 @@ def main(args: dict):
     if args['dft_run_rp']:
         write_table_with_title(RP_STATUS, title = "Reactant + Product", 
                 headers=["Molecule-ID", "MOLECULE", "CREST-Status", "OPT-Status"])
+
+    if args.get("Summary_IRC_Stats", False):
+        write_table_with_title(IRC_STATUS, title = "IRC Status", 
+                headers=["RXN_CONF", "IRC-Status",
+                    "IRC Forward Barrier\n[kcal/mol]", "IRC Backward Barrier\n[kcal/mol]"])
+
     write_pickle("DFT.p", dft_rxns)
 
     exit()

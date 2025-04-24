@@ -19,8 +19,15 @@ class IRC:
 
         self.dft_lot = self.args['dft_lot']
 
+        conf_i = self.index
+
+        print(f"conf_i: {conf_i}")
         if self.dft_lot not in self.rxn.IRC_dft.keys():
             self.rxn.IRC_dft[self.dft_lot] = dict()
+
+        if conf_i not in self.rxn.IRC_dft[self.dft_lot].keys():
+            self.rxn.IRC_dft[self.dft_lot][conf_i] = {}
+            self.rxn.IRC_dft[self.dft_lot][conf_i]["barriers"] = ["NOT AVAILABLE", "NOT AVAILABLE"]
 
     def Initialize(self):
         args = self.args
@@ -120,8 +127,10 @@ class IRC:
             print(f"IRC job {irc_job.jobname} fails, skip this reaction...")
             return
 
-        job_success = False
         conf_i = self.index
+        self.rxn.IRC_dft[self.dft_lot][conf_i]["barriers"] = ["NOT AVAILABLE", "NOT AVAILABLE"]
+
+        job_success = False
         dft_lot = self.dft_lot
         try:
             E, G1, G2, TSG, barrier1, barrier2 = irc_job.analyze_IRC()
@@ -130,7 +139,6 @@ class IRC:
             return
         if job_success is False:
             return
-        rxn.IRC_dft[dft_lot][conf_i] = dict()
         rxn.IRC_dft[dft_lot][conf_i]["node"] = [G1, G2]
         rxn.IRC_dft[dft_lot][conf_i]["TS"] = TSG
         rxn.IRC_dft[dft_lot][conf_i]["barriers"] = [barrier2, barrier1]

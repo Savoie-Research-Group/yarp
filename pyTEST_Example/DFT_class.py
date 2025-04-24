@@ -97,6 +97,9 @@ class RxnProcess:
         self.reactant_inchi = return_inchikey(rxn.reactant, verbose = self.rxn.args['verbose'])
         self.product_inchi  = return_inchikey(rxn.product,  verbose = self.rxn.args['verbose'])
 
+        self.reactant_dft_opt = None
+        self.product_dft_opt = None
+
     def get_TS_conformers(self):
         rxn  = self.rxn
         args = self.args
@@ -246,6 +249,7 @@ class RxnProcess:
         for mol in self.molecules:
             if not mol.FLAG: continue
             if "finished" not in mol.FLAG.lower(): continue
+            if "error" in mol.FLAG.lower(): continue
             if mol.inchi in self.reactant_inchi:
                 self.reactant_dft_opt[dft_lot]["SPE"]+=mol.dft_dict[dft_lot]["SPE"]
                 self.reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]+=mol.dft_dict[dft_lot]["thermal"]["GibbsFreeEnergy"]
@@ -265,6 +269,8 @@ class RxnProcess:
         # default value set to not available, for example, when your TS is still running, or R/P still running
         self.rxn.TS_dft[dft_lot][conf_i]["Barrier"]["F"] = "NOT AVAILABLE"
         self.rxn.TS_dft[dft_lot][conf_i]["Barrier"]["B"] = "NOT AVAILABLE"
+        if not self.reactant_dft_opt: return
+        if not self.product_dft_opt: return
         # if TS still running (default value = 0.0), skip
         if abs(self.rxn.TS_dft[dft_lot][conf_i]["thermal"]["GibbsFreeEnergy"]) < 1e-10: return
         if abs(self.reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]) > 1e-10:

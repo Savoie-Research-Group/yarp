@@ -1,7 +1,7 @@
 import sys
 import yaml
 
-from reaction import generate_rxns
+from yarp.reaction import generate_rxns
 
 
 def main(input):

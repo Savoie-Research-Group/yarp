@@ -1,8 +1,9 @@
 """
-Convenience functions for parsing molecular information from a variety of input formats.
+Helper functions for parsing molecular information from a variety of input formats.
+Consider moving this to util if anything outside of yarpecule needs to access it.
 """
-
 import numpy as np
+from rdkit.Chem import rdmolfiles
 
 
 def xyz_parse(xyz, read_types=False, multiple=False):
@@ -145,3 +146,76 @@ def xyz_parse(xyz, read_types=False, multiple=False):
             return elements, geo, Atom_types
         else:
             return Elements, Geometry, Atom_types
+
+
+def xyz_q_parse(xyz):
+    """
+    This function grabs charge information from the comment line of an xyz file. The charge information is 
+    interpreted as the first field following the `q` keyword. If no charge information is specified the function
+    returns neutral as a the default behavior.
+
+    Parameters
+    ----------
+    xyz : filename
+          This is the xyz file that is read by the function.
+
+    Returns
+    -------
+    q : int
+        The charge information.
+    """
+    with open(xyz, 'r') as f:
+        for lc, lines in enumerate(f):
+            if lc == 1:
+                fields = lines.split()
+                if "q" in fields:
+                    try:
+                        q = int(float(fields[fields.index("q")+1]))
+                    except:
+                        q = 0
+                else:
+                    q = 0
+                break
+    return q
+
+
+def mol_parse(mol):
+    """
+    A simple wrapper for rdkit function to read a mol file.
+
+    Parameters
+    ----------
+    mol: str
+         The mol file that is being to convert into a geometry, adjacency matrix, list of elements, and charge.
+
+    Returns
+    -------
+    (elements, geo, adj_mat, q): tuple
+                                 `elements` is a list with the element labels, `geo` is an nx3 numpy array holding the rdkit
+                                 generated geometry, `adj_mat` is an nxn array holding the adjacency matrix, `q` is an `int`
+                                 holding the charge (based on the sum of formal charges).
+    """
+    m = rdmolfiles.MolFromMolFile(mol)
+    N_atoms = len(m.GetAtoms())
+    elements = []
+    geo = np.zeros((N_atoms, 3))
+    q = 0
+    for i in range(N_atoms):
+        atom = m.GetAtomWithIdx(i)
+        elements += [atom.GetSymbol()]
+        coord = m.GetConformer().GetAtomPosition(i)
+        geo[i] = np.array([coord.x, coord.y, coord.z])
+        q += atom.GetFormalCharge()
+    # Generate adjacency matrix
+    adj_mat = np.zeros((N_atoms, N_atoms))
+    for i in [(_.GetBeginAtomIdx(), _.GetEndAtomIdx()) for _ in m.GetBonds()]:
+        adj_mat[i[0], i[1]] = 1
+        adj_mat[i[1], i[0]] = 1
+    return elements, geo, adj_mat, q
+
+
+def xyz_from_smiles():
+    """
+    This is going to require some extra care to port over...
+    Especially if we're overhauling find_lewis()! - ERM
+    """

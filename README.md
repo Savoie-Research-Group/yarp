@@ -18,7 +18,8 @@ Here's a working list of all the packages I've installed, **and why** (-ERM)
 - `conda install pyaml`: For reading YAML input files from command-line
 - `conda install numpy`: Because numpy is a friend to all
 - `conda install pytest`: For automated unit/regression testing!
-
+- `conda install scipy`: Adjacency matrix routines need this. Other stuff might also
+- `pip install rdkit`: RDKit is a friend to... many (i.e. reading .mol files and processing SMILES)
 
 ## How to add tests cases to the pytest suite
 

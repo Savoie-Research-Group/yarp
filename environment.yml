@@ -7,3 +7,6 @@ dependencies:
   - pip
   - pyaml
   - numpy
+  - scipy
+  - pip:
+      - rdkit

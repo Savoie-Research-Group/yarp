@@ -1,3 +1,6 @@
+"""
+Testing suite for functions contained in yarp/yarpecule/input_parser.py
+"""
 import pytest
 import yarp.yarpecule.input_parsers as inp
 

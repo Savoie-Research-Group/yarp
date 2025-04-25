@@ -1,33 +1,110 @@
+"""
+Definition of yarpecule object class
+"""
 import numpy as np
+
+from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
+from yarp.yarpecule.graph import table_generator
+from yarp.util.properties import el_mass
 
 
 class yarpecule:
-    def __init__(self, mol, mode='rdkit'):
-        # attributes that are obtained from reading a molecule file or SMILES string
-        self.geo = []
-        self.elements = []
-        self.masses = []
-        self.charge = 0
-        self.multiplicity = 1
+    """
+    Base class for describing a molecule in YARP
 
-        self.get_structure(mol, mode)
+    MISSING: update_masses()
 
-        # attributes that are obtained from TAFFI functions
-        self.adj_mat = None
-        self.atom_hashes = None
-        self.yarpecule_hash = None
-        self.mapping = None  # oh dang, what is this friend?????
+    Attributes:
+    -----------
+    geo : numpy.ndarray
+            An (N_atom, 3) array containing the cartesian coordinates of each atom in the molecule.
+            Units are in Angstroms.
+            Array is indexed based on atomic ordering of the `yarpecule`.
 
-        # attributes that are obtained from find_lewis schenans
-        self.n_e_accept = 0
-        self.n_e_donate = 0
-        self.formal_charge = 0
-        self.atom_neighbors = None
-        self.bo_dict = None
+    elements : list (str)
+            A list of lower-case element labels indexed to the atomic ordering of the `yarpecule`.
 
-    def get_structure(self, mol, mode):
+    q : int
+        The total charge on the `yarpecule`. 
+
+    masses : numpy.array
+            The masses of the atoms in the molecule.
+
+    adj_mat : numpy.ndarray
+                The adjacency matrix of the graphical representation of the molecular structure.
+                Array is indexed to atoms in the `yarpecule`. If atom_i and atom_j are
+                bonded, matrix elements M_ij and M_ji are equal to 1. Otherwise,
+                all elements are 0.
+    """
+
+    ###############
+    # Constructor #
+    ###############
+
+    def __init__(self, mol, mode='rdkit', canon=True):
+        self._geo = None
+        self._elements = None
+        self._masses = None
+        self._q = 0
+        # self._multiplicity = 1
+        self._adj_mat = None
+
+        self._update_structure(mol, mode)
+
+        self._atom_hashes = None
+        self._mapping = None  # oh dang, what is this friend?????
+
+        self._order_atoms(canon=canon)
+
+        # How about we shove all these into a self._lewis_struct attribute? - ERM
+        # self._bond_mats = None
+        # self._bond_mat_scores = None
+        # self._yarpecule_hash = None
+        # self._n_e_accept = 0
+        # self._n_e_donate = 0
+        # self._formal_charge = 0
+        # self._atom_neighbors = None
+        # self._bo_dict = None
+        self._lewis = None
+
+        self._gen_lewis_struct()
+
+    ###############
+    # Properties  #
+    ###############
+
+    # the user should pretty much never edit these directly, but may want to view them
+    # therefore, I'm thinking we should use access functions to handle that? - ERM
+
+    @property
+    def geo(self):
+        return self._geo
+
+    @property
+    def elements(self):
+        return self._elements
+
+    @property
+    def adj_mat(self):
+        return self._adj_mat
+
+    ######################
+    # Internal Functions #
+    ######################
+
+    def _update_structure(self, mol, mode):
         """
-        Reads mol and returns info from it
+        Update yarpecule attributes directly impacted by the molecular structure.
+
+        Updated Attributes:
+        ------------------
+        self.adj_mat : numpy.ndarray
+
+        self.geo : numpy.ndarray
+
+        self.elements : list
+
+        self.q : int
         """
 
         # direct branch: user passes core attributes directly
@@ -44,25 +121,25 @@ class yarpecule:
                     "The size of the adjacency array, geometry array, and elements list do not match.")
 
             # assign core attributes
-            self.adj_mat = mol[0]
-            self.geo = mol[1]
-            self.elements = mol[2]
-            self.charge = mol[3]
+            self._adj_mat = mol[0]
+            self._geo = mol[1]
+            self._elements = mol[2]
+            self._q = mol[3]
 
         # xyz branch
         elif len(mol) > 4 and mol[-4:] == ".xyz":
-            self.elements, self.geo = xyz_parse(mol)
-            self.adj_mat = table_generator(self.elements, self.geo)
-            self.charge = xyz_q_parse(mol)
+            self._elements, self._geo = xyz_parse(mol)
+            self._adj_mat = table_generator(self._elements, self._geo)
+            self._q = xyz_q_parse(mol)
 
         # mol branch
         elif len(mol) > 4 and mol[-4:] == ".mol":
-            self.elements, self.geo, self.q, _, _ = mol_parse(mol)
+            self._elements, self._geo, self._q, _, _ = mol_parse(mol)
 
         # SMILES branch
         else:
             try:
-                self.elements, self.geo, self.adj_mat, self.q = xyz_from_smiles(
+                self._elements, self._geo, self._adj_mat, self._q = xyz_from_smiles(
                     mol, mode=mode)
             except:
                 raise TypeError(
@@ -70,31 +147,83 @@ class yarpecule:
 
         # Calculate elementary attributes
         # eventually all functions will expect lowercase element labels
-        self.elements = [_.lower() for _ in self.elements]
+        self._elements = [_.lower() for _ in self._elements]
         # User can update via mass update function.
-        self.masses = np.array([el_mass[_] for _ in self.elements])
+        self._masses = np.array([el_mass[_] for _ in self._elements])
 
-    def get_bond_electron_matrix():
+    def _order_atoms(self, canon=False, mapping=None):
         """
-        Adjacency matrix comes out from this also
-        """
+        Either canonically order the atoms or apply a user defined mapping.
+        Not sure if the adjacency matrix is updated here, but I think it should be.
 
-    def get_lewis_score():
-        """
-        I imagine this would integrate some how with an enumeration method class
-        """
+        Updated Attributes:
+        ------------------
+        self.atom_hashes
 
-    def canonicalize_atom_order():
-        """
-        Can/should this be separated from get_bond_electron_matrix() ?
+        self.mapping       
         """
 
-    def get_mapping_smi():
+    def _gen_lewis_struct(self):
         """
-        Apply atom mapping to a SMILES string and output it
+        Compute Lewis structures and related information for the yarpecule.
+
+        Updated Attributes:
+        ------------------
+        self.bond_mats
+
+        self.bond_mat_scores
+
+        self.yarpecule_hash
+
+        self.n_e_accept
+
+        self.n_e_donate
+
+        self.formal_charge
+
+        self.atom_neighbors
+
+        self.bo_dict
         """
 
-    def overwrite_atom_mapping():
+    ######################
+    # External Functions #
+    ######################
+    def join(self, other_yps, canon=True, mode='rdkit'):
         """
-        Overwrite the atom mapping and update everything in the yarpecule accordingly
+        Join two yarpecules together to form a new yarpecule.
+        """
+
+    def draw_lewis_struct(self):
+        """
+        Draw the Lewis structure of the yarpecule.
+        This shouldn't ever change any of the attributes of the yarpecule.
+        """
+
+    def export_geometry(self, filename, format='xyz'):
+        """
+        Export the geometry of the yarpecule to a file.
+        This shouldn't ever change any of the attributes of the yarpecule.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the file to export the geometry to.
+
+        format : str, default='xyz'
+            The format of the file to export the geometry to.
+        """
+
+    def export_smiles(self, mode='canonical'):
+        """
+        Export the SMILES representation of the yarpecule.
+        This shouldn't ever change any of the attributes of the yarpecule.
+        Option to export SMILES with explicit atom mappings.
+        Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
+
+        Parameters
+        ----------
+        mode : str, default='canonical'
+            The mode of the SMILES representation to export.
+            Options are 'canonical' or 'non-canonical'.
         """

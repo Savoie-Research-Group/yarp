@@ -42,8 +42,11 @@ class OPT:
 
         if self.args["verbose"]:
             print(f"self.inchi_dict : {self.inchi_dict}\n")
-        
-        self.dft_lot = self.args['dft_lot']
+       
+        self.functional = rxn.args.get('functional', 'PBE')
+        self.basis_set  = rxn.args.get('basis_set', 'def2-SVP')
+        self.dft_lot = f"{self.functional}/{self.basis_set}"
+
         self.dft_dict = dict()
         self.dft_dict[self.dft_lot] = {}
 

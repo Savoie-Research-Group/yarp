@@ -15,7 +15,9 @@ class TSOPT:
 
         self.rxn_ind = None
 
-        self.dft_lot = self.args['dft_lot']
+        self.functional = rxn.args.get('functional', 'PBE')
+        self.basis_set  = rxn.args.get('basis_set', 'def2-SVP')
+        self.dft_lot = f"{self.functional}/{self.basis_set}"
 
         if self.dft_lot not in self.rxn.TS_dft.keys():
             self.rxn.TS_dft[self.dft_lot] = dict()

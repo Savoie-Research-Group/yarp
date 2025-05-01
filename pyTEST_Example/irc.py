@@ -17,7 +17,9 @@ class IRC:
 
         self.rxn_ind = None
 
-        self.dft_lot = self.args['dft_lot']
+        self.functional = rxn.args.get('functional', 'PBE')
+        self.basis_set  = rxn.args.get('basis_set', 'def2-SVP')
+        self.dft_lot = f"{self.functional}/{self.basis_set}"
 
         conf_i = self.index
 

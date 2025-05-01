@@ -16,7 +16,7 @@ from utils import xyz_write, add_mix_basis_for_atom
 import re
 
 class Gaussian:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B3LYP/6-31G*', mix_basis=False, mix_lot=[], jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
+    def __init__(self, input_geo, work_folder=os.getcwd(), functional = 'B3LYP', basis_set='6-31G*', mix_basis=False, mix_lot=[], jobtype='OPT', nproc=1, mem=1000, jobname='gaussianjob', charge=0, multiplicity=1, \
                  solvent=False, dielectric=0.0,solvation_model='PCM', dispersion=False, verbose = False):
         """
         Initialize an Gaussian job class
@@ -24,7 +24,8 @@ class Gaussian:
         work_folder: working directory for running the gaussian task
         jobtype: can be single (e.g., "OPT") or multiple jobs (e.g., "OPT FREQ") or with additional specification (e.g., "OPT=(TS, CALCALL, NOEIGEN, maxcycles=400)") # Zhao's note: originally 100 step, changed to 400
         ***: fulltz is added as a method to "correct" energies from using mix-basis-set
-        lot: Level of theory, e.g., "B3LYP/TZVP"
+        functional: functional
+        basis_set: basis_set
         mem: unit in MB, per core
         solvent: if False, will not call solvation model, otherwise specify water, THF, etc.
         solvation_model: select from PCM, CPCM, SMD
@@ -35,7 +36,8 @@ class Gaussian:
         self.work_folder  = work_folder
         self.gjf          = f'{work_folder}/{jobname}.gjf'
         self.jobtype      = jobtype
-        self.lot          = lot
+        self.functional   = functional
+        self.basis_set    = basis_set
         self.chkfile      = ""
         self.nproc        = int(nproc)
         self.mem          = int(mem)
@@ -106,17 +108,15 @@ class Gaussian:
         if self.mix_basis and not self.jobtype.lower()=='irc': # for IRC currently ignore the mix basis set because of syntax reason
             print(f"self.mix_lot: {self.mix_lot}\n")
             # check by element or check by index
-            functional        = self.lot.split('/')[0]
-            general_basis_set = self.lot.split('/')[-1]
             # change basis set to be able to use mix-basis set
-            self.lot = functional + '/' + "gen"
+            self.functional = self.functional + '/' + "gen"
             for count_i, element in enumerate(self.elements):
                 mix_basis_summary = {}
                 atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
                 #atom_mix_basis = add_mix_basis_for_atom(element, count_i, self.mix_lot, "Gaussian")
                 print(f"atom_mix_basis: {atom_mix_basis}")
                 # apply the general basis set to the atom
-                if atom_mix_basis == "": atom_mix_basis = [general_basis_set, count_i]
+                if atom_mix_basis == "": atom_mix_basis = [self.basis_set, count_i]
                 self.Process_atom_mix_basis(atom_mix_basis)
             
 
@@ -128,9 +128,9 @@ class Gaussian:
                 f.write(f"%Chk={self.chkfile}\n")
                 restart_string = ", Restart"
             if self.dispersion:
-                command = f"#{self.lot} EmpiricalDispersion=GD3 "
+                command = f"#{self.functional}/{self.basis_set} EmpiricalDispersion=GD3 "
             else:
-                command = f"#{self.lot} "
+                command = f"#{self.functional}/{self.basis_set} "
             if self.solvation:
                 command += f" {self.solvation}"
             # jobtype settings

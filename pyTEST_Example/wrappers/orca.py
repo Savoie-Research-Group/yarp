@@ -15,7 +15,7 @@ from utils import xyz_write, add_mix_basis_for_atom
 
 # prepare corresponding input files for each calculator
 class ORCA:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B97-3c', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
+    def __init__(self, input_geo, work_folder=os.getcwd(), functional='B97-3c', basis_set='def2-SVP', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
                  defgrid=2, solvent=False, solvation_model='CPCM', dielectric=0.0, writedown_xyz=False):
         """
         Initialize an Orca job class
@@ -32,7 +32,8 @@ class ORCA:
         self.work_folder  = work_folder
         self.orca_input   = f'{work_folder}/{jobname}.in'
         self.jobtype      = jobtype
-        self.lot          = lot ; self.lot = lot.replace("/", " ")
+        self.functional   = functional
+        self.basis_set    = basis_set
         self.mix_basis    = mix_basis
         self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
         self.nproc        = int(nproc)
@@ -132,9 +133,9 @@ class ORCA:
         """
         with open(self.orca_input, "w") as f:
             if self.solvation:
-                f.write(f"! {self.lot} {self.solvation} {self.defgrid} {self.jobtype}\n\n")
+                f.write(f"! {self.functional} {self.basis_set} {self.solvation} {self.defgrid} {self.jobtype}\n\n")
             else:
-                f.write(f"! {self.lot} {self.defgrid} {self.jobtype}\n\n")
+                f.write(f"! {self.functional} {self.basis_set} {self.defgrid} {self.jobtype}\n\n")
             if self.dielectric != 0.0:
                 f.write(f"%cpcm\n epsilon {self.dielectric}\nend\n\n")
 

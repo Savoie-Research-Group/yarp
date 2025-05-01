@@ -94,7 +94,9 @@ class Calculator:
         self.input_geo = ""
         self.work_folder = os.getcwd()
         self.xtb_lot = args.get("lot", "gfn2")
-        self.lot = args.get("dft_lot", "PBE def2-SVP")
+        #self.lot = args.get("dft_lot", "PBE def2-SVP")
+        self.functional = args.get("functional", "PBE")
+        self.basis_set = args.get("basis_set", "def2-SVP")
         self.jobtype = 'OPT'
         self.nproc = int(args.get("dft_nprocs", 1))
         self.mem = int(args["mem"]*1000)
@@ -230,7 +232,8 @@ class Calculator:
                        mem=self.mem,
                        jobname=self.jobname,
                        jobtype=self.jobtype,
-                       lot=self.lot,
+                       functional=self.functional,
+                       basis_set=convert_basis_set(self.basis_set, "ORCA"),
                        mix_basis=self.mix_basis,
                        mix_lot=self.mix_lot,
                        charge=self.charge,
@@ -258,7 +261,8 @@ class Calculator:
                            mem=int(args["mem"])*1000,
                            jobname=self.jobname,
                            jobtype=self.jobtype,
-                           lot=self.lot,
+                           functional=self.functional,
+                           basis_set=convert_basis_set(self.basis_set, "Gaussian"),
                            mix_basis=self.mix_basis,
                            mix_lot=self.mix_lot,
                            charge=self.charge,

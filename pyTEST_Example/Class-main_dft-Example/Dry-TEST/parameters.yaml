@@ -2,7 +2,7 @@
 # Enumetation part
 #input:  /scratch/negishi/li1724/110124-YARP-Github/110824-yarp/classy-yarp/pyTEST_Example//reaction_xyz/DA.xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
 input:  reaction_xyz # (1) The input folder with .xyz or .mol file (2) a text file with multiple smiles
-scratch: /scratch/negishi/li1724/041125-yarp-merge/yarp/pyTEST_Example/Class-main_dft-Example/Dry-TEST/RESULT/
+scratch: /scratch/negishi/li1724/041625-yarp-branch/yarp/pyTEST_Example/Class-main_dft-Example/Dry-TEST/RESULT/
 # The output folder with reaction geometry for constructing reaction network.
 reaction_data: DA.p
 #n_break: 2 # Indicate the number of breaking bonds
@@ -54,7 +54,8 @@ package: ORCA # Gaussian
 dft_irc_package: ORCA
 email_address: zhaoli2023@u.northwestern.edu
 dft_nprocs: 24  # Number of cores used by ORCA
-dft_lot: PBE def2-SVP
+functional: PBE
+basis_set: def2-SVP
 dft_wt: 4
 dft_ppn: 24    # the number of ppn used in the submission (SLURM File)
 #dft_ppn: 24    # the number of ppn used in the submission (SLURM File)

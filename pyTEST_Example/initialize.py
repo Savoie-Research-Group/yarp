@@ -42,16 +42,6 @@ def DFT_Initialize(args):
     if "DFT_Folder" not in keys:
         args["DFT_Folder"] = "DFT"
 
-    if len(args["dft_lot"].split()) > 1:
-        dft_lot = "/".join(args["dft_lot"].split())
-    else:
-        dft_lot = args["dft_lot"]
-    # for dft_lot here, convert ORCA/Other calculator to Gaussian
-    # for example: def2-SVP --> def2SVP
-    dft_lot = dft_lot.split(
-        '/')[0] + '/' + convert_basis_set(dft_lot.split('/')[1], args['package'])
-
-    args['dft_lot'] = dft_lot
 
     if os.path.exists(args.get("scratch", "")) is False:
         raise RuntimeError(

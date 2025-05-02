@@ -80,14 +80,17 @@ class Conformational_Sampling:
         scheduler = args.get("scheduler", "SLURM")
 
         if scheduler == "SLURM":
-            job=SLURM_Job(jobname=f'CREST.{self.inchi}', ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"])*1000, email=args["email_address"])
+            job=SLURM_Job(jobname=f'CREST.{self.inchi}', ppn=args["dft_ppn"], 
+                          partition=args["partition"], time=args["dft_wt"], 
+                          mem_per_cpu=int(args["mem"])*1000, email=args["email_address"],
+                          crest_module=args.get("crest_module", None))
 
             job.create_crest_jobs([self.opt_job])
 
         elif scheduler == "QSE":
             job = QSE_job(package="CREST", jobname=f"CREST.{self.inchi}",
-             orca_module=args.get("orca_module", None), job_calculator=self.opt_job,
-             queue=args["partition"], ncpus=args["dft_nprocs"],
+             crest_module=args.get("crest_module", None), job_calculator=self.opt_job,
+             queue=args["partition"], ncpus=args["dft_ppn"],
              mem=int(args["mem"]*1000), time=args["dft_wt"],
              ntasks=1, email=args["email_address"])
             

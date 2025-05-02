@@ -17,7 +17,7 @@ wait
 # compared with directly call crest in each line
 
 class SLURM_Job:
-    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False, email="", write_memory=True, orca_module=None):
+    def __init__(self, submit_path='.', partition='standby', time=4, jobname='JobSubmission', node=1, ppn=4, mem_per_cpu=1000, specify_array=False, email="", write_memory=True, orca_module=None, crest_module=None):
         """
         Initialize slurm job parameters
         Time needs to be specify in hours
@@ -40,6 +40,11 @@ class SLURM_Job:
             "prereqs", "module unload openmpi \nmodule load intel-mkl \n")
         self.orca_module_software = orca_module.get(
             "software", 'export PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$PATH" \nexport LD_LIBRARY_PATH="/depot/bsavoie/apps/orca_5_0_1_openmpi411:$LD_LIBRARY_PATH" \nexport PATH="/depot/bsavoie/apps/openmpi_4_1_1/bin:$PATH" \nexport LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi_4_1_1/lib:$LD_LIBRARY_PATH"\n')
+
+        if crest_module is None:
+            crest_module = {}
+        self.crest_module_prereqs = crest_module.get("prereqs", "module load anaconda/2022.10-py39")
+        self.crest_module_software = crest_module.get("software", "conda activate classy-yarp")
 
         # Zhao's note: add Email notification
         self.email = email
@@ -276,14 +281,10 @@ class SLURM_Job:
 
         with open(self.script_file, "a") as f:
 
-            # Zhao's note: try fixing crest env
-            # add module load anaconda
-            # conda activate <your current conda env>
-            #This is just a fix on Purdue's machine, you can turn it off#
-            # Zhao's note: purdue changed its default anaconda, switch!
-            #f.write(f"module load anaconda\n")
-            f.write(f"module load anaconda/2022.10-py39\n")
-            f.write(f"conda activate copy-classy-yarp\n")
+            f.write("# Load CREST prerequisites\n")
+            f.write(f"{self.crest_module_prereqs}\n")
+            f.write("# Load YARP environment to access CREST software\n")
+            f.write(f"{self.crest_module_software}\n")
 
             f.write(f"export OMP_STACKSIZE={crest_job_list[0].mem}M\n")
             f.write(f"export OMP_NUM_THREADS={crest_job_list[0].nproc}\n")
@@ -409,7 +410,7 @@ class QSE_job:
     """
 
     # Constructor
-    def __init__(self, package="ORCA", jobname="JobSubmission", orca_module=None,
+    def __init__(self, package="ORCA", jobname="JobSubmission", orca_module=None, crest_module=None,
                  job_calculator=None, queue="long", ncpus=1, mem=2000, time=4, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
@@ -435,6 +436,11 @@ class QSE_job:
         self.orca_module_prereqs = orca_module.get("prereqs", "")
         self.orca_module_software = orca_module.get(
                                     "software", "module load orca\n")
+
+        if crest_module is None:
+            crest_module = {}
+        self.crest_module_prereqs = crest_module.get("prereqs", "")
+        self.crest_module_software = crest_module.get("software", "conda activate classy-yarp")
 
     def status(self):
         """
@@ -512,8 +518,10 @@ class QSE_job:
                     f"$orca {self.job_calculator.orca_input} > {self.job_calculator.output}\n")
             
             elif self.package == "CREST":
-                f.write(f"module load anaconda/2022.10-py39\n")
-                f.write(f"conda activate copy-classy-yarp\n")
+                f.write("# Load CREST prerequisites\n")
+                f.write(f"{self.crest_module_prereqs}\n")
+                f.write("# Load YARP environment to access CREST software\n")
+                f.write(f"{self.crest_module_software}\n")
 
                 f.write(f"export OMP_STACKSIZE={self.job_calculator.mem}M\n")
                 f.write(f"export OMP_NUM_THREADS={self.job_calculator.nproc}\n")

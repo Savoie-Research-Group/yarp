@@ -409,7 +409,7 @@ class QSE_job:
     """
 
     # Constructor
-    def __init__(self, package="ORCA", jobname="JobSubmission", module=None,
+    def __init__(self, package="ORCA", jobname="JobSubmission", orca_module=None,
                  job_calculator=None, queue="long", ncpus=1, mem=2000, time=4, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
@@ -421,8 +421,6 @@ class QSE_job:
 
         self.jobname = jobname
         self.package = package
-        self.module = module  # line needed to load the necessary software
-        # assumes input files have already been generated in this location!
         self.job_calculator = job_calculator
 
         self.email = email
@@ -432,11 +430,11 @@ class QSE_job:
             job_calculator.work_folder, jobname+'.submit')
         self.job_id = None
 
-        if module is None:
-            module = {}
-        self.module_prereqs = module.get("prereqs", "")
-        self.module_software = module.get(
-            "software", "module load orca\n")
+        if orca_module is None:
+            orca_module = {}
+        self.orca_module_prereqs = orca_module.get("prereqs", "")
+        self.orca_module_software = orca_module.get(
+                                    "software", "module load orca\n")
 
     def status(self):
         """
@@ -502,9 +500,9 @@ class QSE_job:
             # Put in script body according to jobname input
             if self.package == "ORCA":
                 f.write("# Load prerequisites\n")
-                f.write(f"{self.module_prereqs}\n")
+                f.write(f"{self.orca_module_prereqs}\n")
                 f.write("# Load software\n")
-                f.write(f"{self.module_software}\n")
+                f.write(f"{self.orca_module_software}\n")
                 f.write("# Set up full path to ORCA for paralleliztion runs\n")
                 f.write("orca=$(which orca)\n\n")
 
@@ -512,13 +510,10 @@ class QSE_job:
                 f.write(f"cd {self.job_calculator.work_folder}\n")
                 f.write(
                     f"$orca {self.job_calculator.orca_input} > {self.job_calculator.output}\n")
-            elif self.package == "CREST":
-                # ERM : Not available from module load, but should work by activating classy YARP conda environment!?
-                f.write("CREST stuff\n")
             else:
                 # Throw a runtime error
                 raise RuntimeError(
-                    "QSE class currently only supports CREST and ORCA job submissions!")
+                    "QSE class currently only supports ORCA job submissions!")
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")

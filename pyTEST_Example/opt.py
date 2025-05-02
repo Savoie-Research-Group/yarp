@@ -133,10 +133,11 @@ class OPT:
 
         elif scheduler == "QSE":
             job = QSE_job(package=args["package"], jobname=f"OPT.{self.inchi}",
-                 module=args.get("module", None), job_calculator=self.dft_job,
-                 queue=args["partition"], ncpus=args["dft_nprocs"],
+                 orca_module=args.get("orca_module", None), job_calculator=self.dft_job,
+                 queue=args["partition"], ncpus=args["dft_ppn"],
                  mem=int(args["mem"]*1000), time=args["dft_wt"],
                  ntasks=1, email=args["email_address"])
+            
             job.prepare_submission_script()
 
         else:

@@ -77,17 +77,24 @@ class Conformational_Sampling:
 
     def Prepare_Submit(self):
         args = self.args
-        if args['scheduler'] == "SLURM":
+        scheduler = args.get("scheduler", "SLURM")
+
+        if scheduler == "SLURM":
             job=SLURM_Job(jobname=f'CREST.{self.inchi}', ppn=args["dft_ppn"], partition=args["partition"], time=args["dft_wt"], mem_per_cpu=int(args["mem"])*1000, email=args["email_address"])
 
             job.create_crest_jobs([self.opt_job])
-        elif args["scheduler"] == "QSE":
-            job = QSE_job(package=args["package"], jobname=f"CREST.{self.rxn_ind}",
-             module=args.get("module", None), job_calculator=self.dft_job,
+
+        elif scheduler == "QSE":
+            job = QSE_job(package="CREST", jobname=f"CREST.{self.inchi}",
+             orca_module=args.get("orca_module", None), job_calculator=self.opt_job,
              queue=args["partition"], ncpus=args["dft_nprocs"],
              mem=int(args["mem"]*1000), time=args["dft_wt"],
              ntasks=1, email=args["email_address"])
+            
             job.prepare_submission_script()
+
+        else:
+            raise RuntimeError(f"Scheduler {scheduler} not supported")
 
         self.submission_job = job
     def Submit(self):

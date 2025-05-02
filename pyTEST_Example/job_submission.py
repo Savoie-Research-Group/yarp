@@ -510,10 +510,23 @@ class QSE_job:
                 f.write(f"cd {self.job_calculator.work_folder}\n")
                 f.write(
                     f"$orca {self.job_calculator.orca_input} > {self.job_calculator.output}\n")
+            
+            elif self.package == "CREST":
+                f.write(f"module load anaconda/2022.10-py39\n")
+                f.write(f"conda activate copy-classy-yarp\n")
+
+                f.write(f"export OMP_STACKSIZE={self.job_calculator.mem}M\n")
+                f.write(f"export OMP_NUM_THREADS={self.job_calculator.nproc}\n")
+
+                f.write("\n# cd into the submission directory\n")
+                f.write(f"cd {self.job_calculator.work_folder}\n\n")
+                f.write("# Running crest jobs for the input file\n")
+                f.write(f"{self.job_calculator.command} > {self.job_calculator.output}\nwait\n\n")
+            
             else:
                 # Throw a runtime error
                 raise RuntimeError(
-                    "QSE class currently only supports ORCA job submissions!")
+                    "QSE class currently only supports ORCA and CREST job submissions!")
 
             # Make script footer
             f.write("\necho End Time is `date`\n\n")

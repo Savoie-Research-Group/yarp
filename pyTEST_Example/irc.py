@@ -81,16 +81,17 @@ class IRC:
 
     def Prepare_Submit(self):
         args = self.args
-        if args['scheduler'] == 'SLURM':
+        scheduler = args.get("scheduler", "SLURM")
+        if scheduler == 'SLURM':
             job = SLURM_Job(jobname=f"IRC.{self.rxn_ind}", ppn=int(args["dft_ppn"]), partition=args["irc_partition"], time=args["irc_wt"], mem_per_cpu=int(
-                int(args["mem"])*1000), email=args["email_address"], write_memory=args['write_memory_in_slurm_job'])
+                int(args["mem"])*1000), email=args["email_address"], write_memory=args['write_memory_in_slurm_job'], orca_module=args.get("orca_module", None))
 
             if args["dft_irc_package"] == "ORCA":
                 job.create_orca_jobs([self.dft_job])
             elif args["dft_irc_package"] == "Gaussian":
                 job.create_gaussian_jobs([self.dft_job])
 
-        elif args["scheduler"] == "QSE":
+        elif scheduler == "QSE":
             job = QSE_job(package=args["package"], jobname=f"IRC.{self.rxn_ind}",
                  module=args.get("module", None), job_calculator=self.dft_job,
                  queue=args["partition"], ncpus=args["dft_nprocs"],
@@ -98,6 +99,9 @@ class IRC:
                  ntasks=1, email=args["email_address"])
 
             job.prepare_submission_script()
+
+        else:
+            raise RuntimeError("Scheduler provided is not supported! Only SLURM and QSE are accepted.")
 
         self.submission_job = job
 

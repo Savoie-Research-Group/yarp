@@ -1,9 +1,8 @@
 """
-Helper functions related to the graphical representation of molecules in YARP
+Helper functions related to adjacency matrices
 """
 import numpy as np
 from scipy.spatial.distance import cdist
-
 from yarp.util.properties import el_radii, el_max_bonds
 
 
@@ -148,3 +147,11 @@ def table_generator(elements, geometry, scale_factor=1.2, filename=None):
         print("")
 
     return adj_mat
+
+
+def adjmat_to_adjlist(adj_mat):
+    """
+    Convenience function for converting between adjacency matrix
+    and adjacency list (actually a list of sets for convenience)
+    """
+    return [set(np.where(_ == 1)[0]) for _ in adj_mat]

@@ -4,7 +4,7 @@ Definition of yarpecule object class
 import numpy as np
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
-from yarp.yarpecule.graph import table_generator
+from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.util.properties import el_mass
 
 

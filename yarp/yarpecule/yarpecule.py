@@ -5,6 +5,8 @@ import numpy as np
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.atom_mapping import canon_order
+from yarp.yarpecule.hashes import atom_hash
 from yarp.util.properties import el_mass
 
 
@@ -12,7 +14,25 @@ class yarpecule:
     """
     Base class for describing a molecule in YARP
 
-    MISSING: update_masses()
+    MISSING: update_masses() <-- ERM: I see this defined, but never used in classy YARP. Do we need it?
+
+    Parameters:
+    -----------
+
+    mol : var
+          The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding
+          (adj_mat, elements, charge),  or one or more filenames. (<-- ERM: CAN it handle multiple files?)
+          For strings the extension is used to determine which parser to use (e.g., .xyz etc),
+          otherwise the constructor will attempt to parse the input as a smiles string using rdkit.
+
+    canon : bool, default=True
+            Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
+
+    mode : str, default=rdkit
+            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default rdkit is used
+            but setting this to 'yarp' will use the in-house parser. This variable is unused if the molecular info
+            is passed through another method besides SMILES.
+            Thoughts on renaming this to smi_mode? - ERM
 
     Attributes:
     -----------
@@ -25,47 +45,52 @@ class yarpecule:
             A list of lower-case element labels indexed to the atomic ordering of the `yarpecule`.
 
     q : int
-        The total charge on the `yarpecule`. 
+            The total charge on the `yarpecule`. 
 
     masses : numpy.array
-            The masses of the atoms in the molecule.
+            A list of the atomic masses in the yarpecule. These masses are used in the determination of uniqueness,
+            such that isotopomers will be considered unique.
 
     adj_mat : numpy.ndarray
-                The adjacency matrix of the graphical representation of the molecular structure.
-                Array is indexed to atoms in the `yarpecule`. If atom_i and atom_j are
-                bonded, matrix elements M_ij and M_ji are equal to 1. Otherwise,
-                all elements are 0.
-    """
+            The adjacency matrix of the graphical representation of the molecular structure.
+            Array is indexed to atoms in the `yarpecule`. If atom_i and atom_j are
+            bonded, matrix elements M_ij and M_ji are equal to 1. Otherwise,
+            all elements are 0.
+
+    atom_hashes : array
+            A list of hash values for each atom, based on graph connectivity and the masses of the atoms.
+
+    mapping : ???
+            Oh dang, what is this friend?????
+
+    lewis_struct : list of `lewis_struct` object(s)
+            Lewis structure(s) of the yarpecule. Multiple structures are generated for cases involving resonance.
+
+    yarpecule_hash : float
+            A unique identifier for the yarpecule based on atom hashes and bond-electron matrices
+            generated from the Lewis structure(s) of the yarpecule.
+  """
 
     ###############
     # Constructor #
     ###############
 
-    def __init__(self, mol, mode='rdkit', canon=True):
+    def __init__(self, mol, canon=True, mode='rdkit'):
         self._geo = None
         self._elements = None
-        self._masses = None
         self._q = 0
-        # self._multiplicity = 1
+        self._masses = None
         self._adj_mat = None
 
-        self._update_structure(mol, mode)
+        self._read_structure(mol, mode)
 
         self._atom_hashes = None
-        self._mapping = None  # oh dang, what is this friend?????
+        self._mapping = None
 
         self._order_atoms(canon=canon)
 
-        # How about we shove all these into a self._lewis_struct attribute? - ERM
-        # self._bond_mats = None
-        # self._bond_mat_scores = None
-        # self._yarpecule_hash = None
-        # self._n_e_accept = 0
-        # self._n_e_donate = 0
-        # self._formal_charge = 0
-        # self._atom_neighbors = None
-        # self._bo_dict = None
-        self._lewis = None
+        self._lewis_struct = None
+        self._yarpecule_hash = None
 
         self._gen_lewis_struct()
 
@@ -73,8 +98,10 @@ class yarpecule:
     # Properties  #
     ###############
 
-    # the user should pretty much never edit these directly, but may want to view them
-    # therefore, I'm thinking we should use access functions to handle that? - ERM
+    # The user should pretty much never edit these directly, but may want to view them.
+    # Therefore, I'm thinking we should use access functions to handle that.
+    # These are fancy python functions that return class attributes as (sort of) read-only.
+    # Mutable values are still mutable, but it puts some protection at least? - ERM
 
     @property
     def geo(self):
@@ -92,19 +119,36 @@ class yarpecule:
     # Internal Functions #
     ######################
 
-    def _update_structure(self, mol, mode):
+    def _read_structure(self, mol, mode):
         """
-        Update yarpecule attributes directly impacted by the molecular structure.
+        Read in an externally provided molecular structure and update
+        core attributes of the yarpecule object.
+
+        Parameters:
+        -----------
+        mol : str or tuple
+                Input structure
+
+        mode : str
+                Mode to control SMILES parsing.
 
         Updated Attributes:
         ------------------
-        self.adj_mat : numpy.ndarray
+        self._adj_mat : numpy.ndarray
+                Set to reflect input structure.
 
-        self.geo : numpy.ndarray
+        self._geo : numpy.ndarray
+                Set to reflect input structure.
 
-        self.elements : list
+        self._elements : list
+                Set to reflect input structure.
 
-        self.q : int
+        self._q : int
+                Set to reflect input structure.
+
+        self._masses : numpy.ndarray
+                Atomic masses are computed from `elements`
+                according to `el_mass` from `yarp.util.properties.py`
         """
 
         # direct branch: user passes core attributes directly
@@ -134,7 +178,7 @@ class yarpecule:
 
         # mol branch
         elif len(mol) > 4 and mol[-4:] == ".mol":
-            self._elements, self._geo, self._q, _, _ = mol_parse(mol)
+            self._elements, self._geo, self._adj_mat, self._q = mol_parse(mol)
 
         # SMILES branch
         else:
@@ -148,47 +192,65 @@ class yarpecule:
         # Calculate elementary attributes
         # eventually all functions will expect lowercase element labels
         self._elements = [_.lower() for _ in self._elements]
+
         # User can update via mass update function.
         self._masses = np.array([el_mass[_] for _ in self._elements])
 
     def _order_atoms(self, canon=False, mapping=None):
         """
         Either canonically order the atoms or apply a user defined mapping.
-        Not sure if the adjacency matrix is updated here, but I think it should be.
+        Not sure if the adjacency matrix is updated here, but I think it should be. - ERM
+
+        Parameters:
+        -----------
+        canon : bool
+                If True, the atoms are ordered based on a canonicalization routine.
+                If False, the atoms are ordered based on the order they are provided.
+
+        mapping : TBD! - ERM
 
         Updated Attributes:
         ------------------
-        self.atom_hashes
+        self._atom_hashes
+                If canon is True, atom hashes are updated according to the `canon_order()` function.
+                If canon is False, atom hashes are calculated directly from the `atom_hash()` function.
 
-        self.mapping       
+        self._mapping
+                I don't know what is currently/should be done with this yet. - ERM
         """
+
+        # TO-DO: send read-only copies to canon_order() and atom_hash()?
+        if canon:
+            self._elements, self._adj_mat, self._atom_hashes, self._mapping, self._geo, self._masses = canon_order(
+                self._elements, self._adj_mat, masses=self._masses, things_to_order=[self._geo, self._masses])
+        else:
+            self._atom_hashes = np.array(
+                [atom_hash(_, self._adj_mat, self._masses) for _ in range(len(self._elements))])
+            # self._mapping = list(range(len(self)))
 
     def _gen_lewis_struct(self):
         """
-        Compute Lewis structures and related information for the yarpecule.
+        Compute Lewis structure(s) for the yarpecule.
+        Also update the yarpecule hash while we're at it?
 
         Updated Attributes:
         ------------------
-        self.bond_mats
-
-        self.bond_mat_scores
-
-        self.yarpecule_hash
-
-        self.n_e_accept
-
-        self.n_e_donate
-
-        self.formal_charge
-
-        self.atom_neighbors
-
-        self.bo_dict
+        self.lewis_struct
         """
 
     ######################
     # External Functions #
     ######################
+    def update_atom_order(self, atom_index=None, canon=True):
+        """
+        Update the atom order of the yarpecule.
+        And then update all the other attributes that depend on the atom order.
+
+        User can just ask to canonicalize the yarpecule,
+        or they can provide a magic little list to tell us how to reorder the atoms.
+        Not sure what exactly this should look like yet. - ERM
+        """
+
     def join(self, other_yps, canon=True, mode='rdkit'):
         """
         Join two yarpecules together to form a new yarpecule.

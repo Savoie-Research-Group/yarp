@@ -3,7 +3,10 @@ Helper functions for parsing molecular information from a variety of input forma
 Consider moving this to util if anything outside of yarpecule needs to access it.
 """
 import numpy as np
-from rdkit.Chem import rdmolfiles
+from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
+from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet
+from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
+from yarp.yarpecule.lewis_structure import lewis_struct
 
 
 def xyz_parse(xyz, read_types=False, multiple=False):
@@ -176,6 +179,7 @@ def xyz_q_parse(xyz):
                 else:
                     q = 0
                 break
+
     return q
 
 
@@ -200,22 +204,145 @@ def mol_parse(mol):
     elements = []
     geo = np.zeros((N_atoms, 3))
     q = 0
+
+    # Get elements, coordinates, and charge
     for i in range(N_atoms):
         atom = m.GetAtomWithIdx(i)
         elements += [atom.GetSymbol()]
         coord = m.GetConformer().GetAtomPosition(i)
         geo[i] = np.array([coord.x, coord.y, coord.z])
         q += atom.GetFormalCharge()
+
     # Generate adjacency matrix
     adj_mat = np.zeros((N_atoms, N_atoms))
     for i in [(_.GetBeginAtomIdx(), _.GetEndAtomIdx()) for _ in m.GetBonds()]:
         adj_mat[i[0], i[1]] = 1
         adj_mat[i[1], i[0]] = 1
+
     return elements, geo, adj_mat, q
 
 
-def xyz_from_smiles():
+def xyz_from_smiles(smiles, mode="rdkit"):
     """
-    This is going to require some extra care to port over...
-    Especially if we're overhauling find_lewis()! - ERM
+    A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
+    Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
+    and an rdkit option. In either case, the generation of 3D geometries is handled by rdkit.
+
+    Parameters
+    ----------
+    smiles : str
+            The SMILES string that is being converted into a geometry, adjacency matrix, list of elements, and charge.
+
+    mode : str
+           This variable controls whether to use the yarp SMILES parser or the rdkit parser.
+           The default is to use rdkit.
+           The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
+
+
+    Returns
+    -------
+
+    (elements, geo, adj_mat, q) : tuple
+            `elements` is a list with the element labels,
+            `geo` is an nx3 numpy array holding the rdkit generated geometry,
+            `adj_mat` is an nxn array holding the adjacency matrix,
+            `q` is an `int` holding the molecular charge (based on the sum of formal charges).
     """
+
+    # Initialize the preferred lone electron dictionary the first time this function is called
+    if not hasattr(xyz_from_smiles, "bond_to_type"):
+        xyz_from_smiles.bond_to_type = {0: BondType.DATIVE, 1: BondType.SINGLE, 2: BondType.DOUBLE,
+                                        3: BondType.TRIPLE, 4: BondType.QUADRUPLE, 5: BondType.QUINTUPLE,
+                                        6: BondType.HEXTUPLE}
+
+    # Yarp branch
+    if mode == "yarp":
+
+        # Parse basics
+        adj_mat, atom_info = smiles2adjmat(smiles)
+        elements = [_[0].lower() for _ in atom_info]
+        fc = [0 if _[1] is None else int(_[1]) for _ in atom_info]
+        q = int(sum(fc))
+
+        # This is new code!!!!!! Needs implementation/testing!!! - ERM
+        lewis = lewis_struct(adj_mat, elements, q)
+        bond_mats = lewis.bond_mats
+
+        # Array of atom-wise octet requirements for determining expanded octects
+        e_exp = np.array([el_n_expand_octet[_] for _ in elements])  # max atoms
+
+        # electrons per atom
+        e = np.sum(2*bond_mats[0], axis=1)-np.diag(bond_mats[0])
+
+        # Check that the octet rules have not been violated
+        violations = [count for count, _ in enumerate(
+            e) if not el_expand_octet[elements[count]] and _-e_exp[count] > 0]
+        # Raise error if octet violations exist
+        if violations:
+            raise OctetError(violations)
+
+        # Throwaway molecule
+        mol = MolFromSmiles("C")
+        mol = rdchem.RWMol(mol)
+        mol.RemoveAtom(0)
+
+        # add atoms
+        [mol.AddAtom(Atom(el_to_an[_.lower()])) for _ in elements]
+        # add bonds
+        for count_j, j in enumerate(adj_mat):
+            for count_k, k in enumerate(j):
+                if count_k < count_j:
+                    if k == 0:
+                        continue
+                    else:
+                        mol.AddBond(
+                            count_j, count_k, xyz_from_smiles.bond_to_type[bond_mats[0][count_j, count_k]])
+                else:
+                    break
+
+        # set explicit H-atoms and formals
+        for count_j, j in enumerate(bond_mats[0]):
+            atom = mol.GetAtomWithIdx(count_j)
+            mol.GetAtomWithIdx(count_j).SetFormalCharge(int(fc[count_j]))
+            mol.GetAtomWithIdx(count_j).SetNumRadicalElectrons(
+                int(j[count_j] % 2))
+
+        mol.UpdatePropertyCache()
+
+        # get geometry
+        AllChem.EmbedMolecule(mol, randomSeed=0xf00d)  # create a 3D geometry
+        N_atoms = len(mol.GetAtoms())  # find the number of atoms
+        geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
+        # loop over atoms, save their labels, positions, and total charge
+        for i in range(N_atoms):
+            atom = mol.GetAtomWithIdx(i)
+            coord = mol.GetConformer().GetAtomPosition(i)
+            geo[i] = np.array([coord.x, coord.y, coord.z])
+
+        return elements, geo, adj_mat, q
+
+    # RDKit branch
+    else:
+        m = MolFromSmiles(smiles)  # create molecule using rdkit
+        m = AddHs(m)  # make the hydrogens explicit
+        AllChem.EmbedMolecule(m, randomSeed=0xf00d)  # create a 3D geometry
+        N_atoms = len(m.GetAtoms())  # find the number of atoms
+        elements = []  # initialize list to hold element labels
+        geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
+        q = 0  # total charge on the molecule
+
+        # loop over atoms, save their labels, positions, and total charge
+        for i in range(N_atoms):
+            atom = m.GetAtomWithIdx(i)
+            elements += [atom.GetSymbol()]
+            coord = m.GetConformer().GetAtomPosition(i)
+            geo[i] = np.array([coord.x, coord.y, coord.z])
+            q += atom.GetFormalCharge()
+
+        # Generate adjacency matrix
+        adj_mat = np.zeros((N_atoms, N_atoms))
+        for i in [(_.GetBeginAtomIdx(), _.GetEndAtomIdx()) for _ in m.GetBonds()]:
+            adj_mat[i[0], i[1]] = 1
+            adj_mat[i[1], i[0]] = 1
+
+    return elements, geo, adj_mat, q

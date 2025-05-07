@@ -12,7 +12,7 @@ from initialize import DFT_Initialize, load_pickle, write_pickle
 def main(args:dict):
 
     DFT_Initialize(args)
-    print(args['write_memory_in_slurm_job'])
+    # print(args['write_memory_in_slurm_job'])
     # finish laod initial TSs into a dict
     scratch=args["scratch"]
     if os.path.isdir(args["scratch"]) is False: os.mkdir(args["scratch"])
@@ -96,7 +96,7 @@ def main(args:dict):
             conf.IRC.args = args
 
             conf.run_TSOPT()
-            conf.run_IRC()
+            # conf.run_IRC()
 
             STATUS.append([conf.TSOPT.rxn_ind, conf.status, conf.TSOPT.FLAG, conf.IRC.FLAG])
     

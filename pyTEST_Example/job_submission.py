@@ -452,18 +452,18 @@ class QSE_job:
             return "NO JOB ID"
 
         try:
-            command = f"qstat -j {self.job_id} | grep 'job_state' | awk {'print $NF'}"
+            command = f"qstat -j {self.job_id} | grep 'job_number' | awk {'print $NF'}"
             output = subprocess.run(
                 command, shell=True, capture_output=True, text=True)
             job_status = output.stdout.strip()
 
             if job_status == "":
                 # Job ID not found, indicating the job has completed
-                return "Finished"
+                return "FINISHED"
             else:
                 # Common status: RUNNING and PENDING
                 # Discard for the sake of uniformity
-                return "Submitted"
+                return "PENDING"
         except:
             return "UNKNOWN"
 

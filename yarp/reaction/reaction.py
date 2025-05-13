@@ -1,81 +1,46 @@
-class Reaction:
-    """
+"""
+Definition of the reaction object class.
+"""
 
-    Attributes:
-    -----------
-
-    self.reactant : yarpecule
-        reactant molecule
-        initialized based on user input
-
-    self.product : yarpecule
-        product molecule
-        initialized based on user input or product enumeration
-
-    self.ID : str
-        unique identifier for reaction
-        <insert description of how this is generated and then how it's used>
-
-    self.status : dict
-        key-value pairs of known stages and their status 
+from yarp.reaction.node import node
+from yarp.reaction.edge import edge
+from yarp.reaction.conformer import select_conformer_pair
 
 
-    """
+class reaction:
 
     def __init__(self, reactant, product):
-        self.reactant = reactant
-        self.product = product
 
-        self.status = dict()
-        self.ID = "carl"
+        self.reactant = node(reactant)
+        self.product = node(product)
 
-    def check_status(self, method):
-        """
-        method : str
-            name of the method to check the status of
+        self.edge = None
 
-        Check if any of the pre-built methods have been completed for this reaction object.
+        self.id = self.reactant.inchi + "_" + self.product.inchi
 
-        Expand self.status dictionary with True/False values for each method
+    def gen_initial_path(self, input):
 
-        Or maybe have a more complex logic than simple True/False...?
-        """
+        self.reactant.gen_conformers(input)
+        self.product.gen_conformers(input)
 
-        # Look for some sort of a flag/file indicating "submitted", "running", "completed with error", "completed successfully"
+        select_conformer_pair(self.reactant, self.product, input)
 
-    def compute(self, input):
-        """
-        Decide which method class to run based on input file.
+        self.path = edge(self.reactant, self.product, input)
 
-        input : dict
-            dictionary of input parameters parsed from input YAML file.
-            should only contain parameters relevant to the current stage begin run.
-        """
+    def refine_reaction(self, input):
 
-        if input.get('method') == 'initial_path':
-            # basically, this will do the same thing as main_xtb.py
-            # but there will be the flexibility to run LL methods besides xTB (i.e. AIMNet or other ML potentials)
-            # also, we will ensure that inputs required for one part (i.e. conformers) will have no impact on separate parts (i.e. ts optimization)
-            self.generate_conformers(input.get('conformer generation'))
-            self.select_conformer_pair(input.get('conformer generation'))
-            self.run_gsm(input.get('gsm'))
-            self.optimize_ts(input.get('TS optimization'))
-            self.validate_irc(input)
+        self.path.refine_edge(input)
+        self.reactant.refine_node(input)
+        self.product.refine_node(input)
 
-        elif input.get('method') == 'refine_path':
-            # this will do the same thing as main_dft.py
-            # but there will be flexiblity to run HL methods besides DFT (i.e. CC)
-            self.rp_opt(input)
-            self.optimize_ts(input.get('TS optimization'))
-            self.validate_irc(input)
+    def refine_ts(self, input):
 
-        # Allow user to isolate any of the individual steps within the refinement process
-        # Should we also allow the user to isolate any of the individual steps within the initial path generation process?
-        elif input.get('method') == 'rp_opt':
-            self.rp_opt(input)
+        self.path.refine_edge(input)  # put the IRC toggle inside this function
 
-        elif input.get('method') == 'ts_opt':
-            self.optimize_ts(input.get('TS optimization'))
+    def refine_reactant(self, input):
 
-        elif input.get('method') == 'irc_val':
-            self.validate_irc(input)
+        self.reactant.refine_node(input)
+
+    def refine_product(self, input):
+        # This is a small DRY violation, so revisit later
+        self.product.refine_node(input)

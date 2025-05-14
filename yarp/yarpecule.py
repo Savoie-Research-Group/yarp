@@ -390,9 +390,9 @@ def draw_yarpecules(yarpecules,name,label_ind=False,mol_labels=None):
     else:
         n_per_row = 3
     if mol_labels:
-        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=[ str(_) for _ in mol_labels])
+        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=[ str(_) for _ in mol_labels], useSVG=False, returnPNG=False)
     else:
-        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row)        
+        img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row, useSVG=False, returnPNG=False)        
     img.save(name)
     return
         
@@ -455,7 +455,7 @@ def draw_bmats(yarpecule,name):
     else:
         n_per_row = 3
     # save the molecule
-    img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=["score: {: <4.3f}".format(_) for _ in yarpecule.bond_mat_scores ], useSVG=False, returnPNG=False)
+    img = Draw.MolsToGridImage(mols,subImgSize=(400, 400),molsPerRow=n_per_row,legends=["score: {: <4.3f}".format(_) for _ in yarpecule.bond_mat_scores ])
     img.save(name)
     return
 

@@ -1,4 +1,17 @@
-class Constants:                                                                                                 
+"""
+Constants module
+
+This module contains a class with physical constants and unit conversions.
+
+"""
+
+class Constants:     
+    """
+    Constants class
+
+    This class contains physical constants and unit conversions.
+
+    """                                                                                            
 
     n_a = 6.022140857E23                      # molecules mol-1
 

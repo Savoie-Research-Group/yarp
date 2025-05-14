@@ -65,6 +65,7 @@ Modules
    sieve.py <yarp.sieve>
    smiles.py <yarp.smiles>
    taffi_functions.py <yarp.taffi_functions>
+   yarpecule.py <yarp.yarpecule>
 
 
 --

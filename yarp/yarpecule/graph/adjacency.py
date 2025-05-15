@@ -2,6 +2,8 @@
 Helper functions related to adjacency matrices
 """
 import numpy as np
+from copy import deepcopy
+
 from scipy.spatial.distance import cdist
 from yarp.util.properties import el_radii, el_max_bonds
 
@@ -155,3 +157,47 @@ def adjmat_to_adjlist(adj_mat):
     and adjacency list (actually a list of sets for convenience)
     """
     return [set(np.where(_ == 1)[0]) for _ in adj_mat]
+
+
+def graph_seps(adj_mat_0):
+    """
+    Returns a matrix of graphical separations for all nodes in a graph defined by the inputted adjacency matrix
+
+    Parameters
+    ----------
+    adj_mat_0 : array
+            This array is indexed to the atoms in the `yarpecule` and has a one at row i and column j if there is 
+            a bond (of any kind) between the i-th and j-th atoms.
+
+    Returns
+    ----------
+    seps : NDArray
+            What is the final shape of this matrix? (ERM)
+    """
+
+    # Create a new name for the object holding A**(N), initialized with A**(1)
+    adj_mat = deepcopy(adj_mat_0)
+
+    # Initialize an array to hold the graphical separations with -1 for all unassigned elements and 0 for the diagonal.
+    seps = np.ones([len(adj_mat), len(adj_mat)])*-1
+    np.fill_diagonal(seps, 0)
+
+    # Perform searches out to len(adj_mat) bonds (maximum distance for a graph with len(adj_mat) nodes
+    for i in np.arange(len(adj_mat)):
+
+        # All perform assignments to unassigned elements (seps==-1)
+        # and all perform an assignment if the value in the adj_mat is > 0
+        seps[np.where((seps == -1) & (adj_mat > 0))] = i+1
+
+        # Since we only care about the leading edge of the search and not the actual number of paths at higher orders, we can
+        # set the larger than 1 values to 1. This ensures numerical stability for larger adjacency matrices.
+        adj_mat[np.where(adj_mat > 1)] = 1
+
+        # Break once all of the elements have been assigned
+        if -1 not in seps:
+            break
+
+        # Take the inner product of the A**(i+1) with A**(1)
+        adj_mat = np.dot(adj_mat, adj_mat_0)
+
+    return seps

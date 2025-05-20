@@ -9,7 +9,7 @@ from yarp.util.properties import el_valence, el_metals, el_expand_octet
 from yarp.yarpecule.atom_mapping import canon_order
 
 
-def smiles2adjmat(smiles):
+def smiles2adjmat(smiles, verbose=False):
     """
     In-house Savoie group SMILES parser. Written in python and transparent to debug. The main motivation
     was to consistently handle protonation of radicals and atoms with formal charges. The usual SMILES 
@@ -111,7 +111,8 @@ def smiles2adjmat(smiles):
 
             # Check for explicit hydrogens
             hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token)
-            print(f"{token=} {hydrogen_match=}")
+            if verbose:
+                print(f"{token=} {hydrogen_match=}")
             if hydrogen_match:
                 found_explicit_h = True
                 if token == '[H]' or token == '[h]':

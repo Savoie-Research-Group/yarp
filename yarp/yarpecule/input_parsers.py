@@ -6,7 +6,7 @@ import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
-from yarp.yarpecule.lewis_structure import lewis_struct
+from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
 def xyz_parse(xyz, read_types=False, multiple=False):

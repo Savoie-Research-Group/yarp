@@ -8,5 +8,4 @@ dependencies:
   - pyaml
   - numpy
   - scipy
-  - pip:
-      - rdkit
+  - rdkit

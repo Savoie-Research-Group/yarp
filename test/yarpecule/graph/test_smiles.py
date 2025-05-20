@@ -305,3 +305,75 @@ class TestSmi2Adj:
         assert adjmat[7, 5] == pytest.approx(0.0, rel=1e-5)
         assert adjmat[7, 6] == pytest.approx(0.0, rel=1e-5)
         assert adjmat[7, 7] == pytest.approx(0.0, rel=1e-5)
+
+    def test_rad_canon(self, rad_canon_smi):
+        adjmat, atom_info = smi.smiles2adjmat(rad_canon_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_rad_canon_map(self, rad_canon_map_smi):
+        adjmat, atom_info = smi.smiles2adjmat(rad_canon_map_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_rad_explicitH(self, rad_explicitH_smi):
+        adjmat, atom_info = smi.smiles2adjmat(rad_explicitH_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_rad_full_map(self, rad_full_map_smi):
+        adjmat, atom_info = smi.smiles2adjmat(rad_full_map_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_anion_canon_smi(self, anion_canon_smi):
+        adjmat, atom_info = smi.smiles2adjmat(anion_canon_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'O', 'O', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_anion_canon_map(self, anion_canon_map_smi):
+        adjmat, atom_info = smi.smiles2adjmat(anion_canon_map_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['O', 'C', 'C', 'O', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_anion_explicitH(self, anion_explicitH_smi):
+        adjmat, atom_info = smi.smiles2adjmat(anion_explicitH_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks
+
+    def test_anion_full_map(self, anion_full_map_smi):
+        adjmat, atom_info = smi.smiles2adjmat(anion_full_map_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']
+
+        assert adjmat.shape == (7, 7)
+        # To-do: add explicit adjmat element checks

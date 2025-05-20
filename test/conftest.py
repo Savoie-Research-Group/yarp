@@ -40,3 +40,43 @@ def haa_heavy_map_smi():
 @pytest.fixture
 def haa_heavy_map_explicitH_smi():
     return '[C:1]([C:4]([O:3][H])([H])[H])(=[O:2])[H]'
+
+
+@pytest.fixture
+def rad_canon_smi():
+    return '[CH2]C'
+
+
+@pytest.fixture
+def rad_canon_map_smi():
+    return '[CH2:2][C:1]'
+
+
+@pytest.fixture
+def rad_explicitH_smi():
+    return 'C([C]([H])[H])([H])([H])[H]'
+
+
+@pytest.fixture
+def rad_full_map_smi():
+    return '[C:1]([C:2]([H:3])[H:7])([H:5])([H:6])[H:4]'
+
+
+@pytest.fixture
+def anion_canon_smi():
+    return 'CC(=O)[O-]'
+
+
+@pytest.fixture
+def anion_canon_map_smi():
+    return '[C:2][C:3](=[O:1])[O-:4]'
+
+
+@pytest.fixture
+def anion_explicitH_smi():
+    return '[O-]C(=O)C([H])([H])[H]'
+
+
+@pytest.fixture
+def anion_full_map_smi():
+    return '[O-:3][C:4](=[O:5])[C:6]([H:13])([H:14])[H:12]'

@@ -115,16 +115,14 @@ def smiles2adjmat(smiles, verbose=False):
                 print(f"{token=} {hydrogen_match=}")
             if hydrogen_match:
                 found_explicit_h = True
-                if token == '[H]' or token == '[h]':
-                    explicit_hydrogens = 0
-                else:
-                    h_str = hydrogen_match.group(1)
+                h_str = hydrogen_match.group(1)
+                # Only set explicit_hydrogens if this is a hydrogen count specification
+                # (i.e., not just a hydrogen atom with other annotations)
+                element_label = smiles2adjmat.element_label_pattern.search(token).group(1)
+                if element_label.lower() != 'h':  # Only set explicit_hydrogens for non-hydrogen atoms
                     if h_str[-1].isdigit():
                         # Case: H2, H3, etc.
                         explicit_hydrogens = int(h_str[1:])
-                    elif h_str == ']':
-                        # Case: H (only one hydrogen)
-                        explicit_hydrogens = 1
                     else:
                         # Case: HH, HHH, etc.
                         explicit_hydrogens = len(h_str)
@@ -174,7 +172,7 @@ def smiles2adjmat(smiles, verbose=False):
 
     # Find all atoms in the SMILES string less the square bracket information (dodges explicit hydrogen issues)
     atoms = re.findall(smiles2adjmat.atom_pattern, ''.join(tokens))
-
+    
     # Initialize adjmat as a square matrix with a row and column for each atom
     adjmat = np.zeros([len(atoms), len(atoms)])
 
@@ -408,12 +406,13 @@ def add_hydrogens(adjmat, atom_info):
 
     # Calculate bonded hydrogens for each atom. This will override the inference value if non-zero
     bonded_hydrogens = []
+    
     for atom in range(len(atom_info)):
         # Count the number of hydrogen atoms already bonded to this atom
         h_count = sum(1 for i in range(len(atom_info))
                       if atom_info[i][0].lower() == 'h' and adjmat[atom, i] != 0)
         bonded_hydrogens.append(h_count)
-
+    
     # Loop over the atoms and determine how many hydrogens to add
     for atom, info in enumerate(atom_info):
         # Determine the element of the current atom
@@ -438,34 +437,34 @@ def add_hydrogens(adjmat, atom_info):
 
         # Calculate the number of bonds (each bond contributes 1 electron)
         bonds = sum(adjmat[atom])
-
-        # First check if there are explicit hydrogens in the SMILES string
-        if bonded_hydrogens[atom] > 0:
-            # If we have square bracket annotation, verify consistency
-            if explicit_hydrogens is not None and explicit_hydrogens != bonded_hydrogens[atom]:
-                raise ValueError(
-                    f"Inconsistent hydrogen specification for atom {atom} ({element}): "
-                    f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
-                    f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
-                )
-            # Use the bonded hydrogens count and disable inference
-            needed_hydrogens = 0
-            should_infer_hydrogens = False
-        # If no explicit hydrogens in SMILES, check square bracket annotation
-        elif not should_infer_hydrogens and explicit_hydrogens is not None:
-            needed_hydrogens = explicit_hydrogens
+        
+        # First check for square bracket annotations
+        if explicit_hydrogens is not None:
+            # If there are also bonded hydrogens, verify consistency
+            if bonded_hydrogens[atom] > 0:
+                if explicit_hydrogens != bonded_hydrogens[atom]:
+                    raise ValueError(
+                        f"Inconsistent hydrogen specification for atom {atom} ({element}): "
+                        f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
+                        f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
+                    )
+                needed_hydrogens = 0
+            else:
+                needed_hydrogens = explicit_hydrogens
+            
         # If we should infer hydrogens, calculate based on formal charge
         elif should_infer_hydrogens:
+            
             # Determine the desired number of electrons for a full octet (8 for most elements)
             # Special cases like hydrogen (which wants 2) can be handled here
             desired_electrons = 8 if element not in ['h', 'he'] else 2
 
             # Calculate the current electrons: valence electrons + bonds - charge
             current_electrons = int(valence_electrons + bonds)
-
+ 
             # Add hydrogen radicals to reach the desired number of electrons
             needed_hydrogens = max(0, desired_electrons - current_electrons)
-
+            
             # Cation case
             if formal_charge > 0:
                 e = desired_electrons - 2*needed_hydrogens - \

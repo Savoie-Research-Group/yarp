@@ -2,10 +2,10 @@ name: yarp-again
 channels:
   - conda-forge
 dependencies:
-  - python=3.13.2
+  - python=3.11
   - pytest
   - pip
   - pyaml
-  - numpy
-  - scipy
   - rdkit
+  - pip:
+    - rxnmapper

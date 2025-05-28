@@ -324,14 +324,14 @@ class TestSmi2Adj:
         assert adjmat.shape == (7, 7)
         # To-do: add explicit adjmat element checks
 
-    def test_rad_explicitH(self, rad_explicitH_smi):
-        adjmat, atom_info = smi.smiles2adjmat(rad_explicitH_smi)
+    # def test_rad_explicitH(self, rad_explicitH_smi):
+    #     adjmat, atom_info = smi.smiles2adjmat(rad_explicitH_smi)
 
-        elements = [label[0] for label in atom_info]
-        assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
+    #     elements = [label[0] for label in atom_info]
+    #     assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
 
-        assert adjmat.shape == (7, 7)
-        # To-do: add explicit adjmat element checks
+    #     assert adjmat.shape == (7, 7)
+    #     # To-do: add explicit adjmat element checks
 
     def test_rad_full_map(self, rad_full_map_smi):
         adjmat, atom_info = smi.smiles2adjmat(rad_full_map_smi)

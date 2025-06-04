@@ -34,41 +34,46 @@ def main(args: dict):
     STATUS = [] # reaction conformer (TSs) status
     RP_STATUS = [] # reactant / product status
     IRC_STATUS = [] # IRC Barriers (if needed)
-    for count, dft_rxn in enumerate(dft_rxns):
+    processed_rp_molecules = [] # inchi keys for storing already-processed molecules, don't submit multiple ones
+    for rxn_count, dft_rxn in enumerate(dft_rxns):
 
         dft_rxn.rxn.args = args
         dft_rxn.args = args
 
         if args['verbose']:
             print(
-                f"dft_rxn: {count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
+                f"dft_rxn: {rxn_count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
 
         # Calculate Reactant/Product Lowest Energies
         if args['dft_run_rp']:
             if len(dft_rxn.molecules) == 0: # only initialize / separate RP once #
                 dft_rxn.separate_Reactant_Product()
-            for count, mol in enumerate(dft_rxn.molecules):
-                dft_rxn.molecules[count].SUBMIT_JOB = 1-args['dry_run']
-                dft_rxn.rp_conformers[count].SUBMIT_JOB = 1-args['dry_run']
+            for mol_count, mol in enumerate(dft_rxn.molecules):
+                dft_rxn.molecules[mol_count].SUBMIT_JOB = 1-args['dry_run']
+                dft_rxn.rp_conformers[mol_count].SUBMIT_JOB = 1-args['dry_run']
+                
+                if dft_rxn.molecules[mol_count].inchi in processed_rp_molecules: continue
 
-                dft_rxn.run_CREST(count)
-                dft_rxn.run_OPT(count)
+                dft_rxn.run_CREST(mol_count)
+                dft_rxn.run_OPT(mol_count)
 
-                print(f"dft_rxn.molecules: {dft_rxn.molecules[count].inchi}\n")
-                RP_STATUS.append([count, dft_rxn.molecules[count].inchi,
-                                  dft_rxn.rp_conformers[count].FLAG, dft_rxn.molecules[count].FLAG])
+                processed_rp_molecules.append(dft_rxn.molecules[mol_count].inchi)
+                
+                print(f"dft_rxn.molecules: {dft_rxn.molecules[mol_count].inchi}\n")
+                RP_STATUS.append([mol_count, dft_rxn.molecules[mol_count].inchi,
+                                  dft_rxn.rp_conformers[mol_count].FLAG, dft_rxn.molecules[mol_count].FLAG])
             dft_rxn.SumUp_RP_Energies()
             for k, v in dft_rxn.reactant_dft_opt.items():
                 print(k, v)
         # TSOPT + IRC #
         # process all the conformers
-        count = 0
+        ts_count = 0
         for conf_i, conf in enumerate(dft_rxn.conformers):
             if not args['dft_run_ts']: continue
-            if(count >= args['nconf_dft']): continue
+            if(ts_count >= args['nconf_dft']): continue
             if not(args['selected_conformers'] == [] or conf.conformer_id in args['selected_conformers']):
                 continue
-            count += 1
+            ts_count += 1
             # yaml argument dry_run = False: prepare job submission files, but do not submit
             conf.SUBMIT_JOB = 1-args['dry_run']
 
@@ -92,7 +97,7 @@ def main(args: dict):
                 IRC_STATUS.append([conf.TSOPT.rxn_ind, conf.IRC.FLAG, 
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][0],
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][1]])
-
+        if rxn_count > 2: exit()
     if args['dft_run_ts']:
         write_table_with_title(STATUS, title = "Transition State",
                 headers=["RXN_CONF", "TSOPT-Status", "IRC-Status", 

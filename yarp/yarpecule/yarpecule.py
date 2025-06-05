@@ -8,6 +8,7 @@ from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash
 from yarp.util.properties import el_mass
+from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
 class yarpecule:
@@ -114,6 +115,10 @@ class yarpecule:
     @property
     def adj_mat(self):
         return self._adj_mat
+
+    @property
+    def lewis(self):
+        return self._lewis_struct
 
     ######################
     # Internal Functions #
@@ -238,6 +243,9 @@ class yarpecule:
         self.lewis_struct
         """
 
+        self._lewis_struct = lewis_struct(
+            self._adj_mat, self._elements, self._q)
+
     ######################
     # External Functions #
     ######################
@@ -289,3 +297,6 @@ class yarpecule:
             The mode of the SMILES representation to export.
             Options are 'canonical' or 'non-canonical'.
         """
+
+    def __len__(self):
+        return len(self._elements)

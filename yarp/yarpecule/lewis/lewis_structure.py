@@ -76,7 +76,7 @@ class lewis_struct:
     ###############
 
     def __init__(self, adj_mat, elements, q):
-
+        self._elements = elements
         self._rings = None
 
         self._find_rings(adj_mat)
@@ -465,3 +465,6 @@ class lewis_struct:
 
         """
         return np.array([el_valence[_] for _ in elements]) - np.sum(bond_mat, axis=1)
+
+    def __len__(self):
+        return len(self._elements)

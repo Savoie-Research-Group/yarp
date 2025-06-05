@@ -2,12 +2,12 @@
 Testing suite for functions contained in yarp/yarpecule/graph/smiles.py
 """
 import pytest
-import yarp.yarpecule.graph.smiles as smi
+from yarp.yarpecule.graph.smiles import smiles2adjmat
 
 
 class TestSmi2Adj:
     def test_ethene(self, ethene_smi):
-        adjmat, atom_info = smi.smiles2adjmat(ethene_smi)
+        adjmat, atom_info = smiles2adjmat(ethene_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H']
@@ -57,7 +57,7 @@ class TestSmi2Adj:
         assert adjmat[5, 5] == pytest.approx(0.0, rel=1e-5)
 
     def test_haa_canon(self, haa_canon_smi):
-        adjmat, atom_info = smi.smiles2adjmat(haa_canon_smi)
+        adjmat, atom_info = smiles2adjmat(haa_canon_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['O', 'C', 'C', 'O', 'H', 'H', 'H', 'H']
@@ -138,7 +138,7 @@ class TestSmi2Adj:
         assert adjmat[7, 7] == pytest.approx(0.0, rel=1e-5)
 
     def test_haa_full_map(self, haa_full_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(haa_full_map_smi)
+        adjmat, atom_info = smiles2adjmat(haa_full_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'O', 'O', 'H', 'H', 'H', 'H']
@@ -147,7 +147,7 @@ class TestSmi2Adj:
         assert adjmat.shape == (8, 8)
 
     def test_haa_heavy_map(self, haa_heavy_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(haa_heavy_map_smi)
+        adjmat, atom_info = smiles2adjmat(haa_heavy_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'O', 'O', 'C', 'H', 'H', 'H', 'H']
@@ -227,7 +227,7 @@ class TestSmi2Adj:
         assert adjmat[7, 7] == pytest.approx(0.0, rel=1e-5)
 
     def test_haa_heavy_map_explicitH(self, haa_heavy_map_explicitH_smi):
-        adjmat, atom_info = smi.smiles2adjmat(haa_heavy_map_explicitH_smi)
+        adjmat, atom_info = smiles2adjmat(haa_heavy_map_explicitH_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'O', 'O', 'C', 'H', 'H', 'H', 'H']
@@ -307,7 +307,7 @@ class TestSmi2Adj:
         assert adjmat[7, 7] == pytest.approx(0.0, rel=1e-5)
 
     def test_rad_canon(self, rad_canon_smi):
-        adjmat, atom_info = smi.smiles2adjmat(rad_canon_smi)
+        adjmat, atom_info = smiles2adjmat(rad_canon_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
@@ -316,7 +316,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_rad_canon_map(self, rad_canon_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(rad_canon_map_smi)
+        adjmat, atom_info = smiles2adjmat(rad_canon_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
@@ -325,7 +325,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_rad_explicitH(self, rad_explicitH_smi):
-        adjmat, atom_info = smi.smiles2adjmat(rad_explicitH_smi)
+        adjmat, atom_info = smiles2adjmat(rad_explicitH_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
@@ -334,7 +334,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_rad_full_map(self, rad_full_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(rad_full_map_smi)
+        adjmat, atom_info = smiles2adjmat(rad_full_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
@@ -343,7 +343,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_anion_canon_smi(self, anion_canon_smi):
-        adjmat, atom_info = smi.smiles2adjmat(anion_canon_smi)
+        adjmat, atom_info = smiles2adjmat(anion_canon_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['C', 'C', 'O', 'O', 'H', 'H', 'H']
@@ -352,7 +352,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_anion_canon_map(self, anion_canon_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(anion_canon_map_smi)
+        adjmat, atom_info = smiles2adjmat(anion_canon_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['O', 'C', 'C', 'O', 'H', 'H', 'H']
@@ -361,7 +361,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_anion_explicitH(self, anion_explicitH_smi):
-        adjmat, atom_info = smi.smiles2adjmat(anion_explicitH_smi)
+        adjmat, atom_info = smiles2adjmat(anion_explicitH_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']
@@ -370,7 +370,7 @@ class TestSmi2Adj:
         # To-do: add explicit adjmat element checks
 
     def test_anion_full_map(self, anion_full_map_smi):
-        adjmat, atom_info = smi.smiles2adjmat(anion_full_map_smi)
+        adjmat, atom_info = smiles2adjmat(anion_full_map_smi)
 
         elements = [label[0] for label in atom_info]
         assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']

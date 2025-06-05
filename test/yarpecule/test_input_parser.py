@@ -2,12 +2,12 @@
 Testing suite for functions contained in yarp/yarpecule/input_parser.py
 """
 import pytest
-import yarp.yarpecule.input_parsers as inp
+from yarp.yarpecule.input_parsers import xyz_parse
 
 
 class TestXYZParser:
     def test_single_molecule_no_types(self, ethene_xyz):
-        elements, geo = inp.xyz_parse(ethene_xyz)
+        elements, geo = xyz_parse(ethene_xyz)
 
         assert elements == ["C", "C", "H", "H", "H", "H"]
         assert geo.shape == (6, 3)

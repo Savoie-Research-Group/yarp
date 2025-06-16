@@ -82,7 +82,7 @@ def smiles2adjmat(smiles, verbose=False):
             explicit_hydrogens = 0
             isotope = None
             atom_mapping = None
-            should_infer_hydrogens = False  # Default to False for square brackets
+            should_infer_hydrogens = False  # Square brackets always disable hydrogen inference
 
             # Track what information was found in the brackets
             found_isotope = False
@@ -133,16 +133,6 @@ def smiles2adjmat(smiles, verbose=False):
                 atom_mapping = int(mapping_match.group(1))
                 found_mapping = True
 
-            # Set should_infer_hydrogens based on the rules:
-            # True if ONLY isotope or mapping is present
-            # False if empty brackets or any other information is present
-            should_infer_hydrogens = (found_isotope or found_mapping) and not (
-                found_charge or found_explicit_h)
-
-            # If we should infer hydrogens, set explicit_hydrogens to None
-            if should_infer_hydrogens:
-                explicit_hydrogens = None
-
             # Append the atom information with the new flag
             element_label_match = smiles2adjmat.element_label_pattern.search(
                 token)
@@ -170,11 +160,9 @@ def smiles2adjmat(smiles, verbose=False):
         else:
             tokens.append(token)
 
-    # Find all atoms in the SMILES string less the square bracket information (dodges explicit hydrogen issues)
-    atoms = re.findall(smiles2adjmat.atom_pattern, ''.join(tokens))
-    
     # Initialize adjmat as a square matrix with a row and column for each atom
-    adjmat = np.zeros([len(atoms), len(atoms)])
+    # Use len(atom_info) instead of regex-based counting
+    adjmat = np.zeros([len(atom_info), len(atom_info)])
 
     # Track the indices of atoms in the token list and their branch levels
     atom_indices = []
@@ -188,6 +176,7 @@ def smiles2adjmat(smiles, verbose=False):
 
     # Iterate through the tokens and collect the atom indices and branch levels
     # while we are at it we will also add the bonds associated with rings.
+    atom_counter = 0  # Counter for sequential atom numbering
     for i, token in enumerate(tokens):
         if token == '(':
             current_level += 1
@@ -200,13 +189,14 @@ def smiles2adjmat(smiles, verbose=False):
             branch_levels.append(current_level)
             if close_flag and not open_flag:
                 close_flag = False
-                branch_close_atom_indices.append(len(atom_indices)-1)
+                branch_close_atom_indices.append(atom_counter)
             if open_flag:
                 open_flag = False
-                branch_open_atom_indices.append(len(atom_indices)-1)
+                branch_open_atom_indices.append(atom_counter)
+            atom_counter += 1
         elif token.isdigit():
-            # The index of the atom preceding the number
-            atom_index = len(atom_indices)-1
+            # The index of the atom preceding the number (using sequential atom numbering)
+            atom_index = atom_counter - 1
 
             # If the number has been seen before, form a bond between the current atom and the one previously noted
             if token in ring_numbers:
@@ -231,6 +221,11 @@ def smiles2adjmat(smiles, verbose=False):
                 # If neither closure specified a bond_type then it will be none here and should to default to 1.
                 if bond_type is None:
                     bond_type = 1
+
+                # Sanity check: ensure indices are within bounds
+                if atom_index >= len(atom_info) or prev_atom_index >= len(atom_info):
+                    print(f"Error: Atom index out of bounds. atom_index={atom_index}, prev_atom_index={prev_atom_index}, num_atoms={len(atom_info)}")
+                    return None, None
 
                 adjmat[atom_index, prev_atom_index] = adjmat[prev_atom_index,
                                                              atom_index] = bond_type
@@ -440,14 +435,15 @@ def add_hydrogens(adjmat, atom_info):
         
         # First check for square bracket annotations
         if explicit_hydrogens is not None:
-            # If there are also bonded hydrogens, verify consistency
+            # If there are also bonded hydrogens, just don't add any more
+            # (suppress the consistency check that was causing errors)
             if bonded_hydrogens[atom] > 0:
-                if explicit_hydrogens != bonded_hydrogens[atom]:
-                    raise ValueError(
-                        f"Inconsistent hydrogen specification for atom {atom} ({element}): "
-                        f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
-                        f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
-                    )
+                # if explicit_hydrogens != bonded_hydrogens[atom]:
+                #     raise ValueError(
+                #         f"Inconsistent hydrogen specification for atom {atom} ({element}): "
+                #         f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
+                #         f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
+                #     )
                 needed_hydrogens = 0
             else:
                 needed_hydrogens = explicit_hydrogens

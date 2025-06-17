@@ -49,7 +49,7 @@ def rad_canon_smi():
 
 @pytest.fixture
 def rad_canon_map_smi():
-    return '[CH2:2][C:1]'
+    return '[CH2:2][CH3:1]'
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def anion_canon_smi():
 
 @pytest.fixture
 def anion_canon_map_smi():
-    return '[C:2][C:3](=[O:1])[O-:4]'
+    return '[CH3:2][C:3](=[O:1])[O-:4]'
 
 
 @pytest.fixture

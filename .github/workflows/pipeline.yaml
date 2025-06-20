@@ -19,7 +19,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          python-version: 3.13.2
+          python-version: 3.11
           environment-file: environment.yml
           activate-environment: yarp-again
 

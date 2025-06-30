@@ -1,0 +1,8 @@
+
+# The indentations matter here!
+initialize:
+  enumerate: True
+  initial species: C=C
+  bonds to break: 2
+  bonds to form: 2
+  quick opt lot: UFF

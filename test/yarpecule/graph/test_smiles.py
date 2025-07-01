@@ -377,3 +377,21 @@ class TestSmi2Adj:
 
         assert adjmat.shape == (7, 7)
         # To-do: add explicit adjmat element checks
+
+    def test_aromatic_canon(self, aromatic_canon_smi):
+        adjmat, atom_info = smiles2adjmat(aromatic_canon_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['O', 'C', 'C', 'C', 'O', 'C', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (10, 10)
+        # To-do: add explicit adjmat element checks
+
+    def test_aromatic_full_map(self, aromatic_full_map_smi):
+        adjmat, atom_info = smiles2adjmat(aromatic_full_map_smi)
+
+        elements = [label[0] for label in atom_info]
+        assert elements == ['C', 'C', 'C', 'C', 'O', 'O', 'H', 'H', 'H', 'H']
+
+        assert adjmat.shape == (10, 10)
+        # To-do: add explicit adjmat element checks

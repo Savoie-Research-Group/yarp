@@ -204,23 +204,28 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
         yield obj_fun(bond_mat), bond_mat, reactive
 
 
-def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps, min_score, ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
+def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                     reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                     ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
     """ 
     A generator for find_lewis() that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
 
     Parameters
     ----------
     obj_fun : function
-              A function that accepts a bond electron matrix and returns a score. This assumes that the elements and objective function weights have already been supplied (e.g., by defining an anonymous function to pass to this function). 
+              A function that accepts a bond electron matrix and returns a score.
+              This assumes that the elements and objective function weights have already been supplied
+              (e.g., by defining an anonymous function to pass to this function).
 
     bond_mats  : list of bond_mat arrays 
-               Contains the bond-electron matrices that have already been discovered and scored. Used by the algorithm to avoid back-tracking. 
+               Contains the bond-electron matrices that have already been discovered and scored.
+               Used by the algorithm to avoid back-tracking.
 
     scores : list of floats
-             Contains the scores for all  bond-electron matrices that have been enumerated.
+             Contains the scores for all bond-electron matrices that have been enumerated.
 
     hashes : set of floats
-             Contains a set of bond-electron matrix  hash values used to accelerate the check for duplication. 
+             Contains a set of bond-electron matrix hash values used to accelerate the check for duplication.
 
     elements : list of lower-case elemental symbols
                Contains elemental information indexed to the supplied adjacency matrix.
@@ -229,43 +234,53 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rin
               Contains the indices of the atoms in the bond-electron matrix that are candidates for the rearrangement moves.
 
     rings: list
-           List of lists holding the atom indices in each ring. 
+           List of lists holding the atom indices in each ring.
 
     ring_atoms: list of integers
-                Contains the indices of of atoms in rings. These are used to determine the possibility of forming double bonds if multiple double bonds and alkynes are allowed on an atom when enumerating resonance structures.
+                Contains the indices of of atoms in rings.
+                These are used to determine the possibility of forming double bonds,
+                if multiple double bonds and alkynes are allowed on an atom when enumerating resonance structures.
 
     bridgeheads: list of integers
-                 Contains the indices of the atoms serving as ring bridgeheads. These are used to determine enforce Bredt's rules during the resonance structure search. 
+                 Contains the indices of the atoms serving as ring bridgeheads.
+                 These are used to enforce Bredt's rules during the resonance structure search.
 
     seps: array
           Contains the number of bonds separating each pair of atoms at the ij-th position.
 
     min_score: float
-               Contains the current best score out of all enumerated lewis structures. 
+               Contains the current best score out of all enumerated Lewis structures.
 
     ind: int, default=0
          Contains the index of the bond_mat within bond_mats that the function is supposed to act on.
 
-    counter: int, default=0 
-             Keeps track of the number of iterations that have passed without finding a better lewis structure. Used to determine the `N_score` break condition.
+    counter: int, default=0
+             Keeps track of the number of iterations that have passed without finding a better Lewis structure.
+             Used to determine the `N_score` break condition.
 
     N_score: int, default=100
-             The function will break if this number of steps pass without finding an improved Lewis Structure. 
+             The function will break if this number of steps pass without finding an improved Lewis structure.
 
     N_max: int, default=10000
-           The function will break if this number of bond electron matrices have been generated. 
+           The function will break if this number of bond electron matrices have been generated.
 
     min_opt: boolean, default=False
-             If set to `True` then the search is run in a greedy mode where Lewis Structures are only accepted if they are as good or better than the structure discovered up to that point. This option is used as part of the base algortihm to initially find a reasonable structure before a more fine-grained comprehensive search. 
+             If set to `True` then the search is run in a greedy mode
+             where Lewis structures are only accepted if they are as good or better than the structure discovered up to that point.
+             This option is used as part of the base algorithm
+             to initially find a reasonable structure before a more fine-grained comprehensive search.
 
     min_win: float, default=False
-             When set, a Lewis Structure is only accepted if its score is within this value of the best structure found up to that point. This allows the algorithm to explore intermediate structures that may be less ideal but that eventually lead to an overall relaxation of the structure.  
+             When set, a Lewis structure is only accepted if its score is within this value of the best structure found up to that point.
+             This allows the algorithm to explore intermediate structures that may be less ideal
+             but that eventually lead to an overall relaxation of the structure.
 
     Yields
     -------
     iterator: tuple
-              This function yields all a set of initial guesses for the find_lewis algorithm via iteration. Each iteration returns a tuple, (score, bond_mat, reactive_indices),
-               containing the score of the initial guess, the bond-electron matrix, and the list of reactive indices.
+              This function yields a set of initial guesses for the find_lewis algorithm via iteration.
+              Each iteration returns a tuple, (score, bond_mat, reactive_indices),
+              containing the score of the initial guess, the bond-electron matrix, and the list of reactive indices.
 
     """
 
@@ -305,8 +320,10 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rin
                         hashes.add(b_hash)
 
                         # Recursively call this function with the updated bond_mat resulting from this iteration's move.
-                        bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps,
-                                                                                         min_score, ind=len(bond_mats)-1, counter=counter, N_score=N_score, N_max=N_max, min_opt=min_opt, min_win=min_win)
+                        bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                                                                                         reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                                                                                         ind=len(bond_mats)-1, counter=counter, N_score=N_score,
+                                                                                         N_max=N_max, min_opt=min_opt, min_win=min_win)
 
             else:
                 # min_win option allows the search to follow structures that increase the score up to min_win above the score of the best structure
@@ -320,8 +337,10 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rin
                             hashes.add(b_hash)
 
                             # Recursively call this function with the updated bond_mat resulting from this iteration's move.
-                            bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps,
-                                                                                             min_score, ind=len(bond_mats)-1, counter=counter, N_score=N_score, N_max=N_max, min_opt=min_opt, min_win=min_win)
+                            bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                                                                                             reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                                                                                             ind=len(bond_mats)-1, counter=counter, N_score=N_score,
+                                                                                             N_max=N_max, min_opt=min_opt, min_win=min_win)
 
                 # otherwise all structures are recursively explored (can be very expensive)
                 else:
@@ -334,8 +353,10 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rin
                         hashes.add(b_hash)
 
                         # Recursively call this function with the updated bond_mat resulting from this iteration's move.
-                        bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps,
-                                                                                         min_score, ind=len(bond_mats)-1, counter=counter, N_score=N_score, N_max=N_max, min_opt=min_opt, min_win=min_win)
+                        bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                                                                                         reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                                                                                         ind=len(bond_mats)-1, counter=counter, N_score=N_score,
+                                                                                         N_max=N_max, min_opt=min_opt, min_win=min_win)
 
             # Break if max has been encountered.
             if len(bond_mats) > N_max:

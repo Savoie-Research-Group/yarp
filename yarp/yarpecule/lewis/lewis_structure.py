@@ -4,10 +4,12 @@ Definition of lewis structure object class
 import sys
 import itertools
 import numpy as np
+from rdkit.Chem import BondType, MolFromSmiles, rdchem, Atom, AllChem, Draw
+from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
-from yarp.util.properties import el_valence, el_n_deficient, el_n_expand_octet, el_en, el_pol
+from yarp.util.properties import el_valence, el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
 from yarp.yarpecule.lewis.be_mat import *
 from yarp.yarpecule.lewis.support_dump import *
 from yarp.yarpecule.hashes import bmat_hash
@@ -77,6 +79,7 @@ class lewis_struct:
 
     def __init__(self, adj_mat, elements, q):
         self._elements = elements
+        self._adj_mat = adj_mat
         self._rings = None
 
         self._find_rings(adj_mat)
@@ -93,6 +96,9 @@ class lewis_struct:
         self._bo_dict = None
 
         self._get_properties(adj_mat, elements)
+
+        self._bond_to_type = {0: BondType.DATIVE, 1: BondType.SINGLE, 2: BondType.DOUBLE,
+                              3: BondType.TRIPLE, 4: BondType.QUADRUPLE, 5: BondType.QUINTUPLE, 6: BondType.HEXTUPLE}
 
     ###############
     # Properties  #
@@ -470,3 +476,65 @@ class lewis_struct:
 
     def __len__(self):
         return len(self._elements)
+
+    def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
+        """
+        Draw the bond electron matrices from the Lewis structure of the yarpecule.
+        This shouldn't ever change any of the attributes of the yarpecule.
+        """
+
+        # # Initialize the preferred lone electron dictionary the first time this function is called
+        # if not hasattr(draw_bmats, "bond_to_type"):
+        #     draw_bmats.bond_to_type = {0: BondType.DATIVE, 1: BondType.SINGLE, 2: BondType.DOUBLE,
+        #                                3: BondType.TRIPLE, 4: BondType.QUADRUPLE, 5: BondType.QUINTUPLE, 6: BondType.HEXTUPLE}
+
+        # loop over bond_mats, create an rdkit mol for each, then plot on a grid with the scores
+        mols = []
+        for count_i, i in enumerate(self._bond_mats):
+            # throwaway molecule
+            mol = MolFromSmiles("C")
+            mol = rdchem.RWMol(mol)
+            mol.RemoveAtom(0)
+            # add atoms
+            [mol.AddAtom(Atom(el_to_an[_])) for _ in self._elements]
+            # add bonds
+            for count_j, j in enumerate(self._adj_mat):
+                for count_k, k in enumerate(j):
+                    if count_k < count_j:
+                        if k == 0:
+                            continue
+                        else:
+                            mol.AddBond(
+                                count_j, count_k, self._bond_to_type[i[count_j, count_k]])
+                    else:
+                        break
+
+            # set explicit H-atoms and formals
+            fc = self._return_formals(i, [_.lower() for _ in self._elements])
+            for count_j, j in enumerate(i):
+                atom = mol.GetAtomWithIdx(count_j)
+                mol.GetAtomWithIdx(count_j).SetNumExplicitHs(0)
+                mol.GetAtomWithIdx(count_j).SetFormalCharge(int(fc[count_j]))
+                mol.GetAtomWithIdx(count_j).SetNumRadicalElectrons(
+                    int(j[count_j] % 2))
+                mol.GetAtomWithIdx(count_j).UpdatePropertyCache()
+
+            # generate coordinates
+            AllChem.Compute2DCoords(mol)
+            mols += [mol]
+
+        # save the molecule
+        if len(mols) <= 3:
+            n_per_row = len(mols)
+        else:
+            n_per_row = 3
+        img = Draw.MolsToGridImage(mols, subImgSize=(400, 400), molsPerRow=n_per_row,
+                                   legends=["score: {: <4.3f}".format(_) for _ in self._scores])
+
+        if show_inline:
+            display(img)
+
+        else:
+            img.save(outfile)
+
+        return

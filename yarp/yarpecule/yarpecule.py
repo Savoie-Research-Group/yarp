@@ -310,12 +310,6 @@ class yarpecule:
         Join two yarpecules together to form a new yarpecule.
         """
 
-    def draw_lewis_struct(self):
-        """
-        Draw the Lewis structure of the yarpecule.
-        This shouldn't ever change any of the attributes of the yarpecule.
-        """
-
     def export_geometry(self, filename, format='xyz'):
         """
         Export the geometry of the yarpecule to a file.
@@ -343,6 +337,10 @@ class yarpecule:
             The mode of the SMILES representation to export.
             Options are 'canonical' or 'non-canonical'.
         """
+
+    def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
+        self._lewis_struct.draw_bmats(outfile, show_inline)
+        return
 
     def __len__(self):
         return len(self._elements)

@@ -5,7 +5,8 @@ This module contains functions and classes used to perform reaction/product enum
 from copy import copy
 from itertools import combinations
 from numpy import vstack
-
+from typing import Iterable, Tuple
+from yarp.find_lewis import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
@@ -64,10 +65,11 @@ def form_bonds(yarpecules, react=[], hashes=None, inter=False, intra=True, def_o
     if len(react) != len(yarpecules):
         react = [set(range(len(y))) for y in yarpecules]
 
+    # Default to empty set if hashes is not supplied
     if hashes is None:
         hashes = set([])
 
-    # This loop only performs bond formation steps within individual yarpecule objects
+    # This loop only performs bond formation steps *within individual yarpecule objects
     if intra:
         for count_y, y in enumerate(yarpecules):
             bonds = set([])
@@ -152,7 +154,53 @@ def form_bonds(yarpecules, react=[], hashes=None, inter=False, intra=True, def_o
 
 def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True, def_only=False, hash_filter=True):
     """
-    What is the purpose of this function???
+    This function is a wrapper around `form_bonds` that allows for the generation of multiple bond formations. For example,
+    if you want to generate all products that result from the formation of two bonds, you can call this function with `n=2`
+    rather than calling `form_bonds()`, gathering all products that result from the formation of one bond, and then calling
+    `form_bonds()` again to generate all products that result from the formation of two bonds. 
+
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                This list holds the yarpecules that should be reacted.
+
+    n: int, default=2
+       The number of sequential bond formations to perform.
+
+    react: list of sets, default=[]
+           When supplied this is used to restrict bond formations only to those atoms in this set. If supplied, then `react` must
+           have a searchable list or set (i.e., the function uses an `in` call, so sets are better) per `yarpecule`. An empty list
+           is interpreted as all atoms being available to react.
+
+    hashes: set, default=None
+            When supplied, this is used to avoid the generation of products that resolve to the same hash as any that are already
+            in this set. This is useful whenever you have a set of products that you have already performed an exploration of and
+            don't want this function to waste time with. For example, if you are performing multiple sequential `form_bonds()`
+            calls, then it is useful to pass the hashes of the generated products from each call forward to the next to avoid
+            redundant calls.
+
+    inter: bool, default=True
+           Controls whether intermolecular bond-formations should be returned. Here, intermolecular is defined as bond-formation
+           steps between distinct yarpecule objects.
+
+    intra: bool, default=True
+           Controls whether intramolecular bond-formations should be returned. Here, intramolecular is defined as bond-formation
+           reactions between atoms within a given yarpecule object.
+
+    def_only: bool, default=False
+              Controls whether only bond formations are performed that involve electron deficient atoms.
+
+    hash_filter: bool, default=True
+                 Controls whether the returned products are filtered by uniqueness. Due to symmetry, the same product may be obtained
+                 by several distinct bond formations. The default behavior is to avoid returning products that resolve to the same hash.
+                 Disabling this option will lead to all distinct mappings being returned (with the associated redundancy). Since isotopomers
+                 resolve to distinct hashes, even with this option enabled there may be the appearance of redundant products, but the isotope
+                 placement will be distinct.
+
+    Returns
+    -------
+    list
+        A list of yarpecule objects representing all products formed after n sequential bond formations.
     """
     yarpecules = prepare_list(yarpecules)
 
@@ -184,7 +232,9 @@ def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True,
 
 def form_bonds_all(yarpecules, react=[], hashes=None, inter=True, intra=True, def_only=False, hash_filter=True):
     """
-    This function yields all products that result from valid bond formations amongst the supplied yarpecules.
+    This function is a wrapper around `form_bonds` that performs bond formations exhaustively until it runs out of products. 
+    The difference between this function and `form_n_bonds` is that this function will continue to perform bond formations until it
+    runs out of products to enumerate.
 
     Parameters
     ----------
@@ -280,7 +330,7 @@ def break_bonds(yarpecules, n=1, react=[], hashes=None, break_higher_order=False
 
     break_higher_order: bool, default=False
                         Controls whether higher-order bonds are broken by this function. When True, double bonds and triple bonds 
-                        will be broken or just as single bonds. Default behavior only breaks single bonds.
+                        will be broken or just single bonds. Default behavior only breaks single bonds.
 
     remove_redundant: bool, default=True
                       Controls whether the yarpecules generated by this function are guarrantteed to be unique. Since distinct bond
@@ -295,13 +345,11 @@ def break_bonds(yarpecules, n=1, react=[], hashes=None, break_higher_order=False
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules)
-    # print(react)
+
     # Prepare react list if it isn't the same length as the number of yarpecules
-    # print(len(react))
-    # print(len(yarpecules))
     if len(react) != len(yarpecules):
         react = [set(range(len(y))) for y in yarpecules]
-    # print(react)
+    
     # Prepare hash set if it isn't already supplied
     if hashes is None:
         hashes = set([])
@@ -337,3 +385,376 @@ def break_bonds(yarpecules, n=1, react=[], hashes=None, break_higher_order=False
                         hashes.add(tmp.hash)
                 else:
                     yield tmp
+
+
+def bmfn(yarpecules,m,n,react=[],hashes=None,inter=False,intra=True,def_only=False,hash_filter=True,lower_score=True,keep_symmetric=True):
+    """
+    This function provides a shortcut for enumerating "break m form n" products without generating intermediate 
+    zwitterionic/dangling bond species
+
+    Still need to implement the keep_symmetric option.
+
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                This list holds the yarpecules that should be reacted. 
+
+    react: set, default=None
+           When supplied this is used to restrict bond formations only to those atoms in this set. If supplied, then `react` must
+           have a searchable list or set (i.e., the function uses an `in` call, so sets are better) per `yarpecule`. An empty list
+           is interpreted as all atoms being available to react. 
+
+    hashes: set, default=None
+            When supplied, this is used to avoid the generation of products that resolve to the same hash as any that are already
+            in this set. This is useful whenever you have a set of products that you have already performed an exploration of and 
+            don't want this function to waste time with. For example, if you are performing multiple sequential `form_bonds()` 
+            calls, then it is useful to pass the hashes of the genereated products from each call forward to the next to avoid 
+            redundant calls. 
+
+    inter: bool, default=False
+           Controls whether intermolecular bond-formations should be returned. Here, intermolecular is defined as bond-formation
+           steps between distinct yarpecule objects.
+
+    intra: bool, default=True
+           Controls whether intramolecular bond-formations should be returned. Here, intramolecular is defined as bond-formation
+           reactions between atoms within a given yarpecule object.
+
+    def_only: bool, default=False
+              Controls whether only bond formations are performed that involve electron deficient atoms.
+
+    hash_filter: bool, default=True
+                 Controls whether the returned products are filtered by uniqueness. Due to symmetry, the same product may be obtained
+                 by several distinct bond formations. The default behavior is to avoid returning products that resolve to the same hash.
+                 Disabling this option will lead to all distinct mappings being returned (with the associated redundancy). Since isotopomers
+                 resolve to distinct hashes, even with this option enabled there may be the appearance of redundant products, but the isotope 
+                 placement will be distinct.  
+
+    lower_score: bool, default=True
+                 During the enumeration it is common to form species that have poor Lewis structures that cost a time to 
+                 perform enumeration on. These are often thrown away after enumeration, but they can cost a lot of time to
+                 perform enumeration on if a multi-bond enumeration is being done. When this option is True, structures are 
+                 only retained if they result in a bond-electron matrix that has a score that is less than or equal to the 
+                 inputted yarpecule. 
+
+    Yields
+    ------
+
+    product: yarpecule
+             The generator yields a yarpecule object holding the bond_electron matrix and other core yarpecule attributes of
+             the product resulting from bond formations.
+    """
+
+    # Wrap yarpecules in a list if only one is supplied
+    yarpecules = prepare_list(yarpecules) 
+    
+    # Prepare react list if it isn't the same length as the number of yarpecules
+    if len(react) != len(yarpecules):
+        react = [ set(range(len(y))) for y in yarpecules ]
+
+    # Prepare empty set if none was supplied
+    if hashes is None:
+        hashes = set([])
+
+    # Perform all bond breaks over relevant atoms
+    for count_y,y in enumerate(yarpecules):
+
+        # keep bonds involving reactive atoms ( return_bondtypes(y)[0] returns all bonds the comprehension is the filter)
+#        bonds = [ i if count_i in react[count_y] else [ j for j in i if j[0] in react[count_y] ] for count_i,i in enumerate(return_bondtypes(y)[0]) ]
+
+        # Find the bond mat that minimizes the formal charges (this may be conservative but I'm trying to avoid spurious zwitterions)
+        fc_ind = [ sum(abs(x) for x in return_formals(_,y.elements)) for _ in y.lewis.bond_mats ]
+        fc_ind = fc_ind.index(min(fc_ind))
+
+        # Return the bonds available to break (the use of the atom hash is to avoid redundant bond formations)
+        bonds = return_bondtypes(y,b_inds=[fc_ind])[0] # returns all bonds, with their atomic hashes and bond orders
+        bonds = [ _ for _ in bonds if ( _[0]  in react[count_y] and _[1] in react[count_y] ) ] # only keep the bonds that involve atoms in the react list
+        radicals = list(return_radicals(y))
+
+        # Loop over combinations of bonds to break (m bonds at a time)
+        for b in combinations(list(range(len(bonds))), m):
+            
+            # Create set to avoid reforming the exact same bonds we just broke
+            # You read this as set(frozenset(bonds we just broke)). We use frozensets to that they are 
+            # order independent (like sets) but hashable (like tuples) so that they can be used as keys in a set
+            # for rapid lookup. 
+            avoid = set(frozenset([frozenset([bonds[_][0], bonds[_][1]]) for _ in b]))
+
+            # Assemble list of reactive atoms: atoms from broken bonds + radical sites
+            # Get atoms from bonds being broken (first 2 elements of each bond via bonds[j][:2])
+            formset = [i for j in b for i in bonds[j][:2]]
+            
+            # Add radical atoms that can form new bonds
+            formset += radicals
+            
+            # Debug output
+            print(f"Breaking bonds at indices: {b}")                        
+            print(f"Reactive atom set: {formset}")
+            print(f"Bonds to avoid reforming: {avoid}")
+            print(f"Number of reactive atoms: {n}")
+            print(f"Actual bonds being broken: {[bonds[_] for _ in b]}")
+            
+            # Start with copy of original bond matrix
+            base_bmat = copy(y.lewis.bond_mats[fc_ind])
+            print("Original bond matrix:")
+            print(base_bmat)
+            
+            # Break the selected bonds (subtract 1 from bond order)
+            base_bmat = add_bonds(base_bmat, [bonds[_] for _ in b], val=-1)
+            print("Bond matrix after breaking bonds:")
+            print(base_bmat)
+
+            # Loop over all unique ways to pair reactive atoms into new bonds
+            print(f"this is the formset: {formset}")
+            print(f"these are the bond formations we will test: {list(unique_set_partition_generator(formset, 2))}")
+            for g in unique_set_partition_generator(formset, 2):
+                
+                # Skip if we would just reform a bond we broke
+                if frozenset(g) in avoid:
+                    print(f"Skipping - would reform broken bond: {g}")
+                    continue
+
+                # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
+                if any([ len(_)<2 for _ in g ]):
+                    avoid.update(g)
+                    continue
+
+                print(f"Forming new bonds: {g}")
+                
+                # Create new adjacency matrix by adding the new bonds
+                adj_mat = add_bonds(copy(base_bmat), [list(_) for _ in g], val=1)
+                
+                # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
+                product = yarpecule((np.where(adj_mat > 0, 1, 0).astype(int), y._geo, y._elements, y._q), canon=False)
+                
+                # Debug: show the transformation
+                print(f"Original adjacency matrix:\n{y._adj_mat}")
+                print(f"New adjacency matrix:\n{product._adj_mat}")
+                
+                # Optional: skip products with higher bond matrix scores (worse quality)
+                if lower_score:
+                    if product.lewis._scores[0] > y.lewis._scores[0]:
+                        print(f"Skipping - higher score: {product.lewis._scores[0]} > {y.lewis._scores[0]}")
+                        continue
+
+                # PROPOSAL: if keep_symmetric is True, then we can't just check the hash, because it is mapping independent (by design).
+                # instead, we need to check the bmat hash. I'm not sure if this is currently stored as an attribute of the yarpecule object.
+                
+                # This will avoid duplicates that are symmetrically equivalent (so distinct mappings will get collapsed, which isn't usually what we want)
+                if product._yarpecule_hash not in hashes:
+                    # Add to hash filter to prevent duplicates (if enabled)
+                    if hash_filter:
+                        hashes.add(product._yarpecule_hash)
+
+                    # Yield new product
+                    print(f"Yielding new product with hash: {product._yarpecule_hash}")
+                    yield product
+                    
+
+ 
+def unique_set_partition_generator(seq: Iterable, group_size: int):
+    """
+    Yield all unique partitions of `seq` into groups of `group_size`.
+    Generates each partition exactly once, in canonical order,
+    without holding all previous results in memory.
+
+    This function returns the unique partitionings of group_size of the elements of seq. The returned partitions
+    are not distinguishable by ordering within partitions or the ordering between partitions. For example, 
+    if seq = [1,2,3,4] and group_size=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
+    the same partition. This function is used to generate all possible partitions of atoms that can form 
+    bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
+    [(3,4),(1,2)] pair of bonds, etc.
+    """
+    seq = tuple(seq)                     # tuple => O(1) index lookup
+    n = len(seq)                        # O(1) lookup   
+ 
+    # Needs to be at least 1 otherwise the partition will be empty
+    if group_size <= 0:
+        return 
+
+    groups_needed = n // group_size
+    used = [False] * n                    # bitmap of positions already grouped
+
+    # It's useful to define the recursive helper function here because it allows us to
+    # separate the passthrough variables from the parent function call.
+    def helper(start_idx: int, accum: Tuple[Tuple[int, ...], ...]):
+        """
+        Recursively build up `accum`, a tuple of grouped index-tuples.
+        The `start_idx` ensures canonical order: we only look *forward*
+        in the sequence for the next unused element, so each partition
+        appears once and only once.
+        """
+        if len(accum) == groups_needed:   # base case: complete partition
+            # Map indices back to original elements exactly once:
+            yield tuple(frozenset(seq[i] for i in grp) for grp in accum)
+            return
+
+        # Pick the smallest unused element to start the next group
+        for i in range(start_idx, n):
+            if used[i]:
+                continue
+            used[i] = True
+
+            # Choose the remaining (group_size - 1) members *after* i
+            available = [j for j in range(i + 1, n) if not used[j]]
+            for combo in combinations(available, group_size - 1):
+                for j in combo:
+                    used[j] = True
+                yield from helper(i + 1, accum + ((i,) + combo,))
+                for j in combo:
+                    used[j] = False
+
+            used[i] = False
+            break   # keep canonical: only first unused i is allowed
+
+    yield from helper(0, ())
+
+def return_bondtypes(yarpecules,b_inds=[]):
+    """
+    This function provides a shortcut for enumerating "break m form n" products without generating intermediate 
+    zwitterionic/dangling bond species. The function returns a list of bonds for each yarpecule. Each bond is a tuple
+    of the form (i,j,i_hash,j_hash,bond_order) where i and j are the indices of the atoms in the bond, i_hash and j_hash
+    are the hashes of the atoms, and bond_order is the bond order of the bond taken from the bond_mat at the index supplied
+    by b_inds.
+
+    Parameters
+    ----------
+    yarpecules: list of yarpecules
+                This list holds the yarpecules that should be reacted. 
+
+    b_inds: list of indices
+            This holds the index of the bond_mat that the user wants the return the bond orders for. 
+            By default the first bond_mat is used. 
+    """
+    # Wrap yarpecules in a list if only one is supplied
+    yarpecules = prepare_list(yarpecules)
+
+    # Use the first bond_mat if no indices are supplied
+    if len(b_inds) != len(yarpecules):
+        b_inds = [ 0 for _ in range(len(yarpecules)) ]
+
+    #    tuple holds: bond between atoms i and j, with their hashes, and the bond order taken from the bond_mat at the index supplied by b_inds. This list of bonds is returned for each yarpecule.
+    return [ [ (count_i,j,y._atom_hashes[count_i],y._atom_hashes[j],y.lewis.bond_mats[b_inds[count_y]][count_i][j]) for count_i,i in enumerate(return_adjlist(y)) for j in i if count_i <= j ] for count_y,y in enumerate(yarpecules) ]    
+
+
+# GRAB THE BETTER ONE FROM UTILS  
+def return_adjlist(yarpecule):
+    return  [np.where(i)[0].tolist() for count_i,i in enumerate(yarpecule.adj_mat) ]
+    
+#def unique_set_partition_generator_old(lst, n):
+#     """
+#     This function returns the unique choose n groupings of the elements of lst. The returned groupings
+#     are not distinguishable by ordering within grouping or the ordering of groupings. For example, 
+#     is lst = [1,2,3,4] and n=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
+#     the same subgroupings. This function is used to generate all possible groupings of atoms that can form 
+#     bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
+#     [(3,4),(1,2)] pair of bonds, etc.
+
+#     Parameters
+#     ----------
+#     lst: list of elements
+#          for efficiency gains the algorithm assumes that the list is sortable. 
+
+#     n: float
+#          The number of elements per subgroup
+
+#     Returns
+#     -------
+#     groupings: lst of frozensets
+#          The list of unique unordered groupings is returned in its totality after a recursion. Each grouping is
+#          stored as a frozenset which is used because a hashable set is needed in the algorithm. 
+#     """
+    
+#     # Return empty list if lst cannot be evenly divided into groups of size n
+#     if len(lst) % n != 0:
+#         return []
+
+#     lst = sorted(lst)
+#     total_groupings = []
+
+#     # Recursive helper function to generate unique groupings
+#     def helper(available_elements, current_partition):
+#         # Base case: if no elements are left, add the current partition to total groupings
+#         if not available_elements:
+#             total_groupings.append(current_partition)
+#             return
+
+#         # Always pick the first element to enforce ordering and avoid duplicates
+#         first_element = available_elements[0]
+#         rest_elements = available_elements[1:]
+
+#         # Generate all combinations of size n-1 from the remaining elements
+#         for comb in combinations(rest_elements, n - 1):
+#             # Form a group by combining the first element with the current combination
+#             group = frozenset([first_element] + list(comb))
+#             # Determine the elements that haven't been grouped yet
+#             remaining_elements = [e for e in rest_elements if e not in comb]
+
+#             # Recursively build groupings with the remaining elements
+#             helper(remaining_elements, current_partition + [group])
+
+#     # Start the recursive process with the full list and an empty partition
+#     helper(lst, [])
+
+#     # Remove duplicates by converting partitions to a sorted tuple of sorted frozensets
+#     unique_groupings_set = set()
+#     for partition in total_groupings:
+#         # Sort groups within the partition and convert them to tuples for hashability
+#         sorted_partition = tuple(sorted([tuple(sorted(group)) for group in partition]))
+#         unique_groupings_set.add(sorted_partition)
+
+#     # Convert back to the desired output format (list of frozensets)
+#     return [list(map(frozenset, grouping)) for grouping in unique_groupings_set]
+
+def return_radicals(y,all_bmats=False):
+    """
+    Returns the indices of the atoms that are radicals in the yarpecule.
+    if all_bmats is True then all bond electron matrices are considered else only the first one
+    """                             
+    if all_bmats:
+        return set([ i for bmat in y.lewis.bond_mats for i in range(len(bmat)) if bmat[i][i] % 2 == 1])
+    else:
+        return set([ i for i in range(len(y.lewis.bond_mats[0])) if y.lewis.bond_mats[0][i][i] % 2 == 1])
+
+
+def add_bonds(bond_mat,bonds,val=1):
+    """
+    Helper function for bmfn. Modifies the bond_mat in place.
+    
+    Parameters
+    ----------
+    bond_mat : numpy array or nested list
+        2D bond matrix to modify
+    bonds : iterable of sequences
+        Each bond should be indexable (list, tuple, etc.) with at least 2 elements
+    val : int or float
+        Value to add to bond matrix elements
+    """
+    for b in bonds:
+        bond_mat[b[0]][b[1]] += val
+        bond_mat[b[1]][b[0]] += val
+    return bond_mat
+
+import numpy as np
+from yarp.util.properties import el_valence
+
+def return_formals(bond_mat,elements): 
+    """
+    Returns returns the formal charge on each atom. SHOULD BE IN LEWIS
+
+    Parameters
+    ----------
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list. 
+
+    elements : list 
+               Contains elemental information indexed to the supplied adjacency matrix. 
+               Expects a list of lower-case elemental symbols.
+
+    Returns
+    -------
+    formals: array
+             Contains the formal charge for each atom. This array is indexed to the bond-electron matrix.
+
+    """
+    return  np.array([el_valence[_] for _ in elements ]) - np.sum(bond_mat,axis=1)

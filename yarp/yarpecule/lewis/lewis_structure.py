@@ -134,20 +134,20 @@ class lewis_struct:
         Parameters
         ----------
         elements : list 
-                Contains elemental information indexed to the supplied adjacency matrix. 
+                Contains elemental information indexed to the supplied adjacency matrix.
                 Expects a list of lower-case elemental symbols.
 
         adj_mat  : array of integers
                 Contains the bonding information of the molecule of interest, indexed to the elements list.
 
         q : int, default=0
-                Sets the overall charge for the molecule. 
+                Sets the overall charge for the molecule.
 
         rings: list, default=None
                 List of lists holding the atom indices in each ring. If none, then the rings are calculated.
 
         mats_max: int, default=10
-                The maximum number of bond electron matrices to return. 
+                The maximum number of bond electron matrices to return.
 
         mats_thresh: float, default=0.5
                         The value used to determine if a bond electron matrix is worth returning to the user.
@@ -170,7 +170,7 @@ class lewis_struct:
                 The weight of the radical term in the objective function for scoring bond-electron matrices.
 
         local_opt: boolean, default=True
-                This controls whether non-local charge transfers are allowed (False). This can be expensive. 
+                This controls whether non-local charge transfers are allowed (False). This can be expensive.
 
         Updates:
         -------
@@ -182,6 +182,8 @@ class lewis_struct:
                 A list of scores for each bond-electon matrix within bond_mats.
         """
 
+        # This makes me nervous, do we really need to do this? Or should we adjust internally our own recursion limits?
+        # Is there a concrete example of "we miss important chemistry if we don't do this"? -ERM
         old_rec_limit = sys.getrecursionlimit()
         sys.setrecursionlimit(5000)
 

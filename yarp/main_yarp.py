@@ -1,7 +1,7 @@
 import sys
 import yaml
 
-from yarp.reaction import generate_rxns
+from yarp.reaction.generate_rxns import generate_rxns
 
 
 def main(input):
@@ -16,7 +16,6 @@ def main(input):
         """)
 
     # Figure out a way to print the current version/commit hash
-
     print("First off, here's the input file you provided:")
     print("=====================================")
     print(yaml.dump(input))
@@ -30,7 +29,7 @@ def main(input):
 
     # BUT FIRST!!! Check CONTROL.yaml to see if the initialization has been done!
 
-    initnode = input.get('initialize')
+    initnode = input.get('initialize', None)
     if not initnode:
         raise RuntimeError(
             "Hey bro beans, I need some molecules or reactions to work with. Missing `initialize` node in YAML file.")
@@ -47,11 +46,13 @@ def main(input):
         print(f"Processing reaction: {rxn.ID}")
 
         # Access the list of stage keys
-        # throw a RuntimeError if 'stages' doesn't exist
+        # Exit if stage keys are not defined
         stages = input.get('stages')
         if not stages:
-            raise RuntimeError(
-                "No stages provided for reaction object generation.")
+            print("No stages defined in input YAML file. Exiting.")
+            # find a way to dump out the reaction objects to a pickle file
+            exit
+
         for stage in stages:
             # Check if the reaction object has already completed this step
             # Probably will interface with CONTROL.yaml file

@@ -5,8 +5,9 @@ import numpy as np
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.lewis.be_mat import return_bo_dict
 from yarp.yarpecule.atom_mapping import canon_order
-from yarp.yarpecule.hashes import atom_hash
+from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
@@ -91,6 +92,7 @@ class yarpecule:
         self._order_atoms(canon=canon)
 
         self._lewis_struct = None
+        self._bond_order_dict = None
         self._yarpecule_hash = None
 
         self._gen_lewis_struct()
@@ -117,8 +119,48 @@ class yarpecule:
         return self._adj_mat
 
     @property
+    def q(self):
+        return self._q
+
+    @property
     def lewis(self):
         return self._lewis_struct
+
+    @property
+    def bond_mats(self):
+        return self._lewis_struct._bond_mats
+
+    @property
+    def bond_mat_scores(self):
+        return self._lewis_struct._scores
+
+    @property
+    def bo_dict(self):
+        return self._bond_order_dict
+
+    @property
+    def hash(self):
+        return self._yarpecule_hash
+
+    @property
+    def atom_hashes(self):
+        return self._atom_hashes
+
+    @property
+    def n_e_accept(self):
+        return self._lewis_struct._e_acceptors
+
+    @property
+    def n_e_donate(self):
+        return self._lewis_struct._e_acceptors
+
+    @property
+    def atom_neighbors(self):
+        return self._lewis_struct._atom_neighbors
+
+    @property
+    def fc(self):
+        return self._lewis_struct._formal_charge
 
     ######################
     # Internal Functions #
@@ -245,6 +287,10 @@ class yarpecule:
 
         self._lewis_struct = lewis_struct(
             self._adj_mat, self._elements, self._q)
+
+        self._bond_order_dict = return_bo_dict(self)
+
+        self._yarpecule_hash = yarpecule_hash(self)
 
     ######################
     # External Functions #

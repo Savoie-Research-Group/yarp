@@ -18,19 +18,19 @@ def form_bonds(yarpecules, react=[], hashes=None, inter=False, intra=True, def_o
     Parameters
     ----------
     yarpecules: list of yarpecules
-                This list holds the yarpecules that should be reacted. 
+                This list holds the yarpecules that should be reacted.
 
     react: set, default=None
            When supplied this is used to restrict bond formations only to those atoms in this set. If supplied, then `react` must
            have a searchable list or set (i.e., the function uses an `in` call, so sets are better) per `yarpecule`. An empty list
-           is interpreted as all atoms being available to react. 
+           is interpreted as all atoms being available to react.
 
     hashes: set, default=None
             When supplied, this is used to avoid the generation of products that resolve to the same hash as any that are already
             in this set. This is useful whenever you have a set of products that you have already performed an exploration of and 
             don't want this function to waste time with. For example, if you are performing multiple sequential `form_bonds()` 
             calls, then it is useful to pass the hashes of the genereated products from each call forward to the next to avoid 
-            redundant calls. 
+            redundant calls.
 
     inter: bool, default=True
            Controls whether intermolecular bond-formations should be returned. Here, intermolecular is defined as bond-formation

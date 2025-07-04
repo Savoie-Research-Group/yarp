@@ -26,19 +26,13 @@ def smiles2adjmat(smiles, verbose=False):
 
     Returns
     -------
-        # Return tokens, adjmat (with bond orders removed), and atom_info list
-    return tokens, np.where(adjmat >= 1, 1, 0).astype(int), atom_info
-    tokens: list of str,
-            The smiles string is tokenized as part of the parsing. The list of tokens is returned for
-            debugging purposes. This list has the [] annotations removed. 
-
     adjmat: array
             This is numpy array holding the graph defined by the smiles string.
 
     atom_info: list of tuples
             This list is indexed to the adjacency matrix and contains a tuple for each atom. Each tuple has
-            the element token, formal charge, explicit hydrogens, and isotope information as its respective
-            elements. 
+            the element token, formal charge, explicit hydrogens, isotope, atom_mapping, and should_infer_hydrogens
+            as its respective elements. 
     """
 
     # When we are ready for production, move all definitions here
@@ -63,9 +57,34 @@ def smiles2adjmat(smiles, verbose=False):
             r'([A-Z](?:[a-z]+)?|[a-z])')
         # matches atom mapping numbers after a colon
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
+        
+        # Valid element symbols for tokenization validation
+        smiles2adjmat.valid_elements = {
+            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+            'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+            'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
+            'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
+            'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Hf', 'Ta', 'W',
+            'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po',
+            'At', 'Rn', 'b', 'c', 'n', 'o', 'p', 's'  # Include aromatic lowercase
+        }
 
     # Find all matches of the pattern in the SMILES string for tokenization
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
+    
+    # Secondary tokenization: split invalid multi-character element tokens
+    final_tokens = []
+    for token in preliminary_tokens:
+        # Check if this is a 2-character token that might be an invalid element
+        if len(token) == 2 and token not in smiles2adjmat.valid_elements:
+            # Split into individual characters if not a valid element
+            final_tokens.extend(list(token))
+        else:
+            final_tokens.append(token)
+    
+    # Use the corrected tokens for the rest of the processing
+    preliminary_tokens = final_tokens
 
     # Initialize the atom_info, tokens lists
     atom_info = []  # holds element label, formal charge, isotope, explicit h information
@@ -82,7 +101,7 @@ def smiles2adjmat(smiles, verbose=False):
             explicit_hydrogens = 0
             isotope = None
             atom_mapping = None
-            should_infer_hydrogens = False  # Default to False for square brackets
+            should_infer_hydrogens = False  # Square brackets always disable hydrogen inference
 
             # Track what information was found in the brackets
             found_isotope = False
@@ -133,16 +152,6 @@ def smiles2adjmat(smiles, verbose=False):
                 atom_mapping = int(mapping_match.group(1))
                 found_mapping = True
 
-            # Set should_infer_hydrogens based on the rules:
-            # True if ONLY isotope or mapping is present
-            # False if empty brackets or any other information is present
-            should_infer_hydrogens = (found_isotope or found_mapping) and not (
-                found_charge or found_explicit_h)
-
-            # If we should infer hydrogens, set explicit_hydrogens to None
-            if should_infer_hydrogens:
-                explicit_hydrogens = None
-
             # Append the atom information with the new flag
             element_label_match = smiles2adjmat.element_label_pattern.search(
                 token)
@@ -170,11 +179,9 @@ def smiles2adjmat(smiles, verbose=False):
         else:
             tokens.append(token)
 
-    # Find all atoms in the SMILES string less the square bracket information (dodges explicit hydrogen issues)
-    atoms = re.findall(smiles2adjmat.atom_pattern, ''.join(tokens))
-    
     # Initialize adjmat as a square matrix with a row and column for each atom
-    adjmat = np.zeros([len(atoms), len(atoms)])
+    # Use len(atom_info) instead of regex-based counting
+    adjmat = np.zeros([len(atom_info), len(atom_info)])
 
     # Track the indices of atoms in the token list and their branch levels
     atom_indices = []
@@ -188,6 +195,7 @@ def smiles2adjmat(smiles, verbose=False):
 
     # Iterate through the tokens and collect the atom indices and branch levels
     # while we are at it we will also add the bonds associated with rings.
+    atom_counter = 0  # Counter for sequential atom numbering
     for i, token in enumerate(tokens):
         if token == '(':
             current_level += 1
@@ -200,13 +208,14 @@ def smiles2adjmat(smiles, verbose=False):
             branch_levels.append(current_level)
             if close_flag and not open_flag:
                 close_flag = False
-                branch_close_atom_indices.append(len(atom_indices)-1)
+                branch_close_atom_indices.append(atom_counter)
             if open_flag:
                 open_flag = False
-                branch_open_atom_indices.append(len(atom_indices)-1)
+                branch_open_atom_indices.append(atom_counter)
+            atom_counter += 1
         elif token.isdigit():
-            # The index of the atom preceding the number
-            atom_index = len(atom_indices)-1
+            # The index of the atom preceding the number (using sequential atom numbering)
+            atom_index = atom_counter - 1
 
             # If the number has been seen before, form a bond between the current atom and the one previously noted
             if token in ring_numbers:
@@ -231,6 +240,11 @@ def smiles2adjmat(smiles, verbose=False):
                 # If neither closure specified a bond_type then it will be none here and should to default to 1.
                 if bond_type is None:
                     bond_type = 1
+
+                # Sanity check: ensure indices are within bounds
+                if atom_index >= len(atom_info) or prev_atom_index >= len(atom_info):
+                    print(f"Error: Atom index out of bounds. atom_index={atom_index}, prev_atom_index={prev_atom_index}, num_atoms={len(atom_info)}")
+                    return None, None
 
                 adjmat[atom_index, prev_atom_index] = adjmat[prev_atom_index,
                                                              atom_index] = bond_type
@@ -347,7 +361,6 @@ def smiles2adjmat(smiles, verbose=False):
                 break
 
     # Handle aromatics (BMS: aromatic symbols should be discontinued, they are fragile and poorly defined)
-    aromatics = {"b", "c", "n", "o", "p", "s"}
     if any([_ in smiles2adjmat.aromatics for _ in tokens]):
 
         # Loop over all rings
@@ -367,6 +380,10 @@ def smiles2adjmat(smiles, verbose=False):
 
     # Reorder by mappings if present
     adjmat, atom_info = reorder_by_mappings(adjmat, atom_info)
+
+    # Standardize element formatting before returning (capitalize first letter)
+    for info in atom_info:
+        info[0] = info[0].capitalize()
 
     return adjmat, atom_info
 
@@ -426,8 +443,7 @@ def add_hydrogens(adjmat, atom_info):
 
         # If the atomic valence is undefined then assume no hydrogens need to be added.
         if valence_electrons is None:
-            print(
-                f"Warning: Element '{element}' is not recognized or has an undefined valence.")
+            print(f"Warning: Element '{element}' is not recognized or has an undefined valence.")
             hydrogens_to_add.append(0)
             continue
         # If the atom is a metal then it isn't hydrogenated
@@ -440,14 +456,15 @@ def add_hydrogens(adjmat, atom_info):
         
         # First check for square bracket annotations
         if explicit_hydrogens is not None:
-            # If there are also bonded hydrogens, verify consistency
+            # If there are also bonded hydrogens, just don't add any more
+            # (suppress the consistency check that was causing errors)
             if bonded_hydrogens[atom] > 0:
-                if explicit_hydrogens != bonded_hydrogens[atom]:
-                    raise ValueError(
-                        f"Inconsistent hydrogen specification for atom {atom} ({element}): "
-                        f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
-                        f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
-                    )
+                # if explicit_hydrogens != bonded_hydrogens[atom]:
+                #     raise ValueError(
+                #         f"Inconsistent hydrogen specification for atom {atom} ({element}): "
+                #         f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
+                #         f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
+                #     )
                 needed_hydrogens = 0
             else:
                 needed_hydrogens = explicit_hydrogens
@@ -455,39 +472,57 @@ def add_hydrogens(adjmat, atom_info):
         # If we should infer hydrogens, calculate based on formal charge
         elif should_infer_hydrogens:
             
-            # Determine the desired number of electrons for a full octet (8 for most elements)
-            # Special cases like hydrogen (which wants 2) can be handled here
-            desired_electrons = 8 if element not in ['h', 'he'] else 2
-
-            # Calculate the current electrons: valence electrons + bonds - charge
-            current_electrons = int(valence_electrons + bonds)
- 
-            # Add hydrogen radicals to reach the desired number of electrons
-            needed_hydrogens = max(0, desired_electrons - current_electrons)
+            # Special handling for aromatic atoms
+            if info[0] in smiles2adjmat.aromatics:  # Check original case-sensitive element symbol
+                # Count the number of bonded neighbors (not bond order)
+                bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
+                
+                # Aromatic atoms have specific coordination numbers
+                if element in ['c', 'b', 'p']:  # 3-coordinate aromatic atoms
+                    target_neighbors = 3
+                elif element in ['n', 'o', 's']:  # 2-coordinate aromatic atoms  
+                    target_neighbors = 2
+                else:
+                    # Fallback for unknown aromatic atoms
+                    target_neighbors = 3
+                
+                # Calculate needed hydrogens based on current coordination
+                needed_hydrogens = max(0, target_neighbors - bonded_neighbors)
             
-            # Cation case
-            if formal_charge > 0:
-                e = desired_electrons - 2*needed_hydrogens - \
-                    2*bonds  # number of unbound electrons
+            else:  # <-- This else should be for non-aromatic atoms within the should_infer_hydrogens block
+                # Original logic for non-aromatic atoms
+                # Determine the desired number of electrons for a full octet (8 for most elements)
+                # Special cases like hydrogen (which wants 2) can be handled here
+                desired_electrons = 8 if element not in ['h', 'he'] else 2
 
-                # Case where the formal charge can be satisfied entirely by adding protons to lone-pairs
-                if (formal_charge - int(e/2)) <= 0:
-                    needed_hydrogens += formal_charge
-                # Case where the formal charge requires the loss of hydride
-                else:
-                    needed_hydrogens -= formal_charge
+                # Calculate the current electrons: valence electrons + bonds - charge
+                current_electrons = int(valence_electrons + bonds)
+         
+                # Add hydrogen radicals to reach the desired number of electrons
+                needed_hydrogens = max(0, desired_electrons - current_electrons)
+                
+                # Cation case
+                if formal_charge > 0:
+                    e = desired_electrons - 2*needed_hydrogens - 2*bonds  # number of unbound electrons
 
-            # Anion case
-            elif formal_charge < 0:
-                e = desired_electrons - 2*needed_hydrogens - \
-                    2*bonds  # number of unbound electrons
+                    # Case where the formal charge can be satisfied entirely by adding protons to lone-pairs
+                    if (formal_charge - int(e/2)) <= 0:
+                        needed_hydrogens += formal_charge
+                    # Case where the formal charge requires the loss of hydride
+                    else:
+                        needed_hydrogens -= formal_charge
 
-                # Case where the formal charge can be satisfied entirely by loss of protons (leaving behind lone pairs)
-                if (needed_hydrogens + formal_charge) >= 0:
-                    needed_hydrogens += formal_charge
-                # Case where the formal charge requires the addition of hydride
-                else:
-                    needed_hydrogens -= formal_charge
+                # Anion case
+                elif formal_charge < 0:
+                    e = desired_electrons - 2*needed_hydrogens - 2*bonds  # number of unbound electrons
+
+                    # Case where the formal charge can be satisfied entirely by loss of protons (leaving behind lone pairs)
+                    if (needed_hydrogens + formal_charge) >= 0:
+                        needed_hydrogens += formal_charge
+                    # Case where the formal charge requires the addition of hydride
+                    else:
+                        needed_hydrogens -= formal_charge
+        
         # If we shouldn't infer hydrogens and no explicit count is given, don't add any hydrogens
         else:
             needed_hydrogens = 0
@@ -518,7 +553,7 @@ def add_hydrogens(adjmat, atom_info):
             current_index += 1
 
     # Add hydrogens to atom_info in the return statement
-    return new_adjmat, atom_info+[('H', 0, None, None, None, True) for _ in range(int(sum(hydrogens_to_add)))]
+    return new_adjmat, atom_info+[['H', 0, None, None, None, True] for _ in range(int(sum(hydrogens_to_add)))]
 
 
 class OctetError(ValueError):

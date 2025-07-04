@@ -1,3 +1,9 @@
+import fnmatch
+from yarp.yarpecule.yarpecule import yarpecule
+
+# NOTE: Long-term I'd like to have all the default user inputs and error handling set up in a different centralized location
+# But I need to recruit some users and devs to help me hammer this out well
+
 
 def generate_rxns(init):
     """
@@ -5,34 +11,51 @@ def generate_rxns(init):
         literally the stuff contained under "initialize" in the input YAML file
 
     Returns a dictionary of reaction objects
+
+    Should this be a class?
     """
     output = dict()
 
-    if "enumerate" in init:
-        print("Product enumeration routine selected!")
+    print("Received initialization node:")
+    print(init)
 
-        if isinstance(init.get('reactants'), str):
-            print(f"Starting from reactant: {init.get('reactants')}")
-            # Do product enumeration and then create a bunch of reaction objects
-            output = enumerate_products(init)
+    # Check product enumeration status (default to False if not provided)
+    enum_flag = init.get("enumerate", False)
+
+    # Initialize reactions for product enumeration
+    if enum_flag:
+
+        print("Enumeration ahoy!")
+        # Check formatting for initial species
+        d0_node = init.get("initial species", None)
+        if not d0_node:
+            raise RuntimeError("Please provide an initial species for enumeration. "
+                               "Can be a single structure SMILES or XYZ, "
+                               "or a previous YARP pickle file.")
+
+        if fnmatch.fnmatch(d0_node, "*.p") or fnmatch.fnmatch(d0_node, "*.pickle"):
+            print("Processing starting node as YARP generated pickle file")
+            raise RuntimeError("Not yet implemented!")
         else:
-            raise RuntimeError(
-                "Product enumeration can only be done from a single reactant!")
+            print("Letting yarpecule object figure out what this is")
+            molecule = yarpecule(d0_node, mode="yarp")
+            print(molecule.elements)
+            print(molecule.adj_mat)
 
+        products = enumerate_products(molecule, init)
     else:
-        print("No product enumeration will be performed.")
-        if "yarp pickle" in init:
-            print("Loading reaction objects from prior YARP run.")
-            # Load in prior reaction objects from a pickle file
-            output = load_from_pickle(init.get('yarp pickle'))
-        elif "reactants" in init & "products" in init:
-            print("Loading reaction objects from reactants and products.")
-            # Create reaction objects from user provided reactants and products
-            # I imagine this will be something that `enumerate_products()` calls internally
-            output = create_reaction(
-                init.get('reactants'), init.get('products'))
-        else:
-            raise RuntimeError(
-                "No reactants or products provided for reaction object generation.")
+        raise RuntimeError("Non-enumeration routines are not yet implemented!")
 
     return output
+
+
+def enumerate_products(r_yp, inp):
+    """
+    r_yp : yarpecule object
+        The reactant from which all products are enumerated
+    """
+
+    # Time to start copying over from main_xtb's run_enumeration function
+    products = []
+
+    return products

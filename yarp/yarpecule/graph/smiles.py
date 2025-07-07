@@ -385,7 +385,14 @@ def smiles2adjmat(smiles, verbose=False):
     for info in atom_info:
         info[0] = info[0].capitalize()
 
-    return adjmat, atom_info
+    # Create bond electron matrix (copy of original adjmat for off-diagonals)
+    bond_electron_mat = adjmat.copy()
+    
+    # Calculate electrons for each atom and place on diagonal
+    for i, info in enumerate(atom_info):     # Place on diagonal
+        bond_electron_mat[i, i] = el_valence[info[0].lower()] - info[1] - sum(adjmat[i])
+
+    return np.where(adjmat > 0, 1, 0), bond_electron_mat, atom_info
 
 
 def add_hydrogens(adjmat, atom_info):

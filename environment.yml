@@ -6,6 +6,7 @@ dependencies:
   - pytest
   - pip
   - pyaml
+  - ipython
   - rdkit
   - pip:
     - rxnmapper

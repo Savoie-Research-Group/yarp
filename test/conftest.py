@@ -49,7 +49,7 @@ def rad_canon_smi():
 
 @pytest.fixture
 def rad_canon_map_smi():
-    return '[CH2:2][C:1]'
+    return '[CH2:2][CH3:1]'
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def anion_canon_smi():
 
 @pytest.fixture
 def anion_canon_map_smi():
-    return '[C:2][C:3](=[O:1])[O-:4]'
+    return '[CH3:2][C:3](=[O:1])[O-:4]'
 
 
 @pytest.fixture
@@ -80,3 +80,13 @@ def anion_explicitH_smi():
 @pytest.fixture
 def anion_full_map_smi():
     return '[O-:3][C:4](=[O:5])[C:6]([H:13])([H:14])[H:12]'
+
+
+@pytest.fixture
+def aromatic_canon_smi():
+    return 'Oc1ccoc1'
+
+
+@pytest.fixture
+def aromatic_full_map_smi():
+    return '[c:0]1([H:15])[c:4]([O:9][H:13])[c:5]([H:20])[c:1]([H:16])[o:6]1'

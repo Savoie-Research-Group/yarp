@@ -259,7 +259,8 @@ def xyz_from_smiles(smiles, mode="rdkit"):
     if mode == "yarp":
 
         # Parse basics
-        adj_mat, atom_info = smiles2adjmat(smiles)
+        # ERM: We are just going to throw-away BE matrix for now, but will integrate this later
+        adj_mat, bemat, atom_info = smiles2adjmat(smiles)
         elements = [_[0].lower() for _ in atom_info]
         fc = [0 if _[1] is None else int(_[1]) for _ in atom_info]
         q = int(sum(fc))

@@ -41,3 +41,5 @@ class input:
             raise RuntimeError("Please provide an initial species for enumeration. "
                                "Can be a single structure SMILES or XYZ, "
                                "or a previous YARP pickle file.")
+
+        self.quick_opt_lot = initnode.get("quick opt lot", "uff")

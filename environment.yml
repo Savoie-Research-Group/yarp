@@ -8,5 +8,6 @@ dependencies:
   - pyaml
   - ipython
   - rdkit
+  - openbabel
   - pip:
     - rxnmapper

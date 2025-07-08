@@ -7,7 +7,7 @@ from yarp.reaction.enum import break_bonds, form_n_bonds, bmfn
 # But I need to recruit some users and devs to help me hammer this out well
 
 
-def generate_rxns(init):
+def generate_rxns(inp):
     """
     init : dict
         literally the stuff contained under "initialize" in the input YAML file
@@ -18,48 +18,47 @@ def generate_rxns(init):
     """
     output = dict()
 
-    print("Received initialization node:")
-    print(init)
-
-    # Check product enumeration status (default to False if not provided)
-    enum_flag = init.get("enumerate", False)
-
     # Initialize reactions for product enumeration
-    if enum_flag:
+    if inp.enum_on:
 
         print("Enumeration ahoy!")
-        # Check formatting for initial species
-        d0_node = init.get("initial species", None)
-        if not d0_node:
-            raise RuntimeError("Please provide an initial species for enumeration. "
-                               "Can be a single structure SMILES or XYZ, "
-                               "or a previous YARP pickle file.")
 
-        if fnmatch.fnmatch(d0_node, "*.p") or fnmatch.fnmatch(d0_node, "*.pickle"):
+        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle"):
             print("Processing starting node as YARP generated pickle file")
             raise RuntimeError("Not yet implemented!")
         else:
             print("Letting yarpecule object figure out what this is")
-            molecule = yarpecule(d0_node, mode="yarp")
+            molecule = yarpecule(inp.d0_node, mode="yarp")
             print(molecule.elements)
             print(molecule.adj_mat)
 
-        products = enumerate_products(molecule, init)
+        products = enumerate_products(
+            molecule, inp.n_break, inp.n_form, inp.enum_mode, inp.l_cutoff)
     else:
         raise RuntimeError("Non-enumeration routines are not yet implemented!")
 
     return output
 
 
-def enumerate_products(r_yp, inp):
+def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0):
     """
     r_yp : yarpecule object
         The reactant from which all products are enumerated
+
+    n_break : int
+        Number of bonds to break
+
+    n_form : int
+        Number of bonds to form
+
+    mode : string
+        Toggle between the two available product enumeration modes:
+        Concerted (default) and sequential enumeration.
+
+    cutoff : float
+        Threshold used in sequential enumeration to discard unphysical Lewis structures
+        with bond-electron matrix scores above this value.
     """
-    mode = inp.get("mode", "concerted")
-    n_break = inp.get("bonds to break", 2)
-    n_form = inp.get("bonds to form", 2)
-    cutoff = inp.get("lewis score", 0.0)
 
     print(f"Product enumeration with break {n_break}, form {n_form} "
           f"will be performed in {mode} mode.")

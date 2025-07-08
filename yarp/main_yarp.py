@@ -40,6 +40,10 @@ def main(file):
     if reactions == {}:
         print("No reaction objects created!")
         exit
+    else:
+        print(f"Number of reactions generated: {len(reactions)}")
+        print(reactions)
+        exit
 
     ###############################################
     ####         STAGE 2                       ####

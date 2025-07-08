@@ -1,14 +1,18 @@
 """
 Definition of yarpecule object class
 """
+import os
 import numpy as np
+from copy import deepcopy
+from openbabel import pybel
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
-from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
 from yarp.yarpecule.lewis.be_mat import return_bo_dict
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
+from yarp.util.misc import mol_write_yp
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
@@ -328,19 +332,92 @@ class yarpecule:
             The format of the file to export the geometry to.
         """
 
-    def export_smiles(self, mode='canonical'):
+    def get_smiles(self, mode='canonical'):
         """
-        Export the SMILES representation of the yarpecule.
+        Generate a SMILES representation of the yarpecule.
         This shouldn't ever change any of the attributes of the yarpecule.
         Option to export SMILES with explicit atom mappings.
         Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
 
         Parameters
         ----------
-        mode : str, default='canonical'
+        mode : str, default='canonical' (NOT implemented!!!)
             The mode of the SMILES representation to export.
             Options are 'canonical' or 'non-canonical'.
         """
+        # Generate a temporary MOL file from yarpecule
+        tmp_file = ".tmp.mol"
+        mol_write_yp(tmp_file, self.elements, self.geo,
+                     self.bond_mats[0], self.adj_mat)
+
+        # Use openbabel to get a SMILES string
+        mol = next(pybel.readfile("mol", tmp_file))
+        smile = mol.write(format="can").strip().split()[0]
+
+        # Remove temporary file
+        os.remove(tmp_file)
+
+        return smile
+
+    def get_inchi(self, verbose=False):
+        """
+        Generate the InChIKey for a given molecule using OpenBabel.
+
+        Parameters
+        ----------
+        molecule : yarpecule object
+
+        Returns
+        -------
+        inchikey : str
+        """
+        E = self.elements
+        G = self.geo
+        bond_mat = self.bond_mats[0]
+        adj_mat = self.adj_mat
+
+        gs = graph_seps(adj_mat)
+
+        groups = []
+        loop_ind = []
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group = [count_j for count_j,
+                             j in enumerate(gs[i, :]) if j >= 0]
+                loop_ind += new_group
+                groups += [new_group]
+        inchikey = []
+
+        for group in groups:
+            N_atom = len(group)
+            elements = [E[ind] for ind in group]
+            bem = [bond_mat[group][:, group]]
+            geo = np.zeros([N_atom, 3])
+            adj = adj_mat[group][:, group]
+
+            for count_i, i in enumerate(group):
+                geo[count_i, :] = G[i, :]
+
+            mol_write_yp(".tmp.mol", elements, geo, bem, adj)
+
+            if verbose:
+                print(os.popen('cat .tmp.mol').read())
+
+            mol = next(pybel.readfile("mol", ".tmp.mol"))
+            try:
+                inchi = mol.write(format='inchikey').strip().split()[0]
+            except:
+                print(f"{mol.write(format='inchikey')}")
+                continue
+            inchikey += [inchi]
+            os.system("rm .tmp.mol")
+
+        if len(inchikey) == 0:
+            return "ERROR"
+        elif len(groups) == 1:
+            return inchikey[0][:14]
+        else:
+            return '-'.join(sorted([i[:14] for i in inchikey]))
 
     def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
         self._lewis_struct.draw_bmats(outfile, show_inline)

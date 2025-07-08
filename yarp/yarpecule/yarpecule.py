@@ -162,6 +162,10 @@ class yarpecule:
     def fc(self):
         return self._lewis_struct._formal_charge
 
+    @property
+    def rings(self):
+        return self._lewis_struct._rings
+
     ######################
     # Internal Functions #
     ######################

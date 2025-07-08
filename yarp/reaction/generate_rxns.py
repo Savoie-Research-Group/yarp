@@ -40,7 +40,7 @@ def generate_rxns(inp):
     return output
 
 
-def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0):
+def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0, ring_mode=False):
     """
     r_yp : yarpecule object
         The reactant from which all products are enumerated
@@ -81,15 +81,17 @@ def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0):
         products = [_ for _ in products if _.bond_mat_scores[0]
                     <= cutoff and sum(np.abs(_.fc)) < 2.0]
 
-        # This makes no sense to me... figure it out later - ERM
-        product = []
-        for _ in products:
-            if _.rings != []:
-                if len(_.rings[0]) > 4:
-                    product.append(_)
-                else:
-                    product.append(_)
-        products = product
+        # This makes no sense to me... it only seems to throw away
+        # ring-open structures... - ERM
+        if ring_mode:
+            product = []
+            for _ in products:
+                if _.rings != []:
+                    if len(_.rings[0]) > 4:
+                        product.append(_)
+                    else:
+                        product.append(_)
+            products = product
         print(f" - {len(products)} cleaned products after filtering")
 
     elif mode == "concerted":

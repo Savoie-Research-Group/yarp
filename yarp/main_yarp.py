@@ -1,5 +1,6 @@
 import sys
 import yaml
+import pickle
 
 from yarp.util.input import input
 from yarp.reaction.generate_rxns import generate_rxns
@@ -39,27 +40,29 @@ def main(file):
 
     if reactions == {}:
         print("No reaction objects created!")
-        exit
+        sys.exit()
     else:
         print(f"Number of reactions generated: {len(reactions)}")
         print(reactions)
-        exit
 
     ###############################################
     ####         STAGE 2                       ####
     ###############################################
 
-    # Iterate through each reaction and apply the appropriate methods
-    for rxn in reactions:
-        print(f"Processing reaction: {rxn.ID}")
+    # Access the list of stage keys
+    # Exit if stage keys are not defined
+    stages = file.get('stages')
+    if not stages:
+        print("No stages defined in input YAML file. Exiting.")
 
-        # Access the list of stage keys
-        # Exit if stage keys are not defined
-        stages = file.get('stages')
-        if not stages:
-            print("No stages defined in input YAML file. Exiting.")
-            # find a way to dump out the reaction objects to a pickle file
-            exit
+        with open("reactions.pkl", "wb") as f:
+            pickle.dump(reactions, f)
+        print("Reactions dictionary has been pickled to reactions.pkl.")
+        sys.exit()
+
+    # Iterate through each reaction and apply the appropriate methods
+    for rxn in reactions.values():
+        print(f"Processing reaction: {rxn.id}")
 
         for stage in stages:
             # Check if the reaction object has already completed this step

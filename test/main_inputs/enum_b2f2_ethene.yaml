@@ -1,8 +1,7 @@
-
-# The indentations matter here!
 initialize:
   enumerate: True
+  mode: concerted
   initial species: C=C
   bonds to break: 2
   bonds to form: 2
-  quick opt lot: UFF
+  quick opt lot: uff

@@ -397,8 +397,7 @@ class yarpecule:
 
             for count_i, i in enumerate(group):
                 geo[count_i, :] = G[i, :]
-
-            mol_write_yp(".tmp.mol", elements, geo, bem, adj)
+            mol_write_yp(".tmp.mol", elements, geo, bem[0], adj)
 
             if verbose:
                 print(os.popen('cat .tmp.mol').read())

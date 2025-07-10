@@ -51,6 +51,14 @@ def generate_rxns(inp):
     else:
         raise RuntimeError("Non-enumeration routines are not yet implemented!")
 
+    # If visualization mode is ON, then dump bond electron matrix drawings to a visuals folder
+    if inp.prod_visuals_on:
+        for index, rxn in enumerate(output.values()):
+            folder = f"rxn_visuals/rxn{index}_{rxn.id}"
+            os.makedirs(folder, exist_ok=True)
+
+            rxn.reactant.graph.draw_bmats(f"{folder}/reactant_bemat.pdf")
+            rxn.product.graph.draw_bmats(f"{folder}/product_bemat.pdf")
     return output
 
 

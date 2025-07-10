@@ -56,9 +56,9 @@ def main(file):
     if not stages:
         print("No stages defined in input YAML file. Exiting.")
 
-        with open("reactions.pkl", "wb") as f:
+        with open(inp.out_file, "wb") as f:
             pickle.dump(reactions, f)
-        print("Reactions dictionary has been pickled to reactions.pkl.")
+        print(f"Reactions dictionary has been pickled to {inp.out_file}.")
         sys.exit()
 
     # Iterate through each reaction and apply the appropriate methods

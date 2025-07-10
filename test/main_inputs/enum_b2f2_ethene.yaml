@@ -2,6 +2,8 @@ initialize:
   enumerate: True
   mode: concerted
   initial species: C=C
+  output: ethene_b2f2.pkl
   bonds to break: 2
   bonds to form: 2
   quick opt lot: uff
+  visualize: False

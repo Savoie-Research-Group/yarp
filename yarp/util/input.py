@@ -43,3 +43,6 @@ class input:
                                "or a previous YARP pickle file.")
 
         self.quick_opt_lot = initnode.get("quick opt lot", "uff")
+        self.prod_visuals_on = initnode.get("visualize", False)
+
+        self.out_file = initnode.get("output", "reactions.pkl")

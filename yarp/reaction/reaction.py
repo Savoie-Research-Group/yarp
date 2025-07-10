@@ -16,6 +16,7 @@ class reaction:
 
         self.edge = None
 
+        # TO-DO: Make the ID --> rxn#_r-inchi_p-inchi
         self.id = self.reactant.inchi + "_" + self.product.inchi
 
     def gen_initial_path(self, input):

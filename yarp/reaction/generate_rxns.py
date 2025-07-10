@@ -26,16 +26,14 @@ def generate_rxns(inp):
     # Initialize reactions for product enumeration
     if inp.enum_on:
 
-        print("Enumeration ahoy!")
+        print("Product enumeration routine selected")
 
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle"):
-            print("Processing starting node as YARP generated pickle file")
+            print(" - Processing starting node as YARP generated pickle file")
             raise RuntimeError("Not yet implemented!")
         else:
-            print("Letting yarpecule object figure out what this is")
+            print(f" - Initializing starting reactant node from {inp.d0_node}")
             reactant = yarpecule(inp.d0_node, mode="yarp")
-            print(reactant.elements)
-            print(reactant.adj_mat)
 
         products = enumerate_products(
             reactant, inp.n_break, inp.n_form, inp.enum_mode, inp.l_cutoff)
@@ -76,21 +74,21 @@ def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0, ring
         with bond-electron matrix scores above this value.
     """
 
-    print(f"Product enumeration with break {n_break}, form {n_form} "
+    print(f" - Product enumeration with break {n_break}, form {n_form} "
           f"will be performed in {mode} mode.")
 
     if mode == "sequential":
-        print(f" * WARNING: Sequential mode is expensive and "
+        print(f"   WARNING: Sequential mode is expensive and "
               "may cause memory blow-up issues!")
 
         # Break bonds
         break_mol = list(break_bonds(r_yp, n=n_break))
-        print(f" - Breaking {n_break} bonds formed "
+        print(f"   + Breaking {n_break} bonds formed "
               f"{len(break_mol)} intermediates")
 
         # Form bonds
         products = form_n_bonds(break_mol, n=n_form)
-        print(f" - Forming {n_form} bonds formed "
+        print(f"   + Forming {n_form} bonds formed "
               f"{len(products)} potential products")
 
         # Filter out the garbage potential products
@@ -108,11 +106,11 @@ def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0, ring
                     else:
                         product.append(_)
             products = product
-        print(f" - {len(products)} cleaned products after filtering")
+        print(f"   + {len(products)} cleaned products after filtering")
 
     elif mode == "concerted":
         products = list(bmfn(r_yp, n_break, n_form))
-        print(f" - Enumerated {len(products)} products")
+        print(f"   + Enumerated {len(products)} products")
     else:
         raise RuntimeError("Please select either concerted or sequential as the "
                            "product enumeration mode!")

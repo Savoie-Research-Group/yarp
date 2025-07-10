@@ -43,7 +43,8 @@ def main(file):
         sys.exit()
     else:
         print(f"Number of reactions generated: {len(reactions)}")
-        print(reactions)
+        for index, rxn in enumerate(reactions.keys()):
+            print(f" -- Reaction {index}: {rxn}")
 
     ###############################################
     ####         STAGE 2                       ####

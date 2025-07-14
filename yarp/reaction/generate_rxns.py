@@ -111,8 +111,8 @@ def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0, ring
                 if _.rings != []:
                     if len(_.rings[0]) > 4:
                         product.append(_)
-                    else:
-                        product.append(_)
+                else:
+                    product.append(_)
             products = product
         print(f"   + {len(products)} cleaned products after filtering")
 

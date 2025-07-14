@@ -117,7 +117,7 @@ def enumerate_products(r_yp, n_break, n_form, mode="concerted", cutoff=0.0, ring
         print(f"   + {len(products)} cleaned products after filtering")
 
     elif mode == "concerted":
-        products = list(bmfn(r_yp, n_break, n_form))
+        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}))
         print(f"   + Enumerated {len(products)} products")
     else:
         raise RuntimeError("Please select either concerted or sequential as the "

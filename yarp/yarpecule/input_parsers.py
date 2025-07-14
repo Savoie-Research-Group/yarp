@@ -222,7 +222,7 @@ def mol_parse(mol):
     return elements, geo, adj_mat, q
 
 
-def xyz_from_smiles(smiles, mode="rdkit"):
+def xyz_from_smiles(smiles, mode="yarp"):
     """
     A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
     Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
@@ -235,8 +235,8 @@ def xyz_from_smiles(smiles, mode="rdkit"):
 
     mode : str
            This variable controls whether to use the yarp SMILES parser or the rdkit parser.
-           The default is to use rdkit.
            The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
+           The default is to use the in-house SMILES parser.
 
 
     Returns

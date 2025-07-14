@@ -34,9 +34,9 @@ class yarpecule:
     canon : bool, default=True
             Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
 
-    mode : str, default=rdkit
-            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default rdkit is used
-            but setting this to 'yarp' will use the in-house parser. This variable is unused if the molecular info
+    mode : str, default=yarp
+            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default
+            the in-house parser is used. This variable is unused if the molecular info
             is passed through another method besides SMILES.
             Thoughts on renaming this to smi_mode? - ERM
 
@@ -81,7 +81,7 @@ class yarpecule:
     # Constructor #
     ###############
 
-    def __init__(self, mol, canon=True, mode='rdkit'):
+    def __init__(self, mol, mode='yarp', canon=True):
         self._geo = None
         self._elements = None
         self._q = 0

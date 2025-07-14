@@ -90,3 +90,11 @@ def aromatic_canon_smi():
 @pytest.fixture
 def aromatic_full_map_smi():
     return '[c:0]1([H:15])[c:4]([O:9][H:13])[c:5]([H:20])[c:1]([H:16])[o:6]1'
+
+@pytest.fixture
+def benzene_smi():
+    return "c1ccccc1"
+
+@pytest.fixture
+def benz_rad_cat_smi():
+    return "[cH+]1ccccc1"

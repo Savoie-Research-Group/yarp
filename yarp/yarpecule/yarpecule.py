@@ -12,7 +12,7 @@ from yarp.yarpecule.lewis.be_mat import return_bo_dict
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
-from yarp.util.misc import mol_write_yp
+from yarp.util.misc import mol_write_yp, xyz_write
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
@@ -331,6 +331,11 @@ class yarpecule:
         format : str, default='xyz'
             The format of the file to export the geometry to.
         """
+        if format == 'xyz':
+            xyz_write(filename, self.elements, self.geo)
+
+        else:
+            raise RuntimeError("All I can do for you my friend is generate an XYZ file...")
 
     def get_smiles(self, mode='canonical'):
         """

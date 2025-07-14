@@ -1,5 +1,6 @@
 .DS_Store
 debug/*.prof
+debug/*.xyz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

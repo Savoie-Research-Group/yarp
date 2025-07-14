@@ -207,3 +207,34 @@ def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
         f.write("M  END\n$$$$\n")
 
     return
+
+def xyz_write(name, elements, geo, append_opt=False):
+    """
+    Write cartesian coordinates of a molecule to an XYZ file
+
+    name : str
+        Name of XYZ file to be generated
+    
+    elements : list of str
+        Elements of molecule.
+        Will be written to file in uppercase.
+
+    geo : numpy array
+        Cartesian coordinates (N x 3) numpy array
+
+    append_opt : bool (default = False)
+        Option to append structure on to an already existing XYZ file
+    """
+    if append_opt == False: 
+        out=open(name, 'w+')
+    else: 
+        out=open(name, 'a+')
+    
+    elements = [el.upper() for el in elements]
+    
+    out.write('{}\n\n'.format(len(elements)))
+    for count_i, i in enumerate(elements):
+        out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
+    out.close()
+
+    return

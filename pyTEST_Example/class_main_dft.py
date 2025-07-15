@@ -9,27 +9,39 @@ def main(args: dict):
 
     DFT_Initialize(args)
 
-    rxns = load_pickle(args["reaction_data"])
+    llrxn_path = args['reaction_data']
+    rxns = load_pickle(llrxn_path)
+    print(f"Low-level computed reactions loaded in from {llrxn_path}")
 
-    for rxn in rxns:
+    for i, rxn in enumerate(rxns):
+        print(f"  - Reaction #{i}: {rxn.id}")
         rxn.args = args
+    print("-***-\n")
 
-    # check if there is a previous pickle file
     if os.path.isfile("DFT.p"):
+        # check if there is a previous pickle file
         dft_rxns = load_pickle("DFT.p")
+        print("Prior DFT work loaded from DFT.p")
+        for i, _ in enumerate(dft_rxns):
+            print(f"  - Reaction #{i}: {_.rxn.id} --> status: {_.status}")
+        print("-***-\n")
+
         # check if rxn lengths matches
         if not len(dft_rxns) == len(rxns):
             print(f"length from DFT.p and length from rxns don't match! Wrong!")
             exit()
-        if args['verbose']:
-            print(f"PROCESSED SAVED DFT PROCESSES\n")
+
     else:
         # Initialize DFT processes
+        print("No prior DFT work performed, starting from scratch!")
         dft_rxns = [RxnProcess(rxn) for rxn in rxns]
         for rxn in rxns:
             rxn.TS_dft = dict()
         for count, dft_rxn in enumerate(dft_rxns):
             dft_rxn.get_TS_conformers()
+            print(f"  - Reaction #{count}: {dft_rxn.rxn.id} --> status: {dft_rxn.status}")
+            
+        print("-***-\n")
 
     STATUS = [] # reaction conformer (TSs) status
     RP_STATUS = [] # reactant / product status
@@ -39,15 +51,20 @@ def main(args: dict):
 
         dft_rxn.rxn.args = args
         dft_rxn.args = args
-
-        if args['verbose']:
-            print(
-                f"dft_rxn: {rxn_count}, confs: {dft_rxn.conformer_key}, conf_len: {dft_rxn.conformers}\n")
-
+        print("-----------------------------------------------------")
+        print(f"Processing Reaction #{rxn_count}")
+        print(f" + {len(dft_rxn.conformers)} conformers:")
+        for key in dft_rxn.conformer_key:
+            print(f"     {key}")
+        print("-----------------------------------------------------")
+        
         # Calculate Reactant/Product Lowest Energies
         if args['dft_run_rp']:
+            print("** Routine 1: Reactant/Product Lowest Energies **")
             if len(dft_rxn.molecules) == 0: # only initialize / separate RP once #
                 dft_rxn.separate_Reactant_Product()
+            
+            print(" - Treating separable molecules individually")
             for mol_count, mol in enumerate(dft_rxn.molecules):
                 dft_rxn.molecules[mol_count].SUBMIT_JOB = 1-args['dry_run']
                 dft_rxn.rp_conformers[mol_count].SUBMIT_JOB = 1-args['dry_run']
@@ -59,14 +76,21 @@ def main(args: dict):
 
                 processed_rp_molecules.append(dft_rxn.molecules[mol_count].inchi)
                 
-                print(f"dft_rxn.molecules: {dft_rxn.molecules[mol_count].inchi}\n")
+                print(f"  + molecule #{mol_count}: {dft_rxn.molecules[mol_count].inchi}\n")
+                
                 RP_STATUS.append([mol_count, dft_rxn.molecules[mol_count].inchi,
                                   dft_rxn.rp_conformers[mol_count].FLAG, dft_rxn.molecules[mol_count].FLAG])
+            
+            print(" - Summing up energies of separated molecules")
             dft_rxn.SumUp_RP_Energies()
+
+            print(" - Final energies/properties:")
             for k, v in dft_rxn.reactant_dft_opt.items():
                 print(k, v)
+        
         # TSOPT + IRC #
         # process all the conformers
+        print("** Routine 2: Transition state refinement and analysis **")
         ts_count = 0
         for conf_i, conf in enumerate(dft_rxn.conformers):
             if not args['dft_run_ts']: continue
@@ -74,6 +98,7 @@ def main(args: dict):
             if not(args['selected_conformers'] == [] or conf.conformer_id in args['selected_conformers']):
                 continue
             ts_count += 1
+            print(f" - Processing conformer #{conf_i}: {conf.conformer_id}")
             # yaml argument dry_run = False: prepare job submission files, but do not submit
             conf.SUBMIT_JOB = 1-args['dry_run']
 
@@ -97,7 +122,9 @@ def main(args: dict):
                 IRC_STATUS.append([conf.TSOPT.rxn_ind, conf.IRC.FLAG, 
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][0],
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][1]])
-        if rxn_count > 2: exit()
+
+        print("-----------------------------------------------------")
+    
     if args['dft_run_ts']:
         write_table_with_title(STATUS, title = "Transition State",
                 headers=["RXN_CONF", "TSOPT-Status", "IRC-Status", 

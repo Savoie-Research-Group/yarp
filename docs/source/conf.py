@@ -49,9 +49,15 @@ extensions = [
 
 # Point autoapi to the yarp source
 autoapi_type = 'python'
-autoapi_dirs = ['../../yarp', '../../test']  # path from docs/source/
+#autoapi_dirs = ['../yarp', '../test']  # path from docs/source/
+import os
+
+autoapi_dirs = [os.path.abspath(os.path.join(os.path.dirname(__file__), '../../yarp'))]
+
 autoapi_add_toctree_entry = True
 autoapi_keep_files = True  # Optional: lets you inspect the generated .rst
+
+
 
 # Napoleon settings
 napoleon_google_docstring = True
@@ -97,6 +103,7 @@ html_css_files = ['custom.css']
 autosummary_generate = True
 autodoc_default_flags = ['members', ]
 add_module_names = False  # hide full dotted names in function headers
+
 
 
 typehints_defaults = "comma"

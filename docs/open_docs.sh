@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# view_docs.sh — Build and open local Sphinx docs
-# Usage: ./view_docs.sh
+# open_docs.sh — Open the YARP documentation
+# Usage: ./open_docs.sh
 
 cd "$(dirname "$0")"
 
@@ -22,3 +22,12 @@ case "$OSTYPE" in
   msys*|cygwin*|win32*) start "$DOC_PATH" ;;   # Git Bash or WSL on Windows
   *)        echo "📝 Please open $DOC_PATH manually." ;;
 esac
+
+echo "Welcome to
+                __   __ _    ____  ____  AGAIN!
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        """

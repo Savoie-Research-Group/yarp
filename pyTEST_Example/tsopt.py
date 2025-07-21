@@ -75,7 +75,7 @@ class TSOPT:
         Input.input_geo = self.inp_xyz
         Input.work_folder = self.wf
         Input.lot = self.dft_lot
-        print(self.args['dft_mix_lot'])
+        # print(self.args['dft_mix_lot'])
         # convert basis set format
         Input.mix_lot = [[a[0], convert_basis_set(
             a[1], self.args['package'])] for a in self.args['dft_mix_lot']]

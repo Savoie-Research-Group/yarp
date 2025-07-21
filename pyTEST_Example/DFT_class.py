@@ -52,7 +52,7 @@ def Check_OPT_Job_Status(OPT, jobtype = "TSOPT", SUBMIT_JOB = False):
         else:
             print(f"    * Just kidding! Submission has been turned off.")
             print(
-                f"      Set dry_run flag to False if you actually want to submit\n")
+                f"      Set dry_run flag to False if you actually want to submit")
     elif "finished" in OPT.FLAG.lower(): # could be "FINISHED", "finished with result", "finished with error"
         print(f"{jobtype} job is not currently running - let's check the status!")
 
@@ -69,15 +69,15 @@ def Check_OPT_Job_Status(OPT, jobtype = "TSOPT", SUBMIT_JOB = False):
             else:
                 print(f"    * Just kidding! Submission has been turned off.")
                 print(
-                    f"      Set dry_run flag to False if you actually want to submit\n")
+                    f"      Set dry_run flag to False if you actually want to submit")
     elif OPT.FLAG in ["Submitted", "RUNNING", "PENDING"]:
-        print(f"{jobtype} job is ongoing - check back later!\n")
+        print(f"{jobtype} job is ongoing - check back later!")
     elif OPT.FLAG == "Finished with Result":
         print(f"{jobtype} has already finished.")
     elif OPT.FLAG == "Finished with Error":
         print(f"{jobtype} has already finished, but seems there is a problem...")
     else:
-        print(f"Unrecognized status for {jobtype} job: {OPT.FLAG}! You might want to check it out.\n")
+        print(f"Unrecognized status for {jobtype} job: {OPT.FLAG}! You might want to check it out.")
 
 class RxnProcess:
     def __init__(self, rxn):
@@ -188,16 +188,16 @@ class RxnProcess:
         conformer.Prepare_Input()
 
         try:
-            print(f"{conformer.inchi}: JOB STATUS: {conformer.submission_job.status()}\n")
+            print(f" - {conformer.inchi}: JOB STATUS: {conformer.submission_job.status()}")
         except:
-            print(f"{conformer.inchi}: JOB STATUS: NO JOB EXIST. DONE A WHILE AGO?\n")
+            print(f" - {conformer.inchi}: JOB STATUS: NO JOB EXIST. DONE A WHILE AGO?")
 
         if conformer.FLAG == "Submitted": # submitted, check if the job is there, if so, wait
             if not conformer.submission_job.status() == "FINISHED": # not finished, job still running/in queue
                 return
 
         if conformer.Done():
-            print(f"CREST DONE! for {conformer.inchi}\n")
+            print(f"   + CREST DONE for {conformer.inchi}")
             conformer.Read_Result()
 
             #print(f"conformer.stable_conf: {conformer.stable_conf}")
@@ -205,11 +205,13 @@ class RxnProcess:
             #conformer.status = "Completed"
         else:
             #conformer.status = "Running"
-            print(f"CREST NOT DONE for {conformer.inchi}!\n")
+            print(f"   + CREST NOT DONE for {conformer.inchi}")
             conformer.Prepare_Submit()
             if conformer.SUBMIT_JOB: conformer.Submit()
+            else:
+                print("      * Dry run selected, no CREST job will be submitted!")
 
-        print(f"{conformer.inchi}: CREST STATUS: {conformer.FLAG}\n")
+        print(f" - {conformer.inchi}: CREST STATUS: {conformer.FLAG}")
 
     def run_OPT(self, count = 0):
         # THis process needs to start if CREST IS DONE
@@ -301,15 +303,15 @@ class ConformerProcess:
         if self.TSOPT.rxn_ind == None:
             self.TSOPT.rxn_ind=f"{self.rxn.reactant_inchi}_{self.rxn.id}_{self.conformer_id}"
 
-        print(f"{self.TSOPT.rxn_ind}: Initial TSOPT STATUS: {self.TSOPT.FLAG}\n")
+        print(f"{self.TSOPT.rxn_ind}: Initial TSOPT STATUS: {self.TSOPT.FLAG}")
 
         Check_OPT_Job_Status(self.TSOPT, "TSOPT", self.SUBMIT_JOB)
-        print(
-            f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}\n")
+        # print(
+        #     f"Reaction {self.TSOPT.rxn_ind} TSOPT status: {self.TSOPT.FLAG}")
         if self.TSOPT.FLAG == "Submitted": # submitted, check if the job is there, if so, wait
             if not self.TSOPT.submission_job.status() == "FINISHED": # not finished, job still running/in queue
                 return
-        print(f"{self.TSOPT.rxn_ind}: Final TSOPT STATUS: {self.TSOPT.FLAG}\n")
+        print(f"Reaction {self.TSOPT.rxn_ind}: Final TSOPT STATUS: {self.TSOPT.FLAG}")
 
     def run_IRC(self):
         if self.IRC.rxn_ind == None:
@@ -317,10 +319,10 @@ class ConformerProcess:
 
         # THis process needs to start if TSOPT has found the TS
         if not self.TSOPT.FLAG == "Finished with Result": return
-        print(f"{self.IRC.rxn_ind}: Initial IRC STATUS: {self.IRC.FLAG}\n")
+        print(f"{self.IRC.rxn_ind}: Initial IRC STATUS: {self.IRC.FLAG}")
 
         Check_OPT_Job_Status(self.IRC, "IRC", self.SUBMIT_JOB)
         if self.IRC.FLAG == "Submitted": # submitted, check if the job is there, if so, wait
             if not self.IRC.submission_job.status() == "FINISHED": # not finished, job still running/in queue
                 return
-        print(f"{self.IRC.rxn_ind}: Final IRC STATUS: {self.IRC.FLAG}\n")
+        print(f"{self.IRC.rxn_ind}: Final IRC STATUS: {self.IRC.FLAG}")

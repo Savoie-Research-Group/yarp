@@ -279,7 +279,8 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False,
     if adj_mat is None: adj_mat = table_generator(E, G)
     # Seperate reactant(s)
     gs      = graph_seps(adj_mat)
-    print(f"gs: {gs}, len(gs): {len(gs)}, q = {q}\n", flush = True)
+    if verbose:
+        print(f"gs: {gs}, len(gs): {len(gs)}, q = {q}\n", flush = True)
 
 
     groups  = []
@@ -297,7 +298,8 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False,
     for count, e in enumerate(E):
         q = int(bond_mat[count][count])
         if q > 0 or e.lower() in el_metals:
-            print(f"Element: {e}, # electron: {bond_mat[count][count]}", flush = True)
+            if verbose:
+                print(f"Element: {e}, # electron: {bond_mat[count][count]}", flush = True)
 
     #exit()
 
@@ -312,7 +314,8 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False,
 
     # Determine the inchikey of all components in the reactant
     mols = {}
-    print(f"# groups: {groups}\n", flush = True)
+    if verbose:
+        print(f"# groups: {groups}\n", flush = True)
     for count_group, group in enumerate(groups):
         #print(f"doing group: {group}\n", flush = True)
         # parse element and geometry of each fragment
@@ -327,7 +330,8 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False,
         group_bond_mat = [bond_mat[a] for a in group]
         group_formal = return_formals(group_bond_mat, frag_E)
         frag_Charge = int(sum(group_formal))
-        print(f"group atom: {len(frag_E)}, frag_charge: {frag_Charge}\n", flush = True)
+        if verbose:
+            print(f"group atom: {len(frag_E)}, frag_charge: {frag_Charge}\n", flush = True)
         #exit()
         # FOR DEBUGGING
         #frag_Charge = 0
@@ -349,12 +353,14 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False,
         mol.adj_mat=adj_mat[group][:, group]
         mol.q = frag_Charge
         mol.geo = copy.deepcopy(frag_G)
-        print(f"frag_charge: {frag_Charge}\n", flush = True)
+        if verbose:
+            print(f"frag_charge: {frag_Charge}\n", flush = True)
         frag_bond_mat, frag_score = find_lewis(mol.elements,mol.adj_mat,q=mol.q)
         mol.bond_mats = [molecule.bond_mats[0][group][:, group]]
         #exit()
         inchikey = return_inchikey(mol)
-        print(f"inchi: {inchikey}, frag_charge: {frag_Charge}\n")
+        if verbose:
+            print(f"inchi: {inchikey}, frag_charge: {frag_Charge}\n")
         #try:
         if inchikey == 'ERROR':   
             print(f"CANNOT GET Inchi key for a molecule during separate mol")

@@ -23,7 +23,7 @@ class IRC:
 
         conf_i = self.index
 
-        print(f"conf_i: {conf_i}")
+        # print(f"conf_i: {conf_i}")
         if self.dft_lot not in self.rxn.IRC_dft.keys():
             self.rxn.IRC_dft[self.dft_lot] = dict()
 

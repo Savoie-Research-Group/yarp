@@ -15,7 +15,7 @@ from utils import xyz_write, add_mix_basis_for_atom
 
 # prepare corresponding input files for each calculator
 class ORCA:
-    def __init__(self, input_geo, work_folder=os.getcwd(), lot='B97-3c', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
+    def __init__(self, input_geo, work_folder=os.getcwd(), functional='B97-3c', basis_set='def2-SVP', mix_basis=False, mix_lot=[], jobtype='ENGRAD', nproc=1, mem=4000, scf_iters=500, jobname='orcajob', charge=0, multiplicity=1,\
                  defgrid=2, solvent=False, solvation_model='CPCM', dielectric=0.0, writedown_xyz=False):
         """
         Initialize an Orca job class
@@ -32,7 +32,8 @@ class ORCA:
         self.work_folder  = work_folder
         self.orca_input   = f'{work_folder}/{jobname}.in'
         self.jobtype      = jobtype
-        self.lot          = lot
+        self.functional   = functional
+        self.basis_set    = basis_set
         self.mix_basis    = mix_basis
         self.mix_lot      = mix_lot # a list of lists, for example: [['Cu', 'def2-TZVP'], [23, 'STO-3G']]
         self.nproc        = int(nproc)
@@ -76,7 +77,9 @@ class ORCA:
                 self.xyz += f'\n'
             self.xyz += '*\n'
 
-    def generate_geometry_settings(self, hess=True, hess_step=10, constraints=[], TS_Active_Atoms=[], oldhess=False):
+        self.autostart = False # flag for checking irc restart through .gbw file
+
+    def generate_geometry_settings(self, hess=True, hess_step=10, constraints=[], TS_Active_Atoms=[], oldhess=False, numhess=False):
         """
         Specific info block for geometry optimization
         For constraints, please use orca constraint type # Note atom index starting from 0
@@ -91,6 +94,7 @@ class ORCA:
         info = '%geom\n'
         if hess: info += f'  Calc_Hess true\n  Recalc_Hess {hess_step}\n'
         if oldhess: info += f'  inhess Read\n  InHessName "{oldhess}"\n'
+        if numhess: info += f'  NumHess true \n'
         if len(constraints) > 0:
             info += '  Constraints\n'
             for constraint in constraints:
@@ -129,12 +133,16 @@ class ORCA:
         """
         with open(self.orca_input, "w") as f:
             if self.solvation:
-                f.write(f"! {self.lot} {self.solvation} {self.defgrid} {self.jobtype}\n\n")
+                f.write(f"! {self.functional} {self.basis_set} {self.solvation} {self.defgrid} {self.jobtype}\n\n")
             else:
-                f.write(f"! {self.lot} {self.defgrid} {self.jobtype}\n\n")
+                f.write(f"! {self.functional} {self.basis_set} {self.defgrid} {self.jobtype}\n\n")
             if self.dielectric != 0.0:
                 f.write(f"%cpcm\n epsilon {self.dielectric}\nend\n\n")
-            f.write(f"%scf\n  MaxIter {self.scf_iters}\nend\n\n")
+
+            # add auto-start flag (picking up .gbw file) if needed
+            additional_autostart = "  AutoStart true\n" if self.autostart else ""
+            f.write(f"%scf\n  MaxIter {self.scf_iters}\n{additional_autostart}end\n\n")
+
             f.write(f"%pal\n  nproc {self.nproc}\nend\n\n")
             f.write(f"%maxcore {self.mem}\n\n")
             if self.geom: f.write(f"{self.geom}")
@@ -474,6 +482,28 @@ class ORCA:
         
         return thermal
     
+    def check_autostart(self):
+        #check if there is a "gbw" file called f'{work_folder}/{jobname}'
+        if os.path.isfile(f'{self.work_folder}/{self.jobname}.gbw'):
+            print(f"found {self.work_folder}/{self.jobname}.gbw\n")
+            self.autostart = True
+        '''
+        add_string = "AutoStart true"
+        with open(self.input, 'r') as file:
+            lines = file.readlines()
+
+        for i in range(len(lines)):
+            modified_lines.append(lines[i])
+
+            # Check if the line contains the match_text
+            if "%scf" in lines[i]:
+                modified_lines.append(add_string + '\n')
+
+        # Write the modified content back to the file
+        with open(self.input, 'w') as file:
+            file.writelines(modified_lines)
+        '''
+
     def check_restart(self): # if there is a new geometry generated in the orca output, read it and process it
         if not self.calculation_terminated_normally() and self.new_opt_geometry():
             tempE, tempG = self.get_final_structure()

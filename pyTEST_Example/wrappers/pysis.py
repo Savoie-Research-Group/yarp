@@ -26,7 +26,8 @@ class PYSIS:
         """
         self.input_geo    = input_geo
         self.work_folder  = work_folder
-        self.pysis_input  = os.path.join(work_folder, f'{jobname}_input.yaml')
+        self.jobname      = jobname
+        self.pysis_input  = os.path.join(work_folder, f'{jobname}-{jobtype}_input.yaml')
         self.output       = os.path.join(work_folder, f'{jobname}-{jobtype}.out')
         self.nproc        = int(nproc)
         self.mem          = int(mem)
@@ -37,8 +38,8 @@ class PYSIS:
         self.multiplicity = multiplicity
         self.alpb         = alpb
         self.gbsa         = gbsa
-        #self.nodes        = 15
-        self.nodes        = 50
+        self.nodes        = 30
+        #self.nodes        = 50
         # Zhao's note: some special fix since the pysis in Classy-yarp repo doesn't work
         self.pysis_dir    = pysis_dir
         # create work folder
@@ -410,7 +411,7 @@ class PYSIS:
             try:
                 num_atoms = int(current_line)
             except ValueError:
-                print(f"Warning: Expected atom count at line {i+1}, got: '{current_line}'")
+                #print(f"Warning: Expected atom count at line {i+1}, got: '{current_line}'")
                 i += 1
                 continue
 
@@ -553,6 +554,9 @@ class PYSIS:
         images   = self.get_strings()
         energies = self.extract_energies_from_xyz_file(f'{self.work_folder}/final_geometries.trj')
 
+        if np.nan in energies:
+            print(f"RXN CONF {self.jobname}, ENERGY CANNOT BE READ FROM final_geometries.trj")
+            energies = self.extract_energies_from_xyz_file(f'{self.work_folder}/current_geometries.trj')
         # find local maxima from final_geometries.trj
         # get number of monotonically increasing (to the left) and decreasing (to the right) for each maxima
         # the one with more left + right points will be the chosen TS guess
@@ -568,13 +572,13 @@ class PYSIS:
         if max_index is not None:
             if not maxima: print(f"No maxima found, use inflection points instead\n", flush = True)
             if(energies[max_index] != spline_hei_energy[0]):
-                print(f"WARNING: Pysis thinks first or last image is TS", flush = True)
-                print(f"Check final_geometries.trj and splined_hei.xyz!", flush = True)
+                print(f"RXN CONF {self.jobname}: WARNING: Pysis thinks first or last image is TS", flush = True)
+                print(f"RXN CONF {self.jobname}: Check final_geometries.trj and splined_hei.xyz!", flush = True)
             # extract the image and element
             elements, geometry = images[max_index]
         else:
-            print(f"WARNING: final_geometries.trj has no good maximum or even inflection points, check your GSM run!", flush = True)
-            print(f"use structure in splined_hei.xyz given by Pysis instead", flush = True)
+            print(f"RXN CONF {self.jobname}: WARNING: geometries.trj has no good maximum or even inflection points, check your GSM run!", flush = True)
+            print(f"RXN CONF {self.jobname}: use structure in splined_hei.xyz given by Pysis instead", flush = True)
             elements, geometry = xyz_parse(f'{self.work_folder}/splined_hei.xyz')
 
         return elements, geometry

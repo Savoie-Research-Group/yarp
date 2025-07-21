@@ -35,7 +35,10 @@ crest_quick: False
 package: ORCA # options: ORCA and Gaussian
 dft_ppn: 24
 dft_nprocs: 24 # the processor for running DFT
-dft_lot: wB97X D4 def2-TZVP # the functional and basis set for DFT
+#dft_lot: wB97X D4 def2-TZVP # the functional and basis set for DFT # Zhao's note: D4 functional seems broken
+# in long term, need to separate functional and basis set
+functional: wB97X
+basis_set: def2-TZVP # the functional and basis set for DFT
 dispersion: False # only valid for Gaussian (if will apply GD3 dispersion correction)
 dft_wt: 4 # the time for running DFT (in hours)
 #partition: bsavoie # options: bsavoie or standby

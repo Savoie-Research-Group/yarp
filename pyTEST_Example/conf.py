@@ -25,6 +25,9 @@ from utils import *
 from yarp.taffi_functions import table_generator, xyz_write
 from yarp.find_lewis import find_lewis
 
+from yarp.properties import el_metals
+
+import yarp.properties
 def generate_rxn_conf_FIX(rxn, logging_queue, verbose = False):
         #rxn, logging_queue = input_data
         rxn.rxn_conf_generation(logging_queue)
@@ -268,7 +271,7 @@ def print_all_elements(diccct):
         for attribute, value in diccct.__dict__.items():
             print(f"{attribute}: {value}")
 
-def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False):
+def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False, separate = True):
     #Zhao's note: pass the total charge as well #
     ''' Function to separate molecules and return a dictionary of each segment '''
     #Zhao's note: add charge for each molecule into the mols dict#
@@ -276,8 +279,14 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False)
     if adj_mat is None: adj_mat = table_generator(E, G)
     # Seperate reactant(s)
     gs      = graph_seps(adj_mat)
+    if verbose:
+        print(f"gs: {gs}, len(gs): {len(gs)}, q = {q}\n", flush = True)
+
+
     groups  = []
     loop_ind= []
+
+    #exit()
 
     # Calculate bond mat #
     bond_mat, score = find_lewis(E,adj_mat,q=q)
@@ -286,19 +295,33 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False)
 
     if verbose: print(f"find_lewis bond_mat: {bond_mat}\n", flush = True)
 
-    for i in range(len(gs)):
-        if i not in loop_ind:
-            new_group =[count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]
-            loop_ind += new_group
-            groups   +=[new_group]
+    for count, e in enumerate(E):
+        q = int(bond_mat[count][count])
+        if q > 0 or e.lower() in el_metals:
+            if verbose:
+                print(f"Element: {e}, # electron: {bond_mat[count][count]}", flush = True)
+
+    #exit()
+
+    if not separate: 
+        groups = [[i for i in range(len(E))]]
+    else:
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group =[count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]
+                loop_ind += new_group
+                groups   +=[new_group]
 
     # Determine the inchikey of all components in the reactant
     mols = {}
-    for group in groups:
+    if verbose:
+        print(f"# groups: {groups}\n", flush = True)
+    for count_group, group in enumerate(groups):
+        #print(f"doing group: {group}\n", flush = True)
         # parse element and geometry of each fragment
         N_atom = len(group)
         for ind in group:
-            if verbose: print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n")
+            if verbose: print(f"NAtom: {N_atom}, ind: {ind}, E: {E[ind]}\n", flush = True)
         #Zhao's note: might consider return "Element + index" for better control
         frag_E = [E[ind] for ind in group]
         frag_G = np.zeros([N_atom,3])
@@ -307,9 +330,14 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False)
         group_bond_mat = [bond_mat[a] for a in group]
         group_formal = return_formals(group_bond_mat, frag_E)
         frag_Charge = int(sum(group_formal))
+        if verbose:
+            print(f"group atom: {len(frag_E)}, frag_charge: {frag_Charge}\n", flush = True)
+        #exit()
+        # FOR DEBUGGING
+        #frag_Charge = 0
 
-        if verbose: 
-            print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n")
+        #if verbose:
+        #    print(f"group, N_atom: {N_atom}, group_bond_mat: {group_bond_mat}, group_formal: {group_formal}\n", flush = True)
             #print(f"group_bond_mat is {group_bond_mat}\n")
             #print(f"new group {group} in sep mols: net charge: {frag_Charge}\n", flush = True)
 
@@ -325,16 +353,26 @@ def separate_mols(E,G,q,molecule, adj_mat=None,namespace='sep', verbose = False)
         mol.adj_mat=adj_mat[group][:, group]
         mol.q = frag_Charge
         mol.geo = copy.deepcopy(frag_G)
+        if verbose:
+            print(f"frag_charge: {frag_Charge}\n", flush = True)
         frag_bond_mat, frag_score = find_lewis(mol.elements,mol.adj_mat,q=mol.q)
         mol.bond_mats = [molecule.bond_mats[0][group][:, group]]
-        mol_write_yp(".tmp.mol", mol)
-
         #exit()
+        inchikey = return_inchikey(mol)
+        if verbose:
+            print(f"inchi: {inchikey}, frag_charge: {frag_Charge}\n")
+        #try:
+        if inchikey == 'ERROR':   
+            print(f"CANNOT GET Inchi key for a molecule during separate mol")
+            print(f"Treat complex as a whole molecule")
+            inchikey = return_inchikey(molecule) # Get inchikey for whole molecule 
+            mols = {}
 
-        mol=next(pybel.readfile("mol", ".tmp.mol"))
-        inchikey=mol.write(format='inchikey').strip().split()[0]
-        #Zhao's note: take the first 14 letters
-        inchikey = inchikey[:14]
+            group = [i for i in range(len(E))]
+            frag_E = [E[ind]+str(ind) for ind in group]
+            mols[inchikey] = [frag_E,G,q]
+            return mols
+
         os.system("mv .tmp.mol " + inchikey + ".mol")
         if verbose: print(f"mol inchikey is {inchikey}\n")
         original_inchi = return_inchikey(molecule)

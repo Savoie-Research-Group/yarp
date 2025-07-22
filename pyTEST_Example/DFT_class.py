@@ -126,10 +126,9 @@ class RxnProcess:
         rxn = self.rxn
         inchi_dict=dict()
 
-        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], molecule = rxn.reactant, namespace="sep-R", verbose = args['verbose'], separate = args['separate_reactant'])
+        tmp_dict=separate_mols(rxn.reactant.elements, rxn.reactant.geo, args['charge'], adj_mat=rxn.reactant.adj_mat, molecule = rxn.reactant, namespace="sep-R", verbose = args['verbose'], separate = args['separate_reactant'])
 
         if args['verbose']: print(f"tmp_dict: {tmp_dict}\n")
-        #exit()
 
         key=[i for i in tmp_dict.keys()]
 
@@ -152,9 +151,8 @@ class RxnProcess:
         n_reactant_inchi = len(inchi_dict)
 
         if rxn.args["backward_DE"]:
-            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], molecule = rxn.product, namespace="sep-P", verbose = args['verbose'], separate = args['separate_product'])
+            tmp_dict=separate_mols(rxn.reactant.elements, rxn.product.geo, args['charge'], adj_mat=rxn.product.adj_mat, molecule = rxn.product, namespace="sep-P", verbose = args['verbose'], separate = args['separate_product'])
             original_p_inchi = return_inchikey(rxn.product, verbose = args['verbose'])
-
             key=[i for i in tmp_dict.keys()]
             for i in key:
                 if i not in inchi_dict.keys():

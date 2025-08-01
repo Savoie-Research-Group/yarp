@@ -324,18 +324,13 @@ class yarpecule:
 
         self._yarpecule_hash = yarpecule_hash(self)
 
-    def _get_smiles(self, removeHs=False):
+    def _get_smiles(self):
         """
         Generate a SMILES representation of the yarpecule.
         This shouldn't ever change any of the attributes of the yarpecule.
         Option to export SMILES with explicit atom mappings.
         Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
 
-        Parameters
-        ----------
-        removeHs : bool
-            Option to remove Hydrogens from explicit SMILES mapping.
-            Default is False.
         
         Modifies
         --------
@@ -347,17 +342,20 @@ class yarpecule:
         mol_write_yp(tmp_file, self.elements, self.geo,
                      self.bond_mats[0], self.adj_mat)
 
-        # Use Open Babel to get a canonical SMILES string
-        obmol = next(pybel.readfile("mol", tmp_file))
-        self._canon_smi = obmol.write(format="can").strip().split()[0]
+        # Use RDKit to get canonical SMILES string
+        mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
+        atoms = mol1.GetNumAtoms()
+        for idx in range(atoms):
+            mol1.GetAtomWithIdx(idx).ClearProp("molAtomMapNumber")
+        self._canon_smi = Chem.MolToSmiles(mol1, canonical=True)
 
         # Use RDKit to get atom-mapped SMILES string
-        rdmol = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=removeHs)
-        atoms = rdmol.GetNumAtoms()
+        mol2 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
+        atoms = mol2.GetNumAtoms()
         for idx in range(atoms):
-            rdmol.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(rdmol.GetAtomWithIdx(idx).GetIdx()))
+            mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(mol2.GetAtomWithIdx(idx).GetIdx()))
         
-        self._map_smi = Chem.MolToSmiles(rdmol)
+        self._map_smi = Chem.MolToSmiles(mol2)
 
         # Remove temporary file
         os.remove(tmp_file)

@@ -7,7 +7,9 @@ dependencies:
   - pip
   - pyaml
   - ipython
+  - ipykernel
   - rdkit
   - openbabel
+  - scipy
   - pip:
-    - rxnmapper
+    - tabulate

@@ -4,7 +4,7 @@ Definition of yarpecule object class
 import os
 import numpy as np
 from copy import deepcopy
-from openbabel import pybel
+from openbabel import openbabel, pybel
 from rdkit import Chem
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
@@ -343,6 +343,9 @@ class yarpecule:
                      self.bond_mats[0], self.adj_mat)
 
         # Use RDKit to get canonical SMILES string
+        # ERM Note: RDKit has an annoying "Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D."
+        # which triggers whenever you initialize from a .mol file for various and sundry reasons.
+        # I have decided it is not worth my time to continue troubleshooting how to avoid this.
         mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
         atoms = mol1.GetNumAtoms()
         for idx in range(atoms):
@@ -354,7 +357,6 @@ class yarpecule:
         atoms = mol2.GetNumAtoms()
         for idx in range(atoms):
             mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(mol2.GetAtomWithIdx(idx).GetIdx()))
-        
         self._map_smi = Chem.MolToSmiles(mol2)
 
         # Remove temporary file

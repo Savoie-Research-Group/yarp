@@ -156,7 +156,7 @@ class yarpecule:
 
     @property
     def n_e_donate(self):
-        return self._lewis_struct._e_acceptors
+        return self._lewis_struct._e_donors
 
     @property
     def atom_neighbors(self):

@@ -5,6 +5,7 @@ import os
 import numpy as np
 from copy import deepcopy
 from openbabel import pybel
+from rdkit import Chem
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
@@ -101,14 +102,25 @@ class yarpecule:
 
         self._gen_lewis_struct()
 
+        self._canon_smi = None
+        self._map_smi = None
+
+        self._get_smiles()
+
+        self._inchi = None
+
+        self._get_inchi()
+
     ###############
     # Properties  #
     ###############
 
-    # The user should pretty much never edit these directly, but may want to view them.
-    # Therefore, I'm thinking we should use access functions to handle that.
-    # These are fancy python functions that return class attributes as (sort of) read-only.
-    # Mutable values are still mutable, but it puts some protection at least? - ERM
+    # Functions acting on yarpecules should pretty much never modify class attributes directly,
+    # but often need to access them.
+    # Therefore, these access function should be used, as they are "getters", but not "setters".
+    # They return class attributes as (sort of) read-only.
+    # However, mutable values are still mutable and can be modified, but I think that's just
+    # what you get to deal with in python. - ERM
 
     @property
     def geo(self):
@@ -169,6 +181,18 @@ class yarpecule:
     @property
     def rings(self):
         return self._lewis_struct._rings
+    
+    @property
+    def inchi(self):
+        return self._inchi
+    
+    @property
+    def canon_smi(self):
+        return self._canon_smi
+    
+    @property
+    def map_smi(self):
+        return self._map_smi
 
     ######################
     # Internal Functions #
@@ -300,6 +324,111 @@ class yarpecule:
 
         self._yarpecule_hash = yarpecule_hash(self)
 
+    def _get_smiles(self, removeHs=False):
+        """
+        Generate a SMILES representation of the yarpecule.
+        This shouldn't ever change any of the attributes of the yarpecule.
+        Option to export SMILES with explicit atom mappings.
+        Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
+
+        Parameters
+        ----------
+        removeHs : bool
+            Option to remove Hydrogens from explicit SMILES mapping.
+            Default is False.
+        
+        Modifies
+        --------
+        self._canon_smi : str
+        self._map_smi : str
+        """
+        # Generate a temporary MOL file from yarpecule
+        tmp_file = ".tmp.mol"
+        mol_write_yp(tmp_file, self.elements, self.geo,
+                     self.bond_mats[0], self.adj_mat)
+
+        # Use Open Babel to get a canonical SMILES string
+        obmol = next(pybel.readfile("mol", tmp_file))
+        self._canon_smi = obmol.write(format="can").strip().split()[0]
+
+        # Use RDKit to get atom-mapped SMILES string
+        rdmol = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=removeHs)
+        atoms = rdmol.GetNumAtoms()
+        for idx in range(atoms):
+            rdmol.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(rdmol.GetAtomWithIdx(idx).GetIdx()))
+        
+        self._map_smi = Chem.MolToSmiles(rdmol)
+
+        # Remove temporary file
+        os.remove(tmp_file)
+
+    def _get_inchi(self):
+        """
+        Generate the InChIKey for a given yarpecule using Open Babel.
+        Each separable group within the yarpecule will have an independently
+        generated InChIKey, with dashes connecting them together.
+
+        Modifies
+        --------
+        self._inchi : str
+        """
+        # Access yarpecule information via "getter" property functions
+        # This should raise an error if code is modifying the
+        # class attributes (which it should NOT be doing here!!!)
+        E = self.elements
+        G = self.geo
+        bond_mat = self.bond_mats[0]
+        adj_mat = self.adj_mat
+
+        # Identify separated graphs
+        gs = graph_seps(adj_mat)
+
+        groups = []
+        loop_ind = []
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group = [count_j for count_j,
+                             j in enumerate(gs[i, :]) if j >= 0]
+                loop_ind += new_group
+                groups += [new_group]
+        inchikey = []
+
+        # Generate a temporary mol file for each separated graph
+        # Then use it to get an INCHI key
+        tmp_file = ".tmp.mol"
+        for group in groups:
+            # extract subgroup information
+            N_atom = len(group)
+            geo = np.zeros([N_atom, 3])
+            for count_i, i in enumerate(group):
+                geo[count_i, :] = G[i, :]
+            elements = [E[ind] for ind in group]
+            bem = [bond_mat[group][:, group]]
+            adj = adj_mat[group][:, group]
+            
+            # generate mol file and read in to Open Babel
+            mol_write_yp(tmp_file, elements, geo, bem[0], adj)
+            mol = next(pybel.readfile("mol", tmp_file))
+            
+            try:
+                inchi = mol.write(format='inchikey').strip().split()[0]
+            except:
+                print("WARNING: ERROR in INCHI key generation!")
+                print(f"  --> {mol.write(format='inchikey')}")
+                continue
+            
+            inchikey += [inchi]
+            
+            os.remove(tmp_file)
+
+        if len(inchikey) == 0:
+            self._inchi = "ERROR"
+        elif len(groups) == 1:
+            self._inchi = inchikey[0][:14]
+        else:
+            self._inchi = '-'.join(sorted([i[:14] for i in inchikey]))
+
+
     ######################
     # External Functions #
     ######################
@@ -333,95 +462,10 @@ class yarpecule:
         """
         if format == 'xyz':
             xyz_write(filename, self.elements, self.geo)
-
+        elif format == 'mol':
+            mol_write_yp(filename, self.elements, self.geo, self.bond_mats[0], self.adj_mat)
         else:
-            raise RuntimeError("All I can do for you my friend is generate an XYZ file...")
-
-    def get_smiles(self, mode='canonical'):
-        """
-        Generate a SMILES representation of the yarpecule.
-        This shouldn't ever change any of the attributes of the yarpecule.
-        Option to export SMILES with explicit atom mappings.
-        Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
-
-        Parameters
-        ----------
-        mode : str, default='canonical' (NOT implemented!!!)
-            The mode of the SMILES representation to export.
-            Options are 'canonical' or 'non-canonical'.
-        """
-        # Generate a temporary MOL file from yarpecule
-        tmp_file = ".tmp.mol"
-        mol_write_yp(tmp_file, self.elements, self.geo,
-                     self.bond_mats[0], self.adj_mat)
-
-        # Use openbabel to get a SMILES string
-        mol = next(pybel.readfile("mol", tmp_file))
-        smile = mol.write(format="can").strip().split()[0]
-
-        # Remove temporary file
-        os.remove(tmp_file)
-
-        return smile
-
-    def get_inchi(self, verbose=False):
-        """
-        Generate the InChIKey for a given molecule using OpenBabel.
-
-        Parameters
-        ----------
-        molecule : yarpecule object
-
-        Returns
-        -------
-        inchikey : str
-        """
-        E = self.elements
-        G = self.geo
-        bond_mat = self.bond_mats[0]
-        adj_mat = self.adj_mat
-
-        gs = graph_seps(adj_mat)
-
-        groups = []
-        loop_ind = []
-        for i in range(len(gs)):
-            if i not in loop_ind:
-                new_group = [count_j for count_j,
-                             j in enumerate(gs[i, :]) if j >= 0]
-                loop_ind += new_group
-                groups += [new_group]
-        inchikey = []
-
-        for group in groups:
-            N_atom = len(group)
-            elements = [E[ind] for ind in group]
-            bem = [bond_mat[group][:, group]]
-            geo = np.zeros([N_atom, 3])
-            adj = adj_mat[group][:, group]
-
-            for count_i, i in enumerate(group):
-                geo[count_i, :] = G[i, :]
-            mol_write_yp(".tmp.mol", elements, geo, bem[0], adj)
-
-            if verbose:
-                print(os.popen('cat .tmp.mol').read())
-
-            mol = next(pybel.readfile("mol", ".tmp.mol"))
-            try:
-                inchi = mol.write(format='inchikey').strip().split()[0]
-            except:
-                print(f"{mol.write(format='inchikey')}")
-                continue
-            inchikey += [inchi]
-            os.system("rm .tmp.mol")
-
-        if len(inchikey) == 0:
-            return "ERROR"
-        elif len(groups) == 1:
-            return inchikey[0][:14]
-        else:
-            return '-'.join(sorted([i[:14] for i in inchikey]))
+            raise RuntimeError("Valid export formats: xyz or mol")
 
     def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
         self._lewis_struct.draw_bmats(outfile, show_inline)

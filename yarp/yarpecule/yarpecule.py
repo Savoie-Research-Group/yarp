@@ -102,14 +102,12 @@ class yarpecule:
 
         self._gen_lewis_struct()
 
+        # These attributes should be set once enumeration is complete
+        # Too many errors/warnings show up in RDkit/Open Babel
         self._canon_smi = None
         self._map_smi = None
-
-        self._get_smiles()
-
         self._inchi = None
 
-        self._get_inchi()
 
     ###############
     # Properties  #
@@ -324,7 +322,11 @@ class yarpecule:
 
         self._yarpecule_hash = yarpecule_hash(self)
 
-    def _get_smiles(self):
+    ######################
+    # External Functions #
+    ######################
+
+    def get_smiles(self):
         """
         Generate a SMILES representation of the yarpecule.
         This shouldn't ever change any of the attributes of the yarpecule.
@@ -362,7 +364,7 @@ class yarpecule:
         # Remove temporary file
         os.remove(tmp_file)
 
-    def _get_inchi(self):
+    def get_inchi(self):
         """
         Generate the InChIKey for a given yarpecule using Open Babel.
         Each separable group within the yarpecule will have an independently
@@ -428,10 +430,6 @@ class yarpecule:
         else:
             self._inchi = '-'.join(sorted([i[:14] for i in inchikey]))
 
-
-    ######################
-    # External Functions #
-    ######################
     def update_atom_order(self, atom_index=None, canon=True):
         """
         Update the atom order of the yarpecule.

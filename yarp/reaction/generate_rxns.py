@@ -1,5 +1,6 @@
 import os
 import fnmatch
+import pickle
 import numpy as np
 from openbabel import pybel
 
@@ -28,25 +29,70 @@ def generate_rxns(inp):
 
         print("Product enumeration routine selected")
 
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle"):
-            print(" - Processing starting node as YARP generated pickle file")
-            raise RuntimeError("Not yet implemented!")
+        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+            print(" - Processing starting node(s) as YARP generated pickle file")
+            
+            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
+            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+
+            print(f" - Reading in {len(og_rxns)} total reactions")
+
+            # NOTE: Oh shoot, how do I account for prior reactions with multiple molecules in the product???
+            
+            # Check that new enumeration nodes have not already been enumerated from
+            # For this, it should be enough to ensure that a product doesn't appear as a reactant
+            # But maybe I'll need to re-evaluate this beyond depth2...
+            p_nodes = []
+            p_hashes = set()
+            prior_enum = set()
+            for rxn in og_rxns.values():
+                # Add old reactions to output
+                output[rxn.id] = rxn
+
+                # Ensure products have never been enumerated as reactants before
+                r_hash = rxn.reactant.graph.hash
+                if r_hash not in prior_enum:
+                    prior_enum.add(r_hash)
+                
+                p_hash = rxn.product.graph.hash
+                if p_hash not in p_hashes: # also ensure no duplicate products!?
+                    p_hashes.add(p_hash)
+                    if p_hash not in prior_enum:
+                        p_nodes.append(rxn.product.graph)
+
+            print(f" - {len(p_nodes)} unique products identified for enumeration")
+
+            # Do the enumeration thing!
+            for node in p_nodes:
+                print(f" - Enumerating from {node.inchi} node")
+                products = enumerate_products(
+                    node, inp.n_break, inp.n_form, mode=inp.enum_mode, cutoff=inp.l_cutoff
+                )
+
+                for prod in products:
+                    # prod = quick_geom_opt(prod, inp.quick_opt_lot)
+                    rxn = reaction(node, prod)
+                    output[rxn.id] = rxn
+            
         else:
             print(f" - Initializing starting reactant node from {inp.d0_node}")
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
-        products = enumerate_products(
-            reactant, inp.n_break, inp.n_form, mode=inp.enum_mode, cutoff=inp.l_cutoff)
+            products = enumerate_products(
+                reactant, inp.n_break, inp.n_form, mode=inp.enum_mode, cutoff=inp.l_cutoff)
 
-        for prod in products:
-            # Do a quick optimization to make product geometries reflect new bonding
-            prod = quick_geom_opt(prod, inp.quick_opt_lot)
+            for i, prod in enumerate(products):
+                # Do a quick optimization to make product geometries reflect new bonding
+                # prod = quick_geom_opt(prod, inp.quick_opt_lot)
 
-            # Generate a reaction object from reactant/product pairs
-            rxn = reaction(reactant, prod)
+                # Generate a reaction object from reactant/product pairs
+                print(f"Processing product #{i}")
+                rxn = reaction(reactant, prod)
+                print(f" - Successfully made reaction {rxn.id}")
 
-            # Add reaction to dictionary paired with its ID
-            output[rxn.id] = rxn
+                # Add reaction to dictionary paired with its ID
+                output[rxn.id] = rxn
 
     else:
         raise RuntimeError("Non-enumeration routines are not yet implemented!")
@@ -59,6 +105,7 @@ def generate_rxns(inp):
 
             rxn.reactant.graph.draw_bmats(f"{folder}/reactant_bemat.pdf")
             rxn.product.graph.draw_bmats(f"{folder}/product_bemat.pdf")
+
     return output
 
 

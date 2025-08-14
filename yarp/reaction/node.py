@@ -18,13 +18,25 @@ class node:
     def __init__(self, yp):
 
         self.graph = yp
-
-        # Ehhh, now that I'm thinking about it, why not just make these yarpecule attributes?
-        # Come back to this later, it might make more sense here, but we'll see
-        self.smiles = self.graph.get_smiles()
-        self.inchi = self.graph.get_inchi()
+        self.graph.get_smiles()
+        self.graph.get_inchi()
 
         self.conformers = []
+
+    ###############
+    # Properties  #
+    ###############
+    @property
+    def inchi(self):
+        return self.graph.inchi
+    
+    @property
+    def canon_smi(self):
+        return self.graph.canon_smi
+    
+    @property
+    def map_smi(self):
+        return self.graph.map_smi
 
     def gen_conformers(self, input):
 

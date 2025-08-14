@@ -6,7 +6,7 @@ from openbabel import pybel
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import break_bonds, form_n_bonds, bmfn
-from yarp.util.misc import mol_write_yp
+from yarp.util.write_files import mol_write_yp
 
 # NOTE: Long-term I'd like to have all the default user inputs and error handling set up in a different centralized location
 # But I need to recruit some users and devs to help me hammer this out well
@@ -36,7 +36,7 @@ def generate_rxns(inp):
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
         products = enumerate_products(
-            reactant, inp.n_break, inp.n_form, inp.enum_mode, inp.l_cutoff)
+            reactant, inp.n_break, inp.n_form, mode=inp.enum_mode, cutoff=inp.l_cutoff)
 
         for prod in products:
             # Do a quick optimization to make product geometries reflect new bonding

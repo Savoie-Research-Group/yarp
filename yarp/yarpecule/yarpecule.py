@@ -13,7 +13,8 @@ from yarp.yarpecule.lewis.be_mat import return_bo_dict
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
-from yarp.util.misc import mol_write_yp, xyz_write
+from yarp.util.write_files import mol_write_yp, xyz_write
+from yarp.util.rdkit import graph_to_rdmol
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
@@ -366,7 +367,8 @@ class yarpecule:
 
     def get_inchi(self):
         """
-        Generate the InChIKey for a given yarpecule using Open Babel.
+        Generate the InChIKey for a given yarpecule using RDKit.
+        Requires the yarpecule to already have SMILES
         Each separable group within the yarpecule will have an independently
         generated InChIKey, with dashes connecting them together.
 

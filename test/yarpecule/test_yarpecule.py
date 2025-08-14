@@ -21,6 +21,8 @@ class TestYarpeculeFromSMILES:
         assert mol_rdkit.elements == ['c', 'c', 'o', 'o', 'h', 'h', 'h', 'h']
 
 class TestSMILESFromYarpecule:
+    # NOTE: Revisit if mapping indexes should start from 0 or from 1.
+    # It would be easier to read in via RDKit if mappings started from 1, I think - ERM
     def test_haa_mapping(self, haa_full_map_smi):
         mol = ypcule(haa_full_map_smi, canon=False)
         mol.get_smiles()
@@ -38,3 +40,19 @@ class TestSMILESFromYarpecule:
         mol.get_smiles()
         assert mol.canon_smi == '[CH2]C'
         assert mol.map_smi == '[C:0]([C:1]([H:2])[H:6])([H:3])([H:4])[H:5]' # revist if this is the correct output - ERM
+
+class TestInchiFromYarpecule:
+    def test_haa(self, haa_full_map_smi):
+        mol = ypcule(haa_full_map_smi)
+        mol.get_inchi()
+        assert mol.inchi == "WGCNASOHLSPBMP"
+
+    def test_aro(self, aromatic_full_map_smi):
+        mol = ypcule(aromatic_full_map_smi)
+        mol.get_inchi()
+        assert mol.inchi == "RNWIJLZQJSGBCU"
+
+    def test_rad(self, rad_full_map_smi):
+        mol = ypcule(rad_full_map_smi)
+        mol.get_inchi()
+        assert mol.inchi == "QUPDWYMUPZLYJZ"

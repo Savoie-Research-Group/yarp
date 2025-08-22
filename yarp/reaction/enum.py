@@ -421,12 +421,11 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
         for b in combinations(list(range(len(bonds))), m):
 
             # Create set to avoid reforming the exact same bonds we just broke
-            # You read this as set(frozenset(bonds we just broke)). We use frozensets to that they are
+            # You read this as set(frozenset(bonds we just broke)). We use frozensets so that they are
             # order independent (like sets) but hashable (like tuples) so that they can be used as keys in a set
             # for rapid lookup.
             avoid = set(
-                frozenset([frozenset([bonds[_][0], bonds[_][1]]) for _ in b]))
-
+                {frozenset([frozenset([bonds[_][0], bonds[_][1]]) for _ in b])})
             # Assemble list of reactive atoms: atoms from broken bonds + radical sites
             # Get atoms from bonds being broken (first 2 elements of each bond via bonds[j][:2])
             formset = [i for j in b for i in bonds[j][:2]]
@@ -469,7 +468,7 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
 
                 # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
                 if any([len(_) < 2 for _ in g]):
-                    avoid.update(g)
+                    avoid.update(frozenset(g))
                     continue
 
                 if verbose:

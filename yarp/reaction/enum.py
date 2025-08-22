@@ -475,12 +475,12 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                     print(f"Forming new bonds: {g}")
 
                 # Create new adjacency matrix by adding the new bonds
-                adj_mat = add_bonds(
-                    copy(base_bmat), [list(_) for _ in g], val=1)
+                adj_mat = copy(base_bmat)
+                np.fill_diagonal(adj_mat, 0)
+                adj_mat = add_bonds(adj_mat, [list(_) for _ in g], val=1)
 
                 # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
-                product = yarpecule((np.where(adj_mat > 0, 1, 0).astype(
-                    int), y._geo, y._elements, y._q), canon=False)
+                product = yarpecule((np.where(adj_mat > 0, 1, 0).astype(int), y.geo, y.elements, y.q), canon=False)
 
                 # Debug: show the transformation
                 if verbose:

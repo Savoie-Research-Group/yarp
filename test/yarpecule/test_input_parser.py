@@ -3,6 +3,7 @@ Testing suite for functions contained in yarp/yarpecule/input_parser.py
 """
 import pytest
 from yarp.yarpecule.input_parsers import xyz_parse
+from yarp.yarpecule.input_parsers import xyz_q_parse
 
 
 class TestXYZParser:
@@ -29,3 +30,16 @@ class TestXYZParser:
         assert geo[5, 0] == pytest.approx(-0.70247, rel=1e-5)
         assert geo[5, 1] == pytest.approx(0.61559, rel=1e-5)
         assert geo[5, 2] == pytest.approx(2.17179, rel=1e-5)
+
+class TestXYZQParser:
+    def test_xyz_with_pos_q(self, ammonium_xyz):
+        q = xyz_q_parse(ammonium_xyz)
+        assert q == pytest.approx(1, rel=1e-5)
+        
+    def test_xyz_neg_q(self, nitrate_xyz):
+        q = xyz_q_parse(nitrate_xyz)
+        assert q == pytest.approx(-1, rel=1e-5)
+                
+    def test_xyz_no_q(self, ethene_xyz):
+        q = xyz_q_parse(ethene_xyz)
+        assert q == pytest.approx(0, rel=1e-5)

@@ -3,8 +3,8 @@ yarp.reaction package
 
 .. automodule:: yarp.reaction
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------

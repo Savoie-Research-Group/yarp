@@ -3,8 +3,8 @@ yarp.yarpecule package
 
 .. automodule:: yarp.yarpecule
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Subpackages
 -----------

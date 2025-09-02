@@ -50,11 +50,11 @@ Module Contents
                 The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
    :type mode: str
 
-   :returns: *
-             * **(elements, geo, adj_mat, q)** (*tuple*) -- `elements` is a list with the element labels,
-               `geo` is an nx3 numpy array holding the rdkit generated geometry,
-               `adj_mat` is an nxn array holding the adjacency matrix,
-               `q` is an `int` holding the molecular charge (based on the sum of formal charges).
+   :returns: **(elements, geo, adj_mat, q)** -- `elements` is a list with the element labels,
+             `geo` is an nx3 numpy array holding the rdkit generated geometry,
+             `adj_mat` is an nxn array holding the adjacency matrix,
+             `q` is an `int` holding the molecular charge (based on the sum of formal charges).
+   :rtype: tuple
 
 
 .. py:function:: xyz_parse(xyz, read_types=False, multiple=False)

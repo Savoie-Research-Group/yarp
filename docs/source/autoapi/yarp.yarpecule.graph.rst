@@ -3,8 +3,8 @@ yarp.yarpecule.graph package
 
 .. automodule:: yarp.yarpecule.graph
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------

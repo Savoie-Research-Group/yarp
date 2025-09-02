@@ -3,8 +3,8 @@ yarp.yarpecule.lewis package
 
 .. automodule:: yarp.yarpecule.lewis
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------

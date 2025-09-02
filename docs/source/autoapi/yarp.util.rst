@@ -3,8 +3,8 @@ yarp.util package
 
 .. automodule:: yarp.util
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------

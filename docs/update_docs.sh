@@ -63,12 +63,13 @@ fi
 #Run for YARP
 #echo "Generating new .rst files..."
 sphinx-apidoc --force --module-first --no-toc -o "$SOURCE_DIR/autoapi" "$YARP_DIR" --separate
+
 #sphinx-apidoc --force --separate --no-toc -o "$SOURCE_DIR" "../test"
 
 # Build the HTML documentation
 echo "Building HTML documentation..."
 
-#With error tracing:
+#Silent Mode:
 make html > /dev/null 2>&1
 
 #Debugging Mode:

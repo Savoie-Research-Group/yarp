@@ -9,3 +9,6 @@ dependencies:
   - rdkit
   - pip:
     - rxnmapper
+    - sphinx-rtd-theme
+    - sphinx-autoapi 
+    - sphinx

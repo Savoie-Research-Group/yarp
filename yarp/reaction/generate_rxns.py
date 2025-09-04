@@ -180,8 +180,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="sequential", lewis
         products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}))
         print(f"   + Enumerated {len(products)} products")
     else:
-        raise RuntimeError("Please select either concerted or sequential as the "
-                           "product enumeration mode!")
+        raise RuntimeError("Please select either concerted or sequential as the product enumeration mode!")
 
     return products
 

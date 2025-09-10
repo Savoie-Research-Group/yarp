@@ -4,6 +4,7 @@ Testing suite for functions contained in yarp/yarpecule/input_parser.py
 import pytest
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.yarpecule.input_parsers import xyz_q_parse
+from yarp.yarpecule.input_parsers import mol_parse
 
 
 class TestXYZParser:
@@ -42,4 +43,36 @@ class TestXYZQParser:
                 
     def test_xyz_no_q(self, ethene_xyz):
         q = xyz_q_parse(ethene_xyz)
+        assert q == pytest.approx(0, rel=1e-5)
+
+class TestMolParser:
+    def test_single_mol_no_charge(self, ethanol_mol):
+        elements, geo, adj_mat, q = mol_parse(ethanol_mol)
+        
+        # elements, heavy atoms only
+        assert elements == ['C','C',"O"]
+        
+        # geometry, heavy atoms only
+        assert geo.shape == (3, 3)
+        assert geo[0, 0] == pytest.approx(-0.9254, rel=1e-5)
+        assert geo[0, 1] == pytest.approx(0.0742, rel=1e-5)
+        assert geo[0, 2] == pytest.approx(0.0328, rel=1e-5)
+        assert geo[1, 0] == pytest.approx(0.5123, rel=1e-5)
+        assert geo[1, 1] == pytest.approx(-0.4192, rel=1e-5)
+        assert geo[1, 2] == pytest.approx(-0.0743, rel=1e-5)
+        assert geo[2, 0] == pytest.approx(1.3778, rel=1e-5)
+
+        # adjacency matrix
+        assert adj_mat.shape == (3,3)
+        assert adj_mat[0, 0] == 0
+        assert adj_mat[0, 1] == 1
+        assert adj_mat[0, 2] == 0
+        assert adj_mat[1, 0] == 1
+        assert adj_mat[1, 1] == 0
+        assert adj_mat[1, 2] == 1
+        assert adj_mat[2, 0] == 0
+        assert adj_mat[2, 1] == 1
+        assert adj_mat[2, 2] == 0
+        
+        # charge
         assert q == pytest.approx(0, rel=1e-5)

@@ -15,10 +15,9 @@ from importlib.metadata import version
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('.'))
 
-
 # -- Project information -----------------------------------------------------
 
-project = 'Yarp'
+project = 'Y.A.R.P.'
 copyright = f'{datetime.date.today().year}, Johannes Steinmetzer'
 copyright = '2023, Savoie Research Group'
 author = 'Savoie Research Group'
@@ -43,6 +42,7 @@ extensions = [
     'sphinx_autodoc_typehints',
     'sphinx.ext.autosummary',
     'sphinx.ext.autosectionlabel',
+    'myst_parser',
 ]
 
 # Napoleon settings

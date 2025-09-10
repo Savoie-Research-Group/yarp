@@ -1,6 +1,14 @@
 """
-This module contains the find_lewis() function and associated helper functions to find the 
+This module contains the 'find_lewis()' function and associated helper functions to find the 
 best resonance structures for yarpecules.
+
+Example Usage: 
+    from find_lewis import find_lewis
+    lewis_structures = find_lewis(molecule_data)
+
+Functions:
+    - find_lewis(molecule): Compute the best Lewis resonance structures.
+    - main(argv): Entry point for command-line execution.
 """
 
 import sys
@@ -13,6 +21,12 @@ from yarp.hashes import bmat_hash
 from yarp.properties import el_to_an,an_to_el,el_valence,el_n_deficient,el_expand_octet,el_en,el_pol,el_max_valence,el_n_expand_octet,el_metals
 
 def main(argv):
+    """
+    Command-line interface for `find_lewis`.
+
+    Args:
+        argv (list): Command-line arguments. Typically contains a molecular identifier or file path.
+    """
 
     # These imports are here just for this main convenience function for testing
     from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType    

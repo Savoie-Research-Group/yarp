@@ -1,7 +1,7 @@
-sieve module
-----------------
+yarp.sieve module
+=================
 
 .. automodule:: yarp.sieve
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

@@ -1,7 +1,7 @@
-hashes module
-----------------
+yarp.hashes module
+==================
 
 .. automodule:: yarp.hashes
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

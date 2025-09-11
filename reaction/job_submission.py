@@ -241,14 +241,14 @@ class SLURM_Job:
         with open(self.script_file, "a") as f:
 
             f.write(f"export OMP_STACKSIZE={crest_job_list[0].mem}M\n")
-            f.write(f"export OMP_NUM_THREADS={crest_job_list[0].nproc}\n")
+            f.write(f"export OMP_NUM_THREADS=$NSLOTS")
 
             # set up GSM commands (only supports doing each task in sequential)
             for crestjob in crest_job_list:
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {crestjob.work_folder}\n\n")
                 f.write("# Running crest jobs for the input file\n")
-                f.write(f"{crestjob.command} > {crestjob.output}\nwait\n\n")
+                f.write(f"export OMP_NUM_THREADS=$NSLOTS")
 
         self.create_job_bottom()
 

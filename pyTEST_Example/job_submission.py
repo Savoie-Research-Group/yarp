@@ -287,7 +287,7 @@ class SLURM_Job:
             f.write(f"{self.crest_module_software}\n")
 
             f.write(f"export OMP_STACKSIZE={crest_job_list[0].mem}M\n")
-            f.write(f"export OMP_NUM_THREADS={crest_job_list[0].nproc}\n")
+            f.write(f"export OMP_NUM_THREADS=$NSLOTS")
 
             # set up GSM commands (only supports doing each task in sequential)
             for crestjob in crest_job_list:
@@ -522,9 +522,9 @@ class QSE_job:
                 f.write(f"{self.crest_module_prereqs}\n")
                 f.write("# Load YARP environment to access CREST software\n")
                 f.write(f"{self.crest_module_software}\n")
-
-                f.write(f"export OMP_STACKSIZE={self.job_calculator.mem}M\n")
-                f.write(f"export OMP_NUM_THREADS={self.job_calculator.nproc}\n")
+                #debug CREST jobsub script here:
+                #f.write(f"export OMP_STACKSIZE={self.job_calculator.mem}M\n")
+                #f.write(f"export OMP_NUM_THREADS={self.job_calculator.nproc}\n")
 
                 f.write("\n# cd into the submission directory\n")
                 f.write(f"cd {self.job_calculator.work_folder}\n\n")

@@ -64,7 +64,7 @@ class OPT:
         # Zhao's note: for mix-basis set, if molecule is separable, the atom indices you want to apply mix-basis-set on might not be there in separated mols, so you need to do a check#
         # For this reason, the elements we returned in inchi_dict are with indices from molecules before the separation#
         # for each molecule, a set of mix-basis-set will be copied and checked#
-        mix_basis_dict = None
+        mix_basis_dict = []
         if (args['dft_mix_basis']):
             mix_basis_dict = []
             # for those in dft_mix_lot with indices, check whether they exist, if not, eliminate

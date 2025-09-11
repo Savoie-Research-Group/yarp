@@ -28,6 +28,21 @@ def nitrate_xyz():
     return str(Path(__file__).parent / "molecules" / "nitrate.xyz")
 
 @pytest.fixture
+def ethanol_mol():
+    """Returns a string object of the absolute path to ethanol MOL file."""
+    return str(Path(__file__).parent / "molecules" / "ethanol.mol")
+
+@pytest.fixture
+def acetate_mol():
+    """Returns a string object of the absolute path to acetate MOL file."""
+    return str(Path(__file__).parent / "molecules" / "acetate.mol")
+
+@pytest.fixture
+def betaine_mol():
+    """Returns a string object of the absolute path to betaine MOL file."""
+    return str(Path(__file__).parent / "molecules" / "betaine.mol")
+
+@pytest.fixture
 def ethene_smi():
     """Returns the smiles string for ethene."""
     return "C=C"

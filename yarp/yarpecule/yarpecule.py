@@ -3,18 +3,17 @@ Definition of yarpecule object class
 """
 import os
 import numpy as np
-from copy import deepcopy
-from openbabel import openbabel, pybel
+from openbabel import pybel
 from rdkit import Chem
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
-from yarp.yarpecule.lewis.be_mat import return_bo_dict
+from yarp.yarpecule.lewis.be_mat import return_bo_dict, return_formals
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
+from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
-from yarp.util.rdkit import graph_to_rdmol
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
@@ -442,10 +441,96 @@ class yarpecule:
         Not sure what exactly this should look like yet. - ERM
         """
 
-    def join(self, other_yps, canon=True, mode='rdkit'):
+    def join(self, yarpecules, canon=True):
         """
-        Join two yarpecules together to form a new yarpecule.
+        Method for creating a new yarpecule containing the union of the current yarpecule and all supplied yarpecules.
+
+        Parameters
+        ----------
+        yarpecules: list of yarpecules
+                    A list of the yarpecules that the user wants to merge with this yarpecule.
+                    Can also handle a single yarpecule being submitted.
+
+        canon: bool, default=True
+            Controls whether or not the resulting yarpecule is subjected to the canonicalization ordering procedure.
+
+        Returns
+        -------
+        yarpecule: yarpecule
+                A new yarpecule containing the union of the chemical graphs contained in the supplied yarpecules.
+
+        Notes
+        -----
+        The resulting yarpecule will not retain any of the bond-electron matrix information of the parent yarpecules.
         """
+        yarpecules = prepare_list(yarpecules) # handles the singular case
+        all_y = [self] + yarpecules # add self to the list
+
+        adj_mat = merge_arrays([ y.adj_mat for y in all_y ])
+        geo = np.vstack([ y.geo for y in all_y])
+        elements = [ e for y in all_y for e in y.elements ]
+        q = int(sum([ y.q for y in all_y ]))
+
+        return yarpecule((adj_mat, geo, elements, q), canon=canon)
+
+    def separate(self, canon=True):
+        """
+        Method for separating discrete molecules into their own standalone yarpecule objects.
+        Returns a copy of itself if there is only one discrete molecule.
+
+        Parameters
+        ----------
+        canon: bool, default=True
+            Controls whether or not the resulting yarpecules are subjected to the canonicalization ordering procedure.
+
+        Returns
+        -------
+        mols: list of yarpecules
+            If there are no distinct molecules, returns a single yarpecule object.
+        """
+
+        # Find disconnected graphs based on adjacency matrix
+        gs = graph_seps(self.adj_mat)
+
+        groups  = [] # list of indexes for each disconnected graph
+        loop_ind= []
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group = [count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]
+                loop_ind += new_group
+                groups += [new_group]
+
+        if len(groups) == 1:
+            # If there are no distinct molecules, return a new yarpecule with same info
+            # NOTE: This is a case where it would be nice to have a "skip Lewis" option,
+            # where we can just feed in the BEMs we already have.
+            return yarpecule((self.adj_mat, self.geo, self.elements, self.q), canon=canon)
+        else:
+            # Iterate over each disconnected graph and generate new yarpecule
+            mols = []
+            for g in groups:
+                # Isolate subsection of adjacency matrix
+                frag_adj = self.adj_mat[g][:, g]
+
+                # Isolate subsection of elements list
+                frag_e = [self.elements[ind] for ind in g]
+
+                # Isolate subsection of geometry coordinates
+                N_atom = len(g)
+                frag_geo = np.zeros([N_atom, 3])
+                for count_i, i in enumerate(g):
+                    frag_geo[count_i,:] = self.geo[i,:]
+
+                # Calculate charge of subgraph
+                # NOTE: We're basing this off of the best scoring BEM of original,
+                # and I'm not really sure how robust of a strategy that is (ERM)
+                frag_bem = [self.bond_mats[0][i] for i in g]
+                frag_formals = return_formals(frag_bem, frag_e)
+                frag_q = int(sum(frag_formals))
+
+                mols.append(yarpecule((frag_adj, frag_geo, frag_e, frag_q), canon=canon))
+
+            return mols
 
     def export_geometry(self, filename, format='xyz'):
         """

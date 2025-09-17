@@ -36,13 +36,14 @@ def main(file):
             lot = dft_conf.TSOPT.dft_lot
             hl_ts_barrier = rxn.TS_dft[lot][id]["Barrier"]["F"] # reactant-side barrier in kcal/mol
             hl_irc_barrier = rxn.IRC_dft[lot][id]['barriers'][1] # reactant-side barrier in kcal/mol
-            
+            reactant_smiles = rxn.reactant_smiles
+            product_smiles = rxn.reactant_smiles
             
             # Into the table goes the row!
             table.append([
-                label, i, conf, ll_barrier, ll_type, hl_ts_barrier, hl_irc_barrier
+                label, i, reactant_smiles, product_smiles, conf, ll_barrier, ll_type, hl_ts_barrier, hl_irc_barrier
             ])
-    headers = ["Reaction Label", "Reaction Index", "Conformer Index", "xTB Forward Barrier (kcal/mol)", "xTB IRC Classifier",
+    headers = ["Reaction Label", "Reaction Index", "Reactant Smiles","Product Smiles","Conformer Index", "xTB Forward Barrier (kcal/mol)", "xTB IRC Classifier",
                 "DFT-tsopt Forward Barrier (kcal/mol)", "DFT-irc Forward Barrier (kcal/mol)"]
     print(tabulate(table, headers=headers, tablefmt="pretty"))
 

@@ -72,7 +72,9 @@ def main(args: dict):
                 dft_rxn.molecules[mol_count].SUBMIT_JOB = 1-args['dry_run']
                 dft_rxn.rp_conformers[mol_count].SUBMIT_JOB = 1-args['dry_run']
                 
-                if dft_rxn.molecules[mol_count].inchi in processed_rp_molecules: continue
+                if dft_rxn.molecules[mol_count].inchi in processed_rp_molecules: 
+                    # Need to fill in the energies from previous calculations  
+                    continue
 
                 dft_rxn.run_CREST(mol_count)
                 dft_rxn.run_OPT(mol_count)
@@ -86,6 +88,8 @@ def main(args: dict):
             
             print("Summing up energies of separated molecules")
             dft_rxn.SumUp_RP_Energies()
+            print(f'[class_main_dft.py] Reactant DFT energies: {dft_rxn.reactant_dft_opt}')
+            print(f'[class_main_dft.py] Product DFT energies: {dft_rxn.product_dft_opt}\n')
 
             print("Final energies/properties:")
             for lot, v in dft_rxn.reactant_dft_opt.items():
@@ -113,18 +117,31 @@ def main(args: dict):
             conf.run_IRC()
 
             dft_rxn.Get_Barriers(conf.TSOPT.index) # Get barrier for the current TS
+                     # --- Minimal debug prints for TS forward/backward barriers (like IRC) ---
+            if args.get("Summary_TS_Stats", True):
+                lot = conf.TSOPT.dft_lot
+                cid = conf.conformer_id
+                fbar = dft_rxn.rxn.TS_dft[lot][cid]["Barrier"]["F"]
+                bbar = dft_rxn.rxn.TS_dft[lot][cid]["Barrier"]["B"]
+#                print(f"[class_main_dft.py] Summary TS Stats, Conformer ID:{cid}")
+#                print(f"[class_main_dft.py] Summary TS Stats, RXN IND:{conf.TSOPT.rxn_ind}")
+#                print(f"[class_main_dft.py] Summary TS Stats, Forward Barrier: {fbar}")
+#                print(f"[class_main_dft.py] Summary TS Stats, Backward Barrier: {bbar}")
 
+   
             STATUS.append([conf.TSOPT.rxn_ind,
                           conf.TSOPT.FLAG, conf.IRC.FLAG, 
                           dft_rxn.rxn.TS_dft[conf.TSOPT.dft_lot][conf.conformer_id]["Barrier"]["F"],
                           dft_rxn.rxn.TS_dft[conf.TSOPT.dft_lot][conf.conformer_id]["Barrier"]["B"]])
             # Report IRC barriers #
-            if args.get("Summary_IRC_Stats", False):
-                # print(conf.conformer_id)
-                # print(conf.TSOPT.rxn_ind)
+            if args.get("Summary_IRC_Stats", True):
+ #               print(f"[class_main_dft.py] Summary IRC Stats, Conformer ID:{conf.conformer_id}")
+ #               print(f"[class_main_dft.py] Summary IRC Stats, RXN IND:{conf.TSOPT.rxn_ind}")
                 IRC_STATUS.append([conf.TSOPT.rxn_ind, conf.IRC.FLAG, 
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][0],
                     dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][1]])
+#                print(f"[class_main_dft.py] Summary IRC Stats, Forward Barrier: {dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][0]}")
+#                print(f"[class_main_dft.py] Summary IRC Stats, Backward Barrier: {dft_rxn.rxn.IRC_dft[conf.TSOPT.dft_lot][conf.conformer_id]['barriers'][1]}")
 
         print("-----------------------------------------------------")
     

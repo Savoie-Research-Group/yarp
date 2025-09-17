@@ -411,7 +411,7 @@ class QSE_job:
 
     # Constructor
     def __init__(self, package="ORCA", jobname="JobSubmission", orca_module=None, crest_module=None,
-                 job_calculator=None, queue="long", ncpus=1, mem=2000, time=4, ntasks=1, email=""):
+                 job_calculator=None, queue="long", ncpus=1, mem=2000, time=24, ntasks=1, email=""):
 
         # Required inputs (based on Notre Dame's Center for Research Computing requirements!)
         self.ncpus = ncpus

@@ -265,6 +265,10 @@ class RxnProcess:
 
     def Get_Barriers(self, conf_i):
         dft_lot = self.conformers[0].TSOPT.dft_lot
+        print(f"\n[DFT_class.py] Getting barriers for conformer {conf_i} at level of theory {dft_lot}")
+        print(f"[DFT_class.py] TS Gibbs Free Energy:",{self.rxn.TS_dft[dft_lot][conf_i]["thermal"]["GibbsFreeEnergy"]})
+        print(f"[DFT_class.py] Reactant Gibbs Free Energy:",{self.reactant_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]} )
+        print(f"[DFT_class.py] Product Gibbs Free Energy:",{self.product_dft_opt[dft_lot]["thermal"]["GibbsFreeEnergy"]} )
         self.rxn.TS_dft[dft_lot][conf_i]["Barrier"] = {}
         # default value set to not available, for example, when your TS is still running, or R/P still running
         self.rxn.TS_dft[dft_lot][conf_i]["Barrier"]["F"] = "NOT AVAILABLE"

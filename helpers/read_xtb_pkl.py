@@ -21,13 +21,15 @@ def main(file):
         conformers = [_ for _ in rxn.IRC_xtb.keys()]
         for conf in conformers:
             label = f'{rxn.reactant_inchi}_{rxn.id}_{conf}'
+            reactant_smiles = rxn.reactant_smiles
+            product_smiles = rxn.reactant_smiles
             barrier = rxn.IRC_xtb[conf]["barriers"][0] # reactant-side barrier in kcal/mol
             type = rxn.IRC_xtb[conf].get("type", "unclassified")
             table.append([
-                label, i, conf, barrier, type
+                label, reactant_smiles, product_smiles, i, conf, barrier, type
             ])
 
-    headers = ["Reaction Label", "Reaction Index", "Conformer Index", "xTB Forward Barrier (kcal/mol)", "xTB IRC Classifier"]
+    headers = ["Reaction Label", "Reactant SMILES", "Product SMILES", "Reaction Index", "Conformer Index", "xTB Forward Barrier (kcal/mol)", "xTB IRC Classifier"]
     print(tabulate(table, headers=headers, tablefmt="pretty"))
 
 

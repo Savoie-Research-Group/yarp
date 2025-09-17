@@ -182,7 +182,10 @@ class OPT:
             _, geo = self.dft_job.get_final_structure()
 
             SPE = self.dft_job.get_energy()
+            print(f"[opt.py] SPE for molecule {inchi} is {SPE} Hartree\n")
             thermal = self.dft_job.get_thermal()
+            print(f"[opt.py] Thermal for molecule {inchi} is {thermal}\n")
+            
             if len(imag_freq) > 0:
                 print(
                     f"WARNING: imaginary frequency identified for molecule {inchi}...")

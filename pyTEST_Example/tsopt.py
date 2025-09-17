@@ -144,7 +144,9 @@ class TSOPT:
             self.rxn.TS_dft[self.dft_lot][conf_i]["geo"] = geo
             self.rxn.TS_dft[self.dft_lot][conf_i]["thermal"] = self.dft_job.get_thermal(
             )
+            print(f"[tsopy.py] Thermal for molecule {self.rxn_ind} is {self.rxn.TS_dft[self.dft_lot][conf_i]['thermal']}\n")
             self.rxn.TS_dft[self.dft_lot][conf_i]["SPE"] = self.dft_job.get_energy()
+            print(f"[tsopy.py] SPE for molecule {self.rxn_ind} is {self.rxn.TS_dft[self.dft_lot][conf_i]['SPE']} Hartree\n")   
             self.rxn.TS_dft[self.dft_lot][conf_i]["imag_mode"] = self.dft_job.get_imag_freq_mode(
             )
 

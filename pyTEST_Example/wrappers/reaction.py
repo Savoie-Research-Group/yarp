@@ -84,7 +84,7 @@ class reaction:
         self.product_inchi=return_inchikey(self.product)
 
         self.reactant_smiles=return_smi_yp(self.reactant)
-        self.reactant_smiles=return_smi_yp(self.product)
+        self.product_smiles=return_smi_yp(self.product)
 
         self.rxn_conf=dict() # ERM: what is this???? stores reactant/product conformer(s), I guess????
         self.id=0

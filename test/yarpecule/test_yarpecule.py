@@ -122,3 +122,18 @@ class TestJoinYarpecules:
         assert adj[6, 8] == 1
 
         assert adj[7, 8] == 0
+
+class TestSeparateYarpecules:
+    def test_eth_h2o(self):
+        eth_h2o = ypcule('C=C.O')
+
+        sep_mols = eth_h2o.separate()
+
+        assert sep_mols[0].elements == ['c', 'c', 'h', 'h', 'h', 'h']
+        assert sep_mols[1].elements == ['o', 'h', 'h']
+
+        assert sep_mols[0].geo.shape == (6, 3)
+        assert sep_mols[1].geo.shape == (3, 3)
+
+        assert sep_mols[0].adj_mat.shape == (6, 6)
+        assert sep_mols[1].adj_mat.shape == (3, 3)

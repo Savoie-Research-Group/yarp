@@ -38,7 +38,12 @@ def generate_rxns(inp):
 
             print(f" - Reading in {len(og_rxns)} total reactions")
 
-            # NOTE: Oh shoot, how do I account for prior reactions with multiple molecules in the product???
+            if inp.separate_prods == 'all':
+                print(f" - Performing product separation on all reactions prior to enumeration")
+            elif isinstance(inp.separate_prods, list) and len(inp.separate_prods) > 0:
+                print(f" - Separating products for reaction indexes: {inp.separate_prods}")
+            else:
+                print(" - No product separation will be performed prior to enumeration")
             
             # Check that new enumeration nodes have not already been enumerated from
             # For this, it should be enough to ensure that a product doesn't appear as a reactant
@@ -46,7 +51,7 @@ def generate_rxns(inp):
             p_nodes = []
             p_hashes = set()
             prior_enum = set()
-            for rxn in og_rxns.values():
+            for count_r, rxn in enumerate(og_rxns.values()):
                 # Add old reactions to output
                 output[rxn.id] = rxn
 
@@ -54,12 +59,51 @@ def generate_rxns(inp):
                 r_hash = rxn.reactant.graph.hash
                 if r_hash not in prior_enum:
                     prior_enum.add(r_hash)
-                
-                p_hash = rxn.product.graph.hash
-                if p_hash not in p_hashes: # also ensure no duplicate products!?
-                    p_hashes.add(p_hash)
-                    if p_hash not in prior_enum:
-                        p_nodes.append(rxn.product.graph)
+
+                # Product separation check
+                prod = rxn.product.graph
+                if inp.separate_prods == 'all':
+                    sep_mols = prod.separate()
+                    if len(sep_mols) > 1:
+                        print(f"  + Separating {prod.inchi} into {len(sep_mols)} nodes")
+
+                    for mol in sep_mols:
+                        p_hash = mol.hash
+                        if p_hash not in p_hashes: # also ensure no duplicate products!?
+                            p_hashes.add(p_hash)
+                            if p_hash not in prior_enum:
+                                mol.get_inchi() # need to recompute this, since fresh yarpecule
+                                p_nodes.append(mol)
+
+                elif isinstance(inp.separate_prods, list) and len(inp.separate_prods) > 0:
+                    sep_targets = set(inp.separate_prods)
+                    if count_r in sep_targets:
+                        sep_mols = prod.separate()
+                        print(f"  + Separating {prod.inchi} into {len(sep_mols)} nodes")
+
+                        for mol in sep_mols:
+                            p_hash = mol.hash
+                            if p_hash not in p_hashes: # also ensure no duplicate products!?
+                                p_hashes.add(p_hash)
+                                if p_hash not in prior_enum:
+                                    mol.get_inchi()
+                                    p_nodes.append(mol)
+
+                    else:
+                        # Move forward without separating products
+                        p_hash = prod.hash
+                        if p_hash not in p_hashes: # also ensure no duplicate products!?
+                            p_hashes.add(p_hash)
+                            if p_hash not in prior_enum:
+                                p_nodes.append(prod)
+
+                else:
+                    # Move forward without separating products
+                    p_hash = prod.hash
+                    if p_hash not in p_hashes: # also ensure no duplicate products!?
+                        p_hashes.add(p_hash)
+                        if p_hash not in prior_enum:
+                            p_nodes.append(prod)
 
             print(f" - {len(p_nodes)} unique products identified for enumeration")
 
@@ -87,9 +131,7 @@ def generate_rxns(inp):
                 # prod = quick_geom_opt(prod, inp.quick_opt_lot)
 
                 # Generate a reaction object from reactant/product pairs
-                print(f"Processing product #{i}")
                 rxn = reaction(reactant, prod)
-                print(f" - Successfully made reaction {rxn.id}")
 
                 # Add reaction to dictionary paired with its ID
                 output[rxn.id] = rxn
@@ -141,7 +183,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="sequential", lewis
         Filter out 3 and 4 member rings from enumerated products.
     """
 
-    print(f" - Product enumeration with break {n_break}, form {n_form} "
+    print(f"  + Product enumeration with break {n_break}, form {n_form} "
           f"will be performed in {mode} mode.")
 
     if mode == "sequential":

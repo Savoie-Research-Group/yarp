@@ -46,3 +46,17 @@ class input:
         self.prod_visuals_on = initnode.get("visualize", False)
 
         self.out_file = initnode.get("output", "reactions.pkl")
+
+        self.separate_prods = initnode.get("separate products", None)
+        print(self.separate_prods, type(self.separate_prods))
+        if self.separate_prods is None:
+            self.separate_prods = []
+        elif isinstance(self.separate_prods, str) and self.separate_prods.lower() == 'all':
+            self.separate_prods = 'all'
+        elif isinstance(self.separate_prods, int):
+            self.separate_prods = [self.separate_prods]
+        elif isinstance(self.separate_prods, list):
+            self.separate_prods = self.separate_prods
+        else:
+            raise RuntimeError("Invalid value for separate products. Accepted inputs: 'all', an integer, or a list of integers")
+        

@@ -486,7 +486,7 @@ class yarpecule:
         Returns
         -------
         mols: list of yarpecules
-            If there are no distinct molecules, returns a single yarpecule object.
+            If there are no distinct molecules, returns a single yarpecule object as a list of length 1.
         """
 
         # Find disconnected graphs based on adjacency matrix
@@ -504,7 +504,7 @@ class yarpecule:
             # If there are no distinct molecules, return a new yarpecule with same info
             # NOTE: This is a case where it would be nice to have a "skip Lewis" option,
             # where we can just feed in the BEMs we already have.
-            return yarpecule((self.adj_mat, self.geo, self.elements, self.q), canon=canon)
+            return [yarpecule((self.adj_mat, self.geo, self.elements, self.q), canon=canon)]
         else:
             # Iterate over each disconnected graph and generate new yarpecule
             mols = []

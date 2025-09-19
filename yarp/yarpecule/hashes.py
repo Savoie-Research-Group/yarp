@@ -3,7 +3,6 @@ Helper functions related to hash objects associated with determining unique atom
 """
 import numpy as np
 
-
 def atom_hash(ind, adj_mat, masses, alpha=100.0, beta=0.1, gens=10):
     """
     Creates a unique hash value for each atom based on its location in the molecular graph (out to a depth of `gens`).
@@ -116,7 +115,7 @@ def bmat_hash(bond_mat):
 
 def yarpecule_hash(y):
     """ 
-    Creates a unique hash value for the yarpecule object based on the lowest-score bond-electron matrix and the atom hashes.
+    Creates a unique hash value for the yarpecule object based on the sum of all bond-electron matrices and the atom hashes.
     Since the atom hashes are sensistive to the masses used for the atoms, the hash of isotopomers will be unique. 
 
     Parameters
@@ -134,26 +133,8 @@ def yarpecule_hash(y):
     Any method affecting the `bond_mats` or `masses` attributes of the yarpecule instance should also recalculate this hash.  
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
-    return np.round(np.sum(y.bond_mats[0]*np.outer(y.atom_hashes, y.atom_hashes)), 8)
+    bem = np.zeros_like(y.bond_mats[0])
+    for mat in y.bond_mats:
+        bem += mat
 
-
-def bmat_hash(bond_mat):
-    """ 
-    Creates a unique hash value for each bond-electron matrix that is used to speed uniqueness checks.
-
-    Parameters
-    ----------
-    bond_mat : array
-               The bond electron matrix that the hash is calculated for.
-
-    Returns
-    -------
-    hash_value: float
-
-
-    Notes
-    -----            
-    The hash is calculated as bond_mat * an ascending array (1,2,... counting up through all elements and rows) summed over rows, 
-    then those values are multiplied by 10**(-i/100) where i is the column, and summed.
-    """
-    return np.sum([_*10**(-(count/100)) for count, _ in enumerate(np.sum(bond_mat*np.arange(1, len(bond_mat)**2+1).reshape(len(bond_mat), len(bond_mat)), axis=0))])
+    return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)

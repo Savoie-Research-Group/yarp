@@ -165,21 +165,23 @@ def graph_seps(adj_mat_0):
 
     Parameters
     ----------
-    adj_mat_0 : array
+    adj_mat_0 : NDArray (N x N)
             This array is indexed to the atoms in the `yarpecule` and has a one at row i and column j if there is 
             a bond (of any kind) between the i-th and j-th atoms.
 
     Returns
     ----------
-    seps : NDArray
-            What is the final shape of this matrix? (ERM)
+    seps : NDArray (N x N)
+            Default is to assign zeros along the diagonal, and -1 for all off-diagonal elements.
+            If a connection to a neighboring atom is found, off-diagonal elements are assigned an
+            integer value of 1 or greater, depending on how many connections are found.
     """
 
     # Create a new name for the object holding A**(N), initialized with A**(1)
     adj_mat = deepcopy(adj_mat_0)
 
     # Initialize an array to hold the graphical separations with -1 for all unassigned elements and 0 for the diagonal.
-    seps = np.ones([len(adj_mat), len(adj_mat)])*-1
+    seps = np.ones([len(adj_mat), len(adj_mat)]) * -1
     np.fill_diagonal(seps, 0)
 
     # Perform searches out to len(adj_mat) bonds (maximum distance for a graph with len(adj_mat) nodes

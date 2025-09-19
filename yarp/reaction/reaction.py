@@ -15,8 +15,9 @@ class reaction:
         self.product = node(product)
 
         self.edge = None
+        self.egat_barrier = None # this is not the final form!!! - ERM
 
-        self.id = self.reactant.inchi + "_" + self.product.inchi
+        self.id = self.reactant.inchi + "_to_" + self.product.inchi
 
     def gen_initial_path(self, input):
 

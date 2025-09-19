@@ -3,7 +3,6 @@ Helper functions related to hash objects associated with determining unique atom
 """
 import numpy as np
 
-
 def atom_hash(ind, adj_mat, masses, alpha=100.0, beta=0.1, gens=10):
     """
     Creates a unique hash value for each atom based on its location in the molecular graph (out to a depth of `gens`).
@@ -116,7 +115,7 @@ def bmat_hash(bond_mat):
 
 def yarpecule_hash(y):
     """ 
-    Creates a unique hash value for the yarpecule object based on the lowest-score bond-electron matrix and the atom hashes.
+    Creates a unique hash value for the yarpecule object based on the sum of all bond-electron matrices and the atom hashes.
     Since the atom hashes are sensistive to the masses used for the atoms, the hash of isotopomers will be unique. 
 
     Parameters
@@ -134,4 +133,8 @@ def yarpecule_hash(y):
     Any method affecting the `bond_mats` or `masses` attributes of the yarpecule instance should also recalculate this hash.  
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
-    return np.round(np.sum(y.bond_mats[0]*np.outer(y.atom_hashes, y.atom_hashes)), 8)
+    bem = np.zeros_like(y.bond_mats[0])
+    for mat in y.bond_mats:
+        bem += mat
+
+    return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)

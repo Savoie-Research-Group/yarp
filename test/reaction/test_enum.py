@@ -16,9 +16,19 @@ class TestConcertedClosedShell:
 
         assert len(prods) == 3
 
-        expected = set([869617.763119, 1131723.29428773, 507132.22729761])
+        expected_prods = ['C=CO', 'C1CO1', 'C=C=O.[H][H]']
+
+        expected_prods_hash = set()
+        for smi in expected_prods:
+            mol = yarpecule(smi)
+            expected_prods_hash.add(mol.hash)
+
+        found_hashes = set()
         for _ in prods:
-            assert _.hash in expected
+            if _.hash in expected_prods_hash:
+                found_hashes.add(_.hash)
+
+        assert found_hashes == expected_prods_hash
 
     def test_haa_b3f3_contains_b2f2(self):
         """
@@ -64,7 +74,7 @@ class TestConcertedClosedShell:
             if _.hash in expected_prods_hash:
                 found_hashes.add(_.hash)
 
-        assert len(found_hashes) == len(expected_prods)
+        assert found_hashes == expected_prods_hash
     
     def test_khp_b3f3_contains_b2f2(self):
         """

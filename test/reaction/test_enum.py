@@ -37,7 +37,7 @@ class TestConcertedClosedShell:
         for i in range(len(b2f2_prods)):
             b2f2_set.add(b2f2_prods[i].hash)
             b3f3_set.add(b3f3_prods[i].hash)
-        
+
         assert b2f2_set == b3f3_set
     
     def test_khp_b2f2_target_products(self):
@@ -63,7 +63,7 @@ class TestConcertedClosedShell:
         for _ in khp_b2f2:
             if _.hash in expected_prods_hash:
                 found_hashes.add(_.hash)
-        
+
         assert len(found_hashes) == len(expected_prods)
     
     def test_khp_b3f3_contains_b2f2(self):

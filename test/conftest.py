@@ -97,4 +97,4 @@ def benzene_smi():
 
 @pytest.fixture
 def benz_rad_cat_smi():
-    return "[cH+]1ccccc1"
+    return "[CH]1C=CC=C[CH+]1"

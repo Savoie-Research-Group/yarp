@@ -11,5 +11,9 @@ dependencies:
   - rdkit
   - openbabel
   - scipy
+  - pandoc
   - pip:
     - tabulate
+    - sphinx-rtd-theme
+    - sphinx-autoapi 
+    - sphinx

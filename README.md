@@ -1,6 +1,25 @@
 # Welcome to yarp-again
 Come on in, the water's (probably) fine!
 
+## Local Documentation
+
+If you've cloned the repo and want to browse the documentation locally:
+
+1. Activate the `yarp_env` Conda environment
+2. Run the build script:
+
+    ```bash
+    cd docs
+    ./update_docs.sh
+    ```
+
+After building the docs with `./update_docs.sh`, view the docs by running:
+./view_docs.sh
+
+The HTML files are located in:  
+📁 `docs/build/html/index.html`
+
+
 ## Installation notes
 
 First, get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`

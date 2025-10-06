@@ -1,0 +1,47 @@
+/* === YARP Documentation Custom Theme === */
+
+/* Top search bar and project name */
+.wy-side-nav-search {
+    background-color: #111D2B;
+    color: #E4D499;
+}
+
+/* Sidebar background */
+.wy-nav-side {
+    background: #111D2B;
+}
+
+/* Sidebar menu text */
+.wy-menu a {
+    color: #E4D499;
+}
+
+/* Active page highlight in sidebar */
+.wy-menu li.current > a {
+    background-color: #E4D499;
+    color: #111D2B;
+}
+
+/* Hover effect for sidebar items */
+.wy-menu a:hover {
+    background-color: #E4D499;
+    color: #111D2B;
+}
+
+/* Main content links */
+.rst-content a {
+    color: #00B0F0;
+    text-decoration: underline;
+}
+
+/* Hover state for content links */
+.rst-content a:hover {
+    color: #01B150;
+}
+
+/* Optional: underline active TOC heading */
+.toctree-l1.current > a {
+    border-left: 4px solid #00B0F0;
+    padding-left: 0.5em;
+}
+

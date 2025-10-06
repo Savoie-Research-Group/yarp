@@ -10,11 +10,37 @@ from pathlib import Path
 #######################################
 
 
+
+# Molecule files
 @pytest.fixture
 def ethene_xyz():
     """Returns a string object of the absolute path to ethene XYZ file."""
     return str(Path(__file__).parent / "molecules" / "ethene.xyz")
 
+@pytest.fixture
+def ammonium_xyz():
+    """Returns a string object of the absolute path to ammonium XYZ file."""
+    return str(Path(__file__).parent / "molecules" / "ammonium.xyz")
+
+@pytest.fixture
+def nitrate_xyz():
+    """Returns a string object of the absolute path to nitrate XYZ file."""
+    return str(Path(__file__).parent / "molecules" / "nitrate.xyz")
+
+@pytest.fixture
+def ethanol_mol():
+    """Returns a string object of the absolute path to ethanol MOL file."""
+    return str(Path(__file__).parent / "molecules" / "ethanol.mol")
+
+@pytest.fixture
+def acetate_mol():
+    """Returns a string object of the absolute path to acetate MOL file."""
+    return str(Path(__file__).parent / "molecules" / "acetate.mol")
+
+@pytest.fixture
+def betaine_mol():
+    """Returns a string object of the absolute path to betaine MOL file."""
+    return str(Path(__file__).parent / "molecules" / "betaine.mol")
 
 @pytest.fixture
 def ethene_smi():
@@ -90,3 +116,11 @@ def aromatic_canon_smi():
 @pytest.fixture
 def aromatic_full_map_smi():
     return '[c:0]1([H:15])[c:4]([O:9][H:13])[c:5]([H:20])[c:1]([H:16])[o:6]1'
+
+@pytest.fixture
+def benzene_smi():
+    return "c1ccccc1"
+
+@pytest.fixture
+def benz_rad_cat_smi():
+    return "[CH]1C=CC=C[CH+]1"

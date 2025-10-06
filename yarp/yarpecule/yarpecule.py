@@ -1,13 +1,19 @@
 """
 Definition of yarpecule object class
 """
+import os
 import numpy as np
+from openbabel import pybel
+from rdkit import Chem
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
-from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
+from yarp.yarpecule.lewis.be_mat import return_bo_dict, return_formals
 from yarp.yarpecule.atom_mapping import canon_order
-from yarp.yarpecule.hashes import atom_hash
+from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
+from yarp.util.misc import prepare_list, merge_arrays
+from yarp.util.write_files import mol_write_yp, xyz_write
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
@@ -29,9 +35,9 @@ class yarpecule:
     canon : bool, default=True
             Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
 
-    mode : str, default=rdkit
-            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default rdkit is used
-            but setting this to 'yarp' will use the in-house parser. This variable is unused if the molecular info
+    mode : str, default=yarp
+            When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default
+            the in-house parser is used. This variable is unused if the molecular info
             is passed through another method besides SMILES.
             Thoughts on renaming this to smi_mode? - ERM
 
@@ -76,7 +82,7 @@ class yarpecule:
     # Constructor #
     ###############
 
-    def __init__(self, mol, canon=True, mode='rdkit'):
+    def __init__(self, mol, mode='yarp', canon=True):
         self._geo = None
         self._elements = None
         self._q = 0
@@ -91,18 +97,28 @@ class yarpecule:
         self._order_atoms(canon=canon)
 
         self._lewis_struct = None
+        self._bond_order_dict = None
         self._yarpecule_hash = None
 
         self._gen_lewis_struct()
+
+        # These attributes should be set once enumeration is complete
+        # Too many errors/warnings show up in RDkit/Open Babel
+        self._canon_smi = None
+        self._map_smi = None
+        self._inchi = None
+
 
     ###############
     # Properties  #
     ###############
 
-    # The user should pretty much never edit these directly, but may want to view them.
-    # Therefore, I'm thinking we should use access functions to handle that.
-    # These are fancy python functions that return class attributes as (sort of) read-only.
-    # Mutable values are still mutable, but it puts some protection at least? - ERM
+    # Functions acting on yarpecules should pretty much never modify class attributes directly,
+    # but often need to access them.
+    # Therefore, these access function should be used, as they are "getters", but not "setters".
+    # They return class attributes as (sort of) read-only.
+    # However, mutable values are still mutable and can be modified, but I think that's just
+    # what you get to deal with in python. - ERM
 
     @property
     def geo(self):
@@ -117,8 +133,64 @@ class yarpecule:
         return self._adj_mat
 
     @property
+    def q(self):
+        return self._q
+
+    @property
     def lewis(self):
         return self._lewis_struct
+
+    @property
+    def bond_mats(self):
+        return self._lewis_struct._bond_mats
+
+    @property
+    def bond_mat_scores(self):
+        return self._lewis_struct._scores
+
+    @property
+    def bo_dict(self):
+        return self._bond_order_dict
+
+    @property
+    def hash(self):
+        return self._yarpecule_hash
+
+    @property
+    def atom_hashes(self):
+        return self._atom_hashes
+
+    @property
+    def n_e_accept(self):
+        return self._lewis_struct._e_acceptors
+
+    @property
+    def n_e_donate(self):
+        return self._lewis_struct._e_donors
+
+    @property
+    def atom_neighbors(self):
+        return self._lewis_struct._atom_neighbors
+
+    @property
+    def fc(self):
+        return self._lewis_struct._formal_charge
+
+    @property
+    def rings(self):
+        return self._lewis_struct._rings
+    
+    @property
+    def inchi(self):
+        return self._inchi
+    
+    @property
+    def canon_smi(self):
+        return self._canon_smi
+    
+    @property
+    def map_smi(self):
+        return self._map_smi
 
     ######################
     # Internal Functions #
@@ -246,9 +318,119 @@ class yarpecule:
         self._lewis_struct = lewis_struct(
             self._adj_mat, self._elements, self._q)
 
+        self._bond_order_dict = return_bo_dict(self)
+
+        self._yarpecule_hash = yarpecule_hash(self)
+
     ######################
     # External Functions #
     ######################
+
+    def get_smiles(self):
+        """
+        Generate a SMILES representation of the yarpecule.
+        This shouldn't ever change any of the attributes of the yarpecule.
+        Option to export SMILES with explicit atom mappings.
+        Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
+
+        
+        Modifies
+        --------
+        self._canon_smi : str
+        self._map_smi : str
+        """
+        # Generate a temporary MOL file from yarpecule
+        tmp_file = ".tmp.mol"
+        mol_write_yp(tmp_file, self.elements, self.geo,
+                     self.bond_mats[0], self.adj_mat)
+
+        # Use RDKit to get canonical SMILES string
+        # ERM Note: RDKit has an annoying "Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D."
+        # which triggers whenever you initialize from a .mol file for various and sundry reasons.
+        # I have decided it is not worth my time to continue troubleshooting how to avoid this.
+        mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
+        atoms = mol1.GetNumAtoms()
+        for idx in range(atoms):
+            mol1.GetAtomWithIdx(idx).ClearProp("molAtomMapNumber")
+        self._canon_smi = Chem.MolToSmiles(mol1, canonical=True)
+
+        # Use RDKit to get atom-mapped SMILES string
+        mol2 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
+        atoms = mol2.GetNumAtoms()
+        for idx in range(atoms):
+            mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(mol2.GetAtomWithIdx(idx).GetIdx()))
+        self._map_smi = Chem.MolToSmiles(mol2)
+
+        # Remove temporary file
+        os.remove(tmp_file)
+
+    def get_inchi(self):
+        """
+        Generate the InChIKey for a given yarpecule using RDKit.
+        Requires the yarpecule to already have SMILES
+        Each separable group within the yarpecule will have an independently
+        generated InChIKey, with dashes connecting them together.
+
+        Modifies
+        --------
+        self._inchi : str
+        """
+        # Access yarpecule information via "getter" property functions
+        # This should raise an error if code is modifying the
+        # class attributes (which it should NOT be doing here!!!)
+        E = self.elements
+        G = self.geo
+        bond_mat = self.bond_mats[0]
+        adj_mat = self.adj_mat
+
+        # Identify separated graphs
+        gs = graph_seps(adj_mat)
+
+        groups = []
+        loop_ind = []
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group = [count_j for count_j,
+                             j in enumerate(gs[i, :]) if j >= 0]
+                loop_ind += new_group
+                groups += [new_group]
+        inchikey = []
+
+        # Generate a temporary mol file for each separated graph
+        # Then use it to get an INCHI key
+        tmp_file = ".tmp.mol"
+        for group in groups:
+            # extract subgroup information
+            N_atom = len(group)
+            geo = np.zeros([N_atom, 3])
+            for count_i, i in enumerate(group):
+                geo[count_i, :] = G[i, :]
+            elements = [E[ind] for ind in group]
+            bem = [bond_mat[group][:, group]]
+            adj = adj_mat[group][:, group]
+            
+            # generate mol file and read in to Open Babel
+            mol_write_yp(tmp_file, elements, geo, bem[0], adj)
+            mol = next(pybel.readfile("mol", tmp_file))
+            
+            try:
+                inchi = mol.write(format='inchikey').strip().split()[0]
+            except:
+                print("WARNING: ERROR in INCHI key generation!")
+                print(f"  --> {mol.write(format='inchikey')}")
+                continue
+            
+            inchikey += [inchi]
+            
+            os.remove(tmp_file)
+
+        if len(inchikey) == 0:
+            self._inchi = "ERROR"
+        elif len(groups) == 1:
+            self._inchi = inchikey[0][:14]
+        else:
+            self._inchi = '-'.join(sorted([i[:14] for i in inchikey]))
+
     def update_atom_order(self, atom_index=None, canon=True):
         """
         Update the atom order of the yarpecule.
@@ -259,16 +441,96 @@ class yarpecule:
         Not sure what exactly this should look like yet. - ERM
         """
 
-    def join(self, other_yps, canon=True, mode='rdkit'):
+    def join(self, yarpecules, canon=True):
         """
-        Join two yarpecules together to form a new yarpecule.
+        Method for creating a new yarpecule containing the union of the current yarpecule and all supplied yarpecules.
+
+        Parameters
+        ----------
+        yarpecules: list of yarpecules
+                    A list of the yarpecules that the user wants to merge with this yarpecule.
+                    Can also handle a single yarpecule being submitted.
+
+        canon: bool, default=True
+            Controls whether or not the resulting yarpecule is subjected to the canonicalization ordering procedure.
+
+        Returns
+        -------
+        yarpecule: yarpecule
+                A new yarpecule containing the union of the chemical graphs contained in the supplied yarpecules.
+
+        Notes
+        -----
+        The resulting yarpecule will not retain any of the bond-electron matrix information of the parent yarpecules.
+        """
+        yarpecules = prepare_list(yarpecules) # handles the singular case
+        all_y = [self] + yarpecules # add self to the list
+
+        adj_mat = merge_arrays([ y.adj_mat for y in all_y ])
+        geo = np.vstack([ y.geo for y in all_y])
+        elements = [ e for y in all_y for e in y.elements ]
+        q = int(sum([ y.q for y in all_y ]))
+
+        return yarpecule((adj_mat, geo, elements, q), canon=canon)
+
+    def separate(self, canon=True):
+        """
+        Method for separating discrete molecules into their own standalone yarpecule objects.
+        Returns a copy of itself if there is only one discrete molecule.
+
+        Parameters
+        ----------
+        canon: bool, default=True
+            Controls whether or not the resulting yarpecules are subjected to the canonicalization ordering procedure.
+
+        Returns
+        -------
+        mols: list of yarpecules
+            If there are no distinct molecules, returns a single yarpecule object as a list of length 1.
         """
 
-    def draw_lewis_struct(self):
-        """
-        Draw the Lewis structure of the yarpecule.
-        This shouldn't ever change any of the attributes of the yarpecule.
-        """
+        # Find disconnected graphs based on adjacency matrix
+        gs = graph_seps(self.adj_mat)
+
+        groups  = [] # list of indexes for each disconnected graph
+        loop_ind= []
+        for i in range(len(gs)):
+            if i not in loop_ind:
+                new_group = [count_j for count_j,j in enumerate(gs[i,:]) if j >= 0]
+                loop_ind += new_group
+                groups += [new_group]
+
+        if len(groups) == 1:
+            # If there are no distinct molecules, return a new yarpecule with same info
+            # NOTE: This is a case where it would be nice to have a "skip Lewis" option,
+            # where we can just feed in the BEMs we already have.
+            return [yarpecule((self.adj_mat, self.geo, self.elements, self.q), canon=canon)]
+        else:
+            # Iterate over each disconnected graph and generate new yarpecule
+            mols = []
+            for g in groups:
+                # Isolate subsection of adjacency matrix
+                frag_adj = self.adj_mat[g][:, g]
+
+                # Isolate subsection of elements list
+                frag_e = [self.elements[ind] for ind in g]
+
+                # Isolate subsection of geometry coordinates
+                N_atom = len(g)
+                frag_geo = np.zeros([N_atom, 3])
+                for count_i, i in enumerate(g):
+                    frag_geo[count_i,:] = self.geo[i,:]
+
+                # Calculate charge of subgraph
+                # NOTE: We're basing this off of the best scoring BEM of original,
+                # and I'm not really sure how robust of a strategy that is (ERM)
+                frag_bem = [self.bond_mats[0][i] for i in g]
+                frag_formals = return_formals(frag_bem, frag_e)
+                frag_q = int(sum(frag_formals))
+
+                mols.append(yarpecule((frag_adj, frag_geo, frag_e, frag_q), canon=canon))
+
+            return mols
 
     def export_geometry(self, filename, format='xyz'):
         """
@@ -283,20 +545,16 @@ class yarpecule:
         format : str, default='xyz'
             The format of the file to export the geometry to.
         """
+        if format == 'xyz':
+            xyz_write(filename, self.elements, self.geo)
+        elif format == 'mol':
+            mol_write_yp(filename, self.elements, self.geo, self.bond_mats[0], self.adj_mat)
+        else:
+            raise RuntimeError("Valid export formats: xyz or mol")
 
-    def export_smiles(self, mode='canonical'):
-        """
-        Export the SMILES representation of the yarpecule.
-        This shouldn't ever change any of the attributes of the yarpecule.
-        Option to export SMILES with explicit atom mappings.
-        Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
-
-        Parameters
-        ----------
-        mode : str, default='canonical'
-            The mode of the SMILES representation to export.
-            Options are 'canonical' or 'non-canonical'.
-        """
+    def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
+        self._lewis_struct.draw_bmats(outfile, show_inline)
+        return
 
     def __len__(self):
         return len(self._elements)

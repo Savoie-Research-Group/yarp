@@ -6,7 +6,6 @@ import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
-from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 
 def xyz_parse(xyz, read_types=False, multiple=False):
@@ -222,7 +221,7 @@ def mol_parse(mol):
     return elements, geo, adj_mat, q
 
 
-def xyz_from_smiles(smiles, mode="rdkit"):
+def xyz_from_smiles(smiles, mode="yarp"):
     """
     A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
     Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
@@ -235,8 +234,8 @@ def xyz_from_smiles(smiles, mode="rdkit"):
 
     mode : str
            This variable controls whether to use the yarp SMILES parser or the rdkit parser.
-           The default is to use rdkit.
            The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
+           The default is to use the in-house SMILES parser.
 
 
     Returns
@@ -259,21 +258,18 @@ def xyz_from_smiles(smiles, mode="rdkit"):
     if mode == "yarp":
 
         # Parse basics
-        # ERM: We are just going to throw-away BE matrix for now, but will integrate this later
+        # NOTE: bemat is used to generate geometry via RDKit, but not returned for
+        # downstream use in yarpecule - ERM
         adj_mat, bemat, atom_info = smiles2adjmat(smiles)
         elements = [_[0].lower() for _ in atom_info]
         fc = [0 if _[1] is None else int(_[1]) for _ in atom_info]
         q = int(sum(fc))
 
-        # This is new code!!!!!! Needs implementation/testing!!! - ERM
-        lewis = lewis_struct(adj_mat, elements, q)
-        bond_mats = lewis.bond_mats
-
         # Array of atom-wise octet requirements for determining expanded octects
         e_exp = np.array([el_n_expand_octet[_] for _ in elements])  # max atoms
 
         # electrons per atom
-        e = np.sum(2*bond_mats[0], axis=1)-np.diag(bond_mats[0])
+        e = np.sum(2*bemat, axis=1)-np.diag(bemat)
 
         # Check that the octet rules have not been violated
         violations = [count for count, _ in enumerate(
@@ -297,12 +293,12 @@ def xyz_from_smiles(smiles, mode="rdkit"):
                         continue
                     else:
                         mol.AddBond(
-                            count_j, count_k, xyz_from_smiles.bond_to_type[bond_mats[0][count_j, count_k]])
+                            count_j, count_k, xyz_from_smiles.bond_to_type[bemat[count_j, count_k]])
                 else:
                     break
 
         # set explicit H-atoms and formals
-        for count_j, j in enumerate(bond_mats[0]):
+        for count_j, j in enumerate(bemat):
             atom = mol.GetAtomWithIdx(count_j)
             mol.GetAtomWithIdx(count_j).SetFormalCharge(int(fc[count_j]))
             mol.GetAtomWithIdx(count_j).SetNumRadicalElectrons(

@@ -1,10 +1,12 @@
 import sys
 import yaml
+import pickle
 
-from yarp.reaction import generate_rxns
+from yarp.util.input import input
+from yarp.reaction.generate_rxns import generate_rxns
 
 
-def main(input):
+def main(file):
 
     print(f"""Welcome to
                 __   __ _    ____  ____  
@@ -16,11 +18,15 @@ def main(input):
         """)
 
     # Figure out a way to print the current version/commit hash
-
     print("First off, here's the input file you provided:")
     print("=====================================")
-    print(yaml.dump(input))
+    print(yaml.dump(file))
     print("=====================================")
+
+    # TO-DO: Check input file for bad syntax or missing things!
+
+    # Initialize a class object to set default parameters
+    inp = input(file)
 
     ###############################################
     ####         STAGE 1                       ####
@@ -30,32 +36,39 @@ def main(input):
 
     # BUT FIRST!!! Check CONTROL.yaml to see if the initialization has been done!
 
-    initnode = input.get('initialize')
-    if not initnode:
-        raise RuntimeError(
-            "Hey bro beans, I need some molecules or reactions to work with. Missing `initialize` node in YAML file.")
+    reactions = generate_rxns(inp)
 
-    reactions = dict()
-    reactions = generate_rxns(initnode)
+    if reactions == {}:
+        print("No reaction objects created!")
+        sys.exit()
+    else:
+        print(f"Number of reactions generated: {len(reactions)}")
+        for index, rxn in enumerate(reactions.keys()):
+            print(f" -- Reaction {index}: {rxn}")
 
     ###############################################
     ####         STAGE 2                       ####
     ###############################################
 
-    # Iterate through each reaction and apply the appropriate methods
-    for rxn in reactions:
-        print(f"Processing reaction: {rxn.ID}")
+    # Access the list of stage keys
+    # Exit if stage keys are not defined
+    stages = file.get('stages')
+    if not stages:
+        print("No stages defined in input YAML file. Exiting.")
 
-        # Access the list of stage keys
-        # throw a RuntimeError if 'stages' doesn't exist
-        stages = input.get('stages')
-        if not stages:
-            raise RuntimeError(
-                "No stages provided for reaction object generation.")
+        with open(inp.out_file, "wb") as f:
+            pickle.dump(reactions, f)
+        print(f"Reactions dictionary has been pickled to {inp.out_file}.")
+        sys.exit()
+
+    # Iterate through each reaction and apply the appropriate methods
+    for rxn in reactions.values():
+        print(f"Processing reaction: {rxn.id}")
+
         for stage in stages:
             # Check if the reaction object has already completed this step
             # Probably will interface with CONTROL.yaml file
-            rxn.check_status(input.get(stage).get('method'))
+            rxn.check_status(file.get(stage).get('method'))
 
             # If not, run the appropriate method
             if rxn.status.get('stage') == True:
@@ -64,8 +77,8 @@ def main(input):
                 break
             else:
                 print(
-                    f"Running stage {stage} for reaction {rxn.rxn_id} with method {input.get(stage).get('method')}")
-                rxn.compute(input.get(stage))
+                    f"Running stage {stage} for reaction {rxn.rxn_id} with method {file.get(stage).get('method')}")
+                rxn.compute(file.get(stage))
 
 
 if __name__ == "__main__":

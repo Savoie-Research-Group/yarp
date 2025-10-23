@@ -14,7 +14,7 @@ class reaction:
         self.reactant = node(reactant)
         self.product = node(product)
 
-        self.edge = edge()
+        self.edge = edge(self.reactant, self.product)
 
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
 

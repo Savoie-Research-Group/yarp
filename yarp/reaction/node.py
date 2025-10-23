@@ -1,6 +1,7 @@
 """
 Definition of the node object class.
 """
+from copy import deepcopy
 
 
 class node:
@@ -15,11 +16,18 @@ class node:
     conformers : list of conformer objects
     """
 
-    def __init__(self, yp):
+    def __init__(self, yp, canon=False):
 
-        self.graph = yp
+        self.graph = deepcopy(yp)
         self.graph.get_smiles()
         self.graph.get_inchi()
+
+        self.species = self.graph.separate(canon=canon)
+        self.conc = dict()
+        for _ in self.species:
+            _.get_smiles()
+            self.conc[_.canon_smi] = 0.0
+
 
         self.conformers = []
 

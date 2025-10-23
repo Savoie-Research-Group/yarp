@@ -14,8 +14,7 @@ class reaction:
         self.reactant = node(reactant)
         self.product = node(product)
 
-        self.edge = None
-        self.egat_barrier = None # this is not the final form!!! - ERM
+        self.edge = edge()
 
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
 
@@ -26,7 +25,7 @@ class reaction:
 
         select_conformer_pair(self.reactant, self.product, input)
 
-        self.path = edge(self.reactant, self.product, input)
+        # self.path = edge(self.reactant, self.product, input)
 
     def refine_reaction(self, input):
 

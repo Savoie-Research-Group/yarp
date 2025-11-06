@@ -142,7 +142,8 @@ def yarpecule_hash(y):
 
 def reaction_hash(rxn):
     """
-    Creates a unique hash value for the reaction object. Stay tuned for the details!
+    Creates a unique hash value for the reaction object based on the sum of reactant/product
+    yarpecule hashes and the hash of the summed BEM difference matrix.
 
     Parameters
     ----------
@@ -152,8 +153,16 @@ def reaction_hash(rxn):
     Returns
     -------
     hash_value: float
-
-
     """
 
-    return 0.0
+    r_bem_sum = np.zeros_like(rxn.reactant.bond_mats[0])
+    for rmat in rxn.reactant.bond_mats:
+        r_bem_sum += rmat
+
+    p_bem_sum = np.zeros_like(rxn.product.bond_mats[0])
+    for pmat in rxn.product.bond_mats:
+        p_bem_sum += pmat
+
+    diff_bem = r_bem_sum - p_bem_sum
+
+    return rxn.reactant.hash + rxn.product.hash + bmat_hash(diff_bem)

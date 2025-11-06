@@ -61,6 +61,10 @@ class state:
         return self._graph.hash
 
     @property
+    def bond_mats(self):
+        return self._graph.bond_mats
+
+    @property
     def species(self):
         return self._species
 

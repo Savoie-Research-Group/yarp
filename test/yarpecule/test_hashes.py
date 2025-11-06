@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 from yarp.yarpecule.hashes import bmat_hash
 from yarp.yarpecule.yarpecule import yarpecule
+from yarp.reaction.reaction import reaction
 
 class TestBmatHash:
     def test_distinguish_mappings(self, haa_canon_smi, haa_full_map_smi):
@@ -80,3 +81,19 @@ class TestYpHash:
         benz_cat = yarpecule(benz_rad_cat_smi)
 
         assert benz.hash != benz_cat.hash
+
+# class TestRxnHash:
+#     def test_distinguish_mapping(self):
+#         """
+#         TO-DO: Find example reaction
+#         """
+
+#         r1 = yarpecule()
+#         p1 = yarpecule()
+#         rxn1 = reaction(r1, p1)
+
+#         r2 = yarpecule()
+#         p2 = yarpecule()
+#         rxn2 = reaction(r2, p2)
+
+#         assert rxn1.hash != rxn2.hash

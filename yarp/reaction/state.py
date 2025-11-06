@@ -34,7 +34,7 @@ class state:
 
         self.conformers = []
 
-        self._species = self.graph.separate(canon=canon)
+        self._species = self._graph.separate(canon=canon)
         self.conc = dict()
         for _ in self.species:
             _.get_smiles()

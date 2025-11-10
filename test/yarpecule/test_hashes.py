@@ -82,18 +82,23 @@ class TestYpHash:
 
         assert benz.hash != benz_cat.hash
 
-# class TestRxnHash:
-#     def test_distinguish_mapping(self):
-#         """
-#         TO-DO: Find example reaction
-#         """
+class TestRxnHash:
+    def test_distinguish_mapping(self):
+        """
+        Test that two reactions with same reactant/product connectivities,
+        but different atom mappings can be distinguished via reaction hash.
+        Test reaction: H2 elimination from ethanol (CCO) to form HAA (C=CO)
+        """
 
-#         r1 = yarpecule()
-#         p1 = yarpecule()
-#         rxn1 = reaction(r1, p1)
+        # H2 elimination from H's attached to 2 C atoms
+        r1 = yarpecule('[C:0]([C:1]([H:6])([H:7])[H:8])([O:2][H:3])([H:4])[H:5]', canon=False)
+        p1 = yarpecule('[C:0](=[C:1]([H:5])[H:6])([O:2][H:3])[H:4].[H:7][H:8]', canon=False)
+        rxn1 = reaction(r1, p1)
 
-#         r2 = yarpecule()
-#         p2 = yarpecule()
-#         rxn2 = reaction(r2, p2)
+        # H2 elimination but now one H comes from O atom and the other C-H replaces O-H
+        r2 = yarpecule('[C:0]([C:1]([H:6])([H:7])[H:8])([O:2][H:3])([H:4])[H:5]', canon=False)
+        p2 = yarpecule('[C:0](=[C:1]([H:5])[H:6])([O:2][H:8])[H:4].[H:7][H:3]', canon=False)
+        rxn2 = reaction(r2, p2)
 
-#         assert rxn1.hash != rxn2.hash
+        assert rxn1.id == rxn2.id
+        assert rxn1.hash != rxn2.hash

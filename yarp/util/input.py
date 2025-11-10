@@ -35,7 +35,7 @@ class input:
         self.enum_mode = initnode.get("mode", "concerted")
         self.n_break = initnode.get("bonds to break", 2)
         self.n_form = initnode.get("bonds to form", 2)
-        self.l_cutoff = initnode.get("lewis score", 0.0)
+
         self.d0_node = initnode.get("initial species", None)
         if not self.d0_node:
             raise RuntimeError("Please provide an initial species for enumeration. "
@@ -59,4 +59,17 @@ class input:
             self.separate_prods = self.separate_prods
         else:
             raise RuntimeError("Invalid value for separate products. Accepted inputs: 'all', an integer, or a list of integers")
-        
+
+        enum_filters = initnode.get('enumeration filters', None)
+        if enum_filters == None:
+            self.l_cutoff = 0.0
+            self.fc_cutoff = 2.0
+            self.ring_filter = False
+            self.dG_cutoff = -100.00
+            self.dG_source = None
+        else:
+            self.l_cutoff = enum_filters.get('lewis score', 0.0)
+            self.fc_cutoff = enum_filters.get('formal charge', 2.0)
+            self.ring_filter = enum_filters.get('discard strained rings', False)
+            self.dG_cutoff = enum_filters.get('barrier cutoff', -100.00)
+            self.dG_source = enum_filters.get('barrier source', None)

@@ -111,7 +111,7 @@ def generate_rxns(inp):
             for node in p_nodes:
                 print(f" - Enumerating from {node.inchi} node")
                 products = enumerate_products(
-                    node, inp.n_break, inp.n_form, mode=inp.enum_mode,
+                    node, inp.n_break, inp.n_form, react=inp.react_atoms, mode=inp.enum_mode,
                     l_cutoff=inp.l_cutoff, fc_cutoff=inp.fc_cutoff, ring_filter=inp.ring_filter
                 )
 
@@ -125,7 +125,7 @@ def generate_rxns(inp):
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
             products = enumerate_products(
-                reactant, inp.n_break, inp.n_form, mode=inp.enum_mode,
+                reactant, inp.n_break, inp.n_form, react=inp.react_atoms, mode=inp.enum_mode,
                 l_cutoff=inp.l_cutoff, fc_cutoff=inp.fc_cutoff, ring_filter=inp.ring_filter
             )
 
@@ -187,8 +187,15 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", l_cuto
         Filter out 3 and 4 member rings from enumerated products.
     """
 
-    print(f"  + Product enumeration with break {n_break}, form {n_form} "
+    print(f"  * Product enumeration with break {n_break}, form {n_form} "
           f"will be performed in {mode} mode.")
+
+    if react != []:
+        react_list = list(react[0])
+        element_list = []
+        for i in react_list:
+            element_list.append(r_yp.elements[i])
+        print(f"   + Reactive atoms defined as: index {react_list} --> element {element_list}")
 
     if mode == "sequential":
         print(f"   WARNING: Sequential mode is expensive and "
@@ -205,7 +212,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", l_cuto
               f"{len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}))
+        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react))
         print(f"   + Enumerated {len(products)} products")
 
     else:

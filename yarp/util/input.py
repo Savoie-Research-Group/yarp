@@ -35,6 +35,11 @@ class input:
         self.enum_mode = initnode.get("mode", "concerted")
         self.n_break = initnode.get("bonds to break", 2)
         self.n_form = initnode.get("bonds to form", 2)
+        self.react_atoms = initnode.get("reactive atoms", None)
+        if self.react_atoms is None:
+            self.react_atoms = []
+        elif isinstance(self.react_atoms, list):
+            self.react_atoms = [set(self.react_atoms)]
 
         self.d0_node = initnode.get("initial species", None)
         if not self.d0_node:
@@ -48,7 +53,6 @@ class input:
         self.out_file = initnode.get("output", "reactions.pkl")
 
         self.separate_prods = initnode.get("separate products", None)
-        print(self.separate_prods, type(self.separate_prods))
         if self.separate_prods is None:
             self.separate_prods = []
         elif isinstance(self.separate_prods, str) and self.separate_prods.lower() == 'all':

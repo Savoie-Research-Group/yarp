@@ -45,6 +45,11 @@ def generate_rxns(inp):
             else:
                 print(" - No product separation will be performed prior to enumeration")
 
+            if isinstance(inp.dG_source, str):
+                print(f" - Barrier filtering selected! Reactions with {inp.dG_source} dG above {inp.dG_cutoff} kcal/mol will be excluded from enumeration.")
+            else:
+                print(" - No barrier filtering will be performed prior to enumeration")
+
             # Check that new enumeration nodes have not already been enumerated from
             # For this, it should be enough to ensure that a product doesn't appear as a reactant
             # But maybe I'll need to re-evaluate this beyond depth2...
@@ -52,6 +57,13 @@ def generate_rxns(inp):
             p_hashes = set()
             prior_enum = set()
             for count_r, rxn in enumerate(og_rxns.values()):
+                # Apply dG cutoff
+                if isinstance(inp.dG_source, str):
+                    dG = rxn.barrier.get(inp.dG_source, None)
+                    if dG is not None and dG > inp.dG_cutoff:
+                        print(f"  + Excluding {rxn.id} (dG = {dG}) from enumeration")
+                        continue
+
                 # Add old reactions to output
                 output[rxn.id] = rxn
 

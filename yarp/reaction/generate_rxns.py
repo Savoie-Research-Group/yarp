@@ -65,7 +65,7 @@ def generate_rxns(inp):
                         continue
 
                 # Add old reactions to output
-                output[rxn.id] = rxn
+                output[rxn.hash] = rxn
 
                 # Ensure products have never been enumerated as reactants before
                 r_hash = rxn.reactant.graph.hash
@@ -130,7 +130,7 @@ def generate_rxns(inp):
                 for prod in products:
                     # prod = quick_geom_opt(prod, inp.quick_opt_lot)
                     rxn = reaction(node, prod)
-                    output[rxn.id] = rxn
+                    output[rxn.hash] = rxn
             
         else:
             print(f" - Initializing starting reactant node from {inp.d0_node}")
@@ -149,7 +149,7 @@ def generate_rxns(inp):
                 rxn = reaction(reactant, prod)
 
                 # Add reaction to dictionary paired with its ID
-                output[rxn.id] = rxn
+                output[rxn.hash] = rxn
 
     else:
         raise RuntimeError("Non-enumeration routines are not yet implemented!")

@@ -64,6 +64,8 @@ class input:
         else:
             raise RuntimeError("Invalid value for separate products. Accepted inputs: 'all', an integer, or a list of integers")
 
+        self.backward_enum = initnode.get("backward enumeration", False)
+
         enum_filters = initnode.get('enumeration filters', None)
         if enum_filters == None:
             self.l_cutoff = 0.0

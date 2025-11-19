@@ -146,3 +146,19 @@ class TestRxnHash:
         rxn4 = reaction(r4, p4)
 
         assert rxn1.hash != rxn4.hash # TODO: figure out if this *should* be equivalent or not
+
+
+    # def test_reverse_reaction(self):
+    #     """
+    #     """
+
+    #     r1 = yarpecule('[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]', canon=False)
+    #     p1 = yarpecule('[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]', canon=False)
+    #     rxn1 = reaction(r1, p1)
+
+    #     r2 = yarpecule('[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]', canon=False)
+    #     p2 = yarpecule('[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]', canon=False)
+    #     rxn2 = reaction(r2, p2)
+
+    #     assert rxn1.id != rxn2.id
+    #     assert rxn1.hash != rxn2.hash

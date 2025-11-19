@@ -4,12 +4,20 @@ Persistent test fixtures for YARP testing suite
 
 import pytest
 from pathlib import Path
+import pickle
 
-#######################################
-#       Molecular Input Parsing       #
-#######################################
+# Pickle files
+@pytest.fixture
+def glucose_single_path():
+    """Returns a dictionary object of the reactions contained in glucose pickle file."""
+    file = str(Path(__file__).parent / "pickles" / "glucose_single_path.pkl")
+    return pickle.load(open(file, 'rb'))
 
-
+@pytest.fixture
+def glucose_multi_path():
+    """Returns a dictionary object of the reactions contained in glucose pickle file."""
+    file = str(Path(__file__).parent / "pickles" / "glucose_multi_path.pkl")
+    return pickle.load(open(file, 'rb'))
 
 # Molecule files
 @pytest.fixture
@@ -42,6 +50,8 @@ def betaine_mol():
     """Returns a string object of the absolute path to betaine MOL file."""
     return str(Path(__file__).parent / "molecules" / "betaine.mol")
 
+
+# SMILES
 @pytest.fixture
 def ethene_smi():
     """Returns the smiles string for ethene."""

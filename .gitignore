@@ -1,6 +1,5 @@
 .DS_Store
-debug/*.prof
-debug/*.xyz
+debug/*
 .vscode
 
 # Byte-compiled / optimized / DLL files

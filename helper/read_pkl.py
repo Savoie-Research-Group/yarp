@@ -19,14 +19,17 @@ def main(args):
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
-        data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.egat_barrier])
+        if 'EGAT' in rxn.barrier:
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['EGAT']])
+        else:
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
         
         # optionally, generate PDFs for each reactant/product pair
         if args.visualize:
             folder = f"visuals/{rxn.id}"
             os.makedirs(folder, exist_ok=True)
-            rxn.reactant.graph.draw_bmats(outfile=f"{folder}/reactant.pdf")
-            rxn.product.graph.draw_bmats(outfile=f"{folder}/product.pdf")
+            rxn.reactant._graph.draw_bmats(outfile=f"{folder}/reactant.pdf")
+            rxn.product._graph.draw_bmats(outfile=f"{folder}/product.pdf")
     
     print(tabulate(data, headers=headers, tablefmt='pretty'))
 

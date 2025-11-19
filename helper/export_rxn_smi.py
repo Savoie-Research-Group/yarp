@@ -19,9 +19,9 @@ def main(args):
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
 
     # Stuff data into a Pandas dataframe for easy export to CSV later
-    df = pd.DataFrame(columns=['rxn_id', 'reactant_smi', 'product_smi'])
+    df = pd.DataFrame(columns=['rxn_id', 'rxn_hash', 'reactant_smi', 'product_smi'])
     for idx, rxn in enumerate(rxns.values()):
-        df.loc[idx] = [rxn.id, rxn.reactant.map_smi, rxn.product.map_smi]
+        df.loc[idx] = [rxn.id, rxn.hash, rxn.reactant.map_smi, rxn.product.map_smi]
     
     df.to_csv(args.output, index=False)
     print(f"...and now you can find them in {args.output}!")

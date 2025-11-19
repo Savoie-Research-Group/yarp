@@ -12,6 +12,7 @@ dependencies:
   - openbabel
   - scipy
   - pandoc
+  - networkx
   - pip:
     - tabulate
     - sphinx-rtd-theme

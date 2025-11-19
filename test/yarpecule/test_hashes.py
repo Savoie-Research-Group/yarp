@@ -103,6 +103,17 @@ class TestRxnHash:
         assert rxn1.id == rxn2.id
         assert rxn1.hash != rxn2.hash
 
+        r3 = yarpecule('[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]', canon=False)
+        p3 = yarpecule('[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]', canon=False)
+        rxn3 = reaction(r3, p3)
+
+        r4 = yarpecule('[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]', canon=False)
+        p4 = yarpecule('[C:0](=[C:1]([O:2][H:6])[H:3])([H:5])[H:4]', canon=False)
+        rxn4 = reaction(r4, p4)
+
+        assert rxn3.id == rxn4.id
+        assert rxn3.hash != rxn4.hash
+
     def test_order_invariance(self):
         """
         Test that two reactions with identical mappings, but scrampled atom ordering

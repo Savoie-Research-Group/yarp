@@ -55,7 +55,6 @@ def generate_rxns(inp):
             # But maybe I'll need to re-evaluate this beyond depth2...
             p_nodes = []
             p_hashes = set()
-            prior_enum = set()
             for count_r, rxn in enumerate(og_rxns.values()):
                 # Apply dG cutoff
                 if isinstance(inp.dG_source, str):
@@ -68,9 +67,7 @@ def generate_rxns(inp):
                 output[rxn.hash] = rxn
 
                 # Ensure products have never been enumerated as reactants before
-                r_hash = rxn.reactant.graph.hash
-                if r_hash not in prior_enum:
-                    prior_enum.add(r_hash)
+                r_hash = rxn.reactant.hash
 
                 # Product separation check
                 prod = rxn.product.graph
@@ -83,9 +80,8 @@ def generate_rxns(inp):
                         p_hash = mol.hash
                         if p_hash not in p_hashes: # also ensure no duplicate products!?
                             p_hashes.add(p_hash)
-                            if p_hash not in prior_enum:
-                                mol.get_inchi() # need to recompute this, since fresh yarpecule
-                                p_nodes.append(mol)
+                            mol.get_inchi() # need to recompute this, since fresh yarpecule
+                            p_nodes.append(mol)
 
                 elif isinstance(inp.separate_prods, list) and len(inp.separate_prods) > 0:
                     sep_targets = set(inp.separate_prods)
@@ -97,25 +93,22 @@ def generate_rxns(inp):
                             p_hash = mol.hash
                             if p_hash not in p_hashes: # also ensure no duplicate products!?
                                 p_hashes.add(p_hash)
-                                if p_hash not in prior_enum:
-                                    mol.get_inchi()
-                                    p_nodes.append(mol)
+                                mol.get_inchi()
+                                p_nodes.append(mol)
 
                     else:
                         # Move forward without separating products
                         p_hash = prod.hash
                         if p_hash not in p_hashes: # also ensure no duplicate products!?
                             p_hashes.add(p_hash)
-                            if p_hash not in prior_enum:
-                                p_nodes.append(prod)
+                            p_nodes.append(prod)
 
                 else:
                     # Move forward without separating products
                     p_hash = prod.hash
                     if p_hash not in p_hashes: # also ensure no duplicate products!?
                         p_hashes.add(p_hash)
-                        if p_hash not in prior_enum:
-                            p_nodes.append(prod)
+                        p_nodes.append(prod)
 
             print(f" - {len(p_nodes)} unique products identified for enumeration")
 

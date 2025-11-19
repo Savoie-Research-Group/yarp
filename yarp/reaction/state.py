@@ -45,6 +45,10 @@ class state:
     # Properties  #
     ###############
     @property
+    def graph(self):
+        return self._graph
+
+    @property
     def inchi(self):
         return self._graph.inchi
     

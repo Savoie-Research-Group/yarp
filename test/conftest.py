@@ -6,6 +6,12 @@ import pytest
 from pathlib import Path
 import pickle
 
+# Pytorch models
+@pytest.fixture
+def egat_pretrain():
+    """Return pytorch model"""
+    return 'bob'
+
 # Pickle files
 @pytest.fixture
 def glucose_single_path():

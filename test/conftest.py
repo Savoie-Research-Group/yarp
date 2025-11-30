@@ -5,12 +5,17 @@ Persistent test fixtures for YARP testing suite
 import pytest
 from pathlib import Path
 import pickle
-
+import omegaconf
+from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model
 # Pytorch models
+@pytest.fixture
+def egat_csv():
+    return str(Path(__file__).parent / "reaction" / "formatted_smiles.csv")
 @pytest.fixture
 def egat_pretrain():
     """Return pytorch model"""
-    return 'bob'
+    model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
+    return model, args
 
 # Pickle files
 @pytest.fixture

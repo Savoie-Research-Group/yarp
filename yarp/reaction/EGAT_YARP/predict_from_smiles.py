@@ -12,13 +12,28 @@ import numpy as np
 import argparse
 import os
 from types import SimpleNamespace
-from model import EGAT_Rxn
-from molecule import Molecule, OLD_BOND_ENCODE, bond_encode
-from graphgenhelperfunctions import return_reactive
-from RDKit.RDKitHelpers import RemoveMapping
+try:
+    from model import EGAT_Rxn
+except ImportError:
+    from yarp.reaction.EGAT_YARP.model import EGAT_Rxn
+try:
+    from molecule import Molecule, OLD_BOND_ENCODE, bond_encode
+except ImportError:
+    from yarp.reaction.EGAT_YARP.molecule import Molecule, OLD_BOND_ENCODE, bond_encode
+try:
+    from graphgenhelperfunctions import return_reactive
+except ImportError:
+    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import return_reactive
+try:
+    from RDKit.RDKitHelpers import RemoveMapping
+except ImportError:
+    from yarp.reaction.EGAT_YARP.RDKit.RDKitHelpers import RemoveMapping
 from rdkit import Chem
 import omegaconf
-from dataset import FastDataset
+try:
+    from dataset import FastDataset
+except ImportError:
+    from yarp.reaction.EGAT_YARP.dataset import FastDataset
 from torch.utils.data import DataLoader
 
 
@@ -59,7 +74,7 @@ def load_model(checkpoint_path, config):
     print(f"Loading model from: {checkpoint_path}")
     
     # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     
     # Extract state dict
     if 'model_state_dict' in checkpoint:

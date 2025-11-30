@@ -1,8 +1,11 @@
 """
 Placeholder for code allowing for ML predicted reaction barriers (and other reaction properties?)
 """
-
-
+from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model, predict_activation_energy
+from yarp.reaction.EGAT_YARP.dataset import FastDataset
+import omegaconf
+import os 
+import pandas as pd 
 def get_egat_barriers(yp_rxns, model):
     """
     yp_rxns : dict
@@ -16,15 +19,65 @@ def get_egat_barriers(yp_rxns, model):
     for rxn in yp_rxns.values():
         rsmiles = rxn.reactant.map_smi
         psmiles = rxn.product.map_smi
-
-    # dataframe to CSV file
-
-    # Fead CSV file into model
+        reaction_smiles = f"{rsmiles}>>{psmiles}"
+        dataframe.append(reaction_smiles)
+    dataframe = pd.DataFrame(dataframe, columns=['AAM'])
+    print(dataframe)
+    os.makedirs('tmp', exist_ok=True)
+    dataframe.to_csv('tmp/egat_barriers.csv', index=False)
+    test_dataset = FastDataset(args, dataset='tmp/egat_barriers.csv')
+    os.remove('tmp/egat_barriers.csv')
+    os.rmdir('tmp')
+    for idx in range(len(test_dataset)):
+        datapoint = test_dataset[idx]
+        if datapoint is None:
+            dataframe.loc[idx, 'egat_barrier'] = None
+            print(f"Error building datapoint for {idx}")
+            continue
+        else:
+            idx, rgraph, pgraph, strings = datapoint
+            print(rgraph)
+            try:
+                prediction = predict_activation_energy(model, rgraph, pgraph)
+                dataframe.loc[idx, 'egat_barrier'] = prediction
+            except Exception as e:
+                print(f"Error predicting barrier for {strings}: {e}")
+                dataframe.loc[idx, 'egat_barrier'] = None
 
     # Update reaction objects with EGAT barriers
     for rxn in yp_rxns.values():
-        rxn.barrier['egat'] = 42.0
+        rxn.barrier['egat'] = dataframe.loc[idx, 'egat_barrier']
+    return yp_rxns
 
-    return 0
+def get_egat_barries_from_csv(csv_path, model):
+    """
+    csv_path : str
+        Path to CSV file with reaction SMILES
+    model : ???
+        Loaded pytorch model
+    """
+    df = pd.read_csv(csv_path)
+    test_dataset = FastDataset(args, dataset=csv_path)
+    for idx in range(len(test_dataset)):
+        datapoint = test_dataset[idx]
+        if datapoint is None:
+            print(f"Error building datapoint for {idx}")
+            continue
+        else:
+            idx, rgraph, pgraph, strings = datapoint
+            print(rgraph)
+            try:
+                prediction = predict_activation_energy(model, rgraph, pgraph)
+                df.loc[idx, 'egat_barrier'] = prediction
+            except Exception as e:
+                print(f"Error predicting barrier for {strings}: {e}")
+                df.loc[idx, 'egat_barrier'] = None
+    return df
 
+import pickle 
+model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
+df = get_egat_barries_from_csv('test/reaction/formatted_smiles.csv', model)
+print(df)
 
+yp_rxns = pickle.load(open('test/pickles/glucose_single_path.pkl', 'rb'))
+get_egat_barriers(yp_rxns, model)

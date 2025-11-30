@@ -3,10 +3,22 @@ import omegaconf
 import yaml
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from graphgenhelperfunctions import return_matrix
-from utilities.yarp.taffi_functions import graph_seps, adjmat_to_adjlist
-from utilities.yarp.taffi_functions import return_rings
-from graphgenhelperfunctions import find_stereochemistry
+try:
+    from graphgenhelperfunctions import return_matrix
+except ImportError:
+    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import return_matrix
+try:
+    from utilities.yarp.taffi_functions import graph_seps, adjmat_to_adjlist
+except ImportError:
+    from yarp.reaction.EGAT_YARP.utilities.yarp.taffi_functions import graph_seps, adjmat_to_adjlist
+try:
+    from utilities.yarp.taffi_functions import return_rings
+except ImportError:
+    from yarp.reaction.EGAT_YARP.utilities.yarp.taffi_functions import return_rings
+try:
+    from graphgenhelperfunctions import find_stereochemistry
+except ImportError:
+    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import find_stereochemistry
 el_to_an = { "h": 1,  "he": 2,
              "li":3,  "be":4,                                                                                                      "b":5,    "c":6,    "n":7,    "o":8,    "f":9,    "ne":10,
              "na":11, "mg":12,                                                                                                     "al":13,  "si":14,  "p":15,   "s":16,   "cl":17,  "ar":18,

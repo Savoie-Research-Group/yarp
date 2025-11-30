@@ -1,7 +1,13 @@
 from torch.utils.data import Dataset
 import pandas as pd 
-from molecule import Molecule
-from molecule import OLD_BOND_ENCODE
+try:
+    from molecule import Molecule
+except ImportError:
+    from yarp.reaction.EGAT_YARP.molecule import Molecule
+try:
+    from molecule import OLD_BOND_ENCODE
+except ImportError:
+    from yarp.reaction.EGAT_YARP.molecule import OLD_BOND_ENCODE
 
 import omegaconf
 import os
@@ -9,9 +15,15 @@ import time
 import traceback
 import torch
 import dgl
-from RDKit.RDKitHelpers import getInchifromSMILES, RemoveMapping
+try:
+    from RDKit.RDKitHelpers import getInchifromSMILES, RemoveMapping
+except ImportError:
+    from yarp.reaction.EGAT_YARP.RDKit.RDKitHelpers import getInchifromSMILES, RemoveMapping
 from rdkit import Chem
-from graphgenhelperfunctions import return_reactive
+try:
+    from graphgenhelperfunctions import return_reactive
+except ImportError:
+    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import return_reactive
 
 
 def getctype(smi:str, molecular:bool=False):
@@ -379,12 +391,16 @@ class FastDataset(Dataset):
             if not molecular:
                 Product = Molecule(Psmiles, self.args)
                 Product.ReadMolecule()
-                if Reactant.elements != Product.elements:
-                    with open(os.path.join(self.data_path,'exclude.txt'),'a') as f:
-                        f.write(f'{Rind}\n')
-                        f.write(f'The reaction between {Rsmiles} and {Psmiles} failed because the element matrix is imbalnaced. \n')
-                        print(f'The reaction between {Rsmiles} and {Psmiles} failed because the element matrix is imbalnaced. \n')
-                    return None
+                print('Reactant elements: ', Reactant.elements)
+                print('Product elements: ', Product.elements)
+
+                #TODO: CHECK IF THIS IS CORRECT
+                # if Reactant.elements != Product.elements:
+                #     with open(os.path.join(self.data_path,'exclude.txt'),'a') as f:
+                #         f.write(f'{Rind}\n')
+                #         f.write(f'The reaction between {Rsmiles} and {Psmiles} failed because the element matrix is imbalanced. \n')
+                #         print(f'The reaction between {Rsmiles} and {Psmiles} failed because the element matrix is imbalnaced. \n')
+                #     return None
 
             elements = Reactant.elements
             

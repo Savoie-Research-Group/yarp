@@ -11,8 +11,6 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from copy import copy,deepcopy
 from itertools import combinations 
-import numba
-from numba import jit, njit
 # Generates the adjacency matrix based on UFF bond radii
 # Inputs:       Elements: N-element List strings for each atom type
 #               Geometry: Nx3 np.array holding the geometry of the molecule

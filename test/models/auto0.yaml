@@ -33,13 +33,13 @@ ablation_NN_model: null
 ablation_NN_model_type: direct
 additionals: null
 atom_map: false
-base_model: /groups/bsavoie2/bpiguave/yarp-egat_auxiliary/test/models/v1.pth
+base_model: test/models/v1.pth
 batch_size: 10
 betas:
 - 0.9
 - 0.999
 class_choice: null
-data_path: /groups/bsavoie2/bpiguave/yarp-egat_auxiliary/tmp
+data_path: tmp
 datastorage: onthefly
 defaults:
   model: EGAT_3MLP_1OUT
@@ -72,7 +72,7 @@ hydra:
   sweep:
     dir: log/direct
     subdir: null
-input: /groups/bsavoie2/bpiguave/yarp-egat_auxiliary/tmp/egat_barriers.csv
+input: tmp/egat_barriers.csv
 learning_rate: 8.0e-05
 lr_decay: 0.6
 lr_min: 2.0e-05
@@ -107,7 +107,7 @@ removeneighborcount: false
 removereactiveinfo: false
 removeringinfo: false
 removestereoinfo: false
-save_path: /groups/bsavoie2/bpiguave/yarp-again/tmp
+save_path: tmp
 scheduler: cos
 shuffle: true
 size: null

@@ -1,22 +1,16 @@
 from __future__ import annotations
-
 import io
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
-
-from rdkit import Chem
-from rdkit import RDLogger
-RDLogger.DisableLog("rdApp.*")
-
-import pickle as pkl  # at the top
-
-
+from typing import Dict
 from decimal import Decimal, ROUND_HALF_UP
-from pathlib import Path
 from yarp.reaction import *
 from rdkit import Chem
-from rdkit.Chem import MolFromSmiles as smi2mol, MolToSmiles as mol2smi
-from typing import Dict, List
+from rdkit import RDLogger
+import pickle as pkl
+RDLogger.DisableLog("rdApp.*")
+
+
+
 
 def elements_from_smiles(smiles):
     """Return elemental composition from a SMILES using RDKit."""
@@ -31,13 +25,12 @@ def elements_from_smiles(smiles):
     return counts
 
 def quote(s):
+    """Single-quote a string for YAML, doubling any embedded single quotes."""
     return "'" + s.replace("'", "''") + "'"
 
 def eq_quote(s):
-    # single-quote the whole equation; double any embedded single quotes for YAML
+    """Single-quote the whole equation; double any embedded single quotes for YAML"""
     return "'" + s.replace("'", "''") + "'"
-
-
 
 def split_species(state):
     """Accept a SMILES string or sequence and return a list of species strings."""
@@ -50,6 +43,7 @@ def split_species(state):
 
 
 def normalize_composition(all_species, overrides):
+    """Build a normalized composition dict from all species and any overrides."""
     comp = {s: 0.0 for s in all_species}
     for k, v in (overrides or {}).items():
         comp[k] = float(v)
@@ -63,6 +57,7 @@ def normalize_composition(all_species, overrides):
     return comp
 
 def convert_energy_to_kcal(value, units):
+    """Convert an energy value to kcal/mol from the given units."""
     u = (units or "").lower()
     if u in ("kcal/mol", "kcal"):
         return float(value)
@@ -71,6 +66,7 @@ def convert_energy_to_kcal(value, units):
     raise ValueError(f"Unsupported energy units '{units}'. Provide kcal/mol or kJ/mol.")
 
 def fmt(x, places=3):
+    """Round a number to the specified number of decimal places."""
     return str(Decimal(x).quantize(Decimal(f"1.{'0'*places}"), rounding=ROUND_HALF_UP))
 
 def state_to_smiles(state_obj):
@@ -85,22 +81,6 @@ def state_to_smiles(state_obj):
             return ".".join(smi_list)
         # Fallback to state-level canon_smi if present
         return getattr(state_obj, "canon_smi", None)
-
-def extract_barrier(energy):
-        """
-        Barriers in YARP objects are often dicts keyed by level of theory (e.g., 'DFT').
-        Accept either a float or dict; prefer DFT if present, else first value.
-        """
-        if energy is None:
-            return None
-        if isinstance(energy, dict):
-            if "DFT" in energy:
-                return energy["DFT"]
-            # grab the first available entry
-            for _, v in energy.items():
-                return v
-            return None
-        return energy
     
 def load_yarp_pickle(payload):
     """

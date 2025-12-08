@@ -3,8 +3,6 @@
 Lightweight YAML validator that can be imported from main_cantera.py
 or run directly from the command line.
 """
-
-import argparse
 import cantera as ct
 
 

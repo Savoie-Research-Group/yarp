@@ -3,28 +3,21 @@
 Build a minimal Cantera YAML from a list of reaction dictionaries produced by
 `pull_cantera_data_from_rxn_obj`.
 """
-
 from __future__ import annotations
-
 import io
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
-
 from rdkit import Chem
 from rdkit import RDLogger
 RDLogger.DisableLog("rdApp.*")
 
 from cantera_util import *
 
-
-# Defaults (tuned to previous script behavior)
 DEFAULT_A = 1e12  # s^-1, reasonable order-of-magnitude pre-exponential
 DEFAULT_B = 0.0   # unitless
 
-
-
-
 def initial_comp_from_lists(species_list, frac_list):
+    """Build initial composition dict from parallel lists."""
     if species_list is None or frac_list is None:
         return None
     if len(species_list) != len(frac_list):
@@ -32,6 +25,7 @@ def initial_comp_from_lists(species_list, frac_list):
     return {str(s): float(f) for s, f in zip(species_list, frac_list)}
 
 def write_species_blocks(buf, species):
+    """Write species blocks to the YAML buffer."""
     buf.write("species:\n")
     for s in species:
         comp = elements_from_smiles(s)
@@ -46,6 +40,7 @@ def write_species_blocks(buf, species):
 
 
 def write_reaction_blocks(buf, cantera_data_list, dg_units):
+    """Write reaction blocks to the YAML buffer."""
     skipped = []
     buf.write("reactions:\n")
     for i, rxn in enumerate(cantera_data_list):

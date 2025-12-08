@@ -40,7 +40,6 @@ INIT_FRAC = [0.5,0.5]
 
 
 from copy import deepcopy
-import hashlib
 import pickle as pkl  # at the top
 
 
@@ -55,13 +54,13 @@ from typing import Dict, List
 from  write_yaml import *
 from validate_yaml import *
 from run_reactor import *
+from cantera_util import *
 
 import sys
 import importlib
 
 
-def fmt(x, places=3):
-    return str(Decimal(x).quantize(Decimal(f"1.{'0'*places}"), rounding=ROUND_HALF_UP))
+
 
 def network_hash(initial_species, temperature_k, pressure_atm, sim_length_s):
     inchies = []
@@ -75,35 +74,6 @@ def network_hash(initial_species, temperature_k, pressure_atm, sim_length_s):
     parts = [inch_str,fmt(temperature_k, 2),fmt(pressure_atm, 2),fmt(sim_length_s, 2)]
     print(f"Network hash parts: {parts}")
     return ("_".join(parts))
-
-def state_to_smiles(state_obj):
-        """
-        Normalize a reaction state to a Cantera-friendly SMILES representation.
-        - If the state has multiple species, return a dot-delimited string in canonical order.
-        - If the state exposes a single canonical SMILES, return that.
-        """
-        if hasattr(state_obj, "species"):
-            # state.species is a list of yarpecule objects
-            smi_list = [sp.canon_smi for sp in state_obj.species]
-            return ".".join(smi_list)
-        # Fallback to state-level canon_smi if present
-        return getattr(state_obj, "canon_smi", None)
-
-def extract_barrier(energy):
-        """
-        Barriers in YARP objects are often dicts keyed by level of theory (e.g., 'DFT').
-        Accept either a float or dict; prefer DFT if present, else first value.
-        """
-        if energy is None:
-            return None
-        if isinstance(energy, dict):
-            if "DFT" in energy:
-                return energy["DFT"]
-            # grab the first available entry
-            for _, v in energy.items():
-                return v
-            return None
-        return energy
 
 def pull_cantera_data_from_rxn_obj(rxn_obj):
     """
@@ -211,19 +181,8 @@ def update_rxn_obj_with_results(reactions, parsed_results):
     print(f"Updated {updated} reactions with fluxes.")
     return reactions
 
-def _load_yarp_pickle(payload):
-    """
-    Accepts a pickle path, raw pickle bytes/bytearray, or an already loaded object.
-    Returns the unpickled YARP reaction object.
-    """
-    if isinstance(payload, (bytes, bytearray)):
-        return pkl.loads(payload)
-    if isinstance(payload, (str, Path)):
-        with open(payload, "rb") as fh:
-            return pkl.load(fh)
-    return payload
 
-def _extract_reactions(container):
+def extract_reactions(container):
     """
     Normalize the reaction collection from various pickle shapes.
     Supports:
@@ -239,6 +198,22 @@ def _extract_reactions(container):
         return list(container)
     raise TypeError("Unsupported reaction container type; expected .reactions, dict, or iterable.")
 
+
+def extract_barrier(energy):
+        """
+        Barriers in YARP objects are often dicts keyed by level of theory (e.g., 'DFT').
+        Accept either a float or dict; prefer DFT if present, else first value.
+        """
+        if energy is None:
+            return None
+        if isinstance(energy, dict):
+            if "DFT" in energy:
+                return energy["DFT"]
+            # grab the first available entry
+            for _, v in energy.items():
+                return v
+            return None
+        return energy
 
 def main_cantera(
     pickle,
@@ -265,7 +240,7 @@ def main_cantera(
     8. Return the updated YARP reaction pickle
     """
     #0. Load YARP reaction pickle, define hash
-    rxn_pickle_obj = _load_yarp_pickle(pickle)
+    rxn_pickle_obj = load_yarp_pickle(pickle)
     updated_yarp_rxn_pickle = deepcopy(rxn_pickle_obj)
     net_hash = network_hash(
         initial_species = initial_species_list,
@@ -278,7 +253,7 @@ def main_cantera(
     output_dir.mkdir(parents=True, exist_ok=True)
     out_yaml_name = output_dir / f"cantera_input_{net_hash}.yaml"
     #1. Extract reaction objects
-    reactions = _extract_reactions(updated_yarp_rxn_pickle)
+    reactions = extract_reactions(updated_yarp_rxn_pickle)
     print(f"Extracted {len(reactions)} reactions from the YARP pickle.")
 
     #2. preparing Cantera data

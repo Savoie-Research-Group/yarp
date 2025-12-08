@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import pathlib
-
 import cantera as ct
 import pandas as pd
 import numpy as np
 
 
 def run_reactor(yaml_path, t_end, time_step, out_prefix):
-    
+    """Run an isothermal, isobaric reactor using the given Cantera YAML file."""
     yaml_path = pathlib.Path(yaml_path)
     out_prefix = pathlib.Path(out_prefix or yaml_path.with_suffix("").name)  # base name of the YAML
     out_prefix.parent.mkdir(parents=True, exist_ok=True)

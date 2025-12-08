@@ -29,10 +29,6 @@ and length of the simulation.
 
 Author: Thomas Burton
 Date: 08DEC2025
-
-
-
-    
 """
 
 INI_COMP = ["O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO", "O"]
@@ -41,28 +37,19 @@ INIT_FRAC = [0.5,0.5]
 
 from copy import deepcopy
 import pickle as pkl  # at the top
-
-
-from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from yarp.reaction import *
 from rdkit import Chem
 from rdkit.Chem import MolFromSmiles as smi2mol, MolToSmiles as mol2smi
 from typing import Dict, List
 
-# Import existing helper functions
 from  write_yaml import *
 from validate_yaml import *
 from run_reactor import *
 from cantera_util import *
 
-import sys
-import importlib
-
-
-
-
 def network_hash(initial_species, temperature_k, pressure_atm, sim_length_s):
+    """Generate a hash string for the reaction network based on initial species and conditions."""
     inchies = []
     for smi in initial_species:
         mol = smi2mol(smi)
@@ -80,7 +67,6 @@ def pull_cantera_data_from_rxn_obj(rxn_obj):
     Given a YARP reaction object, extract the necessary data for Cantera processing.
     Returns a dictionary with the required fields.
     """
-
     cantera_data = {
         "id": rxn_obj.id,
         "reactant_smi": state_to_smiles(rxn_obj.reactant),
@@ -177,7 +163,7 @@ def update_rxn_obj_with_results(reactions, parsed_results):
         if rid and rid in parsed_results:
             setattr(rxn, "max_flux",parsed_results[rid])
             updated += 1
-            print(f"Reaction {rid} updated with max_flux: {parsed_results[rid]}")
+            #print(f"Reaction {rid} updated with max_flux: {parsed_results[rid]}")
     print(f"Updated {updated} reactions with fluxes.")
     return reactions
 

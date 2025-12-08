@@ -10,7 +10,7 @@ from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model
 # Pytorch models
 @pytest.fixture
 def egat_csv():
-    return str(Path(__file__).parent / "reaction" / "formatted_smiles.csv")
+    return str(Path(__file__).parent / "reaction" / "yarp_predictions.csv")
 @pytest.fixture
 def egat_pretrain():
     """Return pytorch model"""

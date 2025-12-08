@@ -193,6 +193,16 @@ Module Contents
 
 
 
+   .. py:method:: draw_bmats(outfile='be_mats.pdf', show_inline=False)
+
+      Draw the bond electron matrices from the Lewis structure of the yarpecule.
+      This shouldn't ever change any of the attributes of the yarpecule.
+
+
+
+   .. py:attribute:: _adj_mat
+
+
    .. py:attribute:: _atom_neighbors
       :value: None
 
@@ -206,6 +216,9 @@ Module Contents
    .. py:attribute:: _bond_mats
       :value: None
 
+
+
+   .. py:attribute:: _bond_to_type
 
 
    .. py:attribute:: _e_acceptors

@@ -34,10 +34,12 @@ Module Contents
 
    :param adj_mat_0: This array is indexed to the atoms in the `yarpecule` and has a one at row i and column j if there is
                      a bond (of any kind) between the i-th and j-th atoms.
-   :type adj_mat_0: array
+   :type adj_mat_0: NDArray (N x N)
 
-   :returns: **seps** -- What is the final shape of this matrix? (ERM)
-   :rtype: NDArray
+   :returns: **seps** -- Default is to assign zeros along the diagonal, and -1 for all off-diagonal elements.
+             If a connection to a neighboring atom is found, off-diagonal elements are assigned an
+             integer value of 1 or greater, depending on how many connections are found.
+   :rtype: NDArray (N x N)
 
 
 .. py:function:: table_generator(elements, geometry, scale_factor=1.2, filename=None)

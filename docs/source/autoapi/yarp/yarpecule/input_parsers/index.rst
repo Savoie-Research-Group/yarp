@@ -37,7 +37,7 @@ Module Contents
    :rtype: tuple
 
 
-.. py:function:: xyz_from_smiles(smiles, mode='rdkit')
+.. py:function:: xyz_from_smiles(smiles, mode='yarp')
 
    A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
    Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
@@ -46,8 +46,8 @@ Module Contents
    :param smiles: The SMILES string that is being converted into a geometry, adjacency matrix, list of elements, and charge.
    :type smiles: str
    :param mode: This variable controls whether to use the yarp SMILES parser or the rdkit parser.
-                The default is to use rdkit.
                 The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
+                The default is to use the in-house SMILES parser.
    :type mode: str
 
    :returns: **(elements, geo, adj_mat, q)** -- `elements` is a list with the element labels,

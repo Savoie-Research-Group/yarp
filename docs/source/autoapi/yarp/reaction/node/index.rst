@@ -38,6 +38,9 @@ Module Contents
    .. py:method:: refine_node(input)
 
 
+   .. py:property:: canon_smi
+
+
    .. py:attribute:: conformers
       :value: []
 
@@ -46,9 +49,9 @@ Module Contents
    .. py:attribute:: graph
 
 
-   .. py:attribute:: inchi
+   .. py:property:: inchi
 
 
-   .. py:attribute:: smiles
+   .. py:property:: map_smi
 
 

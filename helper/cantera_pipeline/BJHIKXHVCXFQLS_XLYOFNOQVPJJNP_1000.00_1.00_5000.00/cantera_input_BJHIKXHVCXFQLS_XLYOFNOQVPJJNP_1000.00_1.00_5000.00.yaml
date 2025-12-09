@@ -1,0 +1,231 @@
+units: {length: cm, time: s, quantity: mol, activation-energy: kcal/mol, pressure: atm, energy: kcal}
+
+phases:
+- name: gas
+  thermo: ideal-gas
+  elements: [C, H, O]
+  kinetics: gas
+  reactions: all
+  species: ['C=O', 'O', 'O/C=C(/O)CO', 'O/C=C(/O)[C@@H](O)[C@H](O)[C@@H](O)CO', 'O/C=C(\O)[C@@H](O)[C@@H](O)[C@@H](O)CO', 'O/C=C\O', 'O=C(CO)CO', 'O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO', 'O=C(CO)[C@H](O)[C@@H](O)[C@H](O)CO', 'O=C/C(O)=C/[C@@H](O)[C@@H](O)CO', 'O=C/C(O)=C\[C@H](O)[C@H](O)CO', 'O=CCO', 'O=C[C@@H](O)CO', 'O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO', 'O=C[C@H](O)CO', 'O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO', 'OC[C@@H](O)[C@@H]1C=C(O)[C@H](O)O1', 'OC[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O', 'Oc1ccoc1', '[H]', '[H][H]']
+  state: {T: 1000.0, P: 1.0 atm, X: { 'C=O': 0.0, 'O': 0.5, 'O/C=C(/O)CO': 0.0, 'O/C=C(/O)[C@@H](O)[C@H](O)[C@@H](O)CO': 0.0, 'O/C=C(\O)[C@@H](O)[C@@H](O)[C@@H](O)CO': 0.0, 'O/C=C\O': 0.0, 'O=C(CO)CO': 0.0, 'O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO': 0.5, 'O=C(CO)[C@H](O)[C@@H](O)[C@H](O)CO': 0.0, 'O=C/C(O)=C/[C@@H](O)[C@@H](O)CO': 0.0, 'O=C/C(O)=C\[C@H](O)[C@H](O)CO': 0.0, 'O=CCO': 0.0, 'O=C[C@@H](O)CO': 0.0, 'O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO': 0.0, 'O=C[C@H](O)CO': 0.0, 'O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO': 0.0, 'OC[C@@H](O)[C@@H]1C=C(O)[C@H](O)O1': 0.0, 'OC[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O': 0.0, 'Oc1ccoc1': 0.0, '[H]': 0.0, '[H][H]': 0.0 } }
+
+species:
+- name: 'C=O'
+  composition: {C: 1, O: 1, H: 2}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O'
+  composition: {O: 1, H: 2}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O/C=C(/O)CO'
+  composition: {O: 3, C: 3, H: 6}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O/C=C(/O)[C@@H](O)[C@H](O)[C@@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O/C=C(\O)[C@@H](O)[C@@H](O)[C@@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O/C=C\O'
+  composition: {O: 2, C: 2, H: 4}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C(CO)CO'
+  composition: {O: 3, C: 3, H: 6}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C(CO)[C@H](O)[C@@H](O)[C@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C/C(O)=C/[C@@H](O)[C@@H](O)CO'
+  composition: {O: 5, C: 6, H: 10}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C/C(O)=C\[C@H](O)[C@H](O)CO'
+  composition: {O: 5, C: 6, H: 10}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=CCO'
+  composition: {O: 2, C: 2, H: 4}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C[C@@H](O)CO'
+  composition: {O: 3, C: 3, H: 6}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C[C@H](O)CO'
+  composition: {O: 3, C: 3, H: 6}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'OC[C@@H](O)[C@@H]1C=C(O)[C@H](O)O1'
+  composition: {O: 5, C: 6, H: 10}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'OC[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O'
+  composition: {O: 6, C: 6, H: 12}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: 'Oc1ccoc1'
+  composition: {O: 2, C: 4, H: 4}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: '[H]'
+  composition: {H: 1}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+- name: '[H][H]'
+  composition: {H: 2}
+  thermo:
+    model: constant-cp
+    h0: 0.0 kcal/mol
+    s0: 0.0 cal/mol/K
+    cp0: 1.0 cal/mol/K
+
+reactions:
+- id: 'BJHIKXHVCXFQLS-XLYOFNOQVPJJNP_to_MNQZXJOMYWMBOU-XLYOFNOQVPJJNP-YTXCQYABGWUXFL'
+  equation: 'O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO + O => O=C[C@@H](O)CO + O/C=C(/O)CO + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 30.5817 kcal/mol}
+  duplicate: false
+
+- id: 'BNFCVHNGQJGIIA-XLYOFNOQVPJJNP_to_BXMMDTDOWCVDIM-XLYOFNOQVPJJNP'
+  equation: 'O=C/C(O)=C\[C@H](O)[C@H](O)CO + O => OC[C@@H](O)[C@@H]1C=C(O)[C@H](O)O1 + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 29.4176 kcal/mol}
+  duplicate: false
+
+- id: 'BXMMDTDOWCVDIM-XLYOFNOQVPJJNP_to_RNWIJLZQJSGBCU-WGCNASOHLSPBMP-XLYOFNOQVPJJNP-XLYOFNOQVPJJNP'
+  equation: 'OC[C@@H](O)[C@@H]1C=C(O)[C@H](O)O1 + O => Oc1ccoc1 + O=CCO + O + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 25.416 kcal/mol}
+  duplicate: false
+
+- id: 'CDCKCSRWIDFXIZ-XLYOFNOQVPJJNP_to_BNFCVHNGQJGIIA-XLYOFNOQVPJJNP-XLYOFNOQVPJJNP'
+  equation: 'O/C=C(/O)[C@@H](O)[C@H](O)[C@@H](O)CO + O => O=C/C(O)=C/[C@@H](O)[C@@H](O)CO + O + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 29.358 kcal/mol}
+  duplicate: false
+
+- id: 'GZCGUPFRVQAUEE_to_BJHIKXHVCXFQLS'
+  equation: 'O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO => O=C(CO)[C@H](O)[C@@H](O)[C@H](O)CO'
+  rate-constant: {A: 1e+12, b: 0, Ea: 30.9776 kcal/mol}
+  duplicate: false
+
+- id: 'GZCGUPFRVQAUEE-XLYOFNOQVPJJNP_to_CDCKCSRWIDFXIZ-XLYOFNOQVPJJNP'
+  equation: 'O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO + O => O/C=C(\O)[C@@H](O)[C@@H](O)[C@@H](O)CO + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 36.0699 kcal/mol}
+  duplicate: false
+
+- id: 'JMCRDEBJJPRTPV-XLYOFNOQVPJJNP_to_WGCNASOHLSPBMP-XLYOFNOQVPJJNP'
+  equation: 'O/C=C\O + O => O=CCO + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 35.5465 kcal/mol}
+  duplicate: false
+
+- id: 'MNQZXJOMYWMBOU-XLYOFNOQVPJJNP_to_RXKJFZQQPQGTFL-XLYOFNOQVPJJNP'
+  equation: 'O=C[C@H](O)CO + O => O=C(CO)CO + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 34.6316 kcal/mol}
+  duplicate: false
+
+- id: 'MNQZXJOMYWMBOU_to_JMCRDEBJJPRTPV-WSFSSNUMVMOOMR'
+  equation: 'O=C[C@H](O)CO => O/C=C\O + C=O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 33.5918 kcal/mol}
+  duplicate: false
+
+- id: 'WQZGKKKJIJFFOK-XLYOFNOQVPJJNP_to_GZCGUPFRVQAUEE-XLYOFNOQVPJJNP'
+  equation: 'OC[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O + O => O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO + O'
+  rate-constant: {A: 1e+12, b: 0, Ea: 23.1664 kcal/mol}
+  duplicate: false
+

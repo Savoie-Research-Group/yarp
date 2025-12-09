@@ -74,6 +74,8 @@ def pull_cantera_data_from_rxn_obj(rxn_obj):
         "barrier": extract_barrier(rxn_obj.barrier),
         "reverse_barrier": extract_barrier(getattr(rxn_obj, "reverse_barrier", None)),
         "hash": getattr(rxn_obj, 'hash', None),
+        "heat_of_rxn": getattr(rxn_obj, 'heat_of_rxn', None),
+        "dG_rxn": getattr(rxn_obj, 'dG_rxn', None)
     }
     return cantera_data
 
@@ -275,6 +277,14 @@ def main_cantera(
         cantera_data = pull_cantera_data_from_rxn_obj(rxn_obj)
         cantera_data_list.append(cantera_data)
     print(f"Prepared Cantera data for {len(cantera_data_list)} reactions.")
+    #for react in cantera_data_list:
+        #print(f"Cantera data: {react}")
+    
+    #2.5 Dump Cantera Data to hashed pickle (for YAKS)
+    cantera_data_pickle_path = output_dir / f"cantera_data_{net_hash}.pkl"
+    with open(cantera_data_pickle_path, "wb") as fh:
+        pkl.dump(cantera_data_list, fh)
+    print(f"Cantera data pickle saved to: {cantera_data_pickle_path}")
     
     #2. Write Cantera YAML
     write_cantera_yaml(
@@ -332,6 +342,7 @@ def main_cantera(
     print(f"You can find the updated YARP reaction pickle at: {updated_pickle_path}")
     print(f"You can find the Cantera YAML file at: {out_yaml_name}")
     print(f"You can find the Cantera simulation results at: {output_dir}")
+    print(f"\n")
     return updated_yarp_rxn_pickle, updated_pickle_path
 
 #pull in arguments with argparse when run as a script

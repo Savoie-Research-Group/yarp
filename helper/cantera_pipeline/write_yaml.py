@@ -92,8 +92,6 @@ def write_yaml(
     write_skip_csv,
     dg_units = "kcal/mol",
     hygrogen_species = ("[H]", "[H][H]")):
-    ...
-
     """
     Serialize a Cantera mechanism YAML from reaction dicts.
     """

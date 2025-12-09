@@ -137,35 +137,54 @@ def run_cantera_simulation(yaml_path, sim_len_s, sim_dt_s, out_prefix):
     else:
         print(f"Cantera simulation failed for YAML: {yaml_path}")
 
-def parse_cantera_results(reaction_flux_summary_path):
+def parse_cantera_results(reaction_flux_summary_path, final_conc_path):
     """
-    Parse the results from the Cantera simulation from the provided csv.
-    return a dictionary mapping reaction IDs to their max flux.
+    Parse Cantera outputs:
+    - reaction fluxes: reaction_id -> max
+    - final concentrations: species -> final concentration
     """
     max_fluxes = pd.read_csv(reaction_flux_summary_path)
-    parsed = {}
-    for _, row in max_fluxes.iterrows():
-        rxn_id = row["reaction_id"]
-        max_flux = row["max"]
-        parsed[rxn_id] = max_flux
-    print(f"Parsed {len(parsed)} reactions' max fluxes from {reaction_flux_summary_path}.")
-    return parsed    
+    fluxes = {row["reaction_id"]: row["max"] for _, row in max_fluxes.iterrows()}
 
-def update_rxn_obj_with_results(reactions, parsed_results):
-    """
-    Update the reaction object with the parsed results from the Cantera simulation.
-    rxn_objs: list of reaction objects (from _extract_reactions)
-    parsed_results: dict {reaction_id: max_flux}
-    """
+    final_path = Path(final_conc_path)
+    conc_df = pd.read_csv(final_path)
+    last_row = conc_df.iloc[-1]
+    concentrations = {species: float(last_row[species]) for species in last_row.index}
+    print(f"Parsed final concentrations for {len(concentrations)} species from {final_path}.")
+    print(f"Parsed {len(fluxes)} reactions' max fluxes from {reaction_flux_summary_path}.")
+    return fluxes, concentrations
+
+
+def update_rxn_obj_with_results(reactions, fluxes, concentrations=None):
+    # max_flux update
     updated = 0
     for rxn in reactions:
         rid = getattr(rxn, "id", None)
-        if rid and rid in parsed_results:
-            setattr(rxn, "max_flux",parsed_results[rid])
+        if rid and rid in fluxes:
+            rxn.max_flux = fluxes[rid]
             updated += 1
-            #print(f"Reaction {rid} updated with max_flux: {parsed_results[rid]}")
     print(f"Updated {updated} reactions with fluxes.")
+
+    # per-state concentrations
+    updated = 0
+    if concentrations is not None:
+        for rxn in reactions:
+            for sp in getattr(rxn.reactant, "species", []):
+                smi = getattr(sp, "canon_smi", None)
+                if smi and smi in concentrations:
+                    rxn.reactant.conc[smi] = concentrations[smi]
+                    updated += 1
+                    #print(f"Set concentration for reactant species {smi} to {concentrations[smi]}")
+            for sp in getattr(rxn.product, "species", []):
+                smi = getattr(sp, "canon_smi", None)
+                if smi and smi in concentrations:
+                    rxn.product.conc[smi] = concentrations[smi]
+                    updated += 1
+                    #print(f"Set concentration for product species {smi} to {concentrations[smi]}")
+        print(f"Filled state.conc for matching species with final concentrations, {updated} updates made.")
     return reactions
+
+
 
 
 def extract_reactions(container):
@@ -225,7 +244,11 @@ def main_cantera(
     7. Update the reaction objects in the YARP pickle with the simulation results
     8. Return the updated YARP reaction pickle
     """
+    print(f"\n===================================")
+    print(f"=== Starting Cantera Pipeline ===")
+    print(f"===================================")
     #0. Load YARP reaction pickle, define hash
+    
     rxn_pickle_obj = load_yarp_pickle(pickle)
     updated_yarp_rxn_pickle = deepcopy(rxn_pickle_obj)
     net_hash = network_hash(
@@ -235,9 +258,13 @@ def main_cantera(
         sim_length_s = simulation_length_s
     )
     print(f"Network hash for this simulation: {net_hash}")
+    print(f"\n===================================")
+    print(f"=== Generating Cantera YAML for network: {net_hash} ===")
+    print(f"===================================")
     output_dir = Path(net_hash)
     output_dir.mkdir(parents=True, exist_ok=True)
     out_yaml_name = output_dir / f"cantera_input_{net_hash}.yaml"
+    
     #1. Extract reaction objects
     reactions = extract_reactions(updated_yarp_rxn_pickle)
     print(f"Extracted {len(reactions)} reactions from the YARP pickle.")
@@ -266,6 +293,9 @@ def main_cantera(
     #3. Validate YAML
     validate_cantera_yaml(out_yaml_name)
     
+    print(f"\n===================================")
+    print(f"=== Running Cantera Simulation for network: {net_hash} ===")
+    print(f"===================================")
     #4. Run Cantera simulation
     run_cantera_simulation(
         out_yaml_name,
@@ -275,11 +305,20 @@ def main_cantera(
     )
     
     #5. Parse results
-    parsed_results = parse_cantera_results(output_dir / f"cantera_results_{net_hash}_reaction_flux_summary.csv")
+    print(f"\n===================================")
+    print(f"=== Parsing Cantera Results for network: {net_hash} ===")
+    print(f"===================================")
+    flux_results, conc_results = parse_cantera_results(output_dir / f"cantera_results_{net_hash}_reaction_flux_summary.csv", 
+                                        output_dir / f"cantera_results_{net_hash}_final_concentrations.csv")
     
     #6. Update reaction objects with results
-    update_rxn_obj_with_results(reactions, parsed_results)
+    update_rxn_obj_with_results(reactions, flux_results, conc_results)
 
+
+    try:
+        setattr(updated_yarp_rxn_pickle, "final_concentrations", conc_results)
+    except Exception:
+        pass
     # 7. Save hashed updated pickle
     updated_pickle_path = output_dir / f"updated_yarp_reactions_{net_hash}.pkl"
     with open(updated_pickle_path, "wb") as fh:
@@ -287,12 +326,17 @@ def main_cantera(
     print(f"Updated YARP reaction pickle saved to: {updated_pickle_path}")
 
     #return updated pickle object and path
+    print(f"\n=================================")
+    print(f"=== Cantera Pipeline Completed for network: {net_hash} ===")
+    print(f"=================================")
+    print(f"You can find the updated YARP reaction pickle at: {updated_pickle_path}")
+    print(f"You can find the Cantera YAML file at: {out_yaml_name}")
+    print(f"You can find the Cantera simulation results at: {output_dir}")
     return updated_yarp_rxn_pickle, updated_pickle_path
 
 #pull in arguments with argparse when run as a script
 if __name__ == "__main__":
     import argparse
-
     parser = argparse.ArgumentParser(description="Cantera Pipeline for YARP Reaction Pickles")
     parser.add_argument("--pickle", type=str, help="Path to the YARP reaction pickle file")
     parser.add_argument("--temp", type=float, default=500, help="Temperature in Kelvin")

@@ -56,5 +56,10 @@ def run_reactor(yaml_path, t_end, time_step, out_prefix):
     spe_x = states.X[-1]
     conc_df = pd.DataFrame([spe_x], columns=states.species_names)
     conc_df.to_csv(f"{out_prefix}_final_mole_fractions.csv", index=False)
+    
+    # Keep final concentrations
+    conc = states.concentrations[-1]
+    conc_df = pd.DataFrame([conc], columns=states.species_names)
+    conc_df.to_csv(f"{out_prefix}_final_concentrations.csv", index=False)
 
     return True

@@ -38,9 +38,11 @@ def write_species_blocks(buf, species):
         buf.write("    s0: 0.0 cal/mol/K\n")
         buf.write("    cp0: 1.0 cal/mol/K\n\n")
 
-
 def write_reaction_blocks(buf, cantera_data_list, dg_units):
-    """Write reaction blocks to the YAML buffer."""
+    """Write reaction blocks to the YAML buffer.
+    Seperate forward and reverse reactions if reverse barrier is provided.
+    Returns a list of skipped reactions with reasons.
+    """
     skipped = []
     buf.write("reactions:\n")
     for i, rxn in enumerate(cantera_data_list):
@@ -53,14 +55,29 @@ def write_reaction_blocks(buf, cantera_data_list, dg_units):
         except Exception as exc:  # capture missing/invalid barrier
             skipped.append({"index": i, "id": rid, "why": str(exc)})
             continue
+
         r_side = " + ".join(r_list) if r_list else "[H]"
         p_side = " + ".join(p_list) if p_list else "[H]"
+
+        # forward reaction
         equation = eq_quote(f"{r_side} => {p_side}")
         buf.write(f"- id: {quote(str(rid))}\n")
         buf.write(f"  equation: {equation}\n")
         buf.write(f"  rate-constant: {{A: {DEFAULT_A:.6g}, b: {DEFAULT_B:.6g}, Ea: {Ea:.6g} kcal/mol}}\n")
-
         buf.write("  duplicate: false\n\n")
+
+        # reverse reaction if a reverse barrier is provided
+        rev_barrier = rxn.get("reverse_barrier")
+        if rev_barrier is not None:
+            try:
+                Ea_rev = convert_energy_to_kcal(rev_barrier, dg_units)
+                rev_equation = eq_quote(f"{p_side} => {r_side}")
+                buf.write(f"- id: {quote(str(rid))}_reverse\n")
+                buf.write(f"  equation: {rev_equation}\n")
+                buf.write(f"  rate-constant: {{A: {DEFAULT_A:.6g}, b: {DEFAULT_B:.6g}, Ea: {Ea_rev:.6g} kcal/mol}}\n")
+                buf.write("  duplicate: false\n\n")
+            except Exception as exc:
+                skipped.append({"index": i, "id": f"{rid}_reverse", "why": str(exc)})
     return skipped
 
 

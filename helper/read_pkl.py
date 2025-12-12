@@ -15,12 +15,12 @@ def main(args):
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
-    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier']
+    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Max Flux']
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
         if 'egat' in rxn.barrier:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['egat']])
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['egat'], rxn.max_flux])
         else:
             data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
         

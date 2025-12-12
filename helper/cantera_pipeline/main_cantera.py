@@ -31,17 +31,15 @@ Author: Thomas Burton
 Date: 08DEC2025
 """
 
-INI_COMP = ["O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO", "O"]
-INIT_FRAC = [0.5,0.5]
-
-
 from copy import deepcopy
 import pickle as pkl  # at the top
+import ast
 from pathlib import Path
 from yarp.reaction import *
 from rdkit import Chem
 from rdkit.Chem import MolFromSmiles as smi2mol, MolToSmiles as mol2smi
 from typing import Dict, List
+import cantera as ct
 
 from  write_yaml import *
 from validate_yaml import *
@@ -187,6 +185,65 @@ def update_rxn_obj_with_results(reactions, fluxes, concentrations=None):
     return reactions
 
 
+def dedupe_cantera_data(cantera_data_list, prefer="lowest_barrier"):
+    """
+    Deduplicate cantera_data dicts by (reactant_smi, product_smi).
+    Returns:
+      unique_list: list of kept cantera_data dicts
+      dup_id_to_kept_id: dict mapping duplicate reaction id -> kept reaction id
+
+    prefer:
+      - "lowest_barrier": keep entry with smallest barrier (None treated as +inf)
+      - "first": keep first seen
+    """
+    def key(d):
+        return (str(d.get("reactant_smi", "")).strip(),
+                str(d.get("product_smi", "")).strip())
+
+    def barrier(d):
+        b = d.get("barrier", None)
+        if b is None:
+            return float("inf")
+        try:
+            return float(b)
+        except Exception:
+            return float("inf")
+
+    kept_by_key = {}          # key -> dict
+    dup_id_to_kept_id = {}    # dup_id -> kept_id
+
+    for d in cantera_data_list:
+        k = key(d)
+        rid = d.get("id", None)
+
+        if k not in kept_by_key:
+            kept_by_key[k] = d
+            continue
+
+        keep = kept_by_key[k]
+
+        if prefer == "first":
+            # current d becomes a duplicate of keep
+            if rid is not None and keep.get("id", None) is not None:
+                dup_id_to_kept_id[rid] = keep["id"]
+            continue
+
+        # prefer == "lowest_barrier"
+        if barrier(d) < barrier(keep):
+            # old keeper becomes duplicate of new
+            old_id = keep.get("id", None)
+            new_id = rid
+            if old_id is not None and new_id is not None:
+                dup_id_to_kept_id[old_id] = new_id
+            kept_by_key[k] = d
+        else:
+            # new becomes duplicate of old keeper
+            keep_id = keep.get("id", None)
+            if rid is not None and keep_id is not None:
+                dup_id_to_kept_id[rid] = keep_id
+
+    unique_list = list(kept_by_key.values())
+    return unique_list, dup_id_to_kept_id
 
 
 def extract_reactions(container):
@@ -219,7 +276,7 @@ def extract_barrier(energy, theory, reverse=False):
             else:
                 #Raise error and exit if theory not found
                 if reverse:
-                    print(f"Warning: Reverse Theory '{theory}' not found in energy dict. Not including reverse barrier.")
+                    #print(f"Warning: Reverse Theory '{theory}' not found in energy dict. Not including reverse barrier.")
                     return None
                 print(f"Warning: Theory '{theory}' not found in energy dict. Specify theory or use a float.")
                 exit()
@@ -251,8 +308,16 @@ def main_cantera(
     print(f"\n===================================")
     print(f"=== Starting Cantera Pipeline ===")
     print(f"===================================")
+    print("Cantera version:", ct.__version__)
     #0. Load YARP reaction pickle, define hash
-    
+    if len(initial_species_list) != len(initial_species_mol_frac):
+        print("Number of mol fractions does not match initial species list. Correct and try again.")
+        exit()
+        
+    print(f"Initial Composition:")
+    for i in range(len(initial_species_list)):
+        print(f"Species:{initial_species_list[i]}; Fraction:{initial_species_mol_frac[i]}")
+        
     rxn_pickle_obj = load_yarp_pickle(pickle)
     updated_yarp_rxn_pickle = deepcopy(rxn_pickle_obj)
     net_hash = network_hash(
@@ -282,15 +347,19 @@ def main_cantera(
     #for react in cantera_data_list:
         #print(f"Cantera data: {react}")
     
+    #2.25 Remove Duplicate Reactions, Keep the lower barrier
+    unique_cantera_data_list, dup_id_map = dedupe_cantera_data(cantera_data_list, prefer="lowest_barrier")
+    print(f"Deduped Cantera data: {len(unique_cantera_data_list)} unique (removed {len(cantera_data_list) - len(unique_cantera_data_list)} dups).")
+
     #2.5 Dump Cantera Data to hashed pickle (for YAKS)
     cantera_data_pickle_path = output_dir / f"cantera_data_{net_hash}.pkl"
     with open(cantera_data_pickle_path, "wb") as fh:
-        pkl.dump(cantera_data_list, fh)
-    print(f"Cantera data pickle saved to: {cantera_data_pickle_path}")
+        pkl.dump(unique_cantera_data_list, fh)
+    print(f"Cantera data pickle saved to: {unique_cantera_data_list}")
     
     #2. Write Cantera YAML
     write_cantera_yaml(
-        cantera_data_list,
+        unique_cantera_data_list,
         out_yaml_name,
         temp,
         pressure,
@@ -350,19 +419,33 @@ def main_cantera(
 #pull in arguments with argparse when run as a script
 if __name__ == "__main__":
     import argparse
+    import json
+
     parser = argparse.ArgumentParser(description="Cantera Pipeline for YARP Reaction Pickles")
-    parser.add_argument("--pickle", type=str, help="Path to the YARP reaction pickle file")
-    parser.add_argument("--temp", type=float, default=500, help="Temperature in Kelvin")
-    parser.add_argument("--pressure", type=float, default=1, help="Pressure in atm")
-    parser.add_argument("--sim_l_s", type=float, default=1, help="Simulation length in seconds")
-    parser.add_argument("--sim_dt_s", type=float, default=0.01, help="Simulation time step in seconds")
-    parser.add_argument("--theory", type=str, default="DFT", help="Level of theory for energy extraction (DFT, EGAT, etc.)")
-    parser.add_argument("--dg_units", type=str, default="kcal/mol", help="Units for Gibbs free energy")
-    parser.add_argument("--initial_species_comp", type=List, default=None, help="Initial species composition")  
-    parser.add_argument("--initial_species_mol_frac", type=list, default=None, help="Initial species mole fractions")  
-    
+    parser.add_argument("--pickle", type=str, required=True)
+    parser.add_argument("--temp", type=float, default=500)
+    parser.add_argument("--pressure", type=float, default=1)
+    parser.add_argument("--sim_l_s", type=float, default=1)
+    parser.add_argument("--sim_dt_s", type=float, default=0.01)
+    parser.add_argument("--theory", type=str, default="DFT")
+    parser.add_argument("--dg_units", type=str, default="kcal/mol")
+
+    # 👇 JSON lists
+    parser.add_argument(
+        "--initial_species_comp",
+        type=json.loads,
+        required=True,
+        help='JSON list, e.g. ["O=CCCOO","C=O"]'
+    )
+    parser.add_argument(
+        "--initial_species_mol_frac",
+        type=json.loads,
+        required=True,
+        help='JSON list, e.g. [1.0, 0.0]'
+    )
+
     args = parser.parse_args()
-    
+
     main_cantera(
         pickle=args.pickle,
         temp=args.temp,
@@ -371,6 +454,6 @@ if __name__ == "__main__":
         sim_dt_s=args.sim_dt_s,
         dg_units=args.dg_units,
         theory=args.theory,
-        initial_species_list=INI_COMP,
-        initial_species_mol_frac=INIT_FRAC
+        initial_species_list=args.initial_species_comp,
+        initial_species_mol_frac=args.initial_species_mol_frac
     )

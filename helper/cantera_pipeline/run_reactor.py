@@ -6,14 +6,14 @@ import pandas as pd
 import numpy as np
 
 
-def run_reactor(yaml_path, t_end, time_step, out_prefix):
+def run_reactor(yaml_path, t_end, time_step, out_prefix, phase="gas"):
     """Run an isothermal, isobaric reactor using the given Cantera YAML file."""
     yaml_path = pathlib.Path(yaml_path)
     out_prefix = pathlib.Path(out_prefix or yaml_path.with_suffix("").name)  # base name of the YAML
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    gas = ct.Solution(yaml_path)
-    r = ct.IdealGasConstPressureReactor(contents=gas, energy="off", name="isothermal_reactor")
+    gas = ct.Solution(yaml_path, phase)
+    r = ct.IdealGasConstPressureReactor(gas, energy="off")
     sim = ct.ReactorNet([r])
     states = ct.SolutionArray(gas, extra=["t"])
 

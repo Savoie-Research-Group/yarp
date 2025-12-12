@@ -6,7 +6,7 @@ import yarp.reaction.ml_barrier as ml_barrier_module
 class TestEgat:
     def test_get_egat_barriers(self, glucose_single_path, egat_pretrain):
         model, args = egat_pretrain
-        glucose_single_path = get_egat_barriers(glucose_single_path, model)
+        glucose_single_path = get_egat_barriers(glucose_single_path, model, args)
         for rxn in glucose_single_path.values():
             assert rxn.barrier['egat'] is not None
     
@@ -22,7 +22,7 @@ class TestEgat:
         expected_df = pd.read_csv(egat_csv)
         
         # Get predictions from the model
-        df = get_egat_barries_from_csv(egat_csv, model)
+        df = get_egat_barries_from_csv(egat_csv, model, args)
         
         # Compare predictions with Activation_PRED
 

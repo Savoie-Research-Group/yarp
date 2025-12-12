@@ -6,7 +6,7 @@ from yarp.reaction.EGAT_YARP.dataset import FastDataset
 import omegaconf
 import os 
 import pandas as pd 
-def get_egat_barriers(yp_rxns, model):
+def get_egat_barriers(yp_rxns, model, args):
     """
     yp_rxns : dict
         Dictionary of reaction class objects (values) stored by reaction hash (key)
@@ -15,8 +15,9 @@ def get_egat_barriers(yp_rxns, model):
         Loaded pytorch model
     """
 
+    rxn_list = list(yp_rxns.values())
     dataframe = []
-    for rxn in yp_rxns.values():
+    for rxn in rxn_list:
         rsmiles = rxn.reactant.map_smi
         psmiles = rxn.product.map_smi
         reaction_smiles = f"{rsmiles}>>{psmiles}"
@@ -28,28 +29,28 @@ def get_egat_barriers(yp_rxns, model):
     test_dataset = FastDataset(args, dataset='tmp/egat_barriers.csv')
     os.remove('tmp/egat_barriers.csv')
     os.rmdir('tmp')
-    for idx in range(len(test_dataset)):
-        datapoint = test_dataset[idx]
+    for data_idx in range(len(test_dataset)):
+        datapoint = test_dataset[data_idx]
         if datapoint is None:
-            dataframe.loc[idx, 'egat_barrier'] = None
-            print(f"Error building datapoint for {idx}")
+            dataframe.loc[data_idx, 'egat_barrier'] = None
+            print(f"Error building datapoint for {data_idx}")
             continue
         else:
-            idx, rgraph, pgraph, strings = datapoint
+            dp_idx, rgraph, pgraph, strings = datapoint
             print(rgraph)
             try:
                 prediction = predict_activation_energy(model, rgraph, pgraph)
-                dataframe.loc[idx, 'egat_barrier'] = prediction
+                dataframe.loc[dp_idx, 'egat_barrier'] = prediction
             except Exception as e:
                 print(f"Error predicting barrier for {strings}: {e}")
-                dataframe.loc[idx, 'egat_barrier'] = None
+                dataframe.loc[dp_idx, 'egat_barrier'] = None
 
     # Update reaction objects with EGAT barriers
-    for rxn in yp_rxns.values():
-        rxn.barrier['egat'] = dataframe.loc[idx, 'egat_barrier']
+    for rxn_idx, rxn in enumerate(rxn_list):
+        rxn.barrier['egat'] = dataframe.loc[rxn_idx, 'egat_barrier']
     return yp_rxns
 
-def get_egat_barries_from_csv(csv_path, model):
+def get_egat_barries_from_csv(csv_path, model, args):
     """
     csv_path : str
         Path to CSV file with reaction SMILES
@@ -74,10 +75,10 @@ def get_egat_barries_from_csv(csv_path, model):
                 df.loc[idx, 'egat_barrier'] = None
     return df
 
-import pickle 
-model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
-df = get_egat_barries_from_csv('test/reaction/formatted_smiles.csv', model)
-print(df)
+#import pickle 
+#model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
+#df = get_egat_barries_from_csv('test/reaction/formatted_smiles.csv', model)
+#print(df)
 
-yp_rxns = pickle.load(open('test/pickles/glucose_single_path.pkl', 'rb'))
-get_egat_barriers(yp_rxns, model)
+#yp_rxns = pickle.load(open('test/pickles/glucose_single_path.pkl', 'rb'))
+#get_egat_barriers(yp_rxns, model)

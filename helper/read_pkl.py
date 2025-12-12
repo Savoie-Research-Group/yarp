@@ -19,8 +19,8 @@ def main(args):
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
-        if 'EGAT' in rxn.barrier:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['EGAT']])
+        if 'egat' in rxn.barrier:
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['egat']])
         else:
             data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
         

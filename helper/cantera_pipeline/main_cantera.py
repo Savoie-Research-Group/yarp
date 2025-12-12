@@ -288,7 +288,7 @@ def main_cantera(
         pkl.dump(cantera_data_list, fh)
     print(f"Cantera data pickle saved to: {cantera_data_pickle_path}")
     
-    #2. Write Cantera YAML
+    #3. Write Cantera YAML
     write_cantera_yaml(
         cantera_data_list,
         out_yaml_name,
@@ -302,13 +302,13 @@ def main_cantera(
         hygrogen_species=("[H]", "[H][H]"),
     )
     
-    #3. Validate YAML
+    #4. Validate YAML
     validate_cantera_yaml(out_yaml_name)
     
     print(f"\n===================================")
     print(f"=== Running Cantera Simulation for network: {net_hash} ===")
     print(f"===================================")
-    #4. Run Cantera simulation
+    #5. Run Cantera simulation
     run_cantera_simulation(
         out_yaml_name,
         simulation_length_s,
@@ -316,14 +316,14 @@ def main_cantera(
         out_prefix = output_dir / f"cantera_results_{net_hash}"  # OUT_PREFIX
     )
     
-    #5. Parse results
+    #6. Parse results
     print(f"\n===================================")
     print(f"=== Parsing Cantera Results for network: {net_hash} ===")
     print(f"===================================")
     flux_results, conc_results = parse_cantera_results(output_dir / f"cantera_results_{net_hash}_reaction_flux_summary.csv", 
                                         output_dir / f"cantera_results_{net_hash}_final_concentrations.csv")
     
-    #6. Update reaction objects with results
+    #7. Update reaction objects with results
     update_rxn_obj_with_results(reactions, flux_results, conc_results)
 
 
@@ -331,7 +331,7 @@ def main_cantera(
         setattr(updated_yarp_rxn_pickle, "final_concentrations", conc_results)
     except Exception:
         pass
-    # 7. Save hashed updated pickle
+    # 8. Save hashed updated pickle
     updated_pickle_path = output_dir / f"updated_yarp_reactions_{net_hash}.pkl"
     with open(updated_pickle_path, "wb") as fh:
         pkl.dump(updated_yarp_rxn_pickle, fh)

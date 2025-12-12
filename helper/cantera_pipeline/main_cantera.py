@@ -62,7 +62,7 @@ def network_hash(initial_species, temperature_k, pressure_atm, sim_length_s):
     print(f"Network hash parts: {parts}")
     return ("_".join(parts))
 
-def pull_cantera_data_from_rxn_obj(rxn_obj):
+def pull_cantera_data_from_rxn_obj(rxn_obj, theory):
     """
     Given a YARP reaction object, extract the necessary data for Cantera processing.
     Returns a dictionary with the required fields.
@@ -71,8 +71,8 @@ def pull_cantera_data_from_rxn_obj(rxn_obj):
         "id": rxn_obj.id,
         "reactant_smi": state_to_smiles(rxn_obj.reactant),
         "product_smi": state_to_smiles(rxn_obj.product),
-        "barrier": extract_barrier(rxn_obj.barrier),
-        "reverse_barrier": extract_barrier(getattr(rxn_obj, "reverse_barrier", None)),
+        "barrier": extract_barrier(rxn_obj.barrier, theory, reverse=False),
+        "reverse_barrier": extract_barrier(getattr(rxn_obj, "reverse_barrier", None), theory, reverse=True),
         "hash": getattr(rxn_obj, 'hash', None),
         "heat_of_rxn": getattr(rxn_obj, 'heat_of_rxn', None),
         "dG_rxn": getattr(rxn_obj, 'dG_rxn', None)
@@ -206,7 +206,7 @@ def extract_reactions(container):
     raise TypeError("Unsupported reaction container type; expected .reactions, dict, or iterable.")
 
 
-def extract_barrier(energy):
+def extract_barrier(energy, theory, reverse=False):
         """
         Barriers in YARP objects are often dicts keyed by level of theory (e.g., 'DFT').
         Accept either a float or dict; prefer DFT if present, else first value.
@@ -214,24 +214,26 @@ def extract_barrier(energy):
         if energy is None:
             return None
         if isinstance(energy, dict):
-            if "DFT" in energy:
-                return energy["DFT"]
-            # grab the first available entry
-            for _, v in energy.items():
-                return v
-            return None
-        return energy
+            if theory in energy:
+                return energy[theory]
+            else:
+                #Raise error and exit if theory not found
+                if reverse:
+                    print(f"Warning: Reverse Theory '{theory}' not found in energy dict. Not including reverse barrier.")
+                    return None
+                print(f"Warning: Theory '{theory}' not found in energy dict. Specify theory or use a float.")
+                exit()
 
 def main_cantera(
     pickle,
-    temp: float = 500,
-    pressure: float = 1,
-    simulation_length_s: float = 1,
-    sim_dt_s: float = 0.01,
-    dg_units: str = "kcal/mol",
-    final_conc: bool = False,
-    initial_species_list = list,
-    initial_species_mol_frac = list
+    temp = 500,
+    pressure = 1,
+    simulation_length_s = 1,
+    sim_dt_s = 0.01,
+    theory = "DFT",
+    dg_units = "kcal/mol",
+    initial_species_list = List,
+    initial_species_mol_frac= List,
 ):
     """
     Main Cantera Pipeline Function
@@ -274,7 +276,7 @@ def main_cantera(
     #2. preparing Cantera data
     cantera_data_list = []
     for rxn_obj in reactions:
-        cantera_data = pull_cantera_data_from_rxn_obj(rxn_obj)
+        cantera_data = pull_cantera_data_from_rxn_obj(rxn_obj, theory)
         cantera_data_list.append(cantera_data)
     print(f"Prepared Cantera data for {len(cantera_data_list)} reactions.")
     #for react in cantera_data_list:
@@ -354,8 +356,8 @@ if __name__ == "__main__":
     parser.add_argument("--pressure", type=float, default=1, help="Pressure in atm")
     parser.add_argument("--sim_l_s", type=float, default=1, help="Simulation length in seconds")
     parser.add_argument("--sim_dt_s", type=float, default=0.01, help="Simulation time step in seconds")
+    parser.add_argument("--theory", type=str, default="DFT", help="Level of theory for energy extraction (DFT, EGAT, etc.)")
     parser.add_argument("--dg_units", type=str, default="kcal/mol", help="Units for Gibbs free energy")
-    parser.add_argument("--final_conc", action="store_true", help="Flag to return final concentrations")
     parser.add_argument("--initial_species_comp", type=List, default=None, help="Initial species composition")  
     parser.add_argument("--initial_species_mol_frac", type=list, default=None, help="Initial species mole fractions")  
     
@@ -368,7 +370,7 @@ if __name__ == "__main__":
         simulation_length_s=args.sim_l_s,
         sim_dt_s=args.sim_dt_s,
         dg_units=args.dg_units,
-        final_conc=args.final_conc,
+        theory=args.theory,
         initial_species_list=INI_COMP,
         initial_species_mol_frac=INIT_FRAC
     )

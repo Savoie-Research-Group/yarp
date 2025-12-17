@@ -5,8 +5,8 @@ import cantera as ct
 import numpy as np
 import io
 import yaml
-import pandas as pd  # CODEx patch: used for CSV summaries emitted by the reactor run
-from pathlib import Path  # CODEx patch: simple path handling for outputs
+import pandas as pd  #Patch used for CSV summaries emitted by the reactor run
+from pathlib import Path  #Patch: simple path handling for outputs
 from collections import Counter
 from cantera_util import elements_from_smiles, split_species
 
@@ -27,7 +27,7 @@ class CANTERA:
 		parallel: list of lists, each of which is a set of model reactions that originate from the same parent molecule (and thus compete for feed material).  If this is empty, all MRs are assumed to originate from the same molecule(s)
 		uncertainty: If false, reactions run without uncertainty; otherwise, should be an integer for the radius of the normal distribution sampled for Ea perturbations
 		"""
-		self.path_to_settings = yaml.load(open(path_to_settings_file, "r"), Loader=yaml.FullLoader)
+		with open(path_to_settings_file, "r", encoding="utf-8") as fh: self.path_to_settings = yaml.load(fh, Loader=yaml.FullLoader)
 		self.path_to_dicts = path_to_dicts
 		# load the setings file to check on all the stuff below
 		keys = [i for i in self.path_to_settings.keys()]
@@ -112,7 +112,7 @@ class CANTERA:
 	def pull_initial_species(self):
 		self.initial_species = []
 		for i in self.path_to_settings["initial_species"]:
-			# CODEx patch: keep [SMILES, fraction] pairs intact so later indexing works
+			#patch: keep [SMILES, fraction] pairs intact so later indexing works
 			if isinstance(i, (list, tuple)):
 				if len(i) == 1:
 					self.initial_species.append([i[0], 1.0])
@@ -140,8 +140,9 @@ class CANTERA:
 		for i in os.listdir(self.path_to_dicts):
 			if i.endswith(".p") and not i.startswith("network_summary.pkl"):
 				self.dicts_list.append(i)
-		f = open(f"{self.path_to_dicts}/network_summary.pkl",'rb')
-		self.summary = pickle.load(f)
+		summary_path = Path(self.path_to_dicts) / "network_summary.pkl"
+		with open(summary_path, "rb") as fh: self.summary = pickle.load(fh)
+
 
 	def pull_all_species(self):
 		self.all_species = []
@@ -239,7 +240,7 @@ class CANTERA:
 		for key, val in self.summary.items():
 			if key == 'interior_nodes':
 				continue
-			self.f.write(f"- id: '{key}'\n")  # CODEx patch: ensure reactions carry stable identifiers
+			self.f.write(f"- id: '{key}'\n")  #Patch : ensure reactions carry stable identifiers
 			if self.direction == 'forward':
 				rsmi_list = [s for s in val['reactant_smiles'].split('.') if s]
 				psmi_list = [s for s in val['product_smiles'].split('.') if s]
@@ -255,7 +256,7 @@ class CANTERA:
 				psmi_list = ["[H]"]
 			r_side = " + ".join(rsmi_list)
 			p_side = " + ".join(psmi_list)
-			self.f.write(f"  equation: '{r_side} => {p_side}'\n")  # CODEx patch: write actual SMILES equation
+			self.f.write(f"  equation: '{r_side} => {p_side}'\n")  # Patch: write actual SMILES equation
 			rc,b = self.get_rate_constant(rsmi_list)
 			self.f.write("  rate-constant: {A: ")
 			if self.direction == 'forward':
@@ -304,14 +305,20 @@ class CANTERA:
 		"""
 		mechanism = self.f.getvalue()
 		sol = ct.Solution(yaml=mechanism, phase="gas")
-		r = ct.IdealGasConstPressureReactor(sol, energy='off', name='isothermal_reactor')
+		r = ct.IdealGasConstPressureReactor(
+    			sol,
+    			energy="off",
+    			name="isothermal_reactor",
+    			clone=False,   # keep old behavior, silences warning
+				)
+
 		sim = ct.ReactorNet([r])
 		states = ct.SolutionArray(sol, extra=['t'])
-		states.append(r.thermo.state, t=sim.time)
+		states.append(r.phase.state, t=sim.time)
 		
 		while sim.time < self.time_sim:
 			sim.advance(sim.time + self.time_step)
-			states.append(r.thermo.state, t=sim.time)
+			states.append(r.phase.state, t=sim.time)
 
 		self.species = list(states.species_names)
 		rxns = sol.reactions()

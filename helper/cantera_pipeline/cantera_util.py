@@ -295,3 +295,4 @@ def derive_element_list(cantera_job):
                     seen.add(symbol)
                     ordered.append(symbol)
     return ordered
+

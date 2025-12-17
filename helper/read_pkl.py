@@ -20,7 +20,7 @@ def main(args):
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
         if 'egat' in rxn.barrier:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.barrier['egat'], rxn.max_flux])
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, f"{rxn.barrier['egat']:.5}", f"{rxn.max_flux:.5g}"])
         else:
             data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
         

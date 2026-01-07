@@ -152,7 +152,6 @@ class network:
             for rxn in terminal_rxns:
                 for mol in rxn.product.species:
                     if mol.hash == hash:
-                        print(f"Found terminal species {mol.canon_smi}")
                         terminal_yp.append(deepcopy(mol))
 
         return terminal_yp

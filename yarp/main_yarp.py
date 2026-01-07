@@ -10,14 +10,13 @@ from yarp.reaction.generate_rxns import generate_rxns
 from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model
 from yarp.reaction.ml_barrier import get_egat_barriers
 
-def save_and_exit(output, yp_rxns):
+def save_reactions(output, yp_rxns):
     """
-    Write YARP reaction objects to a pickle file and close the program
+    Write YARP reaction objects to a pickle file
     """
     with open(output, "wb") as f:
             pickle.dump(yp_rxns, f)
     print(f"Reactions dictionary has been pickled to {output}.")
-    sys.exit()
 
 def main(file):
 
@@ -71,7 +70,8 @@ def main(file):
     stages = file.get('stages')
     if not stages:
         print("No stages defined in input YAML file. Exiting.")
-        save_and_exit(inp.out_file, reactions)
+        save_reactions(inp.out_file, reactions)
+        return
 
     for stage in stages:
         print(f'Processing stage {stage}')
@@ -80,7 +80,8 @@ def main(file):
 
         if method is None:
             print("No method specified in stage. Exiting.")
-            save_and_exit(inp.out_file, reactions)
+            save_reactions(inp.out_file, reactions)
+            return
 
         elif method == 'ml_predict':
             print("Reaction characterization via ML model selected")
@@ -93,16 +94,18 @@ def main(file):
                 model, args = load_model(model_path, omegaconf.OmegaConf.load(config_path))
             else:
                 print(f"Only available model is egat_pretrain. Please re-run with corrected input file. Exiting.")
-                save_and_exit(inp.out_file, reactions)
+                save_reactions(inp.out_file, reactions)
+                return
 
             print(f' - Predicting barriers for {len(reactions)} reactions')
             reactions = get_egat_barriers(reactions, model, args)
 
-            save_and_exit(inp.out_file, reactions)
+            save_reactions(inp.out_file, reactions)
 
         else:
             print("Method not recognized. Exiting")
-            save_and_exit(inp.out_file, reactions)
+            save_reactions(inp.out_file, reactions)
+            return
 
 
 if __name__ == "__main__":

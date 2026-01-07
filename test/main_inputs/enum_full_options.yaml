@@ -1,0 +1,13 @@
+initialize:
+  enumerate: True
+  initial species: OCC=O # can also be a path to an XYZ or MOL file
+  output: tmp.pkl
+  mode: concerted
+  bonds to break: 2
+  bonds to form: 2
+  reactive atoms: [0, 1, 2, 3] # only enumerate between heavy atoms
+  separate products: all
+  enumeration filters:
+    lewis score: 0.0
+    formal charge: 2.0
+    discard strained rings: False

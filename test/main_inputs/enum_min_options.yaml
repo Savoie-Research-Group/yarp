@@ -1,0 +1,4 @@
+initialize:
+  enumerate: True
+  initial species: OCC=O # can also be a path to an XYZ or MOL file
+  output: tmp.pkl

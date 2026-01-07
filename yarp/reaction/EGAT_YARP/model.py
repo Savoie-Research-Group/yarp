@@ -34,7 +34,7 @@ class EGAT_Rxn(nn.Module):
         self.mlp2 = nn.Sequential(nn.Linear(256, 128, bias=True),nn.GELU())
         self.mlp3 = nn.Linear(128, 1, bias=True)
         
-        print('Set: ',num_node_feats,num_edge_feats)
+        # print('Set: ',num_node_feats,num_edge_feats)
 
     def forward(self, graphR, graphP):
 

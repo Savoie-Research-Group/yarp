@@ -6,7 +6,7 @@ from yarp.reaction.EGAT_YARP.dataset import FastDataset
 import omegaconf
 import os 
 import pandas as pd 
-def get_egat_barriers(yp_rxns, model, args):
+def get_egat_barriers(yp_rxns, model, args, verbose=False):
     """
     yp_rxns : dict
         Dictionary of reaction class objects (values) stored by reaction hash (key)
@@ -23,7 +23,9 @@ def get_egat_barriers(yp_rxns, model, args):
         reaction_smiles = f"{rsmiles}>>{psmiles}"
         dataframe.append(reaction_smiles)
     dataframe = pd.DataFrame(dataframe, columns=['AAM'])
-    print(dataframe)
+    if verbose:
+        print("Dataframe generated from reaction objects")
+        print(dataframe)
     os.makedirs('tmp', exist_ok=True)
     dataframe.to_csv('tmp/egat_barriers.csv', index=False)
     test_dataset = FastDataset(args, dataset='tmp/egat_barriers.csv')
@@ -37,7 +39,8 @@ def get_egat_barriers(yp_rxns, model, args):
             continue
         else:
             dp_idx, rgraph, pgraph, strings = datapoint
-            print(rgraph)
+            if verbose:
+                print(rgraph)
             try:
                 prediction = predict_activation_energy(model, rgraph, pgraph)
                 dataframe.loc[dp_idx, 'egat_barrier'] = prediction
@@ -75,10 +78,3 @@ def get_egat_barries_from_csv(csv_path, model, args):
                 df.loc[idx, 'egat_barrier'] = None
     return df
 
-#import pickle 
-#model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
-#df = get_egat_barries_from_csv('test/reaction/formatted_smiles.csv', model)
-#print(df)
-
-#yp_rxns = pickle.load(open('test/pickles/glucose_single_path.pkl', 'rb'))
-#get_egat_barriers(yp_rxns, model)

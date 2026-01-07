@@ -60,7 +60,7 @@ def predict_activation_energy(model, graphR, graphP):
 
 
 
-def load_model(checkpoint_path, config):
+def load_model(checkpoint_path, config, verbose=False):
     """
     Load EGAT_Rxn model from checkpoint file
     
@@ -71,7 +71,8 @@ def load_model(checkpoint_path, config):
     Returns:
         tuple: (model, args) where args is compatible with dataset.py
     """
-    print(f"Loading model from: {checkpoint_path}")
+    if verbose:
+        print(f"Loading model from: {checkpoint_path}")
     
     # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
@@ -102,8 +103,9 @@ def load_model(checkpoint_path, config):
     # Create model config
     model_config = config
     
-    print(f"Model config: num_node_feats={num_node_feats}, num_edge_feats={num_edge_feats}, "
-          f"hidden_dim={hidden_dim}, num_heads={num_heads}")
+    if verbose:
+        print(f"Model config: num_node_feats={num_node_feats}, num_edge_feats={num_edge_feats}, "
+            f"hidden_dim={hidden_dim}, num_heads={num_heads}")
     
     # Create model
     model = EGAT_Rxn(model_config)
@@ -115,7 +117,8 @@ def load_model(checkpoint_path, config):
     # Create args for graph generation (compatible with dataset.py)
     args = config
     
-    print(f"Model loaded successfully!")    
+    if verbose:
+        print(f"Model loaded successfully!")
     return model, args
 
 

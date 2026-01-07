@@ -391,8 +391,8 @@ class FastDataset(Dataset):
             if not molecular:
                 Product = Molecule(Psmiles, self.args)
                 Product.ReadMolecule()
-                print('Reactant elements: ', Reactant.elements)
-                print('Product elements: ', Product.elements)
+                # print('Reactant elements: ', Reactant.elements)
+                # print('Product elements: ', Product.elements)
 
                 #TODO: CHECK IF THIS IS CORRECT
                 # if Reactant.elements != Product.elements:

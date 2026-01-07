@@ -1,6 +1,18 @@
 # Welcome to yarp-again
 Come on in, the water's (probably) fine!
 
+Here is the available functionality for version 0.1.0 of the code
+- Visualize and manipulate molecules with yarpecules
+- Perform bnfm product enumeration to generate chemical reaction networks
+- Estimate reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
+- Perform basic network analysis on chemical reaction networks
+
+To access this version, checkout the associated tag:
+```
+git clone git@github.com:Savoie-Research-Group/yarp-again.git
+git checkout v0.1.0
+```
+
 ## Installation notes
 
 First, get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
@@ -11,7 +23,16 @@ Also from the root directory of `yarp-again`, run `pip install -e .`
 
 How do you know everything's working correctly?
 Run the test suite via the command `pytest -v test/` from the root directory.
-You should see that all tests passed
+You should see that all tests passed.
+
+**NOTE:** As of version 0.1.0, the conda environment has been found to work on Linux OS, but not on Mac OS.
+
+## Getting started using yarp-again
+
+Three modules are available in the `tutorials/` folder:
+1. Introduction to the yarpecule object
+2. Introduction to bnfm product enumeration
+3. Introduction to the full main_yarp.py user workflow
 
 ## How to add tests cases to the pytest suite
 

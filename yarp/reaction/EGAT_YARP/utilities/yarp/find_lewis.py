@@ -16,7 +16,7 @@ def main(argv):
 
     # These imports are here just for this main convenience function for testing
     from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType    
-    from .taffi_functions import table_generator
+    from yarp.yarpecule.graph.adjacency import table_generator
     from .input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles
     
     # run find_lewis on command-line supplied molecule

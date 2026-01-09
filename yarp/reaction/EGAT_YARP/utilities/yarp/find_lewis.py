@@ -9,15 +9,15 @@ import numpy as np
 from copy import copy,deepcopy
 
 from .taffi_functions import adjmat_to_adjlist,return_ring_atoms,return_rings,graph_seps
-from .hashes import bmat_hash
-from .properties import el_to_an,an_to_el,el_valence,el_n_deficient,el_expand_octet,el_en,el_pol,el_max_valence,el_n_expand_octet,el_metals
+from yarp.yarpecule.hashes import bmat_hash
+from yarp.util.properties import el_to_an, an_to_el, el_valence, el_n_deficient, el_expand_octet, el_en, el_pol, el_max_valence, el_n_expand_octet, el_metals
 
 def main(argv):
 
     # These imports are here just for this main convenience function for testing
     from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType    
     from yarp.yarpecule.graph.adjacency import table_generator
-    from .input_parsers import xyz_parse,xyz_q_parse,xyz_from_smiles
+    from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, xyz_from_smiles
     
     # run find_lewis on command-line supplied molecule
     if argv:

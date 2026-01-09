@@ -12,8 +12,8 @@ from scipy.spatial.distance import cdist
 from copy import copy,deepcopy
 from itertools import combinations
 
-from .hashes import atom_hash
-from .properties import el_radii,el_max_bonds,el_mass
+from yarp.yarpecule.hashes import atom_hash
+from yarp.util.properties import el_radii, el_max_bonds, el_mass
 
 # Import table_generator from the main yarp package instead of duplicating it here
 from yarp.yarpecule.graph.adjacency import table_generator

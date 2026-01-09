@@ -6,8 +6,8 @@ performs substructure matching on yarpecules.
 from collections import deque
 from itertools import combinations,combinations_with_replacement,permutations,product
 from .taffi_functions import adjmat_to_adjlist
-from .misc import prepare_list
-from .properties import el_n_deficient,el_expand_octet
+from yarp.util.misc import prepare_list
+from yarp.util.properties import el_n_deficient, el_expand_octet
 from .find_lewis import return_e
 import numpy as np
 

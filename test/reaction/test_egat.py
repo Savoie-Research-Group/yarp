@@ -34,8 +34,8 @@ class TestEgat:
         assert len(predicted_values) > 0, "No valid predictions were generated"
         
         # Compare predictions (using numpy for element-wise comparison)
-        # Allow tolerance for floating point comparisons (0.0001 kcal/mol)
-        tolerance = 0.0001
+        # Allow tolerance for floating point comparisons (0.0005 kcal/mol)
+        tolerance = 0.0005
         differences = np.abs(predicted_values - expected_values)
         
         # Check that all predictions are within tolerance

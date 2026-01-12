@@ -43,6 +43,8 @@ import pandas as pd
 import yaml
 from cantera_wrapper import CANTERA
 from cantera_util import *
+import argparse
+import json
 
 
 def network_hash(initial_species, temperature_k, pressure_atm, sim_length_s):
@@ -502,8 +504,7 @@ def main_cantera(
 
 #pull in arguments with argparse when run as a script
 if __name__ == "__main__":
-    import argparse
-    import json
+
 
     parser = argparse.ArgumentParser(description="Cantera Pipeline for YARP Reaction Pickles")
     parser.add_argument("--pickle", type=str, required=True)

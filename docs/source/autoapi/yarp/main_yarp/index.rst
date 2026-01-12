@@ -23,7 +23,7 @@ Functions
 Module Contents
 ---------------
 
-.. py:function:: main(input)
+.. py:function:: main(file)
 
 .. py:data:: inp
 

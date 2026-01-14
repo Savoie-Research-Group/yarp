@@ -144,19 +144,14 @@ def methyl_4_fluoro_3_buteneium_xyz():
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "1-methyl-4-fluoro-3-buteneium.xyz")
 
 @pytest.fixture
-def propanenirene_xyz():
-    """Returns a string object of the absolute path to propanenireneium XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "2-propanenireneium.xyz")
+def propanenitrene_xyz():
+    """Returns a string object of the absolute path to propanenitreneium XYZ file."""
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "2-propanenitrene.xyz")
 
 @pytest.fixture
 def cp_anion_xyz():
     """Returns a string object of the absolute path to cyclopentadienyl anion XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "cyclopentadienyl_anion.xyz")
-
-@pytest.fixture
-def cycloheptenium_xyz():
-    """Returns a string object of the absolute path to cycloheptenium XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "cycloheptenium.xyz")
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "cp_anion.xyz")
 
 @pytest.fixture
 def cyclopropenium_xyz():
@@ -168,6 +163,7 @@ def ketonate_xyz():
     """Returns a string object of the absolute path to ketonate XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "ketonate.xyz")
 
+@pytest.fixture
 def methylmethyleneoxide_xyz():
     """Returns a string object of the absolute path to methylmethyleneoxide XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "ions" / "methylmethyleneoxide.xyz")
@@ -191,22 +187,22 @@ def toluenium_xyz():
 @pytest.fixture
 def bimole1_far_xyz():
     """Returns a string object of the absolute path to bimole1_far XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole1_far.xyz")
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole_far.xyz")
 
 @pytest.fixture
 def bimole1_one_xyz():
     """Returns a string object of the absolute path to bimole1_one XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole1_one.xyz")
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole_one.xyz")
 
 @pytest.fixture
 def bimole1_two_xyz():
     """Returns a string object of the absolute path to bimole1_two XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole1_two.xyz")
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole_two.xyz")
 
 @pytest.fixture
 def bimole1_xyz():
     """Returns a string object of the absolute path to bimole1 XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure_systems" / "bimole1.xyz")
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "multi_structure" / "bimole.xyz")
 
 # Radicals
 @pytest.fixture
@@ -247,13 +243,13 @@ def biphenylene_xyz():
 
 @pytest.fixture
 def bis_cyclohexane_xyz():
-    """Returns a string object of the absolute path to bis_cyclohexane XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "bis_cyclohexane.xyz")
+    """Returns a string object of the absolute path to bis-cyclohexane XYZ file."""
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "bis-cyclohexane.xyz")
 
 @pytest.fixture
 def napthalene_xyz():
-    """Returns a string object of the absolute path to naphthalene XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "naphthalene.xyz")
+    """Returns a string object of the absolute path to napthalene XYZ file."""
+    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "napthalene.xyz")
 
 @pytest.fixture
 def o_xylene_xyz():
@@ -270,11 +266,6 @@ def thiophene_xyz():
     """Returns a string object of the absolute path to thiophene XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "thiophene.xyz")
 
-@pytest.fixture
-def tropone_xyz():
-    """Returns a string object of the absolute path to tropone XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "rings" / "troponе.xyz")
-
 # Zwitterions
 @pytest.fixture
 def co_xyz():
@@ -290,21 +281,6 @@ def cyclopenteneamine_xyz():
 def diazomethane_xyz():
     """Returns a string object of the absolute path to diazomethane XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "zwitterions" / "diazomethane.xyz")
-
-@pytest.fixture
-def dimethylboroamine_xyz():
-    """Returns a string object of the absolute path to dimethylboroamine XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "zwitterions" / "dimethylboroamine.xyz")
-
-@pytest.fixture
-def n_ylide_xyz():
-    """Returns a string object of the absolute path to n-ylide XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "zwitterions" / "n_ylide.xyz")
-
-@pytest.fixture
-def nitromethane_xyz():
-    """Returns a string object of the absolute path to nitromethane XYZ file."""
-    return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "zwitterions" / "nitromethane.xyz")
 
 @pytest.fixture
 def sulfoxide_xyz():

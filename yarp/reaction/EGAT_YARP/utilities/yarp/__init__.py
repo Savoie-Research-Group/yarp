@@ -21,5 +21,7 @@ from .taffi_functions import *
 from .find_lewis import *
 # sieve.py moved to yarp.util.egat.sieve
 from yarp.util.egat.sieve import *
+# constants.py moved to yarp.util.egat.constants
+from yarp.util.egat.constants import Constants
 # misc.py removed - use yarp.util.misc instead
 from yarp.util.misc import prepare_list, merge_arrays

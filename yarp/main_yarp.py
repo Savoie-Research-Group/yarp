@@ -5,7 +5,7 @@ import pickle
 import omegaconf
 from pathlib import Path
 
-from yarp.util.input import input
+from yarp.util.input import InputParser
 from yarp.reaction.generate_rxns import generate_rxns
 from yarp.reaction.egat.predict_from_smiles import load_model
 from yarp.reaction.ml_barrier import get_egat_barriers
@@ -41,7 +41,7 @@ def main(file):
     # TO-DO: Check input file for bad syntax or missing things!
 
     # Initialize a class object to set default parameters
-    inp = input(file)
+    inp = InputParser(file)
 
     ###############################################
     ####         STAGE 1                       ####

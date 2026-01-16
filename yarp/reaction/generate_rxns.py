@@ -25,7 +25,7 @@ def generate_rxns(inp):
     output = dict()
 
     # Initialize reactions for product enumeration
-    if inp.enum_on:
+    if inp.enum.enumerate:
 
         print("Product enumeration routine selected")
 
@@ -45,8 +45,8 @@ def generate_rxns(inp):
             else:
                 print(" - No product separation will be performed prior to enumeration")
 
-            if isinstance(inp.dG_source, str):
-                print(f" - Barrier filtering selected! Reactions with {inp.dG_source} dG above {inp.dG_cutoff} kcal/mol will be excluded from enumeration.")
+            if isinstance(inp.enum_filters.dG_source, str):
+                print(f" - Barrier filtering selected! Reactions with {inp.enum_filters.dG_source} dG above {inp.enum_filters.dG_cutoff} kcal/mol will be excluded from enumeration.")
             else:
                 print(" - No barrier filtering will be performed prior to enumeration")
 
@@ -57,9 +57,9 @@ def generate_rxns(inp):
             p_hashes = set()
             for count_r, rxn in enumerate(og_rxns.values()):
                 # Apply dG cutoff
-                if isinstance(inp.dG_source, str):
-                    dG = rxn.barrier.get(inp.dG_source, None)
-                    if dG is not None and dG > inp.dG_cutoff:
+                if isinstance(inp.enum_filters.dG_source, str):
+                    dG = rxn.barrier.get(inp.enum_filters.dG_source, None)
+                    if dG is not None and dG > inp.enum_filters.dG_cutoff:
                         print(f"  + Excluding {rxn.id} (dG = {dG}) from enumeration")
                         continue
 
@@ -116,8 +116,8 @@ def generate_rxns(inp):
             for node in p_nodes:
                 print(f" - Enumerating from {node.inchi} node")
                 products = enumerate_products(
-                    node, inp.n_break, inp.n_form, react=inp.react_atoms, mode=inp.enum_mode,
-                    l_cutoff=inp.l_cutoff, fc_cutoff=inp.fc_cutoff, ring_filter=inp.ring_filter
+                    node, inp.enum.n_break, inp.enum.n_form, react=inp.enum.react_atoms, mode=inp.enum.mode,
+                    l_cutoff=inp.enum_filters.l_cutoff, fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
                 )
 
                 for prod in products:
@@ -130,8 +130,8 @@ def generate_rxns(inp):
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
             products = enumerate_products(
-                reactant, inp.n_break, inp.n_form, react=inp.react_atoms, mode=inp.enum_mode,
-                l_cutoff=inp.l_cutoff, fc_cutoff=inp.fc_cutoff, ring_filter=inp.ring_filter
+                reactant, inp.enum.n_break, inp.enum.n_form, react=inp.enum.react_atoms, mode=inp.enum.mode,
+                l_cutoff=inp.enum_filters.l_cutoff, fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
             )
 
             for i, prod in enumerate(products):
@@ -146,15 +146,6 @@ def generate_rxns(inp):
 
     else:
         raise RuntimeError("Non-enumeration routines are not yet implemented!")
-
-    # If visualization mode is ON, then dump bond electron matrix drawings to a visuals folder
-    if inp.prod_visuals_on:
-        for index, rxn in enumerate(output.values()):
-            folder = f"rxn_visuals/rxn{index}_{rxn.id}"
-            os.makedirs(folder, exist_ok=True)
-
-            rxn.reactant.graph.draw_bmats(f"{folder}/reactant_bemat.pdf")
-            rxn.product.graph.draw_bmats(f"{folder}/product_bemat.pdf")
 
     return output
 

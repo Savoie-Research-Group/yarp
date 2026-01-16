@@ -21,8 +21,9 @@ class EnumerationConfig:
 class EnumFilterConfig:
     """Holds settings specific to cleaning up enumeration outputs"""
     # Pre-enumeration filters
-    dG_cutoff: float = -100.0
+    dG_cutoff: float = 1000.0
     dG_source: Optional[str] = None
+    separate_prods: Union[str, List[int]] = field(default_factory=list)
 
     # Post-enumeration filters
     l_cutoff: float = 0.0
@@ -51,10 +52,7 @@ class InputParser:
 
         self.out_file = initnode.get("output", "reactions.pkl")
 
-        # 3. Handle complex "separate products" logic using a helper method
-        self.separate_prods = self._parse_separate_prods(initnode.get("separate products"))
-
-        # 4. Create Sub-Configuration Objects
+        # 3. Create Sub-Configuration Objects
         # We delegate the grouping of parameters to private helper methods
         self.enum = self._parse_enum_config(initnode)
         self.enum_filters = self._parse_enum_filters(initnode)
@@ -92,6 +90,9 @@ class InputParser:
     def _parse_enum_filters(self, initnode: dict) -> EnumFilterConfig:
         """Extracts enumeration filtering settings and returns a clean EnumFilterConfig object."""
 
+        # Handle complex "separate products" logic using a helper method
+        separate_prods = self._parse_separate_prods(initnode.get("separate products"))
+
         # Handle nested filters
         filters = initnode.get('enumeration filters', {})
         # If filters is None (yaml key exists but is empty), treat as empty dict
@@ -103,6 +104,7 @@ class InputParser:
             fc_cutoff=filters.get('formal charge', 2.0),
             ring_filter=filters.get('discard strained rings', False),
             dG_cutoff=filters.get('barrier cutoff', -100.00),
-            dG_source=filters.get('barrier source', None)
+            dG_source=filters.get('barrier source', None),
+            separate_prods=separate_prods
         )
 

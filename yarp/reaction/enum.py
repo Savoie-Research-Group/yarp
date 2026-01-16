@@ -12,6 +12,71 @@ from yarp.yarpecule.lewis.be_mat import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted"):
+    """
+    Master wrapper function for all enumeration routines
+
+    Parameters:
+    -----------
+    r_yp : yarpecule object
+        The reactant from which all products are enumerated
+
+    n_break : int
+        Number of bonds to break
+
+    n_form : int
+        Number of bonds to form
+
+    react : set (default = None)
+        When supplied this is used to restrict bond formations only to those atoms in this set.
+        If supplied, then `react` must have a searchable list or set
+        (i.e., the function uses an `in` call, so sets are better) per `yarpecule`.
+        An empty list is interpreted as all atoms being available to react. 
+
+    mode : string
+        Toggle between the two available product enumeration modes:
+        concerted (default) and sequential enumeration.
+    
+    Returns:
+    --------
+    products : list of yarpecule objects
+        Enumerated products! No duplicate products should be included,
+        as duplicates are filtered out based on the yarpecule hash.
+    """
+
+    print(f"  * Product enumeration with break {n_break}, form {n_form} "
+          f"will be performed in {mode} mode.")
+
+    if react != []:
+        react_list = list(react[0])
+        element_list = []
+        for i in react_list:
+            element_list.append(r_yp.elements[i])
+        print(f"   + Reactive atoms defined as: index {react_list} --> element {element_list}")
+
+    if mode == "sequential":
+        print(f"   WARNING: Sequential mode is expensive and "
+              "may cause memory blow-up issues!")
+
+        # Break bonds
+        break_mol = list(break_bonds(r_yp, n=n_break, react=react))
+        print(f"   + Breaking {n_break} bonds formed "
+              f"{len(break_mol)} intermediates")
+
+        # Form bonds
+        products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash})
+        print(f"   + Forming {n_form} bonds formed "
+              f"{len(products)} potential products")
+
+    elif mode == "concerted":
+        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react))
+        print(f"   + Enumerated {len(products)} products")
+
+    else:
+        raise RuntimeError("Please select either concerted or sequential as the product enumeration mode!")
+
+    return products
+
 
 def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=False,hash_filter=True):
     """

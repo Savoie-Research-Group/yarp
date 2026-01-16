@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 import pickle
 import omegaconf
-from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model
+from yarp.reaction.egat.predict_from_smiles import load_model
 
 # YAML input files
 @pytest.fixture

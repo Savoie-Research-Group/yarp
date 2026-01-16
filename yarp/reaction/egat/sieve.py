@@ -2,14 +2,15 @@
 This module contains the smarts_match and associated helper functions used to 
 performs substructure matching on yarpecules.
 """
-
+import numpy as np
 from collections import deque
 from itertools import combinations,combinations_with_replacement,permutations,product
+
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist
 from yarp.util.misc import prepare_list
 from yarp.util.properties import el_n_deficient, el_expand_octet
-from yarp.reaction.EGAT_YARP.utilities.yarp.find_lewis import return_e
-import numpy as np
+from yarp.yarpecule.lewis.be_mat import return_e
+
 
 valid_smiles_tokens = {'Br', 'C', 'Cl', 'H', 'B', 'N', 'O', 'P', 'S', 'F', 'I', 'b', 'c', 'n', 'o', 's', 'p', \
                        '(', ')', '[', ']', '=', '#', '%', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', \

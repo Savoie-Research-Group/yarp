@@ -1,16 +1,10 @@
 import sys
 import os,sys,subprocess
-current_path = os.path.dirname(os.path.abspath(__file__))
-
-try:
-    from utilities.utility import *
-except ImportError:
-    from yarp.reaction.EGAT_YARP.utilities.utility import *
 import numpy as np
 from scipy.spatial.distance import cdist
 from rdkit import Chem
 
-
+from yarp.reaction.egat.utility import *
 
 
 def return_reactive(E,Rbond_mat,Pbond_mat):

@@ -1,11 +1,13 @@
 """
 Placeholder for code allowing for ML predicted reaction barriers (and other reaction properties?)
 """
-from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model, predict_activation_energy
-from yarp.reaction.EGAT_YARP.dataset import FastDataset
 import omegaconf
-import os 
-import pandas as pd 
+import os
+import pandas as pd
+
+from yarp.reaction.egat.predict_from_smiles import load_model, predict_activation_energy
+from yarp.reaction.egat.dataset import FastDataset
+
 def get_egat_barriers(yp_rxns, model, args, verbose=False):
     """
     yp_rxns : dict

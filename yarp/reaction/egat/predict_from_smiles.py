@@ -6,35 +6,21 @@ Uses the same approach as dataset.py for graph generation
 """
 
 import torch
+from torch.utils.data import DataLoader
 import dgl
 import pandas as pd
 import numpy as np
 import argparse
 import os
 from types import SimpleNamespace
-try:
-    from model import EGAT_Rxn
-except ImportError:
-    from yarp.reaction.EGAT_YARP.model import EGAT_Rxn
-try:
-    from molecule import Molecule, OLD_BOND_ENCODE, bond_encode
-except ImportError:
-    from yarp.reaction.EGAT_YARP.molecule import Molecule, OLD_BOND_ENCODE, bond_encode
-try:
-    from graphgenhelperfunctions import return_reactive
-except ImportError:
-    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import return_reactive
-try:
-    from RDKit.RDKitHelpers import RemoveMapping
-except ImportError:
-    from yarp.reaction.EGAT_YARP.RDKit.RDKitHelpers import RemoveMapping
 from rdkit import Chem
 import omegaconf
-try:
-    from dataset import FastDataset
-except ImportError:
-    from yarp.reaction.EGAT_YARP.dataset import FastDataset
-from torch.utils.data import DataLoader
+
+from yarp.reaction.egat.model import EGAT_Rxn
+from yarp.reaction.egat.molecule import Molecule, OLD_BOND_ENCODE, bond_encode
+from yarp.reaction.egat.graphgenhelperfunctions import return_reactive
+from yarp.reaction.egat.dataset import FastDataset
+from yarp.reaction.egat.RDKitHelpers import RemoveMapping
 
 
 

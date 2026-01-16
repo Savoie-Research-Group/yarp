@@ -7,7 +7,7 @@ from pathlib import Path
 
 from yarp.util.input import input
 from yarp.reaction.generate_rxns import generate_rxns
-from yarp.reaction.EGAT_YARP.predict_from_smiles import load_model
+from yarp.reaction.egat.predict_from_smiles import load_model
 from yarp.reaction.ml_barrier import get_egat_barriers
 
 def save_reactions(output, yp_rxns):

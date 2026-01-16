@@ -1,29 +1,16 @@
-from torch.utils.data import Dataset
-import pandas as pd 
-try:
-    from molecule import Molecule
-except ImportError:
-    from yarp.reaction.EGAT_YARP.molecule import Molecule
-try:
-    from molecule import OLD_BOND_ENCODE
-except ImportError:
-    from yarp.reaction.EGAT_YARP.molecule import OLD_BOND_ENCODE
-
 import omegaconf
 import os
 import time
 import traceback
-import torch
 import dgl
-try:
-    from RDKit.RDKitHelpers import getInchifromSMILES, RemoveMapping
-except ImportError:
-    from yarp.reaction.EGAT_YARP.RDKit.RDKitHelpers import getInchifromSMILES, RemoveMapping
+import torch
+from torch.utils.data import Dataset
+import pandas as pd 
 from rdkit import Chem
-try:
-    from graphgenhelperfunctions import return_reactive
-except ImportError:
-    from yarp.reaction.EGAT_YARP.graphgenhelperfunctions import return_reactive
+
+from yarp.reaction.egat.molecule import Molecule, OLD_BOND_ENCODE
+from yarp.reaction.egat.graphgenhelperfunctions import return_reactive
+from yarp.reaction.egat.RDKitHelpers import getInchifromSMILES, RemoveMapping
 
 
 def getctype(smi:str, molecular:bool=False):

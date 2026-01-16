@@ -4,14 +4,8 @@ from torch.nn import Linear, Dropout
 import torch.nn as nn
 import dgl
 import json
-try:
-    from egat import EGATConv
-except ImportError:
-    from yarp.reaction.EGAT_YARP.egat import EGATConv
-try:
-    from egat import EGATConv
-except ImportError:
-    from yarp.reaction.EGAT_YARP.egat import EGATConv
+
+from yarp.reaction.egat.egat import EGATConv
 
 class EGAT_Rxn(nn.Module):
 

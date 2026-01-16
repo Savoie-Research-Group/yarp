@@ -19,6 +19,7 @@ from yarp.reaction.enum import form_bonds, form_n_bonds, form_bonds_all, break_b
 from yarp.yarpecule.yarpecule import yarpecule
 from .taffi_functions import *
 from .find_lewis import *
-from .sieve import *
+# sieve.py moved to yarp.util.egat.sieve
+from yarp.util.egat.sieve import *
 # misc.py removed - use yarp.util.misc instead
 from yarp.util.misc import prepare_list, merge_arrays

@@ -5,10 +5,10 @@ performs substructure matching on yarpecules.
 
 from collections import deque
 from itertools import combinations,combinations_with_replacement,permutations,product
-from .taffi_functions import adjmat_to_adjlist
+from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist
 from yarp.util.misc import prepare_list
 from yarp.util.properties import el_n_deficient, el_expand_octet
-from .find_lewis import return_e
+from yarp.reaction.EGAT_YARP.utilities.yarp.find_lewis import return_e
 import numpy as np
 
 valid_smiles_tokens = {'Br', 'C', 'Cl', 'H', 'B', 'N', 'O', 'P', 'S', 'F', 'I', 'b', 'c', 'n', 'o', 's', 'p', \
@@ -664,4 +664,113 @@ def is_isocyano(i,adj_mat,elements):
         return True
     else:
         return False
+
+# Utility functions moved from taffi_functions.py
+
+def array_unique(a, a_list):
+    """
+    Checks if an array "a" is unique compared with a list of arrays "a_list"
+    at the first match False is returned.
+    
+    Parameters
+    ----------
+    a : array
+        Array to check for uniqueness
+    a_list : list of arrays
+        List of arrays to compare against
+        
+    Returns
+    -------
+    tuple : (bool, int)
+        Returns (True, 0) if unique, (False, index) if duplicate found
+    """
+    for ind, i in enumerate(a_list):
+        if np.array_equal(a, i):
+            return False, ind
+    return True, 0
+
+def reorder_list(loop_list, atomic_number):
+    """
+    Helper function to check_lewis and get_bonds that rolls the loop_list carbon elements.
+    Reorders a list so that carbon elements are rotated (first carbon moved to end).
+    
+    Parameters
+    ----------
+    loop_list : list
+        List of atom indices to reorder
+    atomic_number : list or array
+        Atomic numbers corresponding to the atoms in loop_list
+        
+    Returns
+    -------
+    list : Reordered list with carbons rotated
+    """
+    c_types = [count_i for count_i, i in enumerate(loop_list) if atomic_number[i] == 6]
+    others = [count_i for count_i, i in enumerate(loop_list) if atomic_number[i] != 6]
+    if len(c_types) > 1:
+        c_types = c_types + [c_types.pop(0)]
+    return [loop_list[i] for i in c_types + others]
+
+def axis_rot(Point, v1, v2, theta, mode='angle'):
+    """
+    Rotate Point by an angle, theta, about the vector with an orientation of v1 passing through v2.
+    Performs counter-clockwise rotations (i.e., if the direction vector were pointing
+    at the spectator, the rotations would appear counter-clockwise).
+    For example, a 90 degree rotation of a 0,0,1 about the canonical 
+    y-axis results in 1,0,0.
+    
+    Parameters
+    ----------
+    Point : array-like, shape (3,)
+        Coordinates to be rotated
+    v1 : array-like, shape (3,)
+        Point the rotation passes through
+    v2 : array-like, shape (3,)
+        Rotation direction vector
+    theta : float
+        Magnitude of the rotation (defined by default in degrees)
+    mode : str, default='angle'
+        If 'angle', theta is converted from degrees to radians
+        
+    Returns
+    -------
+    array : Rotated coordinates
+    """
+    # Temporary variable for performing the transformation
+    rotated = np.array([Point[0], Point[1], Point[2]])
+
+    # If mode is set to 'angle' then theta needs to be converted to radians
+    if mode == 'angle':
+        theta = theta * np.pi / 180.0
+
+    # Rotation carried out using formulae defined here (11/22/13) 
+    # http://inside.mines.edu/fs_home/gmurray/ArbitraryAxisRotation/)
+    # Adapted for the assumption that v1 is the direction vector and v2 is a point that v1 passes through
+    a = v2[0]
+    b = v2[1]
+    c = v2[2]
+    u = v1[0]
+    v = v1[1]
+    w = v1[2]
+    L = u**2 + v**2 + w**2
+
+    # Rotate Point
+    x = rotated[0]
+    y = rotated[1]
+    z = rotated[2]
+
+    # x-transformation
+    rotated[0] = (a * (v**2 + w**2) - u*(b*v + c*w - u*x - v*y - w*z)) \
+                 * (1.0 - np.cos(theta)) + L*x*np.cos(theta) + L**(0.5)*( -c*v + b*w - w*y + v*z)*np.sin(theta)
+
+    # y-transformation
+    rotated[1] = (b * (u**2 + w**2) - v*(a*u + c*w - u*x - v*y - w*z)) \
+                 * (1.0 - np.cos(theta)) + L*y*np.cos(theta) + L**(0.5)*(c*u - a*w + w*x - u*z)*np.sin(theta)
+
+    # z-transformation
+    rotated[2] = (c * (u**2 + v**2) - w*(a*u + b*v - u*x - v*y - w*z)) \
+                 * (1.0 - np.cos(theta)) + L*z*np.cos(theta) + L**(0.5)*(-b*u + a*v - v*x + u*y)*np.sin(theta)
+
+    rotated = rotated / L
+    return rotated
 

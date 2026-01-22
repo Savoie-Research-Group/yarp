@@ -77,6 +77,51 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     print(f" - {len(candidates)} unique products identified for enumeration")
     return candidates
         
+def apply_target_blinders(raw_candidates, target_yp, dist='soergel', mode='beam', k_nodes=1):
+    """
+    Parameters:
+    -----------
+    raw_candidates : list of yarpecule objects
+        Possible species to perform network exploration via product enumeration
+
+    target_yp : yarpecule
+        The "end-goal" (product side) molecule of interest to network exploration
+
+    dist : str
+        Chemical distance metric used to evaluate candidates
+
+    mode : str
+        Select candidates based on a beam search ('beam') or distance cap ('capped')
+        framework
+
+    k_nodes : int
+        Number of candidates to select during beam search mode
+
+    Returns:
+    --------
+    selected_candidates : list of yarpecule objects
+        Eligible species to perform network exploration via product enumeration
+    """
+    if target_yp.canon_smi is None:
+        target_yp.get_smiles()
+
+    # Compute distances for each candidate
+    mol2dist = dict()
+    mol_set = set()
+    for mol in raw_candidates:
+        if mol.hash in mol_set: continue # Throw away all duplicate candidates
+        mol_set.add(mol.hash)
+        mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, dist=dist)
+
+    # Downselect candidates based on requested framework
+    selected_candidates = []
+    if mode=='beam':
+        top_k_mol_hashes = sorted(mol2dist, key=mol2dist.get)[:k_nodes]
+        for mol in raw_candidates:
+            if mol.hash in top_k_mol_hashes:
+                selected_candidates.append(mol)
+    else:
+        raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
 
 def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False):
     """
@@ -145,7 +190,8 @@ def separate_molecules(node):
         print(f"  + Separating {node.inchi} into {len(sep_mols)} nodes")
 
         for mol in sep_mols:
-            mol.get_inchi() # need to generate this for a newly initialized yarpecule object!
+            mol.get_inchi() # need to generate these for a newly initialized yarpecule object!
+            mol.get_smiles()
 
     return sep_mols
 

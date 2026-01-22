@@ -66,6 +66,63 @@ def egat_min_options(tmp_path):
 
     return data
 
+@pytest.fixture
+def d2_default_enum(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_default.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_d2_default_enum_output.pkl"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def d2_sep_prods_enum(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_sep_prods.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_d2_sep_prods_enum_output.pkl"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def d2_dg_filter_enum(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_dg_filter.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_d2_dg_filter_enum_output.pkl"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
 # Pytorch models
 @pytest.fixture
 def egat_csv():
@@ -89,6 +146,11 @@ def glucose_multi_path():
     """Returns a dictionary object of the reactions contained in glucose pickle file."""
     file = str(Path(__file__).parent / "pickles" / "glucose_multi_path.pkl")
     return pickle.load(open(file, 'rb'))
+
+@pytest.fixture
+def d1_path():
+    """Returns a string object to"""
+    return str(Path(__file__).parent / "pickles" / "haa_heavy_b2f2_d1.pkl")
 
 # Molecule files
 @pytest.fixture

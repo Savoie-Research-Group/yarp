@@ -1,0 +1,14 @@
+initialize:
+  enumerate: True
+  initial species: ../pickles/haa_heavy_b2f2_d1.pkl
+  output: tmp.pkl
+  mode: concerted
+  bonds to break: 2
+  bonds to form: 2
+  separate products: all
+  enumeration filters:
+    lewis score: 0.0
+    formal charge: 2.0
+    discard strained rings: False
+    barrier cutoff: 96.00 # kcal/mol
+    barrier source: 'egat'

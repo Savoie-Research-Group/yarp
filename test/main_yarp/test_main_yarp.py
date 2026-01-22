@@ -90,4 +90,4 @@ def test_d2_dg_filter(d2_dg_filter_enum, d1_path):
     with open(output_str, "rb") as f:
         saved_reactions = pickle.load(f)
 
-    assert len(saved_reactions) == 13
+    assert len(saved_reactions) == 16 # keep all originally provided rxns, even if above dG barrier

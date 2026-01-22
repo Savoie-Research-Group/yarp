@@ -23,9 +23,9 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     """
     print(f" - Reading in {len(rxns)} total reactions")
 
-    if isinstance(flags.dG_source, str):
+    if isinstance(dG_source, str):
         print(f" - Barrier filtering selected!")
-        print(f"   Reactions with {flags.dG_source} dG above {flags.dG_cutoff} kcal/mol will be excluded from enumeration.")
+        print(f"   Reactions with {dG_source} dG above {dG_cutoff} kcal/mol will be excluded from enumeration.")
     else:
         print(" - No barrier filtering will be performed prior to enumeration")
 
@@ -33,9 +33,9 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     clean_rxns = dict()
     for count_r, rxn in enumerate(rxns.values()):
         # Throw away all reactions above dG barrier (optionally)
-        if isinstance(flags.dG_source, str):
-            dG = rxn.barrier.get(flags.dG_source, None)
-            if dG is not None and dG > flags.dG_cutoff:
+        if isinstance(dG_source, str):
+            dG = rxn.barrier.get(dG_source, None)
+            if dG is not None and dG > dG_cutoff:
                 print(f"  + Excluding {rxn.id} (dG = {dG}) from enumeration")
                 continue
 
@@ -44,32 +44,34 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         # Get a set of all (remaining) reactant yarpecule hashes
         r_set.add(rxn.reactant.hash)
 
-    if flags.separate_prods == 'all':
+    if separate_prods == 'all':
         print(f" - Performing product separation on all reactions prior to enumeration")
-    elif isinstance(flags.separate_prods, list) and len(flags.separate_prods) > 0:
-        print(f" - Separating products for reaction indexes: {flags.separate_prods}")
+    elif isinstance(separate_prods, list) and len(separate_prods) > 0:
+        print(f" - Separating products for reaction indexes: {separate_prods}")
     else:
         print(" - No product separation will be performed prior to enumeration")
 
     p_set = set()
     candidates = []
-    for count_r, rxn in clean_rxns.values():
+    for count_r, rxn in enumerate(clean_rxns.values()):
 
         # Apply separate product routine to each/select products (optionally)
-        if flags.separate_prods == 'all':
+        if separate_prods == 'all':
             prod = separate_molecules(rxn.product.graph)
-        elif isinstance(flags.separate_prods, list) and len(flags.separate_prods) > 0:
-            sep_targets = set(flags.separate_prods)
+        elif isinstance(separate_prods, list) and len(separate_prods) > 0:
+            sep_targets = set(separate_prods)
             if count_r in sep_targets:
                 prod = separate_molecules(rxn.product.graph)
         else:
-            prod = list(rxn.product.graph)
+            prod = [rxn.product.graph]
 
         # Get a list of all (remaining) product yarpecules
         for p in prod:
             if p.hash in r_set: continue # Throw away all products which have already been explored as reactants
             if p.hash in p_set: continue # Throw away all duplicate candidates
 
+            p_set.add(p.hash)
+            p.get_inchi()
             candidates.append(p)
 
     print(f" - {len(candidates)} unique products identified for enumeration")

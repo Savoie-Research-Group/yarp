@@ -1,6 +1,6 @@
 import numpy as np
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None):
+def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None):
     """
     Parameters:
     -----------
@@ -44,26 +44,28 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         # Get a set of all (remaining) reactant yarpecule hashes
         r_set.add(rxn.reactant.hash)
 
+    candidates = []
+    if netconfig.target_product is not None:
+        candidates = apply_target_blinders(
+            clean_rxns, netconfig.target_product, netconfig.distance_metric, netconfig.mode, netconfig.n_nodes
+        )
+    else:
+        for rxn in clean_rxns.values():
+            candidates.append(rxn.product.graph)
+
     if separate_prods == 'all':
         print(f" - Performing product separation on all reactions prior to enumeration")
-    elif isinstance(separate_prods, list) and len(separate_prods) > 0:
-        print(f" - Separating products for reaction indexes: {separate_prods}")
     else:
         print(" - No product separation will be performed prior to enumeration")
 
     p_set = set()
-    candidates = []
-    for count_r, rxn in enumerate(clean_rxns.values()):
+    for mol in candidates:
 
         # Apply separate product routine to each/select products (optionally)
         if separate_prods == 'all':
-            prod = separate_molecules(rxn.product.graph)
-        elif isinstance(separate_prods, list) and len(separate_prods) > 0:
-            sep_targets = set(separate_prods)
-            if count_r in sep_targets:
-                prod = separate_molecules(rxn.product.graph)
+            prod = separate_molecules(mol)
         else:
-            prod = [rxn.product.graph]
+            prod = [mol]
 
         # Get a list of all (remaining) product yarpecules
         for p in prod:
@@ -77,12 +79,12 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     print(f" - {len(candidates)} unique products identified for enumeration")
     return candidates
         
-def apply_target_blinders(raw_candidates, target_yp, dist='soergel', mode='beam', k_nodes=1):
+def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1):
     """
     Parameters:
     -----------
-    raw_candidates : list of yarpecule objects
-        Possible species to perform network exploration via product enumeration
+    raw_rxns : dictionary of reaction objects
+        Possible reactions to perform network exploration via product enumeration
 
     target_yp : yarpecule
         The "end-goal" (product side) molecule of interest to network exploration
@@ -99,29 +101,53 @@ def apply_target_blinders(raw_candidates, target_yp, dist='soergel', mode='beam'
 
     Returns:
     --------
-    selected_candidates : list of yarpecule objects
+    candidates : list of yarpecule objects
         Eligible species to perform network exploration via product enumeration
     """
     if target_yp.canon_smi is None:
         target_yp.get_smiles()
 
-    # Compute distances for each candidate
-    mol2dist = dict()
-    mol_set = set()
-    for mol in raw_candidates:
-        if mol.hash in mol_set: continue # Throw away all duplicate candidates
-        mol_set.add(mol.hash)
-        mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, dist=dist)
+    candidates = []
+    if mode == 'beam':
+        print(f"  + Selecting {k_nodes} enumeration candidates via beam search")
+        print(f"    Target species: {target_yp.canon_smi}")
+        print(f"    Distance metric: {dist}")
 
-    # Downselect candidates based on requested framework
-    selected_candidates = []
-    if mode=='beam':
+        # Compute distances for each reaction product
+        mol2dist = dict()
+        mol_set = set()
+        for rxn in raw_rxns.values():
+            mol = rxn.product.graph
+            if mol.hash in mol_set: continue # Throw away all duplicate candidates
+            mol_set.add(mol.hash)
+            mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, dist=dist)
+
+        # Downselect candidates based on number of allowed beams
         top_k_mol_hashes = sorted(mol2dist, key=mol2dist.get)[:k_nodes]
-        for mol in raw_candidates:
+        for rxn in raw_rxns.values():
+            mol = rxn.product.graph
             if mol.hash in top_k_mol_hashes:
-                selected_candidates.append(mol)
+                print(f"  + Selecting {mol.inchi} for enumeration")
+                candidates.append(mol)
+
+    elif mode == 'capped':
+        print(f"  + Selecting enumeration candidates via distance capping strategy")
+        print(f"    Target species: {target_yp.canon_smi}")
+        print(f"    Distance metric: {dist}")
+        for rxn in raw_rxns.values():
+            r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, dist=dist)
+            p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, dist=dist)
+            diff = p_dist - r_dist
+            if diff >= 0.0:
+                print(f"  + Selecting {rxn.product.graph.inchi} for enumeration")
+                candidates.append(rxn.product.graph)
+
     else:
         raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
+
+    print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
+    return candidates
+
 
 def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False):
     """

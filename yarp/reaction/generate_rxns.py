@@ -47,7 +47,8 @@ def generate_rxns(inp):
 
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
-                dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source
+                dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
+                netconfig=inp.net_explore
             )
 
             new_rxns = dict()

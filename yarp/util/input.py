@@ -3,6 +3,7 @@ Definition of input object class
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Any
+import yarp as yp
 
 
 # --- CONFIGURATION OBJECTS ---
@@ -30,6 +31,14 @@ class EnumFilterConfig:
     fc_cutoff: float = 2.0
     ring_filter: bool = False
 
+@dataclass
+class NetworkConfig:
+    """Holds settings specific to generating a multi-layered reaction network"""
+    target_product: Optional[yarpecule] = None
+    distance_metric: str = 'sorgel'
+    mode: str = 'capped'
+    n_nodes: Optional[int] = 1
+
 # --- MAIN PARSER CLASS ---
 # This class handles the messy logic of converting the YAML dict 
 # into the clean config objects above.
@@ -56,6 +65,7 @@ class InputParser:
         # We delegate the grouping of parameters to private helper methods
         self.enum = self._parse_enum_config(initnode)
         self.enum_filters = self._parse_enum_filters(initnode)
+        self.net_explore = self._parse_network_config(initnode)
 
     def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:
         """Handles the logic for the 'separate products' input."""
@@ -108,3 +118,26 @@ class InputParser:
             separate_prods=separate_prods
         )
 
+    def _parse_network_config(self, initnode: dict) -> NetworkConfig:
+        """Extracts network exploration settings and returns a clean NetworkConfig object."""
+
+        # Handle nested filters
+        netconfig = initnode.get('network exploration', {})
+        # If netconfig is None (yaml key exists but is empty), treat as empty dict
+        if netconfig is None: 
+            netconfig = {}
+
+        target = netconfig.get("target product", None)
+        if target is not None:
+            target_yp = yp.yarpecule(target)
+            target_yp.get_inchi()
+            target_yp.get_smiles()
+        else:
+            target_yp = None
+
+        return NetworkConfig(
+            target_product=target_yp,
+            distance=netconfig.get("distance metric", 'soergel'),
+            mode=netconfig.get("mode", 'capped'),
+            n_nodes=netconfig.get("n_nodes", 1)
+        )

@@ -129,7 +129,7 @@ class InputParser:
 
         target = netconfig.get("target product", None)
         if target is not None:
-            target_yp = yp.yarpecule(target)
+            target_yp = yarpecule(target)
             target_yp.get_inchi()
             target_yp.get_smiles()
         else:

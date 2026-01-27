@@ -131,7 +131,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         for rxn in raw_rxns.values():
             mol = rxn.product.graph
             if mol.hash in top_k_mol_hashes:
-                print(f"  + Selecting {mol.inchi} for enumeration")
+                print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
                 candidates.append(mol)
 
     elif mode == 'capped':
@@ -141,9 +141,9 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         for rxn in raw_rxns.values():
             r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, metric=dist)
             p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, metric=dist)
-            diff = p_dist - r_dist
+            diff = r_dist - p_dist
             if diff >= 0.0:
-                print(f"  + Selecting {rxn.product.graph.inchi} for enumeration")
+                print(f"  + Selecting {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
                 candidates.append(rxn.product.graph)
 
     else:

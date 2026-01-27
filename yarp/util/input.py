@@ -3,7 +3,7 @@ Definition of input object class
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Any
-import yarp as yp
+from yarp.yarpecule.yarpecule import yarpecule
 
 
 # --- CONFIGURATION OBJECTS ---
@@ -35,7 +35,7 @@ class EnumFilterConfig:
 class NetworkConfig:
     """Holds settings specific to generating a multi-layered reaction network"""
     target_product: Optional[yarpecule] = None
-    distance_metric: str = 'sorgel'
+    distance: str = 'sorgel'
     mode: str = 'capped'
     n_nodes: Optional[int] = 1
 

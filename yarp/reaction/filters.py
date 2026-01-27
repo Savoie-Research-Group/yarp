@@ -1,4 +1,5 @@
 import numpy as np
+from yarp.yarpecule.distance_metrics import compute_min_distance
 
 def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None):
     """

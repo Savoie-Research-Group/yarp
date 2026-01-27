@@ -7,6 +7,40 @@ from rdkit.DataStructs.cDataStructs import TanimotoSimilarity
 from rdkit.Chem import AllChem, GraphDescriptors, Crippen, rdMolDescriptors, MACCSkeys, DataStructs, rdFMCS
 import numpy as np
 
+def compute_min_distance(mol_yp, target_smi, metric='soergel'):
+    """
+    Compute minimum distance between all species in a yarpecule and a target SMILES.
+    """
+    if mol_yp.canon_smi is None:
+        mol_yp.get_smiles()
+
+    all_dist = []
+
+    # Check for separable molecules and compute individual distances
+    mols = mol_yp.separate()
+    if len(mols) > 1:
+        for mol in mols:
+            mol.get_smiles()
+            d = compute_distance(mol.canon_smi, target_smi, metric)
+            all_dist.append(d)
+
+    # Compute distance for original full molecule node
+    dist = compute_distance(mol_yp.canon_smi, target_smi, metric)
+    all_dist.append(dist)
+
+    return min(all_dist)
+
+def compute_distance(smi1, smi2, metric='soergel'):
+    """
+    Compute distance between two SMILES based on requested metric.
+    """
+    if metric == 'soergel':
+        dist = soergel(smi1, smi2)
+    else:
+        raise RuntimeError(f"Requested distance metric {metric} not implemented!")
+
+    return dist
+
 def soergel(smi1, smi2):
     mol1 = Chem.MolFromSmiles(smi1)
     mol2 = Chem.MolFromSmiles(smi2)

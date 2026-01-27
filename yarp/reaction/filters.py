@@ -120,7 +120,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             mol = rxn.product.graph
             if mol.hash in mol_set: continue # Throw away all duplicate candidates
             mol_set.add(mol.hash)
-            mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, dist=dist)
+            mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, metric=dist)
 
         # Downselect candidates based on number of allowed beams
         top_k_mol_hashes = sorted(mol2dist, key=mol2dist.get)[:k_nodes]
@@ -135,8 +135,8 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         print(f"    Target species: {target_yp.canon_smi}")
         print(f"    Distance metric: {dist}")
         for rxn in raw_rxns.values():
-            r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, dist=dist)
-            p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, dist=dist)
+            r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, metric=dist)
+            p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, metric=dist)
             diff = p_dist - r_dist
             if diff >= 0.0:
                 print(f"  + Selecting {rxn.product.graph.inchi} for enumeration")

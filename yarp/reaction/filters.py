@@ -47,8 +47,10 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
     candidates = []
     if netconfig.target_product is not None:
+        print(f" - Constrained network exploration mode selected!")
         candidates = apply_target_blinders(
-            clean_rxns, netconfig.target_product, netconfig.distance_metric, netconfig.mode, netconfig.n_nodes
+            clean_rxns, netconfig.target_product,
+            netconfig.distance, netconfig.mode, netconfig.n_nodes
         )
     else:
         for rxn in clean_rxns.values():
@@ -60,6 +62,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         print(" - No product separation will be performed prior to enumeration")
 
     p_set = set()
+    unique_candidates = []
     for mol in candidates:
 
         # Apply separate product routine to each/select products (optionally)
@@ -75,10 +78,10 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
             p_set.add(p.hash)
             p.get_inchi()
-            candidates.append(p)
+            unique_candidates.append(p)
 
-    print(f" - {len(candidates)} unique products identified for enumeration")
-    return candidates
+    print(f" - {len(unique_candidates)} unique products identified for enumeration")
+    return unique_candidates
         
 def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1):
     """

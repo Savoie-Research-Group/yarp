@@ -59,7 +59,7 @@ def main(file):
     else:
         print(f"Number of reactions generated: {len(reactions)}")
         for index, rxn in enumerate(reactions.values()):
-            print(f" -- Reaction {index}: {rxn.id}")
+            print(f" -- Reaction {index}: {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi}")
 
     ###############################################
     ####         STAGE 2                       ####

@@ -17,6 +17,9 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     dG_source : str
         Level of theory to use for dG_cutoff checks
 
+    netconfig : NetworkConfig object
+        Dataclass that holds settings for network exploration mode from input file
+
     Returns:
     --------
     candidates : list of yarpecule objects
@@ -50,7 +53,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         print(f" - Constrained network exploration mode selected!")
         candidates = apply_target_blinders(
             clean_rxns, netconfig.target_product,
-            netconfig.distance, netconfig.mode, netconfig.n_nodes
+            netconfig.distance, netconfig.mode, netconfig.n_nodes, netconfig.cap
         )
     else:
         for rxn in clean_rxns.values():
@@ -73,7 +76,10 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
         # Get a list of all (remaining) product yarpecules
         for p in prod:
-            if p.hash in r_set: continue # Throw away all products which have already been explored as reactants
+            if p.hash in r_set:
+                p.get_smiles()
+                print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
+                continue
             if p.hash in p_set: continue # Throw away all duplicate candidates
 
             p_set.add(p.hash)
@@ -83,7 +89,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     print(f" - {len(unique_candidates)} unique products identified for enumeration")
     return unique_candidates
         
-def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1):
+def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, cap='moderate'):
     """
     Parameters:
     -----------
@@ -102,6 +108,10 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
 
     k_nodes : int
         Number of candidates to select during beam search mode
+
+    cap : str
+        Protocol for distance cap framework. If 'moderate', all delta distances >= 0.0 will be kept.
+        If 'aggressive', only positive delta distances will be kept as enumeration candidates.
 
     Returns:
     --------
@@ -133,6 +143,9 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             if mol.hash in top_k_mol_hashes:
                 print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
                 candidates.append(mol)
+            else:
+                print(f"  + SKIPPED! {rxn.id} == {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
+
 
     elif mode == 'capped':
         print(f"  + Selecting enumeration candidates via distance capping strategy")
@@ -142,10 +155,16 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, metric=dist)
             p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, metric=dist)
             diff = r_dist - p_dist
-            if diff >= 0.0:
-                print(f"  + Selecting {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
-                candidates.append(rxn.product.graph)
-
+            if cap == 'moderate':
+                if diff >= 0.0:
+                    print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
+                    candidates.append(rxn.product.graph)
+            elif cap == 'aggressive':
+                if diff > 0.0:
+                    print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
+                    candidates.append(rxn.product.graph)
+            else:
+                raise RuntimeError(f"Cutoff {cap} for capped exploration is not recognized/implemented!")
     else:
         raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
 

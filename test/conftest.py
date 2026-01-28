@@ -152,6 +152,12 @@ def d1_path():
     """Returns a string object to"""
     return str(Path(__file__).parent / "pickles" / "haa_heavy_b2f2_d1.pkl")
 
+@pytest.fixture
+def khp_d1():
+    """Returns a dictionary object of the reactions contained in 3HP b2f2 (depth 1) pickle file."""
+    file = str(Path(__file__).parent / "pickles" / "3hp_heavy_b2f2_d1.pkl")
+    return pickle.load(open(file, 'rb'))
+
 # Molecule files
 @pytest.fixture
 def ethene_xyz():

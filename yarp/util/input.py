@@ -38,6 +38,7 @@ class NetworkConfig:
     distance: str = 'sorgel'
     mode: str = 'capped'
     n_nodes: Optional[int] = 1
+    cap: str = 'moderate'
 
 # --- MAIN PARSER CLASS ---
 # This class handles the messy logic of converting the YAML dict 
@@ -139,5 +140,6 @@ class InputParser:
             target_product=target_yp,
             distance=netconfig.get("distance metric", 'soergel'),
             mode=netconfig.get("mode", 'capped'),
-            n_nodes=netconfig.get("n_nodes", 1)
+            n_nodes=netconfig.get("n_nodes", 1),
+            cap=netconfig.get("cutoff", "moderate")
         )

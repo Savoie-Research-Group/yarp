@@ -15,18 +15,21 @@ def main(args):
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
-    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier']
+    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Max Flux']
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
-        data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, rxn.egat_barrier])
+        if 'egat' in rxn.barrier:
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, f"{rxn.barrier['egat']:.5}", f"{rxn.max_flux:.5g}"])
+        else:
+            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
         
         # optionally, generate PDFs for each reactant/product pair
         if args.visualize:
             folder = f"visuals/{rxn.id}"
             os.makedirs(folder, exist_ok=True)
-            rxn.reactant.graph.draw_bmats(outfile=f"{folder}/reactant.pdf")
-            rxn.product.graph.draw_bmats(outfile=f"{folder}/product.pdf")
+            rxn.reactant._graph.draw_bmats(outfile=f"{folder}/reactant.pdf")
+            rxn.product._graph.draw_bmats(outfile=f"{folder}/product.pdf")
     
     print(tabulate(data, headers=headers, tablefmt='pretty'))
 

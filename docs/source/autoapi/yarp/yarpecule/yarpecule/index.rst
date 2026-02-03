@@ -20,7 +20,7 @@ Classes
 Module Contents
 ---------------
 
-.. py:class:: yarpecule(mol, canon=True, mode='rdkit')
+.. py:class:: yarpecule(mol, mode='yarp', canon=True)
 
    Base class for describing a molecule in YARP
 
@@ -38,9 +38,9 @@ Module Contents
    canon : bool, default=True
            Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`.
 
-   mode : str, default=rdkit
-           When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default rdkit is used
-           but setting this to 'yarp' will use the in-house parser. This variable is unused if the molecular info
+   mode : str, default=yarp
+           When parsing SMILES this controls whether RDKIT is used or the in-house parser. By default
+           the in-house parser is used. This variable is unused if the molecular info
            is passed through another method besides SMILES.
            Thoughts on renaming this to smi_mode? - ERM
 
@@ -152,11 +152,7 @@ Module Contents
 
 
 
-   .. py:method:: draw_lewis_struct()
-
-      Draw the Lewis structure of the yarpecule.
-      This shouldn't ever change any of the attributes of the yarpecule.
-
+   .. py:method:: draw_bmats(outfile='be_mats.pdf', show_inline=False)
 
 
    .. py:method:: export_geometry(filename, format='xyz')
@@ -171,22 +167,63 @@ Module Contents
 
 
 
-   .. py:method:: export_smiles(mode='canonical')
+   .. py:method:: get_inchi()
 
-      Export the SMILES representation of the yarpecule.
+      Generate the InChIKey for a given yarpecule using RDKit.
+      Requires the yarpecule to already have SMILES
+      Each separable group within the yarpecule will have an independently
+      generated InChIKey, with dashes connecting them together.
+
+      Modifies
+      --------
+      self._inchi : str
+
+
+
+   .. py:method:: get_smiles()
+
+      Generate a SMILES representation of the yarpecule.
       This shouldn't ever change any of the attributes of the yarpecule.
       Option to export SMILES with explicit atom mappings.
       Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
 
-      :param mode: The mode of the SMILES representation to export.
-                   Options are 'canonical' or 'non-canonical'.
-      :type mode: str, default='canonical'
+
+      Modifies
+      --------
+      self._canon_smi : str
+      self._map_smi : str
 
 
 
-   .. py:method:: join(other_yps, canon=True, mode='rdkit')
+   .. py:method:: join(yarpecules, canon=True)
 
-      Join two yarpecules together to form a new yarpecule.
+      Method for creating a new yarpecule containing the union of the current yarpecule and all supplied yarpecules.
+
+      :param yarpecules: A list of the yarpecules that the user wants to merge with this yarpecule.
+                         Can also handle a single yarpecule being submitted.
+      :type yarpecules: list of yarpecules
+      :param canon: Controls whether or not the resulting yarpecule is subjected to the canonicalization ordering procedure.
+      :type canon: bool, default=True
+
+      :returns: **yarpecule** -- A new yarpecule containing the union of the chemical graphs contained in the supplied yarpecules.
+      :rtype: yarpecule
+
+      .. admonition:: Notes
+
+         The resulting yarpecule will not retain any of the bond-electron matrix information of the parent yarpecules.
+
+
+
+   .. py:method:: separate(canon=True)
+
+      Method for separating discrete molecules into their own standalone yarpecule objects.
+      Returns a copy of itself if there is only one discrete molecule.
+
+      :param canon: Controls whether or not the resulting yarpecules are subjected to the canonicalization ordering procedure.
+      :type canon: bool, default=True
+
+      :returns: **mols** -- If there are no distinct molecules, returns a single yarpecule object as a list of length 1.
+      :rtype: list of yarpecules
 
 
 
@@ -211,6 +248,16 @@ Module Contents
 
 
 
+   .. py:attribute:: _bond_order_dict
+      :value: None
+
+
+
+   .. py:attribute:: _canon_smi
+      :value: None
+
+
+
    .. py:attribute:: _elements
       :value: None
 
@@ -221,7 +268,17 @@ Module Contents
 
 
 
+   .. py:attribute:: _inchi
+      :value: None
+
+
+
    .. py:attribute:: _lewis_struct
+      :value: None
+
+
+
+   .. py:attribute:: _map_smi
       :value: None
 
 
@@ -249,12 +306,54 @@ Module Contents
    .. py:property:: adj_mat
 
 
+   .. py:property:: atom_hashes
+
+
+   .. py:property:: atom_neighbors
+
+
+   .. py:property:: bo_dict
+
+
+   .. py:property:: bond_mat_scores
+
+
+   .. py:property:: bond_mats
+
+
+   .. py:property:: canon_smi
+
+
    .. py:property:: elements
+
+
+   .. py:property:: fc
 
 
    .. py:property:: geo
 
 
+   .. py:property:: hash
+
+
+   .. py:property:: inchi
+
+
    .. py:property:: lewis
+
+
+   .. py:property:: map_smi
+
+
+   .. py:property:: n_e_accept
+
+
+   .. py:property:: n_e_donate
+
+
+   .. py:property:: q
+
+
+   .. py:property:: rings
 
 

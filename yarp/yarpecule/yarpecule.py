@@ -558,3 +558,9 @@ class yarpecule:
 
     def __len__(self):
         return len(self._elements)
+
+    def __eq__(self, other):
+        return self.hash == other.hash
+
+    def __hash__(self):
+        return hash(self.hash)

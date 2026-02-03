@@ -14,6 +14,7 @@ Submodules
 
    yarp.reaction.conformer
    yarp.reaction.edge
+   yarp.reaction.enum
    yarp.reaction.generate_rxns
    yarp.reaction.node
    yarp.reaction.reaction

@@ -42,6 +42,11 @@ Module Contents
 
 
 
+   .. py:attribute:: egat_barrier
+      :value: None
+
+
+
    .. py:attribute:: id
 
 

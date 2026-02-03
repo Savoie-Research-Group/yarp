@@ -16,7 +16,6 @@ Functions
 
    yarp.yarpecule.hashes.atom_hash
    yarp.yarpecule.hashes.bmat_hash
-   yarp.yarpecule.hashes.bmat_hash
    yarp.yarpecule.hashes.rec_sum
    yarp.yarpecule.hashes.yarpecule_hash
 
@@ -66,22 +65,6 @@ Module Contents
       then those values are multiplied by 10**(-i/100) where i is the column, and summed.
 
 
-.. py:function:: bmat_hash(bond_mat)
-
-   Creates a unique hash value for each bond-electron matrix that is used to speed uniqueness checks.
-
-   :param bond_mat: The bond electron matrix that the hash is calculated for.
-   :type bond_mat: array
-
-   :returns: **hash_value**
-   :rtype: float
-
-   .. admonition:: Notes
-
-      The hash is calculated as bond_mat * an ascending array (1,2,... counting up through all elements and rows) summed over rows,
-      then those values are multiplied by 10**(-i/100) where i is the column, and summed.
-
-
 .. py:function:: rec_sum(ind, adj_mat, masses, beta, gens, avoid_list=[])
 
    This is a helper function for `atom_hash()` that performs a non-backtracking walk of the adjacency matrix and sums
@@ -108,7 +91,7 @@ Module Contents
 
 .. py:function:: yarpecule_hash(y)
 
-   Creates a unique hash value for the yarpecule object based on the lowest-score bond-electron matrix and the atom hashes.
+   Creates a unique hash value for the yarpecule object based on the sum of all bond-electron matrices and the atom hashes.
    Since the atom hashes are sensistive to the masses used for the atoms, the hash of isotopomers will be unique.
 
    :param y: This is the yarpecule instance that the hash is being calculated for.

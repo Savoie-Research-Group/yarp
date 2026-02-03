@@ -1,12 +1,27 @@
 import sys
+import os
 import yaml
 import pickle
+import omegaconf
+from pathlib import Path
 
 from yarp.util.input import input
 from yarp.reaction.generate_rxns import generate_rxns
+from yarp.reaction.egat.predict_from_smiles import load_model
+from yarp.reaction.ml_barrier import get_egat_barriers
 
+def save_reactions(output, yp_rxns):
+    """
+    Write YARP reaction objects to a pickle file
+    """
+    with open(output, "wb") as f:
+            pickle.dump(yp_rxns, f)
+    print(f"Reactions dictionary has been pickled to {output}.")
 
 def main(file):
+
+    current_dir = Path(__file__).resolve().parent
+    print(f"Script executing from {current_dir}")
 
     print(f"""Welcome to
                 __   __ _    ____  ____  
@@ -43,8 +58,8 @@ def main(file):
         sys.exit()
     else:
         print(f"Number of reactions generated: {len(reactions)}")
-        for index, rxn in enumerate(reactions.keys()):
-            print(f" -- Reaction {index}: {rxn}")
+        for index, rxn in enumerate(reactions.values()):
+            print(f" -- Reaction {index}: {rxn.id}")
 
     ###############################################
     ####         STAGE 2                       ####
@@ -55,30 +70,42 @@ def main(file):
     stages = file.get('stages')
     if not stages:
         print("No stages defined in input YAML file. Exiting.")
+        save_reactions(inp.out_file, reactions)
+        return
 
-        with open(inp.out_file, "wb") as f:
-            pickle.dump(reactions, f)
-        print(f"Reactions dictionary has been pickled to {inp.out_file}.")
-        sys.exit()
+    for stage in stages:
+        print(f'Processing stage {stage}')
+        stg_inp = file.get(stage)
+        method = stg_inp.get('method', None)
 
-    # Iterate through each reaction and apply the appropriate methods
-    for rxn in reactions.values():
-        print(f"Processing reaction: {rxn.id}")
+        if method is None:
+            print("No method specified in stage. Exiting.")
+            save_reactions(inp.out_file, reactions)
+            return
 
-        for stage in stages:
-            # Check if the reaction object has already completed this step
-            # Probably will interface with CONTROL.yaml file
-            rxn.check_status(file.get(stage).get('method'))
+        elif method == 'ml_predict':
+            print("Reaction characterization via ML model selected")
 
-            # If not, run the appropriate method
-            if rxn.status.get('stage') == True:
-                print(
-                    f"Reaction has completed stage {stage}, progressing to next stage.")
-                break
+            model = stg_inp.get('model', 'egat_pretrain')
+            print(f' - Loading {model} model')
+            if model == 'egat_pretrain':
+                model_path = os.path.join(current_dir, '..', 'test', 'models', 'v1.pth')
+                config_path = os.path.join(current_dir, '..', 'test', 'models', 'auto0.yaml')
+                model, args = load_model(model_path, omegaconf.OmegaConf.load(config_path))
             else:
-                print(
-                    f"Running stage {stage} for reaction {rxn.rxn_id} with method {file.get(stage).get('method')}")
-                rxn.compute(file.get(stage))
+                print(f"Only available model is egat_pretrain. Please re-run with corrected input file. Exiting.")
+                save_reactions(inp.out_file, reactions)
+                return
+
+            print(f' - Predicting barriers for {len(reactions)} reactions')
+            reactions = get_egat_barriers(reactions, model, args)
+
+            save_reactions(inp.out_file, reactions)
+
+        else:
+            print("Method not recognized. Exiting")
+            save_reactions(inp.out_file, reactions)
+            return
 
 
 if __name__ == "__main__":

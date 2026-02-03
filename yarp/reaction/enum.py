@@ -298,7 +298,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
     # Prepare hash set if it isn't already supplied
     if hashes is None:
         hashes = set([])
-        
+
     # Loop over yarpecules 
     for count_y,y in enumerate(yarpecules):
 

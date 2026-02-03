@@ -121,7 +121,7 @@ def yarpecule_hash(y):
     Parameters
     ----------
     y : yarpecule
-        This is the yarpecule instance that the hash is being calculated for. 
+        This is the yarpecule instance that the hash is being calculated for.
 
     Returns
     -------
@@ -138,3 +138,31 @@ def yarpecule_hash(y):
         bem += mat
 
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
+
+
+def reaction_hash(rxn):
+    """
+    Creates a unique hash value for the reaction object based on the sum of reactant/product
+    yarpecule hashes and the hash of the summed BEM difference matrix.
+
+    Parameters
+    ----------
+    y : reaction
+        This is the reaction instance that the hash is being calculated for.
+
+    Returns
+    -------
+    hash_value: float
+    """
+
+    r_bem_sum = np.zeros_like(rxn.reactant.bond_mats[0])
+    for rmat in rxn.reactant.bond_mats:
+        r_bem_sum += rmat
+
+    p_bem_sum = np.zeros_like(rxn.product.bond_mats[0])
+    for pmat in rxn.product.bond_mats:
+        p_bem_sum += pmat
+
+    diff_bem = r_bem_sum - p_bem_sum
+
+    return rxn.reactant.hash + rxn.product.hash + bmat_hash(diff_bem)

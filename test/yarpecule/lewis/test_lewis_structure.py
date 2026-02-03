@@ -176,16 +176,24 @@ class TestLewisStructureGeneration:
         assert len(yp_mol.bond_mats) == 2
         assert yp_mol.bond_mat_scores[0] > 0.0
         assert yp_mol.bond_mat_scores[1] > 0.0
+        #Heuristic for organic radicals
+        assert yp_mol.bond_mat_scores[0] < 5.0
+        assert yp_mol.bond_mat_scores[1] < 5.0
         assert yp_mol.fc[2] == 0.0
         assert yp_mol.fc[3] == 0.0
         assert yp_mol.fc[4] == 0.0
         assert yp_mol.fc[5] == 0.0
+        assert np.trace(yp_mol.bond_mats[0]) == 1.0
+        assert np.trace(yp_mol.bond_mats[1]) == 1.0
         
     def test_propene_radical_xyz(self, propene_radical_xyz):
         yp_mol = ypcule(propene_radical_xyz, mode='yarp')
         assert_invariants(yp_mol)
         assert yp_mol.bond_mat_scores[0] > 0.0
         assert yp_mol.bond_mat_scores[1] > 0.0
+        #Heuristic for organic radicals
+        assert yp_mol.bond_mat_scores[0] < 5.0
+        assert yp_mol.bond_mat_scores[1] < 5.0
         assert yp_mol.atom_neighbors[0] == {0, 1, 2, 3}
         assert yp_mol.atom_neighbors[1] == {0, 1, 6, 7}
         assert yp_mol.atom_neighbors[2] == {0, 2, 4, 5}
@@ -194,6 +202,8 @@ class TestLewisStructureGeneration:
         assert yp_mol.atom_neighbors[5] == {2, 5}
         assert yp_mol.atom_neighbors[6] == {1, 6}
         assert yp_mol.atom_neighbors[7] == {1, 7}
+        assert np.trace(yp_mol.bond_mats[0]) == 1.0
+        assert np.trace(yp_mol.bond_mats[1]) == 1.0
         
     """=========== Find Lewis Structures Tests for Ring Structures ==========="""
     def test_adamantum_xyz(self, adamantum_xyz):
@@ -248,6 +258,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.rings[2][5] == 8
         assert len(yp_mol.bond_mats) == 2
         assert yp_mol.bond_mat_scores[0] == yp_mol.bond_mat_scores[1]
+        assert len(yp_mol.rings) == 3
         
     def test_azulene_xyz(self, azulene_xyz):
         yp_mol = ypcule(azulene_xyz, mode='yarp')
@@ -266,6 +277,8 @@ class TestLewisStructureGeneration:
         assert yp_mol.n_e_accept[10] == 0.0
         assert yp_mol.n_e_donate[9] == 2.0
         assert yp_mol.n_e_donate[10] == 0.0
+        assert len(yp_mol.rings) == 2
+        
         
     def test_benzene_xyz(self, benzene_xyz):
         yp_mol = ypcule(benzene_xyz, mode='yarp')
@@ -278,6 +291,14 @@ class TestLewisStructureGeneration:
         assert yp_mol.bond_mats[0][1][7] == 1.0
         assert yp_mol.bond_mats[1][5][1] == 2.0
         assert yp_mol.bond_mats[1][5][2] == 0.0
+        #Confirm only 1 ring
+        assert yp_mol.rings[0][0] == 0
+        assert yp_mol.rings[0][1] == 1
+        assert yp_mol.rings[0][2] == 5
+        assert yp_mol.rings[0][3] == 4
+        assert yp_mol.rings[0][4] == 3
+        assert yp_mol.rings[0][5] == 2
+        assert len(yp_mol.rings) == 1
         
     def test_biphenylene_xyz(self, biphenylene_xyz):
         yp_mol = ypcule(biphenylene_xyz, mode='yarp')
@@ -291,6 +312,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.n_e_accept[0] == 2.0
         assert yp_mol.n_e_accept[1] == 2.0
         assert yp_mol.n_e_accept[19] == 0.0
+        assert len(yp_mol.rings) == 3
         
         
     def test_bis_cyclohexane_xyz(self, bis_cyclohexane_xyz):
@@ -316,6 +338,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.bond_mats[0][1][20] == 0.0
         assert yp_mol.bond_mats[0][30][26] == 0.0
         assert len(yp_mol.bond_mats) == 1
+        assert len(yp_mol.rings) == 2
         
     def test_napthalene_xyz(self, napthalene_xyz):
         yp_mol = ypcule(napthalene_xyz, mode='yarp')
@@ -324,6 +347,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.fc[8] == 0.0
         assert yp_mol.fc[9] == 0.0
         assert yp_mol.bond_mat_scores[0] < 0.0
+        assert len(yp_mol.rings) == 2
         
     def test_o_xylene_xyz(self, o_xylene_xyz):
         yp_mol = ypcule(o_xylene_xyz, mode='yarp')
@@ -334,6 +358,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.bond_mat_scores[0] == yp_mol.bond_mat_scores[1]
         assert yp_mol.bond_mat_scores[0] < 0.0
         assert len(yp_mol.bond_mats) == 2
+        assert len(yp_mol.rings) == 1
         
     def test_pyridine_aldehyde_bond_matrix(self, pyridine_aldehyde_xyz):
         yp_mol = ypcule(pyridine_aldehyde_xyz, mode='yarp')
@@ -344,6 +369,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.atom_neighbors[4] == {0, 11, 4, 5}
         assert yp_mol.atom_neighbors[5] == {12, 3, 4, 5}
         assert yp_mol.atom_neighbors[6] == {2, 3, 6}
+        assert len(yp_mol.rings) == 1
         
     def test_thiopehene_bond_matrix(self, thiophene_xyz):
         yp_mol = ypcule(thiophene_xyz, mode='yarp')
@@ -354,6 +380,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.atom_neighbors[2] == {0, 2, 3, 7}
         assert yp_mol.atom_neighbors[3] == {8, 1, 2, 3}
         assert yp_mol.atom_neighbors[4] == {0, 1, 4}
+        assert len(yp_mol.rings) == 1
         
     """=========== Find Lewis Structures Tests for Zwitterions ==========="""
     def test_co_xyz(self, co_xyz):
@@ -398,6 +425,10 @@ class TestLewisStructureGeneration:
         assert_invariants(yp_mol)
         assert yp_mol.fc[2] == 1.0
         assert yp_mol.fc[3] == -1.0
+        assert yp_mol.n_e_accept[2] == 2.0
+        assert yp_mol.n_e_accept[3] == 0.0
+        assert yp_mol.n_e_donate[2] == 2.0
+        assert yp_mol.n_e_donate[3] == 6.0
         
     def test_trimethyl_phosphine_oxide_xyz(self, trimethyl_phosphine_oxide_xyz):
         yp_mol = ypcule(trimethyl_phosphine_oxide_xyz, mode='yarp')

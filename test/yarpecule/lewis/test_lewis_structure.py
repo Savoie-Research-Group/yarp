@@ -508,17 +508,17 @@ class TestLewisStructureGeneration:
         # --- 1) Size Check ---
         assert len(one.elements)  == 9
         assert len(two.elements)  == 10
-        assert len(both.elements) == 19
+        assert len(both.elements) == len(one.elements) + len(two.elements)
 
         # --- 2) Element placement check ---
         assert one.elements.count("n")  == 1
         assert two.elements.count("n")  == 0
-        assert both.elements.count("n") == 1
+        assert both.elements.count("n") == one.elements.count("n") + two.elements.count("n")
 
         # --- 3) Ring count and placement ---
         assert len(one.rings)  == 1
         assert len(two.rings)  == 0
-        assert len(both.rings) == 1
+        assert len(both.rings) == len(one.rings) + len(two.rings)
 
         # --- 4) confirm two disconnected fragments in `both` by checking cross-block zeros ---
         # Atoms 0-9 belong to fragment "two", atoms 10-18 belong to fragment "one"

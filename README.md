@@ -1,16 +1,16 @@
 # Welcome to yarp-again
 Come on in, the water's (probably) fine!
 
-Here is the available functionality for version 0.1.0 of the code
+Here is the available functionality for version 0.2.0 of the code
 - Visualize and manipulate molecules with yarpecules
 - Perform bnfm product enumeration to generate chemical reaction networks
-- Estimate reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
+- Estimate forward reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
 - Perform basic network analysis on chemical reaction networks
 
 To access this version, checkout the associated tag:
 ```
 git clone git@github.com:Savoie-Research-Group/yarp-again.git
-git checkout v0.1.0
+git checkout v0.2.0
 ```
 
 ## Installation notes

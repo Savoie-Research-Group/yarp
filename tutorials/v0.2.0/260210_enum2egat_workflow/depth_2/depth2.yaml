@@ -1,0 +1,22 @@
+initialize:
+  enumerate: True
+  initial species: ../depth_1/depth1.pkl
+  output: depth2.pkl
+  mode: concerted
+  bonds to break: 2
+  bonds to form: 2
+  reactive atoms: [0, 1, 2, 3, 4, 5] # incompatible with separate products!!!
+  # separate products: all
+  enumeration filters:
+    lewis score: 0.0
+    formal charge: 2.0
+    discard strained rings: False
+    barrier cutoff: 80.00 # kcal/mol
+    barrier source: 'egat'
+    
+stages:
+  - egat
+
+egat:
+  method: ml_predict
+  model: egat_pretrain

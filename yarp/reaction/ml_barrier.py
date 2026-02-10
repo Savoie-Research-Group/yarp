@@ -55,7 +55,7 @@ def get_egat_barriers(yp_rxns, model, args, verbose=False):
         rxn.barrier['egat'] = dataframe.loc[rxn_idx, 'egat_barrier']
     return yp_rxns
 
-def get_egat_barries_from_csv(csv_path, model, args):
+def get_egat_barries_from_csv(csv_path, model, args, verbose=False):
     """
     csv_path : str
         Path to CSV file with reaction SMILES
@@ -71,7 +71,8 @@ def get_egat_barries_from_csv(csv_path, model, args):
             continue
         else:
             idx, rgraph, pgraph, strings = datapoint
-            print(rgraph)
+            if verbose:
+                print(rgraph)
             try:
                 prediction = predict_activation_energy(model, rgraph, pgraph)
                 df.loc[idx, 'egat_barrier'] = prediction

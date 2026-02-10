@@ -52,8 +52,10 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     if netconfig.target_product is not None:
         print(f" - Constrained network exploration mode selected!")
         candidates = apply_target_blinders(
-            clean_rxns, netconfig.target_product,
-            netconfig.distance, netconfig.mode, netconfig.n_nodes, netconfig.cap
+            raw_rxns=clean_rxns, target_yp=netconfig.target_product,
+            dist=netconfig.distance, mode=netconfig.mode,
+            k_nodes=netconfig.n_nodes, tolerance=netconfig.tolerance,
+            cap=netconfig.cap
         )
     else:
         for rxn in clean_rxns.values():
@@ -89,7 +91,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     print(f" - {len(unique_candidates)} unique products identified for enumeration")
     return unique_candidates
         
-def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, cap='moderate'):
+def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.05, cap='moderate'):
     """
     Parameters:
     -----------
@@ -109,6 +111,9 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
     k_nodes : int
         Number of candidates to select during beam search mode
 
+    tolerance : float
+        Tolerance window for distance tie-breakers in beam search mode
+
     cap : str
         Protocol for distance cap framework. If 'moderate', all delta distances >= 0.0 will be kept.
         If 'aggressive', only positive delta distances will be kept as enumeration candidates.
@@ -123,7 +128,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
 
     candidates = []
     if mode == 'beam':
-        print(f"  + Selecting {k_nodes} enumeration candidates via beam search")
+        print(f"  + Selecting {k_nodes} enumeration candidates via beam search (with {tolerance} window)")
         print(f"    Target species: {target_yp.canon_smi}")
         print(f"    Distance metric: {dist}")
 
@@ -136,8 +141,30 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             mol_set.add(mol.hash)
             mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, metric=dist)
 
-        # Downselect candidates based on number of allowed beams
-        top_k_mol_hashes = sorted(mol2dist, key=mol2dist.get)[:k_nodes]
+        # Sort all hashes by distance (lowest to highest)
+        sorted_hashes = sorted(mol2dist, key=mol2dist.get)
+        
+        # Determine the cutoff threshold
+        # If we have fewer candidates than k_nodes, take them all. 
+        # Otherwise, find the distance of the k-th item and add the tolerance window.
+        if len(sorted_hashes) <= k_nodes:
+            cutoff_dist = float('inf')
+        else:
+            # -1 because list indices are 0-based (e.g. 1st item is at index 0)
+            kth_best_dist = mol2dist[sorted_hashes[k_nodes - 1]] 
+            cutoff_dist = kth_best_dist + tolerance
+
+        # Filter candidates based on the calculated cutoff
+        top_k_mol_hashes = []
+        for h in sorted_hashes:
+            if mol2dist[h] <= cutoff_dist:
+                top_k_mol_hashes.append(h)
+            else:
+                # Since the list is sorted, we can stop early once we exceed the cutoff
+                break
+
+        print(f"  + Identified {len(top_k_mol_hashes)} candidates within window {tolerance} of top {k_nodes}")
+
         for rxn in raw_rxns.values():
             mol = rxn.product.graph
             if mol.hash in top_k_mol_hashes:
@@ -145,7 +172,6 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
                 candidates.append(mol)
             else:
                 print(f"  + SKIPPED! {rxn.id} == {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
-
 
     elif mode == 'capped':
         print(f"  + Selecting enumeration candidates via distance capping strategy")

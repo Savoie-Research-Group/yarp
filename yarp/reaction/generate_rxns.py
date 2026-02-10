@@ -53,7 +53,7 @@ def generate_rxns(inp):
 
             new_rxns = dict()
             for mol in candidates:
-                print(f" - Enumerating from {mol.inchi} node")
+                print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
                     react=inp.enum.react_atoms, mode=inp.enum.mode

@@ -57,7 +57,7 @@ def main(file):
         print("No reaction objects created!")
         sys.exit()
     else:
-        print(f"Number of reactions generated: {len(reactions)}")
+        print(f"Number of reaction objects initialized: {len(reactions)}")
         for index, rxn in enumerate(reactions.values()):
             print(f" -- Reaction {index}: {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi}")
 

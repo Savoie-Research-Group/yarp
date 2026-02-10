@@ -91,7 +91,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     print(f" - {len(unique_candidates)} unique products identified for enumeration")
     return unique_candidates
         
-def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.05, cap='moderate'):
+def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.0, cap='moderate'):
     """
     Parameters:
     -----------

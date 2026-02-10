@@ -38,7 +38,7 @@ class NetworkConfig:
     distance: str = 'sorgel'
     mode: str = 'capped'
     n_nodes: Optional[int] = 1
-    tolerance: float = 0.05
+    tolerance: float = 0.0
     cap: str = 'moderate'
 
 # --- MAIN PARSER CLASS ---
@@ -142,6 +142,6 @@ class InputParser:
             distance=netconfig.get("distance metric", 'soergel'),
             mode=netconfig.get("mode", 'capped'),
             n_nodes=netconfig.get("n_nodes", 1),
-            tolerance=netconfig.get("tie window", 0.05),
+            tolerance=netconfig.get("tie window", 0.0),
             cap=netconfig.get("cutoff", "moderate")
         )

@@ -78,8 +78,6 @@ class reaction:
 
         self.heat_of_rxn = dict()
 
-        self.max_flux = 0.0
-
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
         self.hash = reaction_hash(self)
 

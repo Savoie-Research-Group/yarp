@@ -27,6 +27,9 @@ class network:
             n for n, attr in self.crn.nodes(data=True)
             if attr.get('type') == 'reaction'
         ])
+        
+        self.network_hash = self._gen_network_hash()
+        self.subnet_hash = None
 
     def _normalize_rxn_dict(self, rxns):
         """
@@ -63,6 +66,10 @@ class network:
                 crn.add_edge(rxn.hash, p.hash, dG=0)
 
         return crn
+    
+    def _gen_network_hash(self):
+        # TODO: Design a better hashing scheme
+        return hash(self.crn)
 
     def get_dijkstra_path(self, start, end, objective='dG'):
         """
@@ -192,3 +199,16 @@ class network:
                     seen.add(mol.hash)
 
         return terminal_yp
+
+    def gen_subnet_hash(self, rxn_subset):
+        """
+        Generate a unique identifier for a subnetwork based on its constituent reactions.
+        This is a simple approach that sums the hashes of the included reactions.
+        TODO: Design a more robust hashing scheme.
+        """
+        if not isinstance(rxn_subset, (list, tuple, set)):
+            raise TypeError("rxn_subset must be an iterable of reaction objects")
+        
+        subset_hash = sum(rxn.hash for rxn in rxn_subset)
+        self.subnet_hash = subset_hash
+        return subset_hash

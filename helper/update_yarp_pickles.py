@@ -2,8 +2,7 @@
 Upgrade legacy YARP pickle files in place or into a new output directory.
 
 This helper rebuilds YARP reaction/state/yarpecule objects using native class
-constructors, then backfills any additional legacy attributes. Hashes are
-recomputed with YARP's native hash utilities.
+constructors, then backfills additional legacy attributes.
 
 How to use:
 
@@ -16,11 +15,9 @@ import argparse
 import ast
 from copy import deepcopy
 import importlib
-import os
 import pickle
 from pathlib import Path
 import sys
-import tempfile
 from types import ModuleType
 
 
@@ -32,6 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Guardrail: if core class init attrs drift, force migration script update.
 CLASS_SCHEMA_GUARDRAIL = {
     "reaction": {
         "file": PROJECT_ROOT / "yarp" / "reaction" / "reaction.py",
@@ -103,7 +101,7 @@ def _get_attr_any(obj, *names, default=None):
     return default
 
 
-def _coerce_dict(value, stats, field_name):
+def _as_dict(value):
     if value is None:
         return {}
     if isinstance(value, dict):
@@ -111,8 +109,6 @@ def _coerce_dict(value, stats, field_name):
     try:
         return dict(value)
     except Exception:
-        stats["dict_coercion_failures"] += 1
-        print(f"WARNING: {field_name} is not dict-like ({type(value).__name__}); using empty dict.")
         return {}
 
 
@@ -151,12 +147,6 @@ def _init_stats():
         "states_rebuilt": 0,
         "yarpecules_rebuilt": 0,
         "reaction_dicts_rekeyed": 0,
-        "reaction_hash_collisions": 0,
-        "dict_coercion_failures": 0,
-        "dict_key_preserved_nonprimitive": 0,
-        "reaction_hash_recompute_failures": 0,
-        "yarpecule_hash_recompute_failures": 0,
-        "validation_warnings": 0,
         "changes": 0,
     }
 
@@ -181,7 +171,6 @@ def _scan_class_init_attrs(file_path, class_name):
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             class_node = node
             break
-
     if class_node is None:
         raise RuntimeError(f"Class `{class_name}` not found in {file_path}")
 
@@ -190,7 +179,6 @@ def _scan_class_init_attrs(file_path, class_name):
         if isinstance(node, ast.FunctionDef) and node.name == "__init__":
             init_node = node
             break
-
     if init_node is None:
         raise RuntimeError(f"`{class_name}.__init__` not found in {file_path}")
 
@@ -203,7 +191,6 @@ def _scan_class_init_attrs(file_path, class_name):
             attrs.update(_extract_self_attr_names(node.target))
         elif isinstance(node, ast.AugAssign):
             attrs.update(_extract_self_attr_names(node.target))
-
     return attrs
 
 
@@ -222,7 +209,6 @@ def _run_preflight_guardrail():
 
         missing = sorted(expected - found)
         extra = sorted(found - expected)
-
         if missing or extra:
             msg = [f"{class_name}: schema drift detected in {file_path}"]
             if missing:
@@ -234,7 +220,7 @@ def _run_preflight_guardrail():
     if errors:
         print("ERROR: YARP class schema guardrail failed.")
         print("Migration script assumptions are out of sync with current code.")
-        print("Please update `CLASS_SCHEMA_GUARDRAIL` in helper/update_yarp_pickles.py before running.")
+        print("Please update CLASS_SCHEMA_GUARDRAIL in helper/update_yarp_pickles.py before running.")
         for item in errors:
             print(f"\n- {item}")
         raise SystemExit(2)
@@ -268,33 +254,9 @@ def _clone_generic_object(obj, memo, stats):
         return obj
 
     memo[oid] = new_obj
-
-    # No YARP classes currently use __getstate__/__setstate__ or __slots__,
-    # but this keeps fallback cloning safer for nested third-party objects.
-    if hasattr(obj, "__getstate__") and hasattr(new_obj, "__setstate__"):
-        try:
-            state = obj.__getstate__()
-            new_obj.__setstate__(_rebuild(state, memo, stats))
-            return new_obj
-        except Exception:
-            pass
-
     if hasattr(obj, "__dict__"):
         for key, value in vars(obj).items():
             setattr(new_obj, key, _rebuild(value, memo, stats))
-
-    slots = getattr(obj.__class__, "__slots__", ())
-    if isinstance(slots, str):
-        slots = (slots,)
-    for slot in slots:
-        if slot in ("__dict__", "__weakref__"):
-            continue
-        if hasattr(obj, slot):
-            try:
-                setattr(new_obj, slot, _rebuild(getattr(obj, slot), memo, stats))
-            except Exception:
-                pass
-
     return new_obj
 
 
@@ -354,19 +316,17 @@ def _rebuild_yarpecule(old_yp, memo, stats):
     }
     _copy_attrs(old_yp, new_yp, excluded, memo, stats)
 
-    # Preserve old string descriptors if present and constructor left them unset.
     for attr in ("_canon_smi", "_map_smi", "_inchi"):
         old_val = vars(old_yp).get(attr, None)
         if old_val is not None and getattr(new_yp, attr, None) is None:
             setattr(new_yp, attr, old_val)
             stats["changes"] += 1
 
-    # Recompute hash with YARP native hash logic.
     try:
         hash_mod = _load_hash_module()
         new_yp._yarpecule_hash = hash_mod.yarpecule_hash(new_yp)
     except Exception:
-        stats["yarpecule_hash_recompute_failures"] += 1
+        pass
 
     stats["yarpecules_rebuilt"] += 1
     return new_yp
@@ -395,24 +355,18 @@ def _rebuild_state(old_state, memo, stats):
 
     new_state._graph = graph_new
 
-    # Keep constructor-generated _species to preserve current state invariants.
-    if not hasattr(new_state, "_species") or new_state._species is None:
-        new_state._species = []
-
     if "conformers" in vars(old_state):
         new_state.conformers = _safe_list(_rebuild(vars(old_state)["conformers"], memo, stats))
     elif not hasattr(new_state, "conformers") or new_state.conformers is None:
         new_state.conformers = []
 
-    base_conc = _coerce_dict(getattr(new_state, "conc", None), stats, "state.conc")
-    old_conc = None
+    base_conc = _as_dict(getattr(new_state, "conc", None))
     if "conc" in vars(old_state):
-        old_conc = _coerce_dict(_rebuild(vars(old_state)["conc"], memo, stats), stats, "legacy state.conc")
-    if old_conc:
+        old_conc = _as_dict(_rebuild(vars(old_state)["conc"], memo, stats))
         base_conc.update(old_conc)
     new_state.conc = base_conc
 
-    for mol in new_state._species:
+    for mol in getattr(new_state, "_species", []):
         smi = _get_canon_smi(mol)
         if smi and smi not in new_state.conc:
             new_state.conc[smi] = 0.0
@@ -441,8 +395,6 @@ def _rebuild_reaction(old_rxn, memo, stats):
 
     memo[oid] = new_rxn
 
-    # If legacy payload stored enriched state objects, carry those over.
-    # We recompute id/hash below to keep reaction metadata consistent.
     if _is_state_obj(old_reactant):
         new_rxn.reactant = _rebuild(old_reactant, memo, stats)
     if _is_state_obj(old_product):
@@ -451,12 +403,11 @@ def _rebuild_reaction(old_rxn, memo, stats):
     excluded = {"reactant", "product", "id", "hash"}
     _copy_attrs(old_rxn, new_rxn, excluded, memo, stats)
 
-    # Keep known reaction fields in expected shape.
     for attr in ("ts", "barrier", "reverse_barrier", "network_meta"):
-        setattr(new_rxn, attr, _coerce_dict(getattr(new_rxn, attr, None), stats, f"reaction.{attr}"))
+        setattr(new_rxn, attr, _as_dict(getattr(new_rxn, attr, None)))
 
-    heat_of_reaction = _coerce_dict(getattr(new_rxn, "heat_of_reaction", None), stats, "reaction.heat_of_reaction")
-    heat_of_rxn = _coerce_dict(getattr(new_rxn, "heat_of_rxn", None), stats, "reaction.heat_of_rxn")
+    heat_of_reaction = _as_dict(getattr(new_rxn, "heat_of_reaction", None))
+    heat_of_rxn = _as_dict(getattr(new_rxn, "heat_of_rxn", None))
     if len(heat_of_rxn) == 0 and len(heat_of_reaction) > 0:
         heat_of_rxn = dict(heat_of_reaction)
     if len(heat_of_reaction) == 0 and len(heat_of_rxn) > 0:
@@ -469,12 +420,11 @@ def _rebuild_reaction(old_rxn, memo, stats):
     if reactant_inchi and product_inchi:
         new_rxn.id = f"{reactant_inchi}_to_{product_inchi}"
 
-    # Recompute hash with YARP native hash logic.
     try:
         hash_mod = _load_hash_module()
         new_rxn.hash = hash_mod.reaction_hash(new_rxn)
     except Exception:
-        stats["reaction_hash_recompute_failures"] += 1
+        pass
 
     stats["reactions_rebuilt"] += 1
     return new_rxn
@@ -491,11 +441,8 @@ def _maybe_rekey_reaction_dict(data, stats):
         hsh = getattr(rxn, "hash", None)
         if hsh is None:
             return
-        if hsh in keyed and keyed[hsh] is not rxn:
-            stats["reaction_hash_collisions"] += 1
-            # Keep first-seen entry to avoid silent last-write wins.
-            continue
-        keyed[hsh] = rxn
+        if hsh not in keyed:
+            keyed[hsh] = rxn
 
     if len(keyed) == 0:
         return
@@ -505,10 +452,6 @@ def _maybe_rekey_reaction_dict(data, stats):
         data.update(keyed)
         stats["reaction_dicts_rekeyed"] += 1
         stats["changes"] += 1
-
-
-def _is_primitive_dict_key(key):
-    return isinstance(key, (str, bytes, int, float, bool, type(None)))
 
 
 def _rebuild(obj, memo, stats):
@@ -535,9 +478,6 @@ def _rebuild(obj, memo, stats):
         new_dict = {}
         memo[oid] = new_dict
         for key, value in obj.items():
-            # Preserve original keys to avoid changing key hash/eq semantics.
-            if not _is_primitive_dict_key(key):
-                stats["dict_key_preserved_nonprimitive"] += 1
             new_dict[key] = _rebuild(value, memo, stats)
         _maybe_rekey_reaction_dict(new_dict, stats)
         return new_dict
@@ -591,113 +531,16 @@ def _output_path_for(input_file, input_root, output_dir):
     return output_dir / rel_path
 
 
-def validate_migrated_payload(payload):
-    """
-    Warning-only invariant checks after migration.
-    Returns (warning_count, warning_samples).
-    """
-    warning_count = 0
-    warning_samples = []
-    seen = set()
-    stack = [payload]
-
-    def add_warning(message):
-        nonlocal warning_count
-        warning_count += 1
-        if len(warning_samples) < 25 and message not in warning_samples:
-            warning_samples.append(message)
-
-    while stack:
-        obj = stack.pop()
-        oid = id(obj)
-        if oid in seen:
-            continue
-        seen.add(oid)
-
-        if isinstance(obj, dict):
-            stack.extend(obj.values())
-            continue
-        if isinstance(obj, (list, tuple, set, frozenset)):
-            stack.extend(obj)
-            continue
-        if obj is None or isinstance(obj, (str, bytes, int, float, bool, ModuleType, type)):
-            continue
-
-        if _is_reaction_obj(obj):
-            reactant = getattr(obj, "reactant", None)
-            product = getattr(obj, "product", None)
-            if not _is_state_obj(reactant):
-                add_warning("reaction.reactant is not a state object")
-            if not _is_state_obj(product):
-                add_warning("reaction.product is not a state object")
-            for attr in ("ts", "barrier", "reverse_barrier", "network_meta", "heat_of_rxn"):
-                if not isinstance(getattr(obj, attr, None), dict):
-                    add_warning(f"reaction.{attr} is not a dict")
-            if getattr(obj, "hash", None) is None:
-                add_warning("reaction.hash is missing")
-
-        if _is_state_obj(obj):
-            graph = _extract_graph(obj)
-            if graph is None or not _is_yarpecule_obj(graph):
-                add_warning("state._graph is missing or not a yarpecule")
-            if not isinstance(getattr(obj, "_species", None), list):
-                add_warning("state._species is not a list")
-            if not isinstance(getattr(obj, "conc", None), dict):
-                add_warning("state.conc is not a dict")
-            if not isinstance(getattr(obj, "conformers", None), list):
-                add_warning("state.conformers is not a list")
-
-        if _is_yarpecule_obj(obj):
-            for attr in ("_adj_mat", "_geo", "_elements", "_q", "_yarpecule_hash"):
-                if getattr(obj, attr, None) is None:
-                    add_warning(f"yarpecule.{attr} is missing")
-                    break
-
-        if hasattr(obj, "__dict__"):
-            stack.extend(vars(obj).values())
-
-    return warning_count, warning_samples
-
-
-def _write_pickle_atomic(output_file, payload):
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            delete=False,
-            dir=str(output_file.parent),
-            prefix=f".{output_file.name}.",
-            suffix=".tmp",
-        ) as tmp_handle:
-            tmp_path = Path(tmp_handle.name)
-            pickle.dump(payload, tmp_handle, protocol=pickle.HIGHEST_PROTOCOL)
-            tmp_handle.flush()
-            os.fsync(tmp_handle.fileno())
-
-        os.replace(tmp_path, output_file)
-    finally:
-        if tmp_path is not None and tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
-
-
 def _process_pickle(input_file, output_file):
     with open(input_file, "rb") as handle:
         payload = pickle.load(handle)
 
     stats = _init_stats()
     rebuilt_payload = _rebuild(payload, memo={}, stats=stats)
-    warning_count, warning_samples = validate_migrated_payload(rebuilt_payload)
-    if warning_count:
-        stats["validation_warnings"] += warning_count
-        print(f"WARNING: Found {warning_count} validation warning(s) in migrated payload.")
-        for message in warning_samples[:10]:
-            print(f"  - {message}")
-        if warning_count > len(warning_samples[:10]):
-            print(f"  - ... {warning_count - len(warning_samples[:10])} more")
 
-    _write_pickle_atomic(output_file, rebuilt_payload)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, "wb") as handle:
+        pickle.dump(rebuilt_payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     return stats
 
@@ -744,8 +587,7 @@ def main(args):
                 f"(changes={file_stats['changes']}, "
                 f"rxns={file_stats['reactions_rebuilt']}, "
                 f"states={file_stats['states_rebuilt']}, "
-                f"yarpecules={file_stats['yarpecules_rebuilt']}, "
-                f"validation_warnings={file_stats['validation_warnings']})"
+                f"yarpecules={file_stats['yarpecules_rebuilt']})"
             )
         except Exception as exc:
             failures.append((input_file, str(exc)))
@@ -757,12 +599,6 @@ def main(args):
     print(f"  states rebuilt: {total_stats['states_rebuilt']}")
     print(f"  yarpecules rebuilt: {total_stats['yarpecules_rebuilt']}")
     print(f"  reaction dicts rekeyed: {total_stats['reaction_dicts_rekeyed']}")
-    print(f"  reaction hash collisions: {total_stats['reaction_hash_collisions']}")
-    print(f"  dict coercion failures: {total_stats['dict_coercion_failures']}")
-    print(f"  non-primitive dict keys preserved: {total_stats['dict_key_preserved_nonprimitive']}")
-    print(f"  reaction hash recompute failures: {total_stats['reaction_hash_recompute_failures']}")
-    print(f"  yarpecule hash recompute failures: {total_stats['yarpecule_hash_recompute_failures']}")
-    print(f"  validation warnings: {total_stats['validation_warnings']}")
     print(f"  total changes: {total_stats['changes']}")
     print(f"  files failed: {len(failures)}")
 

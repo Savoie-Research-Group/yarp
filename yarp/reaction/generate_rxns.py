@@ -65,6 +65,7 @@ def generate_rxns(inp):
                 )
 
                 for prod in clean_products:
+                    prod = quick_geom_opt(prod)
                     r2p = reaction(mol, prod)
                     new_rxns[r2p.hash] = r2p
             

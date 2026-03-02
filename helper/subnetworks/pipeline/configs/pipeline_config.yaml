@@ -1,0 +1,154 @@
+yarp_path: /Users/tburton2/Desktop/Repos/yarp-again
+network_manifest: ../../networks/manifest.txt
+array_env_var: SGE_TASK_ID
+output_dir: ../../subnetwork_outputs
+overwrite_source_with_dummy_barriers: true
+dummy_barriers_required: true
+save_terminal_list: true
+save_random_flux_table: true
+random_flux_seed: 42
+random_flux_retain_count: 200000
+merge_product_tables_per_network: false
+merge_random_flux_tables_per_network: false
+merge_all_tables_per_network: true
+merged_all_table_name: network_all_rows_merged.parquet
+remove_source_tables_after_full_merge: true
+clear_previous_outputs: false
+run_steps:
+- dummy_barriers
+- terminal_products
+- subnetwork
+- cantera_yaml
+- cantera_run
+- datatable
+cleanup_mode: clean
+failure_mode: fail_product_continue_network
+log_level: info
+verbose: false
+table_preview_rows: 8
+max_products_per_network: null
+only_product_hash: null
+subnetwork_gen:
+  input:
+    pickle: null
+    directory: ../../networks
+    glob: '*.pkl'
+    recursive: false
+  dummy_reverse_barriers:
+    enabled: true
+    seed: 42
+    save_reverse: true
+    suffix: _full_network
+    verbose: false
+  network:
+    dG_lot: egat
+    terminal_verbose: false
+  start:
+    reaction_id: null
+    smiles: null
+    auto_detect: true
+    index: 0
+    fallback_first_reactant: true
+  paths:
+    cutoff: 4
+    show_progress: true
+    verbose: false
+  subnetworks:
+    min_paths_to_save: 1
+    node_id_style: inchi
+    prefix_with_source_name: true
+    only_end_hash: null
+    only_end_smiles: null
+  logging:
+    max_saved_to_print: 5
+cantera_from_subnetworks:
+  dedupe_after_normalization: true
+  runtime:
+    module_paths: []
+  input:
+    root: ../../subnetwork_outputs
+    glob: '*.pkl'
+    recursive: true
+  output:
+    root: ../../subnetwork_outputs
+    preserve_tree: true
+    write_species_map: false
+    write_reaction_map: false
+  rate:
+    forward_barrier_label: egat
+    reverse_barrier_label: egat
+    energy_units: kJ/mol
+    reverse_fallback_factor: null
+  write_yaml:
+    kinetics: gas
+    reactions: all
+    model: constant-cp
+    EOS: ideal-gas
+    T: 425.0
+    P: 1.0
+  logging:
+    max_print: 20
+cantera_run_subnetworks:
+  runtime:
+    module_paths: []
+  input:
+    cantera_yaml_root: ../../subnetwork_outputs
+    subnetwork_pickle_root: ../../subnetwork_outputs
+    glob: '*.yaml'
+    recursive: true
+  batch:
+    start: 0
+    max_files: null
+  reactor:
+    time_sim: 300.0
+    time_step: 0.01
+    rule: css
+    curr_depth: 1
+    uncertainty: true
+    uncertainty_cycles: 30
+    scale: 2.0
+    write_excel: false
+    terminal_species: auto
+    terminal_completion_mode: auto
+    fraction_basis: X
+    completion_tol: 0.02
+    completion_target_scale_mode: min
+    completion_hold_steps: 10
+    completion_dxdt_tol: 1.0e-4
+    min_completion_time: 30.0
+    extend_if_not_complete: true
+    extend_seconds: 30.0
+    max_time_multiplier: 5.0
+    debug_fraction: false
+    debug_flux_direction: false
+    debug_flux_threshold: 0.0
+  output:
+    write_run_yaml: true
+    run_yaml_suffix: .run.yaml
+    write_reaction_flux_table: false
+    reaction_flux_table_suffix: .flux.csv
+    write_final_product_flux_table: true
+    final_product_flux_table_suffix: .to_final.csv
+    write_flux_timeseries_table: true
+    flux_timeseries_table_suffix: .flux_timeseries.csv
+    write_reactor_debug_yaml: false
+    reactor_debug_yaml_suffix: .reactor_debug.yaml
+    reactor_debug_top_n: 20
+    update_subnetwork_pickle_metadata: true
+    table_preview_rows: 5
+  logging:
+    progress_bar: true
+    max_print: 20
+datatable:
+  retained_timeseries_downsample_seconds: 1.0
+plot_export:
+  enabled: true
+  palette_csv: ../../color_palettes/colors_personal.csv
+  output_subdir: bulk_profile_plots
+  summary_csv_name: bulk_profile_summary.csv
+  profile_pattern: random_flux_timeseries*.parquet
+  product_pattern: product_*.parquet
+  max_conc_species: 12
+  max_flux_species: 10
+  max_reaction_lines: 12
+  fig_dpi: 170

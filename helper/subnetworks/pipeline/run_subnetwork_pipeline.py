@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """Run one-network streaming subnetwork kinetics pipeline."""
 
-from __future__ import annotations
-
 import argparse
 import copy
 import os
-import random
 import shutil
 import subprocess
 import sys
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 
 import pandas as pd
@@ -18,8 +16,50 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
+OUTPUT_MODE_PRESETS = {
+    "debug": {
+        "description": "retain all temp/profile artifacts and generate all network flux plots",
+        "retain_terminal_table": True,
+        "save_flux_for_every_subnetwork": True,
+        "plot_all_network_flux_outputs": True,
+        "cleanup_mode": "keep",
+        "plot_profile_source_mode": "saved_flux_tables",
+        "merge_all_tables_per_network": True,
+        "remove_source_tables_after_full_merge": False,
+        "clear_previous_outputs": True,
+        "retained_timeseries_downsample_seconds": 0.0,
+    },
+    "subnetwork": {
+        "description": "keep per-product tables plus merged network table",
+        "retain_terminal_table": False,
+        "save_flux_for_every_subnetwork": False,
+        "plot_all_network_flux_outputs": False,
+        "cleanup_mode": "clean",
+        "plot_profile_source_mode": "saved_flux_tables",
+        "merge_all_tables_per_network": True,
+        "remove_source_tables_after_full_merge": False,
+        "clear_previous_outputs": True,
+        "retained_timeseries_downsample_seconds": 1.0,
+    },
+    "production": {
+        "description": "keep only merged network output table",
+        "retain_terminal_table": False,
+        "save_flux_for_every_subnetwork": False,
+        "plot_all_network_flux_outputs": False,
+        "cleanup_mode": "clean",
+        "plot_profile_source_mode": "saved_flux_tables",
+        "merge_all_tables_per_network": True,
+        "remove_source_tables_after_full_merge": True,
+        "clear_previous_outputs": True,
+        "retained_timeseries_downsample_seconds": 1.0,
+    },
+}
+
+PRODUCT_RUN_STEPS = ("subnetwork", "cantera_yaml", "cantera_run")
+
 
 def default_config_path(verbose=False):
+    """Return the default pipeline config path."""
     cwd_cfg = Path("pipeline/configs/pipeline_config.yaml")
     if cwd_cfg.exists():
         if verbose:
@@ -32,6 +72,7 @@ def default_config_path(verbose=False):
 
 
 def resolve_path(path_text, cfg_dir, verbose=False):
+    """Resolve a config path relative to the config directory."""
     path = Path(path_text)
     if path.is_absolute():
         if verbose:
@@ -44,16 +85,75 @@ def resolve_path(path_text, cfg_dir, verbose=False):
 
 
 def load_config(config_path, verbose=False):
+    """Load the pipeline config mapping and config directory."""
     with config_path.open("r") as f:
         cfg = yaml.safe_load(f) or {}
-    if not isinstance(cfg, dict):
-        raise ValueError("Config YAML must be a top-level mapping.")
     if verbose:
         print(f"[verbose] Loaded config mapping from {config_path}")
     return cfg, config_path.parent.resolve()
 
 
+def normalize_output_mode(raw_mode):
+    """Map output-mode text to one of: debug, subnetwork, production."""
+    text = str(raw_mode or "subnetwork").strip().lower()
+    if text not in OUTPUT_MODE_PRESETS:
+        valid = ", ".join(sorted(OUTPUT_MODE_PRESETS.keys()))
+        raise ValueError(f"Unsupported output_mode={raw_mode!r}. Valid modes: {valid}")
+    return text
+
+
+def apply_output_mode_defaults(cfg, verbose=False):
+    """Apply output behavior from one output_mode preset and return chosen mode."""
+    output_cfg = cfg.get("output", {}) or {}
+    raw_mode = cfg.get("output_mode", output_cfg.get("mode", "subnetwork"))
+    mode = normalize_output_mode(raw_mode)
+    preset = OUTPUT_MODE_PRESETS[mode]
+    cfg["output_mode"] = mode
+
+    # Mode presets define defaults; explicit config keys can override.
+    cfg["save_flux_for_every_subnetwork"] = bool(
+        cfg.get("save_flux_for_every_subnetwork", preset["save_flux_for_every_subnetwork"])
+    )
+    cfg["plot_all_network_flux_outputs"] = bool(
+        cfg.get("plot_all_network_flux_outputs", preset["plot_all_network_flux_outputs"])
+    )
+    cfg["write_flux_timeseries_table"] = bool(
+        cfg.get(
+            "write_flux_timeseries_table",
+            cfg["save_flux_for_every_subnetwork"] or cfg["plot_all_network_flux_outputs"],
+        )
+    )
+    cfg["cleanup_mode"] = str(preset["cleanup_mode"])
+    cfg["merge_all_tables_per_network"] = bool(preset["merge_all_tables_per_network"])
+    cfg["remove_source_tables_after_full_merge"] = bool(preset["remove_source_tables_after_full_merge"])
+    cfg["clear_previous_outputs"] = bool(preset["clear_previous_outputs"])
+    cfg["save_terminal_list"] = bool(preset["retain_terminal_table"])
+
+    datatable_cfg = cfg.get("datatable", {}) or {}
+    datatable_cfg["retained_timeseries_downsample_seconds"] = float(
+        preset["retained_timeseries_downsample_seconds"]
+    )
+    cfg["datatable"] = datatable_cfg
+
+    plot_cfg = cfg.get("plot_export", {}) or {}
+    plot_cfg["enabled"] = bool(cfg["plot_all_network_flux_outputs"])
+    plot_cfg["profile_source_mode"] = str(
+        plot_cfg.get("profile_source_mode", preset["plot_profile_source_mode"])
+    )
+    plot_cfg["profile_pattern"] = str(plot_cfg.get("profile_pattern", "flux_timeseries*.parquet"))
+    cfg["plot_export"] = plot_cfg
+
+    if verbose:
+        print(
+            "[verbose] output mode resolved:",
+            f"output_mode={mode}",
+            f"description={preset['description']}",
+        )
+    return mode
+
+
 def load_manifest(path, verbose=False):
+    """Load non-comment manifest entries."""
     rows = []
     with path.open("r") as f:
         for line in f:
@@ -70,6 +170,7 @@ def load_manifest(path, verbose=False):
 
 
 def task_index_from_env(env_name, verbose=False):
+    """Return a 1-based task index from an environment variable."""
     raw = os.environ.get(env_name)
     if raw is None:
         if verbose:
@@ -82,6 +183,7 @@ def task_index_from_env(env_name, verbose=False):
 
 
 def safe_label(text, verbose=False):
+    """Convert arbitrary text into a filesystem-safe label."""
     value = "".join(ch if (ch.isalnum() or ch in "-._") else "_" for ch in str(text))
     if verbose:
         print(f"[verbose] safe_label input={text} output={value}")
@@ -89,13 +191,37 @@ def safe_label(text, verbose=False):
 
 
 def run_cmd(cmd, env, verbose=False):
+    """Run a command in the repository root."""
     print("Running:", " ".join(cmd))
     if verbose:
         print(f"[verbose] cwd={REPO_ROOT}")
     subprocess.run(cmd, check=True, cwd=str(REPO_ROOT), env=env)
 
 
+def resolve_product_run_steps(cfg):
+    """Normalize run_steps to product-level stages executed inside run_one_product."""
+    configured_steps = cfg.get("run_steps", []) or []
+    if not configured_steps:
+        return list(PRODUCT_RUN_STEPS)
+
+    no_op_steps = {"dummy_barriers", "terminal_products", "datatable"}
+    allowed_steps = set(PRODUCT_RUN_STEPS)
+    resolved = []
+    for raw_step in configured_steps:
+        step = str(raw_step).strip()
+        if not step or step in no_op_steps:
+            continue
+        if step not in allowed_steps:
+            valid = ", ".join(PRODUCT_RUN_STEPS)
+            raise ValueError(f"Unsupported run_steps entry: {raw_step!r}. Valid product steps: {valid}")
+        if step not in resolved:
+            resolved.append(step)
+
+    return resolved or list(PRODUCT_RUN_STEPS)
+
+
 def verify_yarp_import(env, expected_root=None):
+    """Print the imported YARP module path and validate root when configured."""
     probe = [
         sys.executable,
         "-c",
@@ -126,6 +252,7 @@ def verify_yarp_import(env, expected_root=None):
 
 
 def iter_reaction_objects(container, verbose=False):
+    """Yield reaction-like objects from nested containers."""
     seen = set()
     stack = [container]
     while stack:
@@ -149,7 +276,8 @@ def iter_reaction_objects(container, verbose=False):
             stack.extend(current)
 
 
-def reverse_barrier_is_populated(value, verbose=False):
+def reverse_barrier_is_populated(value):
+    """Return True when a reverse barrier value is populated."""
     if value is None:
         return False
     if isinstance(value, dict):
@@ -163,11 +291,12 @@ def reverse_barrier_is_populated(value, verbose=False):
 
 
 def has_reverse_barriers(payload, verbose=False):
+    """Check if all reactions in the payload have reverse barriers."""
     seen_any = False
     for rxn in iter_reaction_objects(payload, verbose=verbose):
         seen_any = True
         reverse_barrier = getattr(rxn, "reverse_barrier", None)
-        if not reverse_barrier_is_populated(reverse_barrier, verbose=verbose):
+        if not reverse_barrier_is_populated(reverse_barrier):
             if verbose:
                 rid = getattr(rxn, "id", None)
                 rhash = getattr(rxn, "hash", None)
@@ -182,6 +311,7 @@ def has_reverse_barriers(payload, verbose=False):
 
 
 def ensure_dummy_barriers(source_pickle, cfg, verbose=False):
+    """Add dummy reverse barriers when required by config."""
     if not bool(cfg.get("dummy_barriers_required", True)):
         return source_pickle, False
 
@@ -214,6 +344,7 @@ def ensure_dummy_barriers(source_pickle, cfg, verbose=False):
 
 
 def write_runtime_config(base_cfg, source_pickle, product_hash, work_dir, verbose=False):
+    """Write a per-product runtime config in a dedicated temp directory."""
     cfg = copy.deepcopy(base_cfg)
 
     sg = (cfg.get("subnetwork_gen", {}) or {})
@@ -252,7 +383,7 @@ def write_runtime_config(base_cfg, source_pickle, product_hash, work_dir, verbos
     out_cfg.setdefault("write_run_yaml", True)
     out_cfg.setdefault("write_reaction_flux_table", False)
     out_cfg.setdefault("write_final_product_flux_table", True)
-    out_cfg.setdefault("write_flux_timeseries_table", True)
+    out_cfg["write_flux_timeseries_table"] = bool(base_cfg.get("write_flux_timeseries_table", False))
     out_cfg.setdefault("write_reactor_debug_yaml", False)
     out_cfg.setdefault("update_subnetwork_pickle_metadata", True)
     crs["output"] = out_cfg
@@ -272,6 +403,7 @@ def write_runtime_config(base_cfg, source_pickle, product_hash, work_dir, verbos
 
 
 def first_match(root, pattern, verbose=False):
+    """Return the first recursive match for a file glob pattern."""
     hits = sorted(root.rglob(pattern))
     if not hits:
         raise RuntimeError(f"No files matched {pattern} under {root}")
@@ -281,6 +413,7 @@ def first_match(root, pattern, verbose=False):
 
 
 def first_cantera_input_yaml(root, verbose=False):
+    """Return the first cantera model YAML, excluding sidecar metadata YAMLs."""
     for path in sorted(root.rglob("*.yaml")):
         name = path.name
         if name.endswith(".species_map.yaml"):
@@ -304,9 +437,10 @@ def run_one_product(
     network_out_dir,
     product_hash,
     product_smiles,
-    random_flux_output_path=None,
+    flux_output_path=None,
     verbose=False,
 ):
+    """Run subnetwork->Cantera->datatable workflow for one terminal product."""
     product_label = safe_label(product_hash or product_smiles or "product", verbose=verbose)
     work_dir = network_out_dir / ".tmp" / product_label
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -314,11 +448,11 @@ def run_one_product(
         print(f"[verbose] Product work_dir={work_dir}")
         print(
             f"[verbose] Product hash={product_hash} smiles={product_smiles} "
-            f"random_flux_output={random_flux_output_path}"
+            f"flux_output={flux_output_path}"
         )
     runtime_cfg = write_runtime_config(base_cfg, source_pickle, product_hash, work_dir, verbose=verbose)
 
-    run_steps = base_cfg.get("run_steps", []) or []
+    run_steps = list(base_cfg.get("_resolved_product_run_steps", PRODUCT_RUN_STEPS))
     for step in run_steps:
         if step == "subnetwork":
             run_cmd([sys.executable, str(SCRIPT_DIR / "subnetwork_gen.py"), "--config", str(runtime_cfg)], env, verbose=verbose)
@@ -326,13 +460,15 @@ def run_one_product(
             run_cmd([sys.executable, str(SCRIPT_DIR / "cantera_from_subnetworks.py"), "--config", str(runtime_cfg)], env, verbose=verbose)
         elif step == "cantera_run":
             run_cmd([sys.executable, str(SCRIPT_DIR / "cantera_run_subnetworks.py"), "--config", str(runtime_cfg)], env, verbose=verbose)
-        elif step in {"dummy_barriers", "terminal_products", "datatable"}:
-            continue
 
     subnetwork_pickle = first_match(work_dir / "subnetworks", "*.pkl", verbose=verbose)
     cantera_yaml = first_cantera_input_yaml(work_dir / "subnetwork_cantera_yaml", verbose=verbose)
     to_final_csv = first_match(work_dir / "subnetwork_cantera_yaml", "*.to_final.csv", verbose=verbose)
-    flux_ts_csv = first_match(work_dir / "subnetwork_cantera_yaml", "*.flux_timeseries.csv", verbose=verbose)
+    flux_ts_csv = None
+    try:
+        flux_ts_csv = first_match(work_dir / "subnetwork_cantera_yaml", "*.flux_timeseries.csv", verbose=verbose)
+    except RuntimeError:
+        flux_ts_csv = None
 
     table_out = network_out_dir / f"product_{product_label}.parquet"
     datatable_cmd = [
@@ -346,15 +482,15 @@ def run_one_product(
         str(cantera_yaml),
         "--to-final-csv",
         str(to_final_csv),
-        "--flux-timeseries-csv",
-        str(flux_ts_csv),
         "--network-pickle",
         str(source_pickle),
         "--output",
         str(table_out),
     ]
-    if random_flux_output_path is not None:
-        datatable_cmd.extend(["--random-flux-output", str(random_flux_output_path)])
+    if flux_ts_csv is not None:
+        datatable_cmd.extend(["--flux-timeseries-csv", str(flux_ts_csv)])
+    if flux_output_path is not None:
+        datatable_cmd.extend(["--flux-output", str(flux_output_path)])
     run_cmd(datatable_cmd, env, verbose=verbose)
     if verbose:
         print(f"[verbose] Product outputs table={table_out}")
@@ -362,6 +498,7 @@ def run_one_product(
 
 
 def cleanup_workdir(path, verbose=False):
+    """Remove a per-product temp working directory."""
     if path.exists():
         if verbose:
             print(f"[verbose] Cleaning temp directory: {path}")
@@ -369,15 +506,12 @@ def cleanup_workdir(path, verbose=False):
 
 
 def clear_previous_outputs(network_out_dir, verbose=False):
+    """Delete prior network output tables and plot directory."""
     patterns = [
         "product_*.parquet",
         "product_*.pkl",
-        "random_flux_timeseries*.parquet",
-        "random_flux_timeseries*.pkl",
-        "network_products_merged.parquet",
-        "network_products_merged.pkl",
-        "network_random_flux_merged.parquet",
-        "network_random_flux_merged.pkl",
+        "flux_timeseries*.parquet",
+        "flux_timeseries*.pkl",
         "network_all_rows_merged.parquet",
         "network_all_rows_merged.pkl",
         "terminal_products.parquet",
@@ -420,6 +554,7 @@ def read_parquet_with_arrow_retry(path):
 
 
 def load_table_fallback(path, verbose=False):
+    """Load a table from parquet, then pickle fallback."""
     path = Path(path)
     if path.exists():
         if verbose:
@@ -434,6 +569,7 @@ def load_table_fallback(path, verbose=False):
 
 
 def load_table_any(path):
+    """Load a table file by suffix (.parquet or .pkl)."""
     path = Path(path)
     if path.suffix == ".parquet":
         return read_parquet_with_arrow_retry(path)
@@ -443,6 +579,7 @@ def load_table_any(path):
 
 
 def write_table_with_fallback(df, out_path):
+    """Write parquet with pickle fallback on serialization errors."""
     out_path = Path(out_path)
     try:
         df.to_parquet(out_path, index=False)
@@ -458,6 +595,7 @@ def write_table_with_fallback(df, out_path):
 
 
 def preferred_table_files(network_out_dir, parquet_pattern, pkl_pattern):
+    """Choose preferred table files (parquet first, then pickle) by stem."""
     parquet_files = {p.stem: p for p in sorted(network_out_dir.glob(parquet_pattern))}
     pkl_files = {p.stem: p for p in sorted(network_out_dir.glob(pkl_pattern))}
     stems = sorted(set(parquet_files.keys()) | set(pkl_files.keys()))
@@ -470,36 +608,10 @@ def preferred_table_files(network_out_dir, parquet_pattern, pkl_pattern):
     return selected
 
 
-def merge_network_tables(network_out_dir, *, parquet_pattern, pkl_pattern, out_name, verbose=False):
-    table_files = preferred_table_files(network_out_dir, parquet_pattern, pkl_pattern)
-    if not table_files:
-        if verbose:
-            print(f"[verbose] no files matched merge pattern {parquet_pattern} / {pkl_pattern}")
-        return None
-    frames = []
-    for table_path in table_files:
-        try:
-            df = load_table_any(table_path)
-            if not df.empty:
-                frames.append(df)
-        except Exception as exc:
-            print(f"[warning] skipped merge input {table_path}: {exc}")
-    if not frames:
-        if verbose:
-            print(f"[verbose] merge inputs were empty for {out_name}")
-        return None
-    frames = [df.dropna(axis=1, how="all") for df in frames]
-    merged = pd.concat(frames, ignore_index=True, sort=False)
-    out_path = network_out_dir / out_name
-    written = write_table_with_fallback(merged, out_path)
-    print(f"Merged {len(frames)} table(s) -> {written}")
-    return written
-
-
 def merge_all_network_tables(network_out_dir, out_name="network_all_rows_merged.parquet", verbose=False):
+    """Merge product summary tables into one network-level all-rows table."""
     sources = [
         ("product_summary", preferred_table_files(network_out_dir, "product_*.parquet", "product_*.pkl")),
-        ("random_timeseries", preferred_table_files(network_out_dir, "random_flux_timeseries*.parquet", "random_flux_timeseries*.pkl")),
     ]
     frames = []
     for table_origin, paths in sources:
@@ -517,7 +629,7 @@ def merge_all_network_tables(network_out_dir, out_name="network_all_rows_merged.
             frames.append(work.dropna(axis=1, how="all"))
     if not frames:
         if verbose:
-            print("[verbose] no non-empty product/random tables found for full merge")
+            print("[verbose] no non-empty product tables found for full merge")
         return None
     merged = pd.concat(frames, ignore_index=True, sort=False)
     out_path = network_out_dir / out_name
@@ -527,17 +639,10 @@ def merge_all_network_tables(network_out_dir, out_name="network_all_rows_merged.
 
 
 def remove_network_source_tables_after_merge(network_out_dir, verbose=False):
+    """Remove source tables after writing the merged all-rows table."""
     patterns = [
         "product_*.parquet",
         "product_*.pkl",
-        "random_flux_timeseries*.parquet",
-        "random_flux_timeseries*.pkl",
-        "terminal_products.parquet",
-        "terminal_products.pkl",
-        "network_products_merged.parquet",
-        "network_products_merged.pkl",
-        "network_random_flux_merged.parquet",
-        "network_random_flux_merged.pkl",
     ]
     removed = 0
     for pattern in patterns:
@@ -548,7 +653,117 @@ def remove_network_source_tables_after_merge(network_out_dir, verbose=False):
                 if verbose:
                     print(f"[verbose] Removed source table after merge: {path}")
     if removed:
-        print(f"Removed {removed} source product/random table(s) after full merge.")
+        print(f"Removed {removed} source product table(s) after full merge.")
+
+
+def detect_available_cores():
+    """Detect available CPU cores from affinity, then os.cpu_count fallback."""
+    if hasattr(os, "sched_getaffinity"):
+        try:
+            return max(1, len(os.sched_getaffinity(0)))
+        except Exception:
+            pass
+    return max(1, int(os.cpu_count() or 1))
+
+
+def resolve_parallel_workers(cfg, total_jobs, cli_workers=None, verbose=False):
+    """Resolve worker count from CLI, config, scheduler env var, and CPU count."""
+    if total_jobs <= 1:
+        return 1
+
+    if cli_workers is not None:
+        workers = max(1, int(cli_workers))
+        return min(workers, total_jobs)
+
+    configured = cfg.get("parallel_subnetwork_workers", "auto")
+    env_var = str(cfg.get("parallel_worker_env_var", "NSLOTS"))
+    env_raw = os.environ.get(env_var)
+    env_workers = None
+    if env_raw:
+        try:
+            env_workers = max(1, int(env_raw))
+        except Exception:
+            env_workers = None
+
+    if isinstance(configured, str) and configured.strip().lower() in {"auto", ""}:
+        workers = env_workers if env_workers is not None else detect_available_cores()
+    else:
+        workers = max(1, int(configured))
+        if env_workers is not None:
+            workers = min(workers, env_workers)
+
+    workers = min(workers, total_jobs)
+    if verbose:
+        print(
+            "[verbose] parallel worker resolution:",
+            f"configured={configured}",
+            f"env_var={env_var}",
+            f"env_workers={env_workers}",
+            f"detected_cores={detect_available_cores()}",
+            f"resolved={workers}",
+        )
+    return max(1, workers)
+
+
+def run_product_job(
+    cfg,
+    env,
+    source_pickle,
+    network_out_dir,
+    job,
+    verbose=False,
+):
+    """Run one product job dict and return its output metadata."""
+    work_dir, table_out = run_one_product(
+        cfg,
+        env,
+        source_pickle,
+        network_out_dir,
+        job["product_hash"],
+        job["product_smiles"],
+        job["flux_output_path"],
+        verbose=verbose,
+    )
+    return {"work_dir": work_dir, "table_out": table_out, "job": job}
+
+
+def apply_single_core_subprocess_env(cfg, env, verbose=False):
+    """Force spawned subprocesses to one thread unless explicitly disabled."""
+    if not bool(cfg.get("subprocess_single_core", True)):
+        return env
+    thread_vars = cfg.get(
+        "subprocess_thread_env_vars",
+        [
+            "OMP_NUM_THREADS",
+            "MKL_NUM_THREADS",
+            "OPENBLAS_NUM_THREADS",
+            "NUMEXPR_NUM_THREADS",
+            "VECLIB_MAXIMUM_THREADS",
+            "BLIS_NUM_THREADS",
+        ],
+    )
+    out = dict(env)
+    for var_name in list(thread_vars):
+        key = str(var_name).strip()
+        if key:
+            out[key] = "1"
+    if verbose:
+        print(f"[verbose] single-core subprocess env applied: {', '.join([str(v) for v in thread_vars])}")
+    return out
+
+
+def write_resolved_config_snapshot(cfg, network_out_dir, verbose=False):
+    """Write one resolved config snapshot per network for provenance."""
+    snapshot = copy.deepcopy(cfg)
+    for key in list(snapshot.keys()):
+        if str(key).startswith("_"):
+            snapshot.pop(key, None)
+    out_path = network_out_dir / "pipeline_runtime_resolved.yaml"
+    with out_path.open("w") as f:
+        yaml.safe_dump(snapshot, f, sort_keys=False)
+    if verbose:
+        print(f"[verbose] Wrote resolved config snapshot: {out_path}")
+    return out_path
 
 
 def main():
@@ -560,14 +775,25 @@ def main():
         default=None,
         help="Optional direct network pickle path override (bypasses manifest/task selection).",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Optional override for per-network subnetwork worker count.",
+    )
     args = parser.parse_args()
 
     cfg_path = Path(args.config) if args.config else default_config_path()
     cfg, cfg_dir = load_config(cfg_path)
+    mode = apply_output_mode_defaults(cfg, verbose=bool(cfg.get("verbose", False)))
     verbose = bool(cfg.get("verbose", False))
     if verbose:
         print(f"[verbose] Config loaded from {cfg_path}")
         print(f"[verbose] Config dir: {cfg_dir}")
+    print(f"Output mode: {mode} ({OUTPUT_MODE_PRESETS[mode]['description']})")
+    cfg["_resolved_product_run_steps"] = resolve_product_run_steps(cfg)
+    if verbose:
+        print(f"[verbose] product run_steps={cfg['_resolved_product_run_steps']}")
 
     yarp_path = cfg.get("yarp_path")
     env = os.environ.copy()
@@ -580,6 +806,7 @@ def main():
         verify_yarp_import(env, expected_root=yarp_root)
     else:
         verify_yarp_import(env, expected_root=None)
+    env = apply_single_core_subprocess_env(cfg, env, verbose=verbose)
 
     if args.network_pickle:
         source_pickle = Path(args.network_pickle).expanduser().resolve()
@@ -605,6 +832,7 @@ def main():
     network_out_dir.mkdir(parents=True, exist_ok=True)
     if bool(cfg.get("clear_previous_outputs", False)):
         clear_previous_outputs(network_out_dir, verbose=verbose)
+    write_resolved_config_snapshot(cfg, network_out_dir, verbose=verbose)
 
     print(f"Task {task_id}/{len(manifest_rows)} | network: {source_pickle}")
     source_pickle, updated = ensure_dummy_barriers(source_pickle, cfg, verbose=verbose)
@@ -636,6 +864,13 @@ def main():
     if terminals.empty:
         print("No terminal products found.")
         return
+    retain_terminal_table = bool(cfg.get("save_terminal_list", False))
+    if not retain_terminal_table:
+        for p in [terminal_path, terminal_path.with_suffix(".pkl")]:
+            if p.exists() and p.is_file():
+                p.unlink()
+                if verbose:
+                    print(f"[verbose] Removed terminal product table due to output mode: {p}")
 
     only_product_hash = cfg.get("only_product_hash")
     max_products = cfg.get("max_products_per_network")
@@ -657,58 +892,121 @@ def main():
         return
     print(f"Selected terminal products for processing: {len(terminals)}")
 
-    rng = random.Random(int(cfg.get("random_flux_seed", 42)) + task_id)
-    retain_count = max(0, int(cfg.get("random_flux_retain_count", 1)))
-    if bool(cfg.get("save_random_flux_table", False)) and retain_count > 0:
-        keep_count = min(retain_count, len(terminals))
-        random_indices = sorted(rng.sample(range(len(terminals)), k=keep_count))
+    save_flux_tables = bool(cfg.get("save_flux_for_every_subnetwork", False))
+    if save_flux_tables:
+        print(f"Flux profile table retention enabled for all {len(terminals)} product(s).")
     else:
-        random_indices = []
-    random_index_set = set(random_indices)
-    if random_indices:
-        print(f"Retaining random flux tables for {len(random_indices)} product(s): indices={random_indices}")
-    else:
-        print("Random flux table retention disabled.")
+        print("Flux profile table retention disabled.")
     cleanup_mode = str(cfg.get("cleanup_mode", "clean"))
     failure_mode = str(cfg.get("failure_mode", "fail_product_continue_network"))
-
+    keep_failed = cleanup_mode == "debug_keep_failed"
+    jobs = []
     for i, row in terminals.reset_index(drop=True).iterrows():
         product_hash = str(row.get("product_hash", ""))
         product_smiles = row.get("product_smiles")
-        print(f"[{i+1}/{len(terminals)}] product_hash={product_hash} smiles={product_smiles}")
-        keep_failed = cleanup_mode == "debug_keep_failed"
-        random_flux_output_path = None
-        if i in random_index_set:
-            product_label = safe_label(product_hash or product_smiles or "product", verbose=verbose)
-            random_flux_output_path = network_out_dir / f"random_flux_timeseries__{product_label}.parquet"
-        work_dir = None
-        try:
-            work_dir, table_out = run_one_product(
-                cfg,
-                env,
-                source_pickle,
-                network_out_dir,
-                product_hash,
-                product_smiles,
-                random_flux_output_path,
-                verbose=verbose,
+        product_label = safe_label(product_hash or product_smiles or "product", verbose=verbose)
+        flux_output_path = None
+        if save_flux_tables:
+            flux_output_path = network_out_dir / f"flux_timeseries__{product_label}.parquet"
+        jobs.append(
+            {
+                "index": i,
+                "total": len(terminals),
+                "product_hash": product_hash,
+                "product_smiles": product_smiles,
+                "product_label": product_label,
+                "flux_output_path": flux_output_path,
+                "work_dir": network_out_dir / ".tmp" / product_label,
+            }
+        )
+
+    parallel_enabled = bool(cfg.get("parallelize_subnetworks", True))
+    workers = resolve_parallel_workers(cfg, total_jobs=len(jobs), cli_workers=args.max_workers, verbose=verbose)
+    if not parallel_enabled:
+        workers = 1
+    print(f"Subnetwork worker mode: parallelize_subnetworks={parallel_enabled} workers={workers}")
+
+    if workers <= 1:
+        for job in jobs:
+            print(
+                f"[{job['index']+1}/{job['total']}] "
+                f"product_hash={job['product_hash']} smiles={job['product_smiles']}"
             )
-            print(f"Wrote: {table_out}")
-            if cleanup_mode in {"clean", "debug_keep_failed"} and work_dir is not None:
-                cleanup_workdir(work_dir, verbose=verbose)
-        except Exception as exc:
-            print(f"FAILED product {product_hash}: {exc}")
-            if work_dir is not None and not keep_failed:
-                cleanup_workdir(work_dir, verbose=verbose)
-            if failure_mode != "fail_product_continue_network":
-                raise
+            work_dir = None
+            try:
+                work_dir, table_out = run_one_product(
+                    cfg,
+                    env,
+                    source_pickle,
+                    network_out_dir,
+                    job["product_hash"],
+                    job["product_smiles"],
+                    job["flux_output_path"],
+                    verbose=verbose,
+                )
+                print(f"Wrote: {table_out}")
+                if cleanup_mode in {"clean", "debug_keep_failed"} and work_dir is not None:
+                    cleanup_workdir(work_dir, verbose=verbose)
+            except Exception as exc:
+                print(f"FAILED product {job['product_hash']}: {exc}")
+                if work_dir is not None and not keep_failed:
+                    cleanup_workdir(work_dir, verbose=verbose)
+                if failure_mode != "fail_product_continue_network":
+                    raise
+    else:
+        pending = []
+        first_failure = None
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            for job in jobs:
+                print(
+                    f"[queued {job['index']+1}/{job['total']}] "
+                    f"product_hash={job['product_hash']} smiles={job['product_smiles']}"
+                )
+                future = executor.submit(
+                    run_product_job,
+                    cfg,
+                    env,
+                    source_pickle,
+                    network_out_dir,
+                    job,
+                    verbose,
+                )
+                pending.append((future, job))
+
+            future_map = {f: j for f, j in pending}
+            while future_map:
+                done, _ = wait(list(future_map.keys()), return_when=FIRST_COMPLETED)
+                for future in done:
+                    job = future_map.pop(future)
+                    try:
+                        result = future.result()
+                        table_out = result["table_out"]
+                        work_dir = result["work_dir"]
+                        print(
+                            f"[done {job['index']+1}/{job['total']}] "
+                            f"product_hash={job['product_hash']} -> {table_out}"
+                        )
+                        if cleanup_mode in {"clean", "debug_keep_failed"} and work_dir is not None:
+                            cleanup_workdir(work_dir, verbose=verbose)
+                    except Exception as exc:
+                        print(f"FAILED product {job['product_hash']}: {exc}")
+                        if not keep_failed and job.get("work_dir") is not None:
+                            cleanup_workdir(job["work_dir"], verbose=verbose)
+                        if failure_mode != "fail_product_continue_network" and first_failure is None:
+                            first_failure = exc
+                            for other_future in list(future_map.keys()):
+                                other_future.cancel()
+                            future_map.clear()
+                            break
+
+        if first_failure is not None:
+            raise first_failure
 
     tmp_root = network_out_dir / ".tmp"
     if tmp_root.exists() and not any(tmp_root.iterdir()):
         tmp_root.rmdir()
 
-    plot_cfg = cfg.get("plot_export", {}) or {}
-    if bool(plot_cfg.get("enabled", False)):
+    if bool(cfg.get("plot_all_network_flux_outputs", False)):
         run_cmd(
             [
                 sys.executable,
@@ -722,22 +1020,6 @@ def main():
             verbose=verbose,
         )
 
-    if bool(cfg.get("merge_product_tables_per_network", False)):
-        merge_network_tables(
-            network_out_dir,
-            parquet_pattern="product_*.parquet",
-            pkl_pattern="product_*.pkl",
-            out_name="network_products_merged.parquet",
-            verbose=verbose,
-        )
-    if bool(cfg.get("merge_random_flux_tables_per_network", False)):
-        merge_network_tables(
-            network_out_dir,
-            parquet_pattern="random_flux_timeseries*.parquet",
-            pkl_pattern="random_flux_timeseries*.pkl",
-            out_name="network_random_flux_merged.parquet",
-            verbose=verbose,
-        )
     if bool(cfg.get("merge_all_tables_per_network", False)):
         out_name = str(cfg.get("merged_all_table_name", "network_all_rows_merged.parquet"))
         merged_path = merge_all_network_tables(network_out_dir, out_name=out_name, verbose=verbose)

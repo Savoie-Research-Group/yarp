@@ -126,38 +126,10 @@ def load_subnetwork_payload(pickle_path):
             raise ValueError(f"`rxns` payload in {pickle_path} must be a dictionary.")
         return rxns, paths, metadata
 
-    if isinstance(payload, dict) and payload and all(is_reaction_like(v) for v in payload.values()):
-        # Legacy subnetwork pickle: reactions only, no path metadata.
-        return payload, [], {}
-
     reactions = list(iter_reactions(payload))
     if not reactions:
         raise RuntimeError(f"No reaction objects found in pickle payload: {pickle_path}")
     return {idx: rxn for idx, rxn in enumerate(reactions, start=1)}, [], {}
-
-
-def extract_reverse_seed_refs(paths):
-    seed_keys = set()
-    seed_hashes = set()
-
-    for path in paths:
-        if not isinstance(path, list):
-            continue
-        step_rows = [row for row in path if isinstance(row, dict)]
-        if len(step_rows) <= 1:
-            # One-step path is reactant -> product; skip reverse inclusion.
-            continue
-        step_rows.sort(key=lambda r: int(r.get("step", 0)))
-        first_step = step_rows[0]
-
-        rxn_key = first_step.get("rxn_key")
-        rxn_hash = first_step.get("rxn_hash")
-        if rxn_key is not None:
-            seed_keys.add(rxn_key)
-        if rxn_hash is not None:
-            seed_hashes.add(str(rxn_hash))
-
-    return seed_keys, seed_hashes
 
 
 def collect_path_reaction_keys(paths):

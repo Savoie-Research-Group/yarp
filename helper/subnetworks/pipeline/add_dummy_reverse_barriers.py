@@ -5,22 +5,19 @@ For each reaction object found in a reactions container, set `reverse_barrier` t
 is randomly either 20% lower or 20% higher than the forward barrier.
 """
 
-from __future__ import annotations
-
 import pickle
 import random
 from pathlib import Path
-from typing import Any
 
 
-def is_reaction_like(obj: Any) -> bool:
+def is_reaction_like(obj):
     """Return True for objects that look like YARP reaction objects."""
     return hasattr(obj, "reverse_barrier") and (
         hasattr(obj, "forward_barrier") or hasattr(obj, "barrier")
     )
 
 
-def iter_reaction_objects(container: Any):
+def iter_reaction_objects(container):
     """Yield reaction-like objects contained in nested dict/list/tuple/set."""
     seen_container_ids = set()
     stack = [container]
@@ -42,7 +39,7 @@ def iter_reaction_objects(container: Any):
             stack.extend(current)
 
 
-def build_reverse_barrier(forward: Any) -> Any:
+def build_reverse_barrier(forward):
     """Create a reverse barrier object from a forward barrier object."""
     factor = random.choice((0.8, 1.2))
 
@@ -60,12 +57,12 @@ def build_reverse_barrier(forward: Any) -> Any:
 
 
 def add_dummy_reverse_barriers(
-    reactions_payload: Any,
+    reactions_payload,
     *,
-    output_path: str | Path | None = None,
-    seed: int | None = None,
-    verbose: bool = False,
-) -> tuple[Any, Path | None, int, int]:
+    output_path=None,
+    seed=None,
+    verbose=False,
+):
     """Update reverse barriers in an already-loaded reactions object.
 
     Parameters
@@ -109,7 +106,7 @@ def add_dummy_reverse_barriers(
         except (TypeError, ValueError):
             skipped_count += 1
 
-    written_path: Path | None = None
+    written_path = None
     if output_path is not None:
         written_path = Path(output_path)
         written_path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,7 +122,7 @@ def add_dummy_reverse_barriers(
     return updated_payload, written_path, updated_count, skipped_count
 
 
-def load_pickle_payload(pickle_path: str | Path) -> Any:
+def load_pickle_payload(pickle_path):
     """Load a pickle payload with an informative missing-module error."""
     path = Path(pickle_path)
     if not path.exists():

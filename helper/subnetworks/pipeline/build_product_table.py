@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""Build one compact species-level parquet table for a single product subnetwork."""
-
-from __future__ import annotations
+"""Build compact product-level and retained-timeseries tables for one subnetwork."""
 
 import argparse
 import json
@@ -130,6 +128,14 @@ def equation_states(equation):
     left_state = ".".join(left_parts) if left_parts else pd.NA
     right_state = ".".join(right_parts) if right_parts else pd.NA
     return left_state, right_state
+
+
+def parse_reaction_index(reaction_name):
+    """Parse Cantera reaction name like reaction_12 into zero-based index."""
+    try:
+        return int(str(reaction_name).split("_")[-1]) - 1
+    except Exception:
+        return -1
 
 
 def normalize_smiles(smiles):
@@ -264,6 +270,41 @@ def species_hash_lookup(rxns):
                 if sp_hash is not None:
                     lookup[smi].add(str(sp_hash))
     return {k: sorted(v) for k, v in lookup.items()}
+
+
+def state_hash_lookup(rxns):
+    """Map normalized full-state SMILES to observed state hash values."""
+    lookup = {}
+    for rxn in (rxns or {}).values():
+        for state in (getattr(rxn, "reactant", None), getattr(rxn, "product", None)):
+            smi = normalize_smiles_text(state_smiles(state))
+            if not smi:
+                continue
+            lookup.setdefault(smi, set())
+            state_hash = getattr(state, "hash", None)
+            if state_hash is not None:
+                lookup[smi].add(str(state_hash))
+    return {k: sorted(v) for k, v in lookup.items()}
+
+
+def hash_candidates_for_smiles(smiles, *, state_hashes=None, species_hashes=None):
+    """Return ordered unique hash candidates for a normalized state SMILES string."""
+    normalized = normalize_smiles_text(smiles)
+    if not normalized:
+        return []
+    values = []
+    for value in (state_hashes or {}).get(normalized, []):
+        text = clean_text(value)
+        if text:
+            values.append(text)
+    for part in split_smiles(normalized):
+        for value in (species_hashes or {}).get(part, []):
+            text = clean_text(value)
+            if text:
+                values.append(text)
+    if not values:
+        return []
+    return sorted(dict.fromkeys(values))
 
 
 def collect_all_intermediates(rxns, reagent_smiles, product_smiles):
@@ -415,34 +456,6 @@ def iter_yaml_reactions(rxns, reaction_map):
         }
 
 
-def direction_flags(yaml_reactions, reagent_smiles, product_smiles, current_smiles):
-    """Return direction-inclusion flags for one species relative to R and P."""
-    has_r_to_i = False
-    has_i_to_r = False
-    has_i_to_p = False
-    has_p_to_i = False
-
-    for row in yaml_reactions:
-        reactant_parts = row["reactant_parts"]
-        product_parts = row["product_parts"]
-        reverse_enabled = bool(row["reverse_enabled"])
-
-        if reagent_smiles in reactant_parts and current_smiles in product_parts:
-            has_r_to_i = True
-            if reverse_enabled:
-                has_i_to_r = True
-        if current_smiles in reactant_parts and reagent_smiles in product_parts:
-            has_i_to_r = True
-        if current_smiles in reactant_parts and product_smiles in product_parts:
-            has_i_to_p = True
-            if reverse_enabled:
-                has_p_to_i = True
-        if product_smiles in reactant_parts and current_smiles in product_parts:
-            has_p_to_i = True
-
-    return has_r_to_i, has_i_to_r, has_i_to_p, has_p_to_i
-
-
 def direction_flags_for_state(yaml_reactions, reagent_state, terminal_states, current_state):
     """Return state-level direction flags (R<->I and I->P) for one intermediate state."""
     has_r_to_i = False
@@ -587,23 +600,6 @@ def species_flux_timeseries_from_flux_rows(flux_ts, reaction_part_maps):
     return pd.DataFrame(rows)
 
 
-def final_species_flux_lookup(species_flux_df):
-    """Get final-time species in/out cumulative flux values."""
-    if species_flux_df.empty:
-        return {}
-    final_t = float(species_flux_df["time_s"].max())
-    final_rows = species_flux_df[species_flux_df["time_s"] == final_t]
-    lookup = {}
-    for _, row in final_rows.iterrows():
-        lookup[str(row["species_smiles"])] = {
-            "in": float(row["cumulative_in_flux"]),
-            "in_std": float(row.get("cumulative_in_flux_std", 0.0)),
-            "out": float(row["cumulative_out_flux"]),
-            "out_std": float(row.get("cumulative_out_flux_std", 0.0)),
-        }
-    return lookup
-
-
 def write_table(df, out_path):
     """Write parquet table with pickle fallback."""
     out_path = Path(out_path)
@@ -740,25 +736,31 @@ def downsample_timeseries_df(df, interval_s, group_cols):
 
 
 def main():
-    """Build final per-species table and optional random timeseries table."""
+    """Build final per-species table and optional flux timeseries profile table."""
     parser = argparse.ArgumentParser(description="Build compact species datatable.")
     parser.add_argument("--config", default=None)
     parser.add_argument("--subnetwork-pickle", required=True)
     parser.add_argument("--cantera-yaml", required=True)
     parser.add_argument("--to-final-csv", required=True)
-    parser.add_argument("--flux-timeseries-csv", required=True)
+    parser.add_argument("--flux-timeseries-csv", required=False, default=None)
     parser.add_argument("--network-pickle", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--random-flux-output", default=None)
+    parser.add_argument("--flux-output", default=None)
     args = parser.parse_args()
 
     config_path = Path(args.config) if args.config else default_config_path()
     cfg = load_config(config_path)
     preview_rows = max(1, int(cfg.get("table_preview_rows", 10)))
+    output_mode = str(cfg.get("output_mode", "")).strip().lower()
     cleanup_mode = str(cfg.get("cleanup_mode", "clean")).strip().lower()
     datatable_cfg = cfg.get("datatable", {}) or {}
     retained_downsample_seconds = float(datatable_cfg.get("retained_timeseries_downsample_seconds", 0.0) or 0.0)
-    apply_retained_downsample = cleanup_mode in {"clean", "debug_keep_failed"} and retained_downsample_seconds > 0.0
+    if output_mode == "debug":
+        apply_retained_downsample = False
+    elif output_mode in {"subnetwork", "production"}:
+        apply_retained_downsample = retained_downsample_seconds > 0.0
+    else:
+        apply_retained_downsample = cleanup_mode in {"clean", "debug_keep_failed"} and retained_downsample_seconds > 0.0
     rate_cfg = ((cfg.get("cantera_from_subnetworks", {}) or {}).get("rate", {}) or {})
     barrier_label = str(rate_cfg.get("forward_barrier_label", "egat"))
 
@@ -786,21 +788,39 @@ def main():
     included_keys = {row["orig_key"] for row in yaml_reactions}
     if not included_keys:
         included_keys = {str(k) for k in (rxns or {}).keys()}
+    reverse_enabled_by_key = {}
+    for row in yaml_reactions:
+        key_text = clean_text((row or {}).get("orig_key", ""))
+        if not key_text:
+            continue
+        reverse_enabled_by_key[key_text] = bool(
+            reverse_enabled_by_key.get(key_text, False)
+            or bool((row or {}).get("reverse_enabled", False))
+        )
 
     tf = pd.read_csv(args.to_final_csv, low_memory=False)
-    flux_ts = pd.read_csv(args.flux_timeseries_csv, low_memory=False)
+    flux_ts = pd.DataFrame()
+    if args.flux_timeseries_csv:
+        flux_ts = pd.read_csv(args.flux_timeseries_csv, low_memory=False)
     if "from_smiles" in tf.columns:
         tf["from_smiles_norm"] = tf["from_smiles"].map(normalize_smiles_text)
     if "to_smiles" in tf.columns:
         tf["to_smiles_norm"] = tf["to_smiles"].map(normalize_smiles_text)
     tf["source_type"] = tf["source_type"] if "source_type" in tf.columns else pd.NA
+    tf_to_p_flux_col = "flux_to_final_species" if "flux_to_final_species" in tf.columns else "cumulative_abs_flux"
+    tf_to_p_flux_series = (
+        pd.to_numeric(tf[tf_to_p_flux_col], errors="coerce").fillna(0.0).clip(lower=0.0)
+        if tf_to_p_flux_col in tf.columns
+        else pd.Series([0.0] * len(tf), index=tf.index, dtype=float)
+    )
+    tf["to_p_flux"] = tf_to_p_flux_series
+
     species_to_p_flux = {}
     species_to_p_flux_class = {}
-    if {"from_smiles_norm", "cumulative_abs_flux"}.issubset(set(tf.columns)):
-        tf_flux_series = pd.to_numeric(tf["cumulative_abs_flux"], errors="coerce").fillna(0.0)
+    if {"from_smiles_norm", "to_p_flux"}.issubset(set(tf.columns)):
         for from_state, flux_value, source_type in zip(
             tf["from_smiles_norm"],
-            tf_flux_series,
+            tf["to_p_flux"],
             tf["source_type"],
         ):
             from_norm = normalize_smiles_text(from_state)
@@ -960,7 +980,7 @@ def main():
             roles.append("co_product")
         return roles or ["intermediate"]
 
-    total_flux = float(tf["cumulative_abs_flux"].sum()) if "cumulative_abs_flux" in tf.columns else 0.0
+    total_flux = float(tf["to_p_flux"].sum()) if "to_p_flux" in tf.columns else 0.0
     conc_by_smiles_raw = meta.get("final_species_concentration_by_smiles", {}) or {}
     conc_by_smiles = {normalize_smiles_text(k): v for k, v in conc_by_smiles_raw.items() if normalize_smiles_text(k)}
     cantera_run_meta = meta.get("cantera_run", {}) or {}
@@ -1052,7 +1072,6 @@ def main():
     }
     total_flux_to_final_species = float(sum(max(v, 0.0) for v in flux_to_final_by_key.values()))
     species_flux_df = species_flux_timeseries_from_flux_rows(flux_ts, reaction_part_maps)
-    final_species_flux = final_species_flux_lookup(species_flux_df)
     hash_lookup = species_hash_lookup(rxns)
     product_id = str((meta.get("end") or {}).get("hash", ""))
 
@@ -1075,138 +1094,531 @@ def main():
     else:
         status_flag_value = "ok"
 
-    rows = []
-    species_rows = (
-        [("reagent", reagent_smiles)]
-        + [("intermediate", s) for s in intermediates]
-        + [("co_product", s) for s in coproduct_species]
-        + [("product", product_smiles)]
+    state_hashes = state_hash_lookup(rxns)
+    reaction_map_by_name = reaction_map if isinstance(reaction_map, dict) else {}
+    rxn_id_by_key = {
+        clean_text(k): clean_text(v.get("rxn_id", ""))
+        for k, v in reaction_identity_lookup.items()
+    }
+    rxn_hash_by_key = {
+        clean_text(k): clean_text(v.get("rxn_hash", ""))
+        for k, v in reaction_identity_lookup.items()
+    }
+
+    reaction_rows_work = tf.copy()
+    required_cols = {
+        "reaction_index": pd.NA,
+        "reaction_name": pd.NA,
+        "equation": pd.NA,
+        "orig_key": "",
+        "rxn_id": pd.NA,
+        "rxn_hash": pd.NA,
+        "source_type": pd.NA,
+        "from_smiles": pd.NA,
+        "to_smiles": pd.NA,
+        "flux_to_final_species": 0.0,
+        "flux_to_final_species_std": 0.0,
+        "cumulative_abs_flux": 0.0,
+        "cumulative_abs_flux_std": 0.0,
+        "final_rate_of_progress": 0.0,
+        "final_rate_of_progress_std": 0.0,
+    }
+    for col, default_val in required_cols.items():
+        if col not in reaction_rows_work.columns:
+            reaction_rows_work[col] = default_val
+
+    reaction_rows_work["reaction_name"] = reaction_rows_work["reaction_name"].map(clean_text).replace("", pd.NA)
+    reaction_rows_work["orig_key"] = reaction_rows_work["orig_key"].map(clean_text)
+    mapped_orig = reaction_rows_work["reaction_name"].map(
+        lambda name: clean_text((reaction_map_by_name.get(clean_text(name), {}) or {}).get("orig_key", ""))
     )
-    for role, current in species_rows:
+    reaction_rows_work["orig_key"] = [
+        first_nonempty_text(orig, map_orig)
+        for orig, map_orig in zip(reaction_rows_work["orig_key"], mapped_orig)
+    ]
+
+    reaction_rows_work["from_smiles"] = reaction_rows_work["from_smiles"].map(normalize_smiles_text)
+    reaction_rows_work["to_smiles"] = reaction_rows_work["to_smiles"].map(normalize_smiles_text)
+    reaction_rows_work["from_smiles"] = reaction_rows_work["from_smiles"].fillna(
+        reaction_rows_work["orig_key"].map(
+            lambda k: (reaction_state_map.get(clean_text(k), {}) or {}).get("from_smiles", pd.NA)
+        )
+    )
+    reaction_rows_work["to_smiles"] = reaction_rows_work["to_smiles"].fillna(
+        reaction_rows_work["orig_key"].map(
+            lambda k: (reaction_state_map.get(clean_text(k), {}) or {}).get("to_smiles", pd.NA)
+        )
+    )
+    reaction_rows_work["from_smiles"] = reaction_rows_work["from_smiles"].map(normalize_smiles_text)
+    reaction_rows_work["to_smiles"] = reaction_rows_work["to_smiles"].map(normalize_smiles_text)
+
+    if "equation" in reaction_rows_work.columns:
+        parsed_states = reaction_rows_work["equation"].map(equation_states)
+        eq_from = parsed_states.map(lambda pair: pair[0])
+        eq_to = parsed_states.map(lambda pair: pair[1])
+        reaction_rows_work["from_smiles"] = reaction_rows_work["from_smiles"].fillna(eq_from)
+        reaction_rows_work["to_smiles"] = reaction_rows_work["to_smiles"].fillna(eq_to)
+        reaction_rows_work["from_smiles"] = reaction_rows_work["from_smiles"].map(normalize_smiles_text)
+        reaction_rows_work["to_smiles"] = reaction_rows_work["to_smiles"].map(normalize_smiles_text)
+
+    reaction_rows_work["source_type"] = reaction_rows_work["source_type"].map(clean_text).str.upper()
+    reaction_rows_work["source_type"] = reaction_rows_work["source_type"].replace("", pd.NA)
+    reaction_rows_work["source_type"] = reaction_rows_work["source_type"].fillna(
+        reaction_rows_work["from_smiles"].map(
+            lambda smi: (
+                "R"
+                if reagent_smiles and reagent_smiles in split_smiles(normalize_smiles_text(smi))
+                else "I"
+            )
+        )
+    )
+    reaction_rows_work = reaction_rows_work[
+        reaction_rows_work["source_type"].isin({"R", "I"})
+    ].copy()
+
+    needs_backfill = reaction_rows_work["orig_key"].map(
+        lambda k: (not clean_text(k)) or clean_text(k).startswith("reaction_")
+    )
+    if needs_backfill.any():
+        backfilled = []
+        view = reaction_rows_work.loc[needs_backfill, ["orig_key", "reaction_name", "from_smiles", "to_smiles"]]
+        for _, row in view.iterrows():
+            current_orig = clean_text(row.get("orig_key", ""))
+            current_name = clean_text(row.get("reaction_name", ""))
+            from_state = normalize_smiles_text(row.get("from_smiles"))
+            to_state = normalize_smiles_text(row.get("to_smiles"))
+            pair = (from_state, to_state)
+            map_orig = clean_text((reaction_map_by_name.get(current_name, {}) or {}).get("orig_key", ""))
+            candidates = pair_lookup.get(pair, [])
+            chosen = None
+            if map_orig and any(key == map_orig for key, _ in candidates):
+                chosen = next((item for item in candidates if item[0] == map_orig), None)
+            elif current_orig and any(key == current_orig for key, _ in candidates):
+                chosen = next((item for item in candidates if item[0] == current_orig), None)
+            elif candidates:
+                chosen = sorted(candidates, key=lambda item: item[0])[0]
+            if chosen is None and map_orig:
+                chosen = (map_orig, pd.NA)
+            if chosen is None and current_orig and not current_orig.startswith("reaction_"):
+                chosen = (current_orig, pd.NA)
+            resolved_orig = clean_text(chosen[0]) if chosen else current_orig
+            backfilled.append(resolved_orig)
+        reaction_rows_work.loc[needs_backfill, "orig_key"] = backfilled
+
+    reaction_rows_work["orig_key"] = reaction_rows_work["orig_key"].map(clean_text)
+    reaction_rows_work["reaction_index"] = pd.to_numeric(
+        reaction_rows_work["reaction_index"], errors="coerce"
+    )
+    reaction_rows_work["reaction_index"] = reaction_rows_work["reaction_index"].fillna(
+        reaction_rows_work["reaction_name"].map(
+            lambda name: (
+                parse_reaction_index(clean_text(name)) + 1
+                if clean_text(name).startswith("reaction_")
+                else math.nan
+            )
+        )
+    )
+    reaction_rows_work["reaction_index"] = reaction_rows_work["reaction_index"].astype("Int64")
+
+    for metric_col in [
+        "flux_to_final_species",
+        "flux_to_final_species_std",
+        "cumulative_abs_flux",
+        "cumulative_abs_flux_std",
+        "final_rate_of_progress",
+        "final_rate_of_progress_std",
+    ]:
+        reaction_rows_work[metric_col] = pd.to_numeric(
+            reaction_rows_work[metric_col], errors="coerce"
+        ).fillna(0.0)
+
+    mapped_rxn_id = reaction_rows_work["reaction_name"].map(
+        lambda name: clean_text((reaction_map_by_name.get(clean_text(name), {}) or {}).get("rxn_id", ""))
+    )
+    mapped_rxn_hash = reaction_rows_work["reaction_name"].map(
+        lambda name: clean_text((reaction_map_by_name.get(clean_text(name), {}) or {}).get("rxn_hash", ""))
+    )
+    key_rxn_id = reaction_rows_work["orig_key"].map(lambda k: clean_text(rxn_id_by_key.get(clean_text(k), "")))
+    key_rxn_hash = reaction_rows_work["orig_key"].map(lambda k: clean_text(rxn_hash_by_key.get(clean_text(k), "")))
+    reaction_rows_work["rxn_id"] = [
+        first_nonempty_text(a, b, c)
+        for a, b, c in zip(
+            reaction_rows_work["rxn_id"],
+            key_rxn_id,
+            mapped_rxn_id,
+        )
+    ]
+    reaction_rows_work["rxn_hash"] = [
+        first_nonempty_text(a, b, c)
+        for a, b, c in zip(
+            reaction_rows_work["rxn_hash"],
+            key_rxn_hash,
+            mapped_rxn_hash,
+        )
+    ]
+    reaction_rows_work["rxn_id"] = reaction_rows_work["rxn_id"].replace("", pd.NA)
+    reaction_rows_work["rxn_hash"] = reaction_rows_work["rxn_hash"].replace("", pd.NA)
+
+    reaction_rows_work["reaction_obj"] = reaction_rows_work["orig_key"].map(
+        lambda k: get_reaction_by_key(rxns, clean_text(k))
+    )
+    reaction_rows_work["reaction_forward_barrier"] = reaction_rows_work["reaction_obj"].map(
+        lambda rxn: forward_barrier(rxn, barrier_label) if rxn is not None else pd.NA
+    )
+    reaction_rows_work["reaction_reverse_barrier"] = reaction_rows_work["reaction_obj"].map(
+        lambda rxn: reverse_barrier(rxn, barrier_label) if rxn is not None else pd.NA
+    )
+
+    def state_concentration(state_smiles):
+        state_norm = normalize_smiles_text(state_smiles)
+        parts = split_smiles(state_norm)
+        if not parts:
+            return math.nan
+        return float(sum(to_float(conc_by_smiles.get(part, 0.0), default=0.0) for part in parts))
+
+    def p_to_i_included(current_state):
+        current = normalize_smiles_text(current_state)
         if not current:
-            continue
+            return False
+        for row in (yaml_reactions or []):
+            reactant_state = normalize_smiles_text(row.get("reactant_state"))
+            product_state = normalize_smiles_text(row.get("product_state"))
+            reverse_enabled = bool(row.get("reverse_enabled", False))
+            if reactant_state == current and product_state in terminal_state_set and reverse_enabled:
+                return True
+            if reactant_state in terminal_state_set and product_state == current:
+                return True
+        return False
 
-        _, f_rxn = pick_reaction(rxns, reagent_smiles, current, preferred_keys=included_keys)
-        _, r_rxn = pick_reaction(rxns, current, reagent_smiles, preferred_keys=included_keys)
-        r_to_i_f = pd.NA
-        i_to_r_f = pd.NA
-        i_to_p_f = pd.NA
-        p_to_i_f = pd.NA
-        row_flux = total_flux if role in {"reagent", "product"} else 0.0
-        flux_in_out = final_species_flux.get(current, {"in": 0.0, "out": 0.0})
-        hash_candidates = hash_lookup.get(current, [])
-        hash_primary = hash_candidates[0] if hash_candidates else pd.NA
-        is_on_target = bool(role in {"reagent", "product", "co_product"} or current in on_target_set)
-        is_direct_on_target = bool(current in direct_on_target_set)
-        state_candidates = sorted(intermediate_states_by_species.get(current, set()))
-        direct_state_candidates = sorted(direct_states_by_species.get(current, set()))
-        primary_state = state_candidates[0] if state_candidates else pd.NA
+    rows = []
+    total_reaction_to_p_flux = float(
+        reaction_rows_work["flux_to_final_species"].clip(lower=0.0).sum()
+    )
+    path_summary_by_terminal = {}
+    weighted_paths = []
+    total_weighted_path_flux = 0.0
+    for rec in (path_records or []):
+        terminal_key = clean_text(rec.get("terminal_rxn_key", ""))
+        path_flux = max(to_float(rec.get("terminal_flux_to_final_species", 0.0), default=0.0), 0.0)
+        multiplicity = max(1, int(to_float(rec.get("multiplicity", 1), default=1)))
+        weighted_flux = float(path_flux * multiplicity)
+        path_index = int(to_float(rec.get("path_index", 0), default=0))
+        path_smiles = clean_text(rec.get("smiles_path", ""))
+        steps = sorted((rec.get("steps") or []), key=lambda row: int(row.get("step", 0)))
+        path_class = "R->P" if len(steps) <= 1 else "R->I->P"
 
-        if role == "intermediate":
-            related_on_target_states = [
-                state
-                for state in on_target_state_set
-                if current in split_smiles(normalize_smiles_text(state))
-            ]
-            if related_on_target_states:
-                r_to_i_f = False
-                i_to_r_f = False
-                i_to_p_f = False
-                for inter_state in related_on_target_states:
-                    state_r_to_i, state_i_to_r, state_i_to_p = direction_flags_for_state(
-                        yaml_reactions,
-                        reagent_state=reagent_smiles,
-                        terminal_states=terminal_product_states,
-                        current_state=inter_state,
-                    )
-                    r_to_i_f = bool(r_to_i_f or state_r_to_i)
-                    i_to_r_f = bool(i_to_r_f or state_i_to_r)
-                    i_to_p_f = bool(i_to_p_f or state_i_to_p)
-                p_to_i_f = False
-            else:
-                r_to_i_f, i_to_r_f, i_to_p_f, p_to_i_f = direction_flags(
-                    yaml_reactions,
-                    reagent_smiles=reagent_smiles,
-                    product_smiles=product_smiles,
-                    current_smiles=current,
-                )
-            if {"source_type", "from_smiles_norm", "cumulative_abs_flux"}.issubset(set(tf.columns)):
-                mask = (tf["source_type"] == "I") & (tf["from_smiles_norm"] == current)
-                row_flux = float(tf.loc[mask, "cumulative_abs_flux"].sum())
-        elif role == "co_product":
-            if {"to_smiles_norm", "cumulative_abs_flux"}.issubset(set(tf.columns)):
-                mask = tf["to_smiles_norm"].fillna("").astype(str).map(
-                    lambda state: current in split_smiles(normalize_smiles_text(state))
-                )
-                row_flux = float(tf.loc[mask, "cumulative_abs_flux"].sum())
+        total_weighted_path_flux += weighted_flux
+        weighted_paths.append(
+            {
+                "terminal_key": terminal_key,
+                "path_index": path_index,
+                "path_smiles": path_smiles,
+                "path_class": path_class,
+                "weighted_flux": weighted_flux,
+            }
+        )
+        summary = path_summary_by_terminal.setdefault(
+            terminal_key,
+            {
+                "indices": [],
+                "smiles_paths": [],
+                "classes": set(),
+                "weighted_flux_total": 0.0,
+            },
+        )
+        summary["indices"].append(path_index)
+        summary["smiles_paths"].append(path_smiles)
+        summary["classes"].add(path_class)
+        summary["weighted_flux_total"] += weighted_flux
 
+    dominant_path_record = (
+        max(weighted_paths, key=lambda row: float(row.get("weighted_flux", 0.0)))
+        if weighted_paths
+        else None
+    )
+    dominant_path_class_overall = (
+        dominant_path_record.get("path_class", pd.NA)
+        if dominant_path_record is not None
+        else pd.NA
+    )
+    dominant_path_smiles_overall = (
+        dominant_path_record.get("path_smiles", pd.NA)
+        if dominant_path_record is not None
+        else pd.NA
+    )
+    dominant_path_terminal_key = (
+        dominant_path_record.get("terminal_key", pd.NA)
+        if dominant_path_record is not None
+        else pd.NA
+    )
+    dominant_path_weighted_flux = (
+        float(dominant_path_record.get("weighted_flux", 0.0))
+        if dominant_path_record is not None
+        else 0.0
+    )
+    dominant_terminal_rxn_flux = (
+        float(reaction_rows_work["flux_to_final_species"].max())
+        if not reaction_rows_work.empty
+        else 0.0
+    )
+    dominant_terminal_path_flux = (
+        max((float(v.get("weighted_flux_total", 0.0)) for v in path_summary_by_terminal.values()), default=0.0)
+    )
+
+    for _, rxn_row in reaction_rows_work.iterrows():
+        source_type = clean_text(rxn_row.get("source_type", "")).upper()
+        from_state = normalize_smiles_text(rxn_row.get("from_smiles"))
+        to_state = normalize_smiles_text(rxn_row.get("to_smiles"))
+        orig_key = clean_text(rxn_row.get("orig_key", ""))
+        reverse_enabled_for_row = bool(reverse_enabled_by_key.get(orig_key, False))
+        reaction_obj = rxn_row.get("reaction_obj")
+
+        from_hash_candidates = hash_candidates_for_smiles(
+            from_state,
+            state_hashes=state_hashes,
+            species_hashes=hash_lookup,
+        )
+        to_hash_candidates = hash_candidates_for_smiles(
+            to_state,
+            state_hashes=state_hashes,
+            species_hashes=hash_lookup,
+        )
+
+        r_to_i_forward = pd.NA
+        r_to_i_reverse = pd.NA
+        i_to_p_forward = pd.NA
+        i_to_p_reverse = pd.NA
+        r_to_p_forward = pd.NA
+        r_to_p_reverse = pd.NA
+        included_forward_r_to_i = pd.NA
+        included_reverse_i_to_r = pd.NA
+        included_forward_i_to_p = pd.NA
+        included_reverse_p_to_i = pd.NA
+        included_forward_r_to_p = bool(source_type == "R")
+        included_reverse_p_to_r = bool(source_type == "R" and reverse_enabled_for_row)
+        if source_type == "I" and from_state:
+            _, r_to_i_rxn = pick_reaction(rxns, reagent_smiles, from_state, preferred_keys=included_keys)
+            _, i_to_r_rxn = pick_reaction(rxns, from_state, reagent_smiles, preferred_keys=included_keys)
+            r_to_i_forward = forward_barrier(r_to_i_rxn, barrier_label) if r_to_i_rxn is not None else pd.NA
+            r_to_i_reverse = reverse_barrier(r_to_i_rxn, barrier_label) if r_to_i_rxn is not None else pd.NA
+            i_to_p_forward = forward_barrier(reaction_obj, barrier_label) if reaction_obj is not None else pd.NA
+            i_to_p_reverse = reverse_barrier(reaction_obj, barrier_label) if reaction_obj is not None else pd.NA
+            state_r_to_i, state_i_to_r, state_i_to_p = direction_flags_for_state(
+                yaml_reactions,
+                reagent_state=reagent_smiles,
+                terminal_states=terminal_product_states,
+                current_state=from_state,
+            )
+            included_forward_r_to_i = bool(state_r_to_i)
+            included_reverse_i_to_r = bool(state_i_to_r)
+            included_forward_i_to_p = bool(state_i_to_p)
+            included_reverse_p_to_i = bool(p_to_i_included(from_state))
+        elif source_type == "R":
+            r_to_p_forward = forward_barrier(reaction_obj, barrier_label) if reaction_obj is not None else pd.NA
+            r_to_p_reverse = reverse_barrier(reaction_obj, barrier_label) if reaction_obj is not None else pd.NA
+
+        row_flux = max(to_float(rxn_row.get("flux_to_final_species", 0.0), default=0.0), 0.0)
+        row_fraction = (
+            row_flux / total_reaction_to_p_flux
+            if total_reaction_to_p_flux > 0.0
+            else 0.0
+        )
+        path_summary = path_summary_by_terminal.get(orig_key, {})
+        path_indices = sorted(set(path_summary.get("indices", [])))
+        path_smiles_rows = list(
+            dict.fromkeys([s for s in path_summary.get("smiles_paths", []) if clean_text(s)])
+        )
+        terminal_matching_paths = [row for row in weighted_paths if clean_text(row.get("terminal_key")) == orig_key]
+        dominant_terminal_path = (
+            max(terminal_matching_paths, key=lambda row: float(row.get("weighted_flux", 0.0)))
+            if terminal_matching_paths
+            else None
+        )
+        path_classes = sorted(path_summary.get("classes", set()) or [])
+        weighted_terminal_flux = float(path_summary.get("weighted_flux_total", 0.0))
+        weighted_terminal_fraction = (
+            weighted_terminal_flux / total_weighted_path_flux
+            if total_weighted_path_flux > 0.0
+            else 0.0
+        )
+        inferred_path_class = (
+            "|".join(path_classes)
+            if path_classes
+            else ("R->P" if source_type == "R" else "R->I->P")
+        )
         rows.append(
             {
                 "network_id": network_id,
                 "subnetwork_id": subnetwork_id,
                 "product_id": product_id,
-                "run_id": run_id,
-                "created_at_utc": now,
-                "row_role": role,
-                "species_smiles": current,
-                "species_hash_primary": hash_primary,
-                "species_hash_candidates": ";".join(hash_candidates) if hash_candidates else "",
-                "is_on_target": is_on_target,
-                "is_direct_on_target": is_direct_on_target,
                 "source_network_path": network_path,
                 "reagent_smiles": reagent_smiles,
                 "product_smiles": product_smiles,
-                "is_target_product": bool(role == "product"),
-                "intermediate_state_smiles": primary_state,
-                "intermediate_state_smiles_all": ";".join(state_candidates),
-                "direct_intermediate_state_smiles_all": ";".join(direct_state_candidates),
-                "r_to_current_forward_barrier": forward_barrier(f_rxn, barrier_label) if f_rxn is not None else pd.NA,
-                "r_to_current_reverse_barrier": reverse_barrier(r_rxn, barrier_label) if r_rxn is not None else pd.NA,
-                "included_forward_r_to_i_in_yaml": r_to_i_f,
-                "included_reverse_i_to_r_in_yaml": i_to_r_f,
-                "included_forward_i_to_p_in_yaml": i_to_p_f,
-                "included_reverse_p_to_i_in_yaml": p_to_i_f,
-                "included_direct_r_to_p_in_yaml": bool(has_direct_r_to_p_in_yaml),
-                "included_reverse_p_to_r_in_yaml": bool(has_reverse_p_to_r_in_yaml),
-                "direct_on_target_intermediate_count": int(len(direct_on_target_set)),
-                "on_target_intermediate_state_count": int(len(on_target_state_set)),
-                "direct_on_target_intermediate_state_count": int(len(direct_on_target_state_set)),
-                "terminal_product_states": ";".join(sorted(terminal_product_states)),
-                "terminal_completion_mode": terminal_completion_mode,
-                "completion_terminal_species": ";".join(completion_terminal_species),
-                "completion_terminal_species_count": int(len(completion_terminal_species)),
-                "completion_terminal_concentration": completion_terminal_concentration,
-                "missing_reverse_into_reagent_on_direct_count": int(direct_missing_reverse_count),
-                "cumulative_flux_into_p_for_row": row_flux,
-                "flux_to_final_species_for_row": row_flux,
-                "to_p_cumulative_flux_for_row": row_flux,
-                "to_p_flux_class_for_row": (
-                    "R->P"
-                    if role == "reagent"
-                    else ("I->P" if role in {"intermediate", "co_product"} else "")
+                "reaction_index": rxn_row.get("reaction_index", pd.NA),
+                "reaction_name": rxn_row.get("reaction_name", pd.NA),
+                "reaction_label": f"{from_state or '?'} -> {to_state or '?'}",
+                "source_type": source_type,
+                "to_p_flux_class_for_row": "R->P" if source_type == "R" else "I->P",
+                "orig_key": orig_key or pd.NA,
+                "rxn_id": clean_text(rxn_row.get("rxn_id", "")) or pd.NA,
+                "rxn_hash": clean_text(rxn_row.get("rxn_hash", "")) or pd.NA,
+                "from_smiles": from_state,
+                "to_smiles": to_state,
+                "from_yarpecule_hash_primary": from_hash_candidates[0] if from_hash_candidates else pd.NA,
+                "from_yarpecule_hash_candidates": ";".join(from_hash_candidates) if from_hash_candidates else "",
+                "to_yarpecule_hash_primary": to_hash_candidates[0] if to_hash_candidates else pd.NA,
+                "to_yarpecule_hash_candidates": ";".join(to_hash_candidates) if to_hash_candidates else "",
+                "r_to_i_forward_barrier": r_to_i_forward,
+                "r_to_i_reverse_barrier": r_to_i_reverse,
+                "i_to_p_forward_barrier": i_to_p_forward,
+                "i_to_p_reverse_barrier": i_to_p_reverse,
+                "r_to_p_forward_barrier": r_to_p_forward,
+                "r_to_p_reverse_barrier": r_to_p_reverse,
+                "included_forward_r_to_i_in_yaml": included_forward_r_to_i,
+                "included_reverse_i_to_r_in_yaml": included_reverse_i_to_r,
+                "included_forward_i_to_p_in_yaml": included_forward_i_to_p,
+                "included_reverse_p_to_i_in_yaml": included_reverse_p_to_i,
+                "included_forward_r_to_p_in_yaml": included_forward_r_to_p,
+                "included_reverse_p_to_r_in_yaml": included_reverse_p_to_r,
+                "network_has_any_r_to_p_in_yaml": bool(has_direct_r_to_p_in_yaml),
+                "flux_to_final_species_for_row": float(rxn_row.get("flux_to_final_species", 0.0)),
+                "flux_to_final_species_std_for_row": float(rxn_row.get("flux_to_final_species_std", 0.0)),
+                "cumulative_abs_flux_for_row": float(rxn_row.get("cumulative_abs_flux", 0.0)),
+                "cumulative_abs_flux_std_for_row": float(rxn_row.get("cumulative_abs_flux_std", 0.0)),
+                "final_rate_of_progress_for_row": float(rxn_row.get("final_rate_of_progress", 0.0)),
+                "final_rate_of_progress_std_for_row": float(rxn_row.get("final_rate_of_progress_std", 0.0)),
+                "cumulative_flux_into_p_for_row": float(rxn_row.get("flux_to_final_species", 0.0)),
+                "to_p_cumulative_flux_for_row": float(rxn_row.get("flux_to_final_species", 0.0)),
+                "fraction_of_total_flux_into_p": row_fraction,
+                "fraction_of_total_flux_to_final_species_for_row": row_fraction,
+                "to_p_fraction_of_subnetwork_flux_for_row": row_fraction,
+                "fraction_flux_into_p_label": row_fraction,
+                "reaction_path_class": inferred_path_class,
+                "terminal_reaction_path_count": int(len(path_indices)),
+                "terminal_reaction_unique_path_count": int(len(path_smiles_rows)),
+                "terminal_reaction_path_indices": ";".join(str(v) for v in path_indices),
+                "terminal_reaction_paths_smiles": " || ".join(path_smiles_rows),
+                "dominant_terminal_path_smiles": (
+                    dominant_terminal_path.get("path_smiles", pd.NA)
+                    if dominant_terminal_path is not None
+                    else pd.NA
                 ),
-                "cumulative_in_flux_for_row": float(flux_in_out.get("in", 0.0)),
-                "cumulative_in_flux_std_for_row": float(flux_in_out.get("in_std", 0.0)),
-                "cumulative_out_flux_for_row": float(flux_in_out.get("out", 0.0)),
-                "cumulative_out_flux_std_for_row": float(flux_in_out.get("out_std", 0.0)),
-                "net_cumulative_flux_for_row": float(flux_in_out.get("in", 0.0)) - float(flux_in_out.get("out", 0.0)),
-                "fraction_of_total_flux_into_p": (row_flux / total_flux) if total_flux else 0.0,
-                "fraction_of_total_flux_to_final_species_for_row": (row_flux / total_flux) if total_flux else 0.0,
-                "to_p_fraction_of_subnetwork_flux_for_row": (row_flux / total_flux) if total_flux else 0.0,
-                "final_concentration": conc_by_smiles.get(current, pd.NA),
+                "dominant_terminal_path_class": (
+                    dominant_terminal_path.get("path_class", pd.NA)
+                    if dominant_terminal_path is not None
+                    else pd.NA
+                ),
+                "terminal_reaction_weighted_path_flux": weighted_terminal_flux,
+                "terminal_reaction_weighted_path_fraction": weighted_terminal_fraction,
+                "is_dominant_terminal_reaction_by_flux": bool(row_flux >= (dominant_terminal_rxn_flux - 1.0e-15)),
+                "is_dominant_terminal_reaction_by_path_flux": bool(
+                    weighted_terminal_flux >= (dominant_terminal_path_flux - 1.0e-15)
+                ),
+                "dominant_path_class_overall": dominant_path_class_overall,
+                "dominant_path_smiles_overall": dominant_path_smiles_overall,
+                "dominant_path_terminal_rxn_key": dominant_path_terminal_key,
+                "dominant_path_weighted_flux_overall": dominant_path_weighted_flux,
+                "intermediate_final_concentration": (
+                    state_concentration(from_state) if source_type == "I" else math.nan
+                ),
+                "terminal_completion_concentration": float(completion_terminal_concentration),
+                "completion_ratio": (
+                    float(completion_ratio) if math.isfinite(to_float(completion_ratio, default=math.nan)) else math.nan
+                ),
+                "kinetic_trap_flag": bool(kinetic_trap_flag),
                 "status_flag": status_flag_value,
-                **run_conditions,
+                "cantera_temperature_K": run_conditions.get("cantera_temperature_K", math.nan),
+                "cantera_pressure_atm": run_conditions.get("cantera_pressure_atm", math.nan),
+                "cantera_time_sim_s": run_conditions.get("cantera_time_sim_s", math.nan),
+                "cantera_uncertainty_enabled": run_conditions.get("cantera_uncertainty_enabled", pd.NA),
+                "cantera_uncertainty_cycles": run_conditions.get("cantera_uncertainty_cycles", pd.NA),
+                "min_completion_time_s": run_conditions.get("min_completion_time_s", math.nan),
+                "final_sim_time_mean_s": run_conditions.get("final_sim_time_mean_s", math.nan),
+                "final_sim_time_max_s": run_conditions.get("final_sim_time_max_s", math.nan),
+                "path_record_count": int(len(path_records)),
             }
         )
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out_df = pd.DataFrame(rows)
+    if not out_df.empty:
+        out_df["_class_order"] = out_df["source_type"].map({"I": 0, "R": 1}).fillna(2)
+        out_df = out_df.sort_values(
+            ["_class_order", "fraction_of_total_flux_into_p", "reaction_index"],
+            ascending=[True, False, True],
+            kind="stable",
+        ).drop(columns=["_class_order"]).reset_index(drop=True)
+        keep_cols = [
+            "network_id",
+            "subnetwork_id",
+            "product_id",
+            "reagent_smiles",
+            "product_smiles",
+            "reaction_index",
+            "reaction_name",
+            "reaction_label",
+            "source_type",
+            "to_p_flux_class_for_row",
+            "orig_key",
+            "rxn_id",
+            "rxn_hash",
+            "from_smiles",
+            "to_smiles",
+            "from_yarpecule_hash_primary",
+            "to_yarpecule_hash_primary",
+            "r_to_i_forward_barrier",
+            "r_to_i_reverse_barrier",
+            "i_to_p_forward_barrier",
+            "i_to_p_reverse_barrier",
+            "r_to_p_forward_barrier",
+            "r_to_p_reverse_barrier",
+            "included_forward_r_to_i_in_yaml",
+            "included_reverse_i_to_r_in_yaml",
+            "included_forward_i_to_p_in_yaml",
+            "included_reverse_p_to_i_in_yaml",
+            "included_forward_r_to_p_in_yaml",
+            "included_reverse_p_to_r_in_yaml",
+            "network_has_any_r_to_p_in_yaml",
+            "flux_to_final_species_for_row",
+            "flux_to_final_species_std_for_row",
+            "final_rate_of_progress_for_row",
+            "final_rate_of_progress_std_for_row",
+            "fraction_flux_into_p_label",
+            "reaction_path_class",
+            "terminal_reaction_path_count",
+            "terminal_reaction_unique_path_count",
+            "terminal_reaction_path_indices",
+            "terminal_reaction_paths_smiles",
+            "dominant_terminal_path_smiles",
+            "dominant_terminal_path_class",
+            "terminal_reaction_weighted_path_flux",
+            "terminal_reaction_weighted_path_fraction",
+            "is_dominant_terminal_reaction_by_flux",
+            "is_dominant_terminal_reaction_by_path_flux",
+            "dominant_path_class_overall",
+            "dominant_path_smiles_overall",
+            "dominant_path_terminal_rxn_key",
+            "intermediate_final_concentration",
+            "terminal_completion_concentration",
+            "completion_ratio",
+            "kinetic_trap_flag",
+            "status_flag",
+            "cantera_temperature_K",
+            "cantera_pressure_atm",
+            "cantera_time_sim_s",
+            "cantera_uncertainty_cycles",
+            "min_completion_time_s",
+            "final_sim_time_mean_s",
+            "final_sim_time_max_s",
+            "path_record_count",
+        ]
+        out_df = out_df[[c for c in keep_cols if c in out_df.columns]]
     written = write_table(out_df, out)
     print(f"Wrote product datatable: {written}")
     print(out_df.head(preview_rows).to_string(index=False))
 
-    if args.random_flux_output:
+    if args.flux_output:
         tf_cols = [c for c in ["orig_key", "source_type", "from_smiles_norm", "to_smiles_norm"] if c in tf.columns]
         tf_small = tf[tf_cols].copy() if tf_cols else pd.DataFrame()
         flux_ts_work = flux_ts.copy()
@@ -1765,9 +2177,9 @@ def main():
 
         pieces = [df for df in [reaction_df, species_random_df, concentration_df, path_df] if not df.empty]
         random_df = pd.concat(pieces, ignore_index=True, sort=False) if pieces else pd.DataFrame()
-        Path(args.random_flux_output).parent.mkdir(parents=True, exist_ok=True)
-        written_random = write_table(random_df, args.random_flux_output)
-        print(f"Wrote random flux timeseries: {written_random}")
+        Path(args.flux_output).parent.mkdir(parents=True, exist_ok=True)
+        written_random = write_table(random_df, args.flux_output)
+        print(f"Wrote flux timeseries profile: {written_random}")
         print(random_df.head(preview_rows).to_string(index=False))
 
 

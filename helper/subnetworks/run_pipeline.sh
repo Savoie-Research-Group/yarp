@@ -40,7 +40,38 @@ NETWORK_DIR="${NETWORK_DIR:-${ROOT_DIR}/networks}"
 NETWORK_GLOB="${NETWORK_GLOB:-*.pkl}"
 MANIFEST_PATH="${MANIFEST_PATH:-${ROOT_DIR}/networks/manifest.txt}"
 AUTO_BUILD_MANIFEST="${AUTO_BUILD_MANIFEST:-1}"
-RUNTIME_CFG="${RUNTIME_CFG:-${ROOT_DIR}/subnetwork_outputs/.cluster_runtime_config.yaml}"
+RUNTIME_CFG="${RUNTIME_CFG:-}"
+OVERRIDE_OUTPUT_MODE="${OVERRIDE_OUTPUT_MODE:-production}"
+OVERRIDE_OUTPUT_DIR="${OVERRIDE_OUTPUT_DIR:-}"
+LOG_DIR="${LOG_DIR:-${ROOT_DIR}/job_logs}"
+LOG_CLEAN_DIR="${LOG_CLEAN_DIR:-${LOG_DIR}}"
+LOG_CLEAN_HOURS="${LOG_CLEAN_HOURS:-4}"
+LOG_END_MARKER="${LOG_END_MARKER:-TIME_ENDED:}"
+RUNTIME_CFG_AUTO=0
+
+mkdir -p "${LOG_DIR}"
+
+on_exit() {
+  local exit_code=$?
+  echo "${LOG_END_MARKER} $(date -u +%Y-%m-%dT%H:%M:%SZ) JOB_ID=${JOB_ID:-unknown} TASK_ID=${SGE_TASK_ID:-unknown} EXIT_CODE=${exit_code}"
+  if [[ "${RUNTIME_CFG_AUTO:-0}" == "1" ]] && [[ -n "${RUNTIME_CFG:-}" ]] && [[ -f "${RUNTIME_CFG}" ]]; then
+    rm -f "${RUNTIME_CFG}" || true
+  fi
+  if [[ -x "${SCRIPT_DIR}/cleanup_completed_logs.sh" ]]; then
+    "${SCRIPT_DIR}/cleanup_completed_logs.sh" "${LOG_CLEAN_DIR}" "${LOG_CLEAN_HOURS}" "${LOG_END_MARKER}" || true
+  fi
+}
+trap on_exit EXIT
+
+# Avoid shared runtime-config races across array tasks/jobs unless explicitly set.
+if [[ -z "${RUNTIME_CFG}" ]]; then
+  JOB_TAG="${JOB_ID:-nojob}"
+  TASK_TAG="${SGE_TASK_ID:-notask}"
+  TMP_CFG_DIR="${TMPDIR:-/tmp}"
+  mkdir -p "${TMP_CFG_DIR}"
+  RUNTIME_CFG="${TMP_CFG_DIR}/subnetwork_pipeline_runtime.${JOB_TAG}.${TASK_TAG}.yaml"
+  RUNTIME_CFG_AUTO=1
+fi
 
 echo "Using Python: ${PYTHON_BIN}"
 "${PYTHON_BIN}" -c "import sys; import yarp; print('sys.executable=', sys.executable); print('yarp=', yarp.__file__)"
@@ -76,17 +107,24 @@ import yaml
 cfg_path = Path(r"""${PIPELINE_CFG}""").expanduser().resolve()
 manifest_path = Path(r"""${MANIFEST_PATH}""").expanduser().resolve()
 runtime_cfg = Path(r"""${RUNTIME_CFG}""").expanduser().resolve()
+override_output_mode = r"""${OVERRIDE_OUTPUT_MODE}""".strip()
+override_output_dir = r"""${OVERRIDE_OUTPUT_DIR}""".strip()
 cfg = yaml.safe_load(cfg_path.read_text()) or {}
 if not isinstance(cfg, dict):
     raise RuntimeError(f"Pipeline config must be a mapping: {cfg_path}")
+
 cfg["network_manifest"] = str(manifest_path)
+if override_output_mode:
+    cfg["output_mode"] = override_output_mode
+if override_output_dir:
+    cfg["output_dir"] = override_output_dir
+
 runtime_cfg.write_text(yaml.safe_dump(cfg, sort_keys=False))
 print(f"Runtime config written: {runtime_cfg}")
 print(f"Runtime manifest: {manifest_path}")
+print(f"Configured output_mode={cfg.get('output_mode')}")
 print(f"Configured max_products_per_network={cfg.get('max_products_per_network')}")
-print(f"Configured random_flux_retain_count={cfg.get('random_flux_retain_count')}")
-print(f"Configured merge_all_tables_per_network={cfg.get('merge_all_tables_per_network')}")
-print(f"Configured plot_export.enabled={((cfg.get('plot_export') or {}).get('enabled'))}")
+print(f"Configured output_dir={cfg.get('output_dir')}")
 PY
 
 cd "$ROOT_DIR"

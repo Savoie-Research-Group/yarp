@@ -39,13 +39,35 @@ def get_current_reactions(reaction_dict,depth_dict,expl_nodes,curr_depth):
     rev_rxns = filtered_rev
     return for_rxns,rev_rxns
 
-def get_rate_constant(rsmi_list,P):
+def get_rate_constant(rsmi_list, T, P):
+    """
+    Returns the ideal-gas TST prefactor for an elementary reaction
+    along with the molecularity.
+
+    Parameters
+    ----------
+    rsmi_list : list
+        List of reactant SMILES (or reactant identifiers).
+    T : float
+        Temperature (K).
+    P : float
+        Standard-state pressure (Pa).
+
+    Returns
+    -------
+    k_prefactor : float
+        TST prefactor before the activation free-energy term.
+    molecularity : int
+        Number of reactant molecules.
+    """
+
     molecularity = len(rsmi_list)
-    K_HAT = 1
-    kB = 1.380649*10**-23
-    h = 6.62607015*10**-34
-    R = 0.000082057366080960
-    return (K_HAT*kB/h*(R/P)**(molecularity-1)),(molecularity)
+
+    kB = 1.380649e-23      # J/K
+    h  = 6.62607015e-34    # J*s
+    R  = 8.314462618       # J/mol/K
+
+    return (kB*T/h*((R*T)/P)**(molecularity-1)), molecularity
 
 def _element_sort_key(symbol):
     preferred = ["C", "H", "O", "N", "S", "P", "F", "Cl", "Br", "I"]
@@ -161,7 +183,7 @@ def write_yaml(
             ys.write(f'- equation: "{eqn}"\n')
             if equation_counts.get(eqn, 0) > 1:
                 ys.write("  duplicate: true\n")
-            rc,b = get_rate_constant(reaction_dict[ws]['reactants'],P)
+            rc,b = get_rate_constant(reaction_dict[ws]['reactants'], T, P)
             ys.write("  rate-constant: {A: ")
             ys.write(f"{rc}, b: {b}, Ea: {reaction_dict[ws]['barrier']}")
             ys.write("}\n")
@@ -173,7 +195,7 @@ def write_yaml(
             ys.write(f'- equation: "{eqn}"\n')
             if equation_counts.get(eqn, 0) > 1:
                 ys.write("  duplicate: true\n")
-            rc,b = get_rate_constant(reaction_dict[ws]['products'],P)
+            rc,b = get_rate_constant(reaction_dict[ws]['products'], T, P)
             ys.write("  rate-constant: {A: ")
             ys.write(f"{rc}, b: {b}, Ea: {reaction_dict[ws]['barrier']-reaction_dict[ws]['dG']}")
             ys.write("}\n")
@@ -190,7 +212,7 @@ def _build_isothermal_const_pressure_reactor(sol):
     last_error = None
     for ctor in constructors:
         try:
-            return ctor(sol, energy='off', name='isothermal_reactor')
+            return ctor(sol, energy='off', name='isothermal_reactor', clone=False)
         except TypeError as exc:
             last_error = exc
         try:
@@ -513,7 +535,6 @@ def build_and_run_reactor(input_file,time_sim,time_step,rule,curr_depth,uncertai
                 '75th percentile': quartile_75,
                 'number of values': num})
         sorted_by_mean = sorted(stats, key=lambda x: x['mean'], reverse=True)
-        sorted_by_median = sorted(stats, key=lambda x: x['median'], reverse=True)
         net_states = [(stat['mean'], stat['species'], stat['index']) for stat in sorted_by_mean]
         if write_excel:
             with pd.ExcelWriter(f"ct_out_{curr_depth}_stats.xlsx") as writer:

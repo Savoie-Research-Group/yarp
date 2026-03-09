@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Run Cantera over subnetwork YAMLs and write one run YAML plus pickle metadata updates."""
 
-from __future__ import annotations
-
 import argparse
 import csv
 import math
@@ -852,29 +850,96 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
     if isinstance(extend_seconds_raw, str) and extend_seconds_raw.strip().lower() in {"", "none", "null"}:
         extend_seconds_raw = None
     extend_seconds_cfg = None if extend_seconds_raw is None else float(extend_seconds_raw)
-    net_states, states, details = build_and_run_reactor(
-        str(yaml_path),
-        float(reactor_cfg.get("time_sim", 100.0)),
-        float(reactor_cfg.get("time_step", 0.1)),
-        str(reactor_cfg.get("rule", "css")),
-        int(reactor_cfg.get("curr_depth", 1)),
-        uncertainty=bool(reactor_cfg.get("uncertainty", True)),
-        uncertainty_cycles=int(reactor_cfg.get("uncertainty_cycles", 30)),
-        scale=float(reactor_cfg.get("scale", 3.0)),
-        write_excel=bool(reactor_cfg.get("write_excel", False)),
-        terminal_species=terminal_species_cfg,
-        fraction_basis=str(reactor_cfg.get("fraction_basis", "X")),
-        completion_tol=completion_tol_cfg,
-        completion_target=completion_target_value,
-        completion_hold_steps=int(reactor_cfg.get("completion_hold_steps", 5)),
-        completion_dxdt_tol=float(reactor_cfg.get("completion_dxdt_tol", 0.0)),
-        min_completion_time=min_completion_time_cfg,
-        debug_fraction=bool(reactor_cfg.get("debug_fraction", False)),
-        extend_if_not_complete=bool(reactor_cfg.get("extend_if_not_complete", False)),
-        extend_seconds=extend_seconds_cfg,
-        max_time_multiplier=float(reactor_cfg.get("max_time_multiplier", 10.0)),
-        return_details=True,
-    )
+    output_cfg = cfg.get("output", {}) or {}
+    try:
+        net_states, states, details = build_and_run_reactor(
+            str(yaml_path),
+            float(reactor_cfg.get("time_sim", 100.0)),
+            float(reactor_cfg.get("time_step", 0.1)),
+            str(reactor_cfg.get("rule", "css")),
+            int(reactor_cfg.get("curr_depth", 1)),
+            uncertainty=bool(reactor_cfg.get("uncertainty", True)),
+            uncertainty_cycles=int(reactor_cfg.get("uncertainty_cycles", 30)),
+            scale=float(reactor_cfg.get("scale", 3.0)),
+            write_excel=bool(reactor_cfg.get("write_excel", False)),
+            terminal_species=terminal_species_cfg,
+            fraction_basis=str(reactor_cfg.get("fraction_basis", "X")),
+            completion_tol=completion_tol_cfg,
+            completion_target=completion_target_value,
+            completion_hold_steps=int(reactor_cfg.get("completion_hold_steps", 5)),
+            completion_dxdt_tol=float(reactor_cfg.get("completion_dxdt_tol", 0.0)),
+            min_completion_time=min_completion_time_cfg,
+            debug_fraction=bool(reactor_cfg.get("debug_fraction", False)),
+            extend_if_not_complete=bool(reactor_cfg.get("extend_if_not_complete", False)),
+            extend_seconds=extend_seconds_cfg,
+            max_time_multiplier=float(reactor_cfg.get("max_time_multiplier", 10.0)),
+            return_details=True,
+        )
+    except Exception as exc:
+        error_text = f"{exc.__class__.__name__}: {exc}"
+        print(f"[warning] solver failure for {yaml_path.name}: {error_text}")
+
+        run_payload = {
+            "run": {
+                "input_yaml": str(yaml_path),
+                "subnetwork_pickle": str(pickle_path),
+                "rule": reactor_cfg.get("rule", "css"),
+                "time_sim": float(reactor_cfg.get("time_sim", 100.0)),
+                "time_step": float(reactor_cfg.get("time_step", 0.1)),
+                "uncertainty": bool(reactor_cfg.get("uncertainty", True)),
+                "uncertainty_cycles": int(reactor_cfg.get("uncertainty_cycles", 30)),
+                "scale": float(reactor_cfg.get("scale", 3.0)),
+                "terminal_completion_mode": terminal_completion_mode,
+                "completion_terminal_species": completion_terminal_species,
+                "completion_target_value": float(completion_target_value),
+                "min_completion_time": float(min_completion_time_cfg),
+                "status": "solver_failed",
+                "solver_error": error_text,
+            }
+        }
+
+        if bool(output_cfg.get("write_run_yaml", True)):
+            run_yaml_suffix = str(output_cfg.get("run_yaml_suffix", ".run.yaml"))
+            run_yaml_path = yaml_path.with_suffix(run_yaml_suffix)
+            dump_yaml(run_yaml_path, run_payload)
+        # Always emit an empty to_final table so downstream steps can continue.
+        table_suffix = str(output_cfg.get("final_product_flux_table_suffix", ".to_final.csv"))
+        table_path = yaml_path.with_suffix(table_suffix)
+        write_final_product_flux_table(table_path, [])
+        # Emit empty optional tables if they are enabled.
+        if bool(output_cfg.get("write_reaction_flux_table", False)):
+            rxn_suffix = str(output_cfg.get("reaction_flux_table_suffix", ".flux.csv"))
+            write_reaction_flux_table(yaml_path.with_suffix(rxn_suffix), [])
+        if bool(output_cfg.get("write_flux_timeseries_table", True)):
+            ts_suffix = str(output_cfg.get("flux_timeseries_table_suffix", ".flux_timeseries.csv"))
+            write_flux_timeseries_table(yaml_path.with_suffix(ts_suffix), [])
+
+        if bool(output_cfg.get("update_subnetwork_pickle_metadata", True)):
+            payload.setdefault("metadata", {})
+            payload["metadata"]["cantera_run"] = {
+                "input_yaml": str(yaml_path),
+                "status": "solver_failed",
+                "solver_error": error_text,
+                "terminal_completion_mode": terminal_completion_mode,
+                "completion_terminal_species": completion_terminal_species,
+                "completion_target_value": float(completion_target_value),
+                "min_completion_time": float(min_completion_time_cfg),
+            }
+            with pickle_path.open("wb") as f:
+                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return {
+            "yaml_path": yaml_path,
+            "pickle_path": pickle_path,
+            "final_species_smiles": "solver_failed",
+            "final_species_concentration": float("nan"),
+            "all_reaction_flux_zero": True,
+            "flux_direction_failures": 0,
+            "missing_direction_pairs": 0,
+            "flux_direction_check_enabled": False,
+            "solver_failed": True,
+            "solver_error": error_text,
+        }
 
     species = [normalize_smiles_text(s) or str(s) for s in (details.get("species", []) or [])]
     if end_smiles in species:
@@ -1133,7 +1198,6 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
         "flux_direction_checks": flux_direction_checks,
     }
 
-    output_cfg = cfg.get("output", {}) or {}
     preview_rows = int(output_cfg.get("table_preview_rows", 5))
     if bool(output_cfg.get("write_run_yaml", True)):
         run_yaml_suffix = str(output_cfg.get("run_yaml_suffix", ".run.yaml"))
@@ -1361,6 +1425,8 @@ def main():
         )
         if summary.get("all_reaction_flux_zero"):
             line += " | WARNING: all reaction cumulative fluxes are zero"
+        if summary.get("solver_failed"):
+            line += f" | solver_failed={summary.get('solver_error', '')}"
         if summary.get("flux_direction_check_enabled"):
             line += (
                 f" | flux_dir_failures={summary.get('flux_direction_failures', 0)}"
@@ -1379,6 +1445,7 @@ def main():
             f"final={s['final_species_smiles']} | x_final={s['final_species_concentration']:.6e}"
             f" | flux_dir_failures={s.get('flux_direction_failures', 0)}"
             f" | missing_RI_pairs={s.get('missing_direction_pairs', 0)}"
+            f" | solver_failed={bool(s.get('solver_failed', False))}"
         )
     if len(summaries) > max_print:
         print(f"... and {len(summaries) - max_print} more files")

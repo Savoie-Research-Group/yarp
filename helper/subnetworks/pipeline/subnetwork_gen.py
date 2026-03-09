@@ -11,12 +11,9 @@ Pipeline:
 6. Save per-terminal subnetworks as pickle files.
 """
 
-from __future__ import annotations
-
 import argparse
 import pickle
 from pathlib import Path
-from typing import Any
 
 from rdkit import Chem
 from yarp.network.network import network
@@ -283,8 +280,6 @@ def save_subnetworks(source_pickle,rxns_payload,crn,start_yp,paths,subnet_cfg,lo
     node_id_style = subnet_cfg.get("node_id_style", "inchi")
     prefix_with_source_name = bool(subnet_cfg.get("prefix_with_source_name", True))
     max_saved_to_print = int(log_cfg.get("max_saved_to_print", 25))
-    only_end_hash = subnet_cfg.get("only_end_hash")
-    only_end_smiles = subnet_cfg.get("only_end_smiles")
 
     start_dir_label = _safe_label(_node_id(start_yp, node_id_style))
     start_file_label = _safe_label(_node_id(start_yp, node_id_style))
@@ -312,10 +307,6 @@ def save_subnetworks(source_pickle,rxns_payload,crn,start_yp,paths,subnet_cfg,lo
     skipped_groups = 0
 
     for end_yp, path_list in paths.items():
-        if only_end_hash and str(getattr(end_yp, "hash", "")) != str(only_end_hash):
-            continue
-        if only_end_smiles and str(getattr(end_yp, "canon_smi", "")) != str(only_end_smiles):
-            continue
         if len(path_list) < min_paths_to_save:
             skipped_groups += 1
             continue

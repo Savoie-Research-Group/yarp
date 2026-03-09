@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Write terminal product list for one YARP network pickle."""
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 

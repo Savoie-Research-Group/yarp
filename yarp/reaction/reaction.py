@@ -78,10 +78,10 @@ class reaction:
 
         self.heat_of_rxn = dict()
 
-        self.max_flux = 0.0
-
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
         self.hash = reaction_hash(self)
+        
+        self.network_meta = dict()  # placeholder for storing metadata related to reaction network generation + subnetwork kinetics
 
     def gen_initial_path(self, input):
 

@@ -10,19 +10,29 @@ import argparse
 import pickle
 from tabulate import tabulate
 
+def _format_optional_barrier(value):
+    if value is None:
+        return "none"
+    return f"{value:.5}"
+
 def main(args):
     file = args.filename
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
-    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Max Flux']
+    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Reverse EGAT barrier']
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
-        if 'egat' in rxn.barrier:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, f"{rxn.barrier['egat']:.5}", f"{rxn.max_flux:.5g}"])
-        else:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
+        egat_barrier = rxn.barrier.get('egat') if rxn.barrier else None
+        reverse_egat_barrier = rxn.reverse_barrier.get('egat') if rxn.reverse_barrier else None
+        data.append([
+            rxn.id,
+            rxn.reactant.canon_smi,
+            rxn.product.canon_smi,
+            _format_optional_barrier(egat_barrier),
+            _format_optional_barrier(reverse_egat_barrier),
+        ])
         
         # optionally, generate PDFs for each reactant/product pair
         if args.visualize:

@@ -16,6 +16,10 @@ from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
+# RDKit warning suppression is configured in input_parsers.py.
+from openbabel import openbabel as ob
+ob.obErrorLog.SetOutputLevel(ob.obError)  # keep only errors, hide warnings
+
 
 class yarpecule:
     """
@@ -88,6 +92,7 @@ class yarpecule:
         self._q = 0
         self._masses = None
         self._adj_mat = None
+        self._atom_info = None  # Dictionary for retaining atom info (index, ID, isotope, etc.)
 
         self._read_structure(mol, mode)
 

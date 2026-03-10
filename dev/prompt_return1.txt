@@ -1,0 +1,810 @@
+Below is the design I would recommend for a reviewable, custom Python parser/generator that is strict about map IDs, drops stereo on output, emits uppercase explicit-bond SMILES, and has a deterministic aromatic fallback instead of relying on a single toolkit kekulization step. One important framing point: OpenSMILES standardizes syntax, but not one universal canonicalization algorithm, so your project should define its own canonicalization contract explicitly. Daylight also distinguishes ordinary valid SMILES from a special “unique SMILES,” and modern toolkits expose their own canonicalization behavior and options rather than a cross-tool standard.
+
+1) Recommended architecture
+
+Keep the implementation split into small modules with clear responsibilities:
+
+smiles_core/
+  model.py          # dataclasses: Atom, Bond, Molecule, ParseWarning
+  tokenize.py       # lexical scanner: atoms, brackets, bonds, ring tokens, branches, stereo tokens
+  parse.py          # builds graph; preserves raw stereo markers only in metadata
+  mapping.py        # validate existing map ids, fill missing ids, heavy-first then H
+  aromatic.py       # aromatic-intent handling + deterministic fallback localization
+  canon.py          # canonical ranking + canonical traversal + tie-breaking
+  write.py          # emits uppercase explicit-bond SMILES and mapped SMILES
+  api.py            # public entry points
+  errors.py         # ParseError, DuplicateMapError, ValenceError, AromaticResolutionError
+
+  Core data model
+
+  @dataclass
+class Atom:
+    idx: int
+    symbol: str               # normalized element, e.g. "C", "N", "Cl"
+    isotope: int | None = None
+    charge: int = 0
+    hydrogens: int | None = None   # explicit bracket H count if present
+    atom_map: int | None = None
+    aromatic_hint: bool = False    # parsed from lowercase aromatic input
+    stereo: dict = field(default_factory=dict)  # {"atom_parity": "@"/"@@"}
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class Bond:
+    idx: int
+    a1: int
+    a2: int
+    order: int                 # 1, 2, 3
+    aromatic_hint: bool = False
+    stereo: dict = field(default_factory=dict)  # {"bond_dir": "/" or "\\"}
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class Molecule:
+    atoms: list[Atom]
+    bonds: list[Bond]
+    adj: dict[int, list[int]]     # atom_idx -> bond indices
+    metadata: dict = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+
+    Function boundaries
+
+def parse_smiles(text: str, *, strict: bool = True) -> Molecule
+def validate_map_ids(mol: Molecule) -> None
+def fill_missing_map_ids(mol: Molecule, start: int = 0) -> None
+def resolve_aromaticity(mol: Molecule, *, mode: str = "deterministic") -> Molecule
+def canonical_rank_atoms(mol: Molecule) -> list[int]
+def reorder_to_canonical(mol: Molecule, ranks: list[int]) -> Molecule
+def to_canonical_smiles(mol: Molecule) -> str
+def to_canonical_mapped_smiles(mol: Molecule) -> str
+
+That separation makes code review much easier: parsing, mapping, aromatic resolution, canonicalization, and writing can all be discussed independently. It also matches how the literature and toolkit docs separate syntax, aromaticity/perception, and canonical string generation.
+
+2) Canonicalization strategy options
+Option A: Custom canonicalization inside your parser
+
+Use a Morgan/WL-style iterative refinement to assign initial atom invariants, then refine with neighborhood signatures until stable, then do deterministic DFS traversal from the lowest-ranked atom.
+
+Recommended invariants:
+
+atomic number / symbol
+
+formal charge
+
+isotope
+
+explicit H count
+
+degree
+
+valence / valence deficit
+
+ring membership
+
+localized bond orders
+
+aromatic-hint provenance only as a tiebreaker, not as emitted syntax
+
+ignore atom-map numbers entirely in ranking
+
+This is the best fit for your constraints because you want canonical strings that are independent of user-provided maps, while still preserving those exact IDs in the mapped output. RDKit exposes the same idea at the API level: canonical SMILES generation can be instructed to ignore atom-map numbers during canonicalization, and it separately exposes canonical atom ranking.
+
+Pros
+
+fully auditable
+
+stable across versions of your own codebase
+
+easy to make “map-agnostic canonicalization” part of the contract
+
+Cons
+
+hardest to get perfect on high-symmetry graphs
+
+tie-breaking logic needs careful testing
+
+Option B: Toolkit-assisted ranking, custom writing
+
+Use RDKit or another toolkit only to obtain a canonical rank order, then emit your own project-specific output:
+
+uppercase only
+
+all bonds explicit
+
+no stereo emission
+
+user maps preserved exactly in mapped mode
+
+This is pragmatic, but it makes the canonical form partly toolkit-version-dependent. RDKit documents canonical generation, explicit-bond output, and atom-map-agnostic canonicalization, but also notes that kekulized output is not canonical.
+
+Pros
+
+fast to implement
+
+good behavior on symmetry
+
+useful as a regression oracle
+
+Cons
+
+output may drift with toolkit changes
+
+“canonical uppercase explicit-bond SMILES” is still your format, not standard toolkit canonical SMILES
+
+Option C: InChI-assisted labels (“Universal SMILES”-style)
+
+O’Boyle’s Universal SMILES approach uses InChI canonical labels and then generates a canonical SMILES from them. It is attractive when you want label stability across input orderings. The tradeoff is that you inherit InChI’s normalization choices or auxiliary-label semantics, depending on the variant.
+
+Pros
+
+very strong canonical labeling basis
+
+literature-backed
+
+Cons
+
+extra dependency
+
+can be awkward for metals, delocalized charge cases, and parser-local semantics
+
+less natural for a custom, map-preserving reaction workflow
+
+My recommendation
+
+Use Option A in production, and keep Option B as a test oracle during development.
+
+That gives you:
+
+a stable project-defined canonical form
+
+no silent toolkit dependency in core output
+
+a way to compare your canonical ordering against RDKit on ordinary cases
+
+3) Aromatic handling options and tradeoffs
+Ground rule
+
+Because you want uppercase explicit-bond output and no stereo output, aromatic lowercase input should be treated as input intent, not as output syntax. Daylight’s documentation is explicit that aromatic input is a shortcut and that aromaticity is perceived internally; it also shows that some lowercase aromatic inputs are converted to valence-safe localized forms while impossible cases should be rejected.
+
+Option 1: “Parse lowercase, then call toolkit kekulize”
+
+This is the simplest, but not enough for your requirement. RDKit explicitly says kekulized SMILES output is not canonical and can fail on some structures.
+
+Use only as a fallback oracle, not as the sole implementation.
+
+Option 2: Deterministic localized-bond assignment with valence safety
+
+This is the best fit.
+
+Recommended deterministic fallback strategy
+
+Parse lowercase aromatic atoms/bonds as:
+
+atom.aromatic_hint = True
+
+bond.aromatic_hint = True
+
+preserve original token provenance in metadata
+
+Identify each connected aromatic-hint subgraph.
+
+Build a bond-order assignment problem over that subgraph:
+
+candidate edges are aromatic-hint edges
+
+allowed localized orders are single/double
+
+preserve formal charges and bracket H counts
+
+do not exceed allowed valence for each atom
+
+respect heteroatom donor/acceptor patterns conservatively
+
+Solve using:
+
+maximum matching / constrained search for double bonds
+
+reject assignments that violate atom valence or explicit H/charge constraints
+
+If multiple valid assignments exist:
+
+choose the one with the lexicographically smallest edge-order signature under your provisional canonical ranks
+
+If no valid assignment exists:
+
+in strict=True, raise AromaticResolutionError
+
+in strict=False, emit a warning and downgrade the subgraph to a valence-safe nonaromatic form only if one exists; otherwise still error
+
+This lines up well with the practical lessons in Daylight and with O’Boyle’s discussion that many canonicalization failures in practice are really kekulization/aromatic-model failures, not traversal failures.
+
+Option 3: Fully reproduce a Daylight- or RDKit-like aromaticity model
+
+Possible, but a bigger project. RDKit documents one aromaticity model and notes that aromaticity models differ across toolkits.
+
+Recommendation: keep your model smaller and more explicit:
+
+aromatic lowercase is parsed robustly
+
+output is always localized uppercase explicit-bond form
+
+aromaticity only helps determine valid localized bond assignments
+
+4) Reference implementation sketch
+
+This is a robust sketch, not a full production parser. It shows the boundaries and the critical pieces for your constraints.
+
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from collections import defaultdict
+from typing import Optional, Iterable
+import heapq
+
+
+# -----------------------------
+# errors.py
+# -----------------------------
+
+class SmilesError(Exception):
+    pass
+
+class ParseError(SmilesError):
+    pass
+
+class DuplicateMapError(SmilesError):
+    pass
+
+class ValenceError(SmilesError):
+    pass
+
+class AromaticResolutionError(SmilesError):
+    pass
+
+
+# -----------------------------
+# model.py
+# -----------------------------
+
+@dataclass
+class Atom:
+    idx: int
+    symbol: str
+    isotope: Optional[int] = None
+    charge: int = 0
+    hydrogens: Optional[int] = None
+    atom_map: Optional[int] = None
+    aromatic_hint: bool = False
+    stereo: dict = field(default_factory=dict)   # {"atom_parity": "@"/"@@"}
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class Bond:
+    idx: int
+    a1: int
+    a2: int
+    order: int = 1
+    aromatic_hint: bool = False
+    stereo: dict = field(default_factory=dict)   # {"bond_dir": "/" or "\\"}
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class Molecule:
+    atoms: list[Atom] = field(default_factory=list)
+    bonds: list[Bond] = field(default_factory=list)
+    adj: dict[int, list[int]] = field(default_factory=lambda: defaultdict(list))
+    metadata: dict = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+
+    def add_atom(self, atom: Atom) -> int:
+        self.atoms.append(atom)
+        self.adj.setdefault(atom.idx, [])
+        return atom.idx
+
+    def add_bond(self, bond: Bond) -> int:
+        self.bonds.append(bond)
+        self.adj[bond.a1].append(bond.idx)
+        self.adj[bond.a2].append(bond.idx)
+        return bond.idx
+
+    def neighbors(self, atom_idx: int) -> list[tuple[int, Bond]]:
+        out = []
+        for bidx in self.adj[atom_idx]:
+            bond = self.bonds[bidx]
+            nbr = bond.a2 if bond.a1 == atom_idx else bond.a1
+            out.append((nbr, bond))
+        return out
+
+
+# -----------------------------
+# mapping.py
+# -----------------------------
+
+HEAVY_ATOMIC_SYMBOLS = {
+    "B","C","N","O","F","P","S","Cl","Br","I","Si","Se","As"
+}
+
+def validate_map_ids(mol: Molecule) -> None:
+    used = {}
+    for atom in mol.atoms:
+        if atom.atom_map is None:
+            continue
+        if atom.atom_map in used:
+            raise DuplicateMapError(
+                f"duplicate atom-map id {atom.atom_map} on atoms "
+                f"{used[atom.atom_map]} and {atom.idx}"
+            )
+        used[atom.atom_map] = atom.idx
+
+def _is_heavy(atom: Atom) -> bool:
+    return atom.symbol != "H"
+
+def fill_missing_map_ids(mol: Molecule, start: int = 0) -> None:
+    """
+    Fill only missing atom maps.
+    Preserve all user-provided map ids exactly.
+    Heavy atoms first, then H.
+    """
+    validate_map_ids(mol)
+
+    used = {a.atom_map for a in mol.atoms if a.atom_map is not None}
+    next_id = start
+
+    def alloc() -> int:
+        nonlocal next_id
+        while next_id in used:
+            next_id += 1
+        out = next_id
+        used.add(out)
+        next_id += 1
+        return out
+
+    unmapped_heavy = [a for a in mol.atoms if a.atom_map is None and _is_heavy(a)]
+    unmapped_h = [a for a in mol.atoms if a.atom_map is None and not _is_heavy(a)]
+
+    for atom in unmapped_heavy + unmapped_h:
+        atom.atom_map = alloc()
+
+
+# -----------------------------
+# aromatic.py
+# -----------------------------
+
+_ALLOWED_VALENCE = {
+    # intentionally conservative defaults
+    "B": {3},
+    "C": {4},
+    "N": {3, 4},
+    "O": {2, 1, 3},
+    "P": {3, 5},
+    "S": {2, 4, 6},
+    "F": {1},
+    "Cl": {1},
+    "Br": {1},
+    "I": {1},
+    "H": {1},
+}
+
+def bond_order_sum(mol: Molecule, atom_idx: int) -> int:
+    s = 0
+    for _, bond in mol.neighbors(atom_idx):
+        s += bond.order
+    return s
+
+def explicit_h_count(atom: Atom) -> int:
+    return 0 if atom.hydrogens is None else atom.hydrogens
+
+def valence_ok(mol: Molecule, atom_idx: int) -> bool:
+    atom = mol.atoms[atom_idx]
+    allowed = _ALLOWED_VALENCE.get(atom.symbol, {4})
+    total = bond_order_sum(mol, atom_idx) + explicit_h_count(atom)
+    return total in allowed or total <= max(allowed)
+
+def aromatic_components(mol: Molecule) -> list[list[int]]:
+    seen = set()
+    comps = []
+    aromatic_atoms = {a.idx for a in mol.atoms if a.aromatic_hint}
+    for start in aromatic_atoms:
+        if start in seen:
+            continue
+        stack = [start]
+        comp = []
+        seen.add(start)
+        while stack:
+            u = stack.pop()
+            comp.append(u)
+            for v, bond in mol.neighbors(u):
+                if not bond.aromatic_hint:
+                    continue
+                if v in aromatic_atoms and v not in seen:
+                    seen.add(v)
+                    stack.append(v)
+        comps.append(sorted(comp))
+    return comps
+
+def _candidate_aromatic_edges(mol: Molecule, comp: list[int]) -> list[int]:
+    comp_set = set(comp)
+    return [
+        bond.idx for bond in mol.bonds
+        if bond.aromatic_hint and bond.a1 in comp_set and bond.a2 in comp_set
+    ]
+
+def resolve_aromaticity(mol: Molecule, *, strict: bool = True) -> Molecule:
+    """
+    Deterministically localize aromatic-hint subgraphs into single/double bonds.
+    Stereo stays in metadata only and is never emitted by the writer.
+    """
+    comps = aromatic_components(mol)
+
+    for comp in comps:
+        edge_ids = _candidate_aromatic_edges(mol, comp)
+
+        # reset candidate aromatic edges to single initially
+        for bidx in edge_ids:
+            mol.bonds[bidx].order = 1
+
+        # Greedy + backtracking sketch:
+        # choose edges for double bonds without violating conservative valence.
+        # In production, replace with a maximum matching / CSP solver.
+        success = _assign_double_bonds_backtracking(mol, edge_ids, comp)
+
+        if not success:
+            msg = f"could not localize aromatic component safely: atoms={comp}"
+            if strict:
+                raise AromaticResolutionError(msg)
+            mol.warnings.append(msg)
+
+        # After localization, clear aromatic hints for emission
+        for aidx in comp:
+            mol.atoms[aidx].aromatic_hint = False
+        for bidx in edge_ids:
+            mol.bonds[bidx].aromatic_hint = False
+
+    return mol
+
+def _assign_double_bonds_backtracking(mol: Molecule, edge_ids: list[int], comp: list[int]) -> bool:
+    # Deterministic edge order using provisional local invariants
+    ordered = sorted(
+        edge_ids,
+        key=lambda bidx: (
+            min(mol.bonds[bidx].a1, mol.bonds[bidx].a2),
+            max(mol.bonds[bidx].a1, mol.bonds[bidx].a2),
+        )
+    )
+
+    def dfs(i: int) -> bool:
+        if i == len(ordered):
+            return all(valence_ok(mol, aidx) for aidx in comp)
+
+        bidx = ordered[i]
+        bond = mol.bonds[bidx]
+
+        # Try double bond first, then single, in a deterministic order
+        for order in (2, 1):
+            old = bond.order
+            bond.order = order
+            if valence_ok(mol, bond.a1) and valence_ok(mol, bond.a2):
+                if dfs(i + 1):
+                    return True
+            bond.order = old
+        return False
+
+    return dfs(0)
+
+
+# -----------------------------
+# canon.py
+# -----------------------------
+
+def atom_invariant(mol: Molecule, atom_idx: int) -> tuple:
+    a = mol.atoms[atom_idx]
+    return (
+        a.symbol,
+        a.charge,
+        a.isotope if a.isotope is not None else -1,
+        explicit_h_count(a),
+        len(mol.adj[a.idx]),
+        int(a.metadata.get("in_ring", 0)),
+        # crucially, atom_map intentionally excluded
+        # stereo intentionally excluded from emitted form
+    )
+
+def canonical_rank_atoms(mol: Molecule, iterations: int = 8) -> list[int]:
+    """
+    WL/Morgan-style refinement sketch.
+    Returns integer ranks, lower is earlier.
+    """
+    labels = {a.idx: atom_invariant(mol, a.idx) for a in mol.atoms}
+
+    for _ in range(iterations):
+        new_labels = {}
+        for atom in mol.atoms:
+            nbr_sig = sorted(
+                (bond.order, labels[nbr]) for nbr, bond in mol.neighbors(atom.idx)
+            )
+            new_labels[atom.idx] = (labels[atom.idx], tuple(nbr_sig))
+
+        # Compress deterministically
+        uniq = {lab: i for i, lab in enumerate(sorted(set(new_labels.values())))}
+        compressed = {idx: uniq[lab] for idx, lab in new_labels.items()}
+
+        if all(labels[a.idx] == compressed[a.idx] for a in mol.atoms if isinstance(labels[a.idx], int)):
+            break
+        labels = compressed
+
+    # break remaining ties deterministically using local signatures
+    rank_pairs = sorted(
+        ((labels[a.idx], atom_invariant(mol, a.idx), a.idx) for a in mol.atoms)
+    )
+    rank = {}
+    for r, (_, _, aidx) in enumerate(rank_pairs):
+        rank[aidx] = r
+    return [rank[a.idx] for a in mol.atoms]
+
+
+# -----------------------------
+# write.py
+# -----------------------------
+
+_BOND_SYMBOL = {1: "-", 2: "=", 3: "#"}
+
+def format_ring_id(n: int) -> str:
+    return str(n) if 0 <= n <= 9 else f"%{n}"
+
+def atom_text(atom: Atom, *, mapped: bool) -> str:
+    """
+    Always uppercase output; no stereo emission.
+    Uses bracket form when needed.
+    """
+    sym = atom.symbol.upper()
+
+    needs_brackets = (
+        atom.isotope is not None or
+        atom.charge != 0 or
+        explicit_h_count(atom) > 0 or
+        mapped
+    )
+
+    if not needs_brackets:
+        return sym
+
+    parts = ["["]
+    if atom.isotope is not None:
+        parts.append(str(atom.isotope))
+    parts.append(sym)
+    hcount = explicit_h_count(atom)
+    if hcount == 1:
+        parts.append("H")
+    elif hcount > 1:
+        parts.append(f"H{hcount}")
+    if atom.charge:
+        if atom.charge == 1:
+            parts.append("+")
+        elif atom.charge > 1:
+            parts.append(f"+{atom.charge}")
+        elif atom.charge == -1:
+            parts.append("-")
+        else:
+            parts.append(f"{atom.charge}")
+    if mapped:
+        parts.append(f":{atom.atom_map}")
+    parts.append("]")
+    return "".join(parts)
+
+def to_canonical_smiles(mol: Molecule) -> str:
+    return _write_canonical(mol, mapped=False)
+
+def to_canonical_mapped_smiles(mol: Molecule) -> str:
+    validate_map_ids(mol)
+    return _write_canonical(mol, mapped=True)
+
+def _write_canonical(mol: Molecule, *, mapped: bool) -> str:
+    ranks = canonical_rank_atoms(mol)
+    rank_of = {a.idx: ranks[a.idx] for a in mol.atoms}
+
+    # A full production writer needs explicit ring-opening/closing management.
+    # This sketch shows the traversal contract and ring-id formatting.
+    start = min((a.idx for a in mol.atoms), key=lambda i: rank_of[i])
+    visited_atoms = set()
+    visited_bonds = set()
+    ring_numbers = {}
+    next_ring = 1
+    out = []
+
+    def dfs(u: int, parent: Optional[int] = None) -> None:
+        nonlocal next_ring
+        visited_atoms.add(u)
+        out.append(atom_text(mol.atoms[u], mapped=mapped))
+
+        nbrs = []
+        for v, bond in mol.neighbors(u):
+            nbrs.append((rank_of[v], _BOND_SYMBOL[bond.order], v, bond))
+        nbrs.sort()
+
+        first_tree_child = True
+        for _, bond_sym, v, bond in nbrs:
+            if bond.idx in visited_bonds:
+                if v != parent:
+                    key = tuple(sorted((u, v))) + (bond.idx,)
+                    if key not in ring_numbers:
+                        ring_numbers[key] = next_ring
+                        rn = next_ring
+                        next_ring += 1
+                    else:
+                        rn = ring_numbers[key]
+                    out.append(bond_sym + format_ring_id(rn))
+                continue
+
+            visited_bonds.add(bond.idx)
+
+            if v in visited_atoms:
+                key = tuple(sorted((u, v))) + (bond.idx,)
+                if key not in ring_numbers:
+                    ring_numbers[key] = next_ring
+                    rn = next_ring
+                    next_ring += 1
+                else:
+                    rn = ring_numbers[key]
+                out.append(bond_sym + format_ring_id(rn))
+                continue
+
+            if first_tree_child:
+                out.append(bond_sym)
+                dfs(v, u)
+                first_tree_child = False
+            else:
+                out.append("(" + bond_sym)
+                dfs(v, u)
+                out.append(")")
+
+    dfs(start)
+    return "".join(out)
+
+
+# -----------------------------
+# api.py
+# -----------------------------
+
+def canonicalize_smiles(text: str, *, fill_maps: bool = False) -> tuple[str, str]:
+    mol = parse_smiles(text)               # parser not expanded here
+    validate_map_ids(mol)
+    if fill_maps:
+        fill_missing_map_ids(mol)
+    resolve_aromaticity(mol, strict=True)
+    plain = to_canonical_smiles(mol)
+    mapped = to_canonical_mapped_smiles(mol)
+    return plain, mapped
+
+
+
+Notes on the sketch
+
+The critical project rules are implemented here:
+
+duplicate map IDs raise immediately
+
+only missing map IDs are filled
+
+fill order is heavy atoms first, then hydrogens
+
+stereo markers are stored but not written
+
+all bonds are emitted explicitly
+
+ring closures above 9 use %10, %11, ...
+
+The % notation for ring closures above 9 is standard SMILES syntax; Daylight explicitly documents it, and OpenSMILES also documents ring-closure pairing and reuse behavior.
+
+5) Unit test matrix
+
+I would organize tests by subsystem.
+
+A. Map preservation / filling
+Case	Input	Expected
+Preserve exact maps	[C:7]-[O:12]	mapped output keeps 7 and 12 exactly
+Duplicate maps error	[C:1]-[O:1]	DuplicateMapError
+Partial fill starts at 0	[C:4]-O-N	maps become 4,0,1
+Skip used IDs	[C:0]-O-[N:2]	missing gets 1
+Heavy before H	[CH3:5]-[H] with explicit H unmapped	heavy unmapped atoms assigned before H
+All mapped unchanged	[C:8](-[H:9])-[O:10]	no reassignment
+B. Stereo retention but non-emission
+Case	Input	Expected
+Tetrahedral stereo stored	F[C@](Cl)(Br)I	atom metadata contains @; output has no @
+@@ preserved in metadata	F[C@@](Cl)(Br)I	metadata contains @@; output omits it
+E/Z bond direction stored	F/C=C/F	bond metadata stores /; output omits /
+Mixed stereo + maps	[C@H:4](F)(Cl)Br	map preserved, stereo omitted in output
+C. Ring syntax
+Case	Input	Expected
+Single ring	C1CCCCC1	canonical uppercase explicit-bond form
+Reused ring digits	valid example with multiple closures	parses and rewrites correctly
+Ring closure >9	synthetic polycycle needing 10	output uses %10
+Unmatched ring digit	C1CCC	ParseError
+D. Aromatic lowercase handling
+Case	Input	Expected
+Benzene	c1ccccc1	output localized uppercase explicit-bond form
+Pyridine	n1ccccc1	valence-safe localized form
+Pyrrole	[nH]1cccc1	preserve bracket H, localized form
+Fused aromatic	c1ccc2ccccc2c1	deterministic localized form
+Antiaromatic-like lowercase accepted then localized	c1ccc1	valence-safe localized form or strict rejection per your policy
+Impossible aromatic input	c1cccc1	reject with AromaticResolutionError in strict mode
+
+Daylight explicitly documents that some lowercase aromatic inputs can be converted to corresponding localized forms, while impossible ones such as c1cccc1 should fail.
+
+E. Canonicalization invariance
+Case	Input variants	Expected
+Same graph, different atom order	multiple equivalent SMILES for ethanol or benzene	identical canonical output
+Same graph, different map IDs	[C:7]-[O:9] vs [C:100]-[O:4]	same plain canonical output
+Same graph, partial maps	mapped/unmapped variants	same plain canonical output
+Branch-order permutations	CC(O)N, N(C)CO, etc. same graph	same canonical output
+F. Regression tests from toolkit disagreements
+
+Build a folder of known tricky cases:
+
+aromatic sulfur heterocycles
+
+delocalized charges
+
+fused systems
+
+symmetric mapped molecules
+
+radicals/metals if you support them
+
+O’Boyle’s paper is useful here because it calls out real canonicalization failures caused by kekulization, stereo disagreement, and delocalized charges, which are exactly the cases worth preserving as regressions.
+
+6) Practical design rules I would write into the project spec
+
+Canonical ranking must ignore atom-map numbers.
+
+Mapped output is a projection of the canonical atom order plus preserved/fill-completed map IDs.
+
+Stereo markers influence metadata only, not emitted SMILES.
+
+Output syntax is a project-defined canonical uppercase explicit-bond dialect.
+
+Lowercase aromatic input is accepted as intent, then localized deterministically before output.
+
+Aromatic localization must be valence-safe and deterministic; impossible cases error in strict mode.
+
+That spec matters because “canonical SMILES” in the literature and toolkits often means different things:
+
+Daylight distinguishes generic SMILES from “unique SMILES” and “absolute SMILES.”
+
+OpenSMILES gives syntax rules, not one canonicalization algorithm.
+
+RDKit exposes canonicalization controls, explicit bonds, and map-number handling, but also warns that kekulized output is not canonical.
+
+7) Sources to use in code review / design doc
+
+These are the references I would cite in your repo docs:
+
+Weininger, 1988. SMILES, a chemical language and information system. 1. Introduction to methodology and encoding rules. Foundational SMILES paper and the basis for graph traversal / unique representation concepts.
+
+Daylight Theory Manual / SMILES chapter. Excellent practical reference for aromaticity, unique SMILES, and how aromatic input may be converted into localized forms.
+
+OpenSMILES specification. Best source for standardized SMILES syntax, including ring closures and standard-form expectations.
+
+Daylight rings tutorial. Clear source for %10 ring-closure notation.
+
+RDKit Book / RDKit SMILES docs. Useful for practical aromaticity-model notes, canonical ranking APIs, explicit-bond writing, and map-number canonicalization controls.
+
+O’Boyle, 2012. Towards a Universal SMILES representation. Helpful when discussing canonical-label strategies, InChI-assisted canonicalization, and known failure modes around aromaticity/kekulization.
+
+Bottom line
+
+For your use case, I would build:
+
+a custom parser
+
+a custom map validator/filler
+
+a custom canonical writer
+
+a deterministic aromatic localization step
+
+and keep RDKit only as an optional development oracle, not as the sole implementation.
+
+That gives you a codebase that is readable in group review, stable for reaction atom-mapping workflows, and explicit about the exact semantics of your canonical outputs.
+
+I can turn this into a concrete package skeleton with model.py, mapping.py, aromatic.py, canon.py, and pytest files next.

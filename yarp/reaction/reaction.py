@@ -3,7 +3,6 @@ Definition of the reaction object class.
 """
 
 
-from yarp.reaction.conformer import select_conformer_pair
 from yarp.reaction.state import state
 
 from yarp.yarpecule.hashes import reaction_hash
@@ -70,25 +69,30 @@ class reaction:
 
         self.reactant = state(reactant)
         self.product = state(product)
+        self.bond_changes = None # Call a quick function here to compare R/P adj mats upon init
 
-        self.ts = dict()
+        self.ts_geom = dict() # Use conformer objects here also????
 
         self.barrier = dict()
         self.reverse_barrier = dict()
-
         self.heat_of_rxn = dict()
 
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
         self.hash = reaction_hash(self)
+
+        self.outcome_label = None # this will hold the intended/unintended label logic
         
         self.network_meta = dict()  # placeholder for storing metadata related to reaction network generation + subnetwork kinetics
 
+
+
+
     def gen_initial_path(self, input):
 
-        self.reactant.gen_conformers(input)
-        self.product.gen_conformers(input)
+        self.reactant.gen_conformers(input.conformer)
+        self.product.gen_conformers(input.conformer)
 
-        select_conformer_pair(self.reactant, self.product, input)
+        self._select_conformer_pair(self.reactant, self.product, input)
 
         # self.path = edge(self.reactant, self.product, input)
 
@@ -109,3 +113,6 @@ class reaction:
     def refine_product(self, input):
         # This is a small DRY violation, so revisit later
         self.product.refine_node(input)
+    
+    def _select_conformer_pair():
+        pass

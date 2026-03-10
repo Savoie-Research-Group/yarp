@@ -19,17 +19,34 @@ class conformer:
         as attributes. This way, we can easily add new properties without modifying the class.
 
     lot : str
-        Some label that indicates the level of theory used to generate the conformer.
-        Not sure if this should be put here, or in the higher level classes that contain conformers.
+        Some label that indicates the level of theory used to generate the conformer's data.
+
+    type : str
+        Some label that indicates the sort of structure this conformer is.
+        Current thoughts: "local minimum" for reactant/product, "saddle point" for transition states,
+        and "black magic" for conical intersections
     """
 
-    def __init__(self):
-
+    def __init__(self, calc_type=None, calc_data=None):
+        self.lot = ""
+        self.type = ""
         self.geo = None
         self.elements = []
-        self.properties = dict()
-        self.lot = ""
+        self.properties = {
+            "internal_energy_Eh": 0.0,
+            "Gibbs_free_energy_kcal_per_mol": 0.0,
+            "heat_of_formation_0K_kcal_per_mol": 0.0,
+            "heat_of_formation_298K_kcal_per_mol": 0.0,
+            "standard_entropy_kcal_per_mol": 0.0,
+            "heat_capacity_joule_per_K": 0.0 # assume starting temp/pressure of 25C and 1 atm?
+        }
+
+        if calc_type is not None and calc_data is not None:
+            self.update_from_calc(calc_type, calc_data)
+    
+    def update_from_calc(self, calc_type, calc_data):
+        # read in data from a completed calculation, and scrape all the important stuff out
+        # Have a distinct routine to scrape data from a yarpecule class!
+        pass
 
 
-def select_conformer_pair(r, p, inp):
-    pass

@@ -3,6 +3,8 @@ Definition of the state object class.
 """
 from copy import deepcopy
 
+from yarp.reaction.conformer import conformer
+
 
 class state:
     """
@@ -13,8 +15,16 @@ class state:
         Yarpecule object that contains the molecular graph of all molecules in state.
         This is provided upon initialization, and is typically not modified.
 
-    conformers : list of conformer objects
-        Conformers correspond to all molecules contained in state?
+    conformers : dict of conformer objects
+        Conformers correspond to all molecules contained in state (for now...)
+        Keys indicate where in the process a given conformer was generated.
+        Doesn't need to indicate the specific level-of-theory used,
+        as that should be stored within the conformer object itself.
+        The conformer stored under the key "final" will be used in downstream
+        reaction characterization processes
+
+    paired_bem : 2D numpy array
+        Bond electron matrix to be used in the generation of joint optimized conformers
 
     species : list of yarpecule objects
         Separated molecular graphs of each species contained in state.
@@ -32,7 +42,11 @@ class state:
         self._graph.get_smiles()
         self._graph.get_inchi()
 
-        self.conformers = []
+        # This duplication of data seems worth it for the downstream clarity
+        self.conformers = {
+            "initial_geom": conformer(calc_type="yarpecule", calc_data=self._graph)
+        }
+        self.paired_bem = None
 
         self._species = self._graph.separate(canon=canon)
         self.conc = dict()
@@ -72,13 +86,35 @@ class state:
     def species(self):
         return self._species
 
-    def gen_conformers(self, input):
-
-        # Initialize a calculator object to make a call out to CREST or RDKit
-        # Placeholder for actual conformer generation
-        self.conformers = ["conf1", "conf2", "conf3"]
-
-    def refine(self, input):
-        # Initialize a calculator object to perform a geometry optimization (local minima)
-        # This will probably just be a light wrapper to do this in the conformer class, actually
+    def opt_geom(self, target_geom, starting_geom="initial_geom", lot="uff"):
+        # Select a starting point 3D geometry (from self.conformers) and optimize it using requested LOT
+        # It will be saved using the label provided in target_geom (required input!!!)
         pass
+
+    def gen_conformers(self, starting_geom="initial_geom", lot="uff", engine="crest", n_conf=1):
+        # Select a starting point 3D geometry (from self.conformers)
+        # Use selected software engine to generate the requested number of conformers
+        # with the requested level of theory
+        # Do I make a way to control the label it will be stored under self.conformers here?
+        # Yeah... I think that probably makes sense to do!
+        pass
+
+    def joint_opt(self, bem, starting_geom=["initial_geom"], lot="uff"):
+        # Generate conformers based on provided bem
+        # Not sure how to downselect yet only the desired conformers... maybe a list of keys?
+        # Provided BEM will be stored under self.paired_bem
+        pass
+
+    def select_conformer(self):
+        # Apply ML prediction model to select the best conformer candidate for use in
+        # downstream reaction path characterization processes
+        pass
+
+    def _update_conf_from_calc(self):
+        # This will be used to read in data from completed calcs
+        # Hopefully, I can make this general enough to use whenever we are
+        # writing input files to / reading output files from disk
+        pass
+
+
+

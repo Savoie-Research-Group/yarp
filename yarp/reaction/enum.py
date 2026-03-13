@@ -12,7 +12,7 @@ from yarp.yarpecule.lewis.be_mat import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
-def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted"):
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False):
     """
     Master wrapper function for all enumeration routines
 
@@ -69,7 +69,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted"):
               f"{len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react))
+        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react, verbose=verbose))
         print(f"   + Enumerated {len(products)} products")
 
     else:
@@ -574,6 +574,11 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                         print(f"Yielding new product with hash: "
                               f"{product._yarpecule_hash}")
                     yield product
+                # KMH: Added error message to let user know why some products were skipped
+                else:
+                    if verbose:
+                        print(f"Skipping - product hash already in set: "
+                              f"{product._yarpecule_hash}")
 
 
 def unique_set_partition_generator(seq: Iterable, group_size: int):
@@ -629,7 +634,7 @@ def unique_set_partition_generator(seq: Iterable, group_size: int):
                     used[j] = False
 
             used[i] = False
-            break   # keep canonical: only first unused i is allowed
+            #break   # keep canonical: only first unused i is allowed
 
     yield from helper(0, ())
 

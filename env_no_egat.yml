@@ -1,0 +1,22 @@
+name: yarp-again
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pytest
+  - pip
+  - pyaml
+  - ipython
+  - ipykernel
+  - rdkit
+  - openbabel
+  - scipy
+  - pandoc
+  - networkx
+  - omegaconf
+  - pip:
+    - tabulate
+    - sphinx-rtd-theme
+    - sphinx-autoapi 
+    - sphinx

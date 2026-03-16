@@ -4,6 +4,7 @@ Definition of the state object class.
 from copy import deepcopy
 
 from yarp.reaction.conformer import conformer
+from yarp.reaction.external.calculator import CrestCalculator
 
 
 class state:
@@ -92,13 +93,25 @@ class state:
     # STAGE 2: Initial Guess Generation Helpers
     # ==========================================
 
-    def generate_conformers(self, lot, software, n_conformers=1):
+    def generate_conformers(self, lot='gfn2', software='crest', source="initial_geom", n_conformers=1):
         """
         Step 2.A: Generate an ensemble of conformers for this state.
         Calls external tools (like CREST) and populates self.conformers 
         with the resulting structures.
         """
-        pass
+        if source not in self.conformers.keys():
+            print(f"Inital geometry from {source} not found in State object! Can't generate conformers")
+            return
+        
+        xyz_str = self.conformers[source].to_xyz_string()
+        job_id = f'{self._graph.inchi}'
+        if str(software).lower() == 'crest':
+            calc = CrestCalculator(init_xyz=xyz_str, job_id=job_id, lot=lot)
+            results = calc.execute()
+        else:
+            raise ValueError(f"Software {software} is not available to generate conformers with!")
+
+        return
 
     def bias_conformers_to_target(self, target_state_bem, lot, software):
         """

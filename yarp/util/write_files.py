@@ -161,12 +161,41 @@ def xyz_write(name, elements, geo, append_opt=False):
         out=open(name, 'w+')
     else: 
         out=open(name, 'a+')
+
+    file_str = xyz_generate_string(elements=elements, geo=geo)
     
     elements = [el.upper() for el in elements]
     
-    out.write('{}\n\n'.format(len(elements)))
-    for count_i, i in enumerate(elements):
-        out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
+    out.write(file_str)
     out.close()
 
     return
+
+def xyz_generate_string(elements, geo):
+    """
+    Generates a string in XYZ format from cartesian coordinates.
+
+    elements : list of str
+        Elements of molecule.
+    geo : numpy array or list of lists
+        Cartesian coordinates (N x 3).
+
+    Returns:
+        str: The formatted XYZ data as a single string.
+    """
+    lines = []
+    
+    # 1. Number of atoms
+    lines.append(str(len(elements)))
+    
+    # 2. Comment line (standard XYZ format requires a blank or comment line here)
+    lines.append("")
+    
+    # 3. Element and coordinates
+    for i, element in enumerate(elements):
+        symbol = element.upper()
+        x, y, z = geo[i]
+        lines.append(f"{symbol} {x:>12.8f} {y:>12.8f} {z:>12.8f}")
+    
+    # Join everything with newlines and add a trailing newline
+    return "\n".join(lines) + "\n"

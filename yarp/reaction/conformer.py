@@ -1,6 +1,7 @@
 """
 Definition of the conformer class and related helper functions.
 """
+from yarp.util.write_files import xyz_generate_string
 
 class conformer:
     """
@@ -9,7 +10,8 @@ class conformer:
     Attributes:
     -----------
     geo : numpy.ndarray
-        3D cartesian coordinates of the conformer (N x 3).
+        An (N_atom, 3) array containing the cartesian coordinates of each atom in the molecule.
+        Units are in Angstroms.
 
     elements : list of str
         List of atomic symbols in the conformer.
@@ -34,21 +36,22 @@ class conformer:
     """
 
     def __init__(self, calc_type=None, calc_data=None):
+        self.geo = None
+        self.elements = []
+
         self.lot = ""
         self.software = ""
         self.type = ""
         
-        self.geo = None
-        self.elements = []
         self.imaginary_freqs = []
 
         self.properties = {
-            "internal_energy_Eh": 0.0,
-            "Gibbs_free_energy_kcal_per_mol": 0.0,
-            "heat_of_formation_0K_kcal_per_mol": 0.0,
-            "heat_of_formation_298K_kcal_per_mol": 0.0,
-            "standard_entropy_kcal_per_mol": 0.0,
-            "heat_capacity_joule_per_K": 0.0 # assume starting temp/pressure of 25C and 1 atm?
+            "internal_energy_Eh": None,
+            "Gibbs_free_energy_kcal_per_mol": None,
+            "heat_of_formation_0K_kcal_per_mol": None,
+            "heat_of_formation_298K_kcal_per_mol": None,
+            "standard_entropy_kcal_per_mol": None,
+            "heat_capacity_joule_per_K": None # assume starting temp/pressure of 25C and 1 atm?
         }
 
         if calc_type is not None and calc_data is not None:
@@ -59,7 +62,13 @@ class conformer:
         General parser router. Depending on the calc_type (e.g., 'xtb_opt', 'g16_freq'),
         it routes the calc_data (raw text or parsed dict) to the appropriate internal updater.
         """
-        pass
+
+        if calc_type == "yarpecule":
+            self.geo = calc_data.geo
+            self.elements = calc_data.elements
+            self.type = "initial_mol_graph"
+        else:
+            pass
 
     def is_valid_minimum(self):
         """
@@ -80,6 +89,9 @@ class conformer:
         Returns the geometry formatted as a standard XYZ string, useful for 
         passing to external scripts or writing scratch files.
         """
-        pass
+        if self.geo is not None and len(self.elements) > 0:
+            return xyz_generate_string(elements=self.elements, geo=self.geo)
+        else:
+            return None
 
 

@@ -31,7 +31,7 @@ CURRENT_DECISIONS = {
         "keep code edits minimal",
         "match existing yarp-again style as closely as possible",
         "add as few new functions as possible",
-        "do not add new functions without explicit confirmation, except the mass dictionary in constants.py",
+        "do not add new functions without explicit confirmation",
     ],
     "_atom_info_shape": [
         "dictionary keyed by current atom index",
@@ -54,6 +54,7 @@ CURRENT_DECISIONS = {
         "atom_index and atom_map are separate concepts and must stay separate",
         "partial user-mapped input should be preserved",
         "canonicalization should never overwrite existing user-provided maps",
+        "enumeration should carry parent _atom_info forward instead of regenerating it from scratch",
     ],
     "aromatic_policy": [
         "start with kekulization",
@@ -92,9 +93,11 @@ CURRENT_DECISIONS = {
     ],
     "isotope_policy": [
         "input config gains optional isotope section",
-        "each isotope entry includes atom index, element, and new mass",
-        "defaults should behave as absent/None",
-        "natural masses should auto-populate from a mass dictionary in yarp/util/constants.py when no override is given",
+        "proposed format: isotope: {12: 14}",
+        "keys are atom_map values and values are isotope masses",
+        "defaults should behave as absent or empty dict",
+        "natural masses should auto-populate from yarp.util.properties.el_mass when no override is given",
+        "applied isotope overrides should persist through enumeration via carried _atom_info",
     ],
 }
 
@@ -104,18 +107,20 @@ TOUCHPOINTS = {
         REPO_ROOT / "yarp/yarpecule/graph/smiles.py",
         REPO_ROOT / "yarp/yarpecule/input_parsers.py",
     ],
-    "constants": [
-        REPO_ROOT / "yarp/util/constants.py",
+    "properties": [
+        REPO_ROOT / "yarp/util/properties.py",
     ],
     "yarpecule": [
         REPO_ROOT / "yarp/yarpecule/yarpecule.py",
         REPO_ROOT / "yarp/yarpecule/atom_mapping.py",
+        REPO_ROOT / "yarp/reaction/enum.py",
     ],
     "exports": [
         REPO_ROOT / "yarp/util/write_files.py",
     ],
     "tests": [
         REPO_ROOT / "test/yarpecule/graph/test_smiles.py",
+        REPO_ROOT / "test/yarpecule/test_input_parser.py",
         REPO_ROOT / "test/yarpecule/test_yarpecule.py",
         REPO_ROOT / "test/conftest.py",
     ],
@@ -144,6 +149,7 @@ IMPLEMENTATION_SKETCH = {
     "_read_structure": {
         "needs": [
             "initialize _atom_info for smiles/xyz/mol inputs",
+            "accept carried tuple atom_info when provided by enum or other graph transforms",
             "apply canonical reorder before generated maps when user maps absent",
             "for xyz inputs, generate atom mappings after adjacency/canonicalization rather than reading them from file",
         ],
@@ -167,6 +173,22 @@ IMPLEMENTATION_SKETCH = {
         "needs": [
             "write RDKit canonical smiles in xyz comment line",
             "write maps in mol atom mapping field",
+        ],
+    },
+    "tests": {
+        "needs": [
+            "update parser tests that currently unpack four returns from mol_parse()",
+            "update any xyz_from_smiles() call sites that unpack four returns",
+            "migrate smiles parser tests from list-based atom_info assertions to dict-based assertions",
+            "update exact map_smi string expectations once mapped smiles use _atom_info atom_map values",
+            "add isotope override tests keyed by atom_map",
+            "add enumeration persistence tests for carried _atom_info and isotope masses",
+        ],
+    },
+    "enum": {
+        "needs": [
+            "carry parent _atom_info into tuple-created product yarpecules",
+            "avoid regenerating atom maps and isotope-adjusted masses during enumeration",
         ],
     },
 }
@@ -240,11 +262,15 @@ DATA_MODEL_NOTES = {
 
 
 NEXT_ITERATION_CHECKLIST = [
-    "Add the atom-mass dictionary to yarp/util/constants.py.",
+    "Reuse yarp.util.properties.el_mass rather than adding a duplicate atom-mass dictionary.",
     "Define the call-site try/fallback flow for strict=False yarp parsing to RDKit parsing.",
     "Prototype deterministic stereo ownership on the atom to the right.",
     "Implement verbose inspection output around in-memory RDKit mol generation and map injection.",
     "Define exactly how the notebook will write and inspect xyz and mol files for each yarpecule.",
+    "Include lowercase naphthalene in the parser notebook and future parser tests.",
+    "Make _read_structure() part of the first production migration so get_smiles()/export become testable on real yarpecules.",
+    "Propose tuple-input and enum changes so parent _atom_info survives product generation.",
+    "Propose YAML isotope parsing keyed by atom_map, e.g. isotope: {12: 14}.",
 ]
 
 

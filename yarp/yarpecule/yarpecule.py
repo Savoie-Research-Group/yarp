@@ -92,7 +92,7 @@ class yarpecule:
         self._q = 0
         self._masses = None
         self._adj_mat = None
-        self._atom_info = None  # Dictionary for retaining atom info (index, ID, isotope, etc.)
+        self._atom_info = {}  # Dictionary for retaining atom info (index, ID, isotope, etc.)
 
         self._read_structure(mol, mode)
 

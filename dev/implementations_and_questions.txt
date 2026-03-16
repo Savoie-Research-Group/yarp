@@ -1,67 +1,249 @@
 Implementations And Questions Log
 ================================
 
-Status Summary
---------------
-- Planning docs updated to use dict-based `_atom_info` with keyed fields.
-- RDKit generation path updated in plan to be inherently stereo-free (`isomericSmiles=False`) rather than post-strip.
-- Fallback policy set to warning+fallback by default.
-- Isotope policy set to integer override in a single `mass` field.
-- Map-aware XYZ/MOL export included in plan.
+Current State
+-------------
+- Planning is converged enough to start production migration.
+- The parser-side draft is in better shape than the yarpecule-side draft.
+- The development notebook is useful for parser and `_read_structure()` comparisons, but real `get_smiles()` and export comparisons are still blocked until production `yarpecule` objects populate `_atom_info`.
+- Lowercase naphthalene has been added to the notebook parser cases.
 
-Implementation Decisions (Current)
-----------------------------------
-1. `_atom_info` schema
-   - dictionary keyed by local atom index
-   - key fields: `atom_index`, `atom_map`, `element` (uppercase), `formal_charge`, `mass`, `stereo`, `aromatic_input`
-
-2. Mapping logic
-   - preserve all user-provided map values
-   - duplicate mapped input -> hard error
-   - fill missing only
-   - fill order: heavy atoms then hydrogens
-   - start at 0 and skip used values
-
-3. Stereo policy
-   - store `@`, `@@`, `/`, `\\` in `_atom_info`
-   - never emit stereo in either YARP or RDKit output strings
-   - RDKit mode uses generation flags to keep output stereo-free intrinsically
-
-4. Aromatic handling
-   - non-kekulization-first approach
-   - deterministic aromatic assignment attempt
-   - warning+fallback default if assignment fails
-
-5. Canonicalization
-   - target: YARP-independent canonicalization in dedicated writer path
-   - keep RDKit mode as fallback/compatibility path
-
-6. Export behavior
-   - MOL: map-aware output via atom mapping field
-   - XYZ: keep standard XYZ body for compatibility; add map metadata in comment line (`maps=...`)
-
-Slide-Transfer Section
+Latest Planning Update
 ----------------------
-Slide 1: Problem and Constraints
-- Need deterministic, reviewable SMILES generation with preserved atom mapping for ML workflows.
-- Current parser/writer path loses or rewrites mapping in some workflows.
-- Requirements: dict-based atom metadata, stereo retained as metadata only, canonical uppercase explicit-bond output.
+1. Carried `_atom_info` is now part of the proposed yarpecule API.
+   - Proposed constructor direction:
+     - `yarpecule(mol, mode='yarp', canon=True, strict=False, atom_info=None)`
+   - Proposed `_read_structure()` direction:
+     - `_read_structure(self, mol, mode, strict=False, atom_info=None)`
+   - `__init__` should still declare `self._atom_info`.
+   - `_read_structure()` should be the place where `_atom_info` is either:
+     - generated from the input structure, or
+     - copied from a parent yarpecule during enum/join/separate workflows
 
-Slide 2: Proposed Architecture
-- Parser (`smiles.py`) keeps graph + `_atom_info` metadata (maps, stereo, mass, aromatic hints).
-- New writer module (`graph/smiles_yarp.py`) performs canonical ranking + traversal + emission.
-- YARP path is primary; RDKit path remains fallback/compatibility.
-- Join/separate carry `_atom_info` with collision-safe reindexing and no separation renumbering.
+2. Enumeration carry-through is now explicit in the plan.
+   - Current enum code repeatedly creates products from 4-tuples.
+   - Without an explicit carry-through path, parent `_atom_info` would be lost.
+   - The planned fix is to let enum pass parent metadata into new yarpecules via `atom_info=...`.
+   - That preserves:
+     - user-provided atom maps
+     - generated atom maps
+     - isotope-overridden masses
 
-Slide 3: Risk Control and Validation
-- Duplicate map input errors early.
-- Aromatic resolution uses warning+fallback default.
-- `%10+` ring tokens supported.
-- Unit tests mirror existing class-based style and fixtures.
-- Map-aware exports: MOL standard field, XYZ comment metadata for Avogadro/VMD readability.
+3. Isotope override planning is now tied to atom maps.
+   - Proposed config form:
+     - `isotope: {12: 14}`
+   - Keys are `atom_map` values.
+   - Values are overridden masses.
+   - Overrides should update both:
+     - `_atom_info[i]["mass"]`
+     - `self._masses[i]`
+   - Because enum is planned to carry `_atom_info`, those overrides should persist through enumeration.
 
-Open Questions (for team discussion)
-------------------------------------
-1. Should strict aromatic mode (`strict=True`) be exposed for developer/debug runs while keeping warning+fallback default?
-2. Should disconnected component ordering in canonical output be rank-only or rank+formula tiebreak?
-3. Should RDKit fallback stay production-enabled or be limited to debug/oracle mode after YARP writer matures?
+Confirmed Decisions
+-------------------
+1. General approach
+   - Keep edits minimal.
+   - Match existing `yarp-again` style closely.
+   - Add as few new functions as possible.
+   - Keep `smiles.py` parser-only.
+   - Keep RDKit fallback outside `smiles.py`.
+
+2. `_atom_info` model
+   - `_atom_info` is a dict keyed by current local atom index.
+   - Required fields:
+     - `atom_index`
+     - `atom_map`
+     - `element`
+     - `formal_charge`
+     - `mass`
+     - `stereo`
+     - `aromatic_input`
+   - `element` is stored lower-case.
+   - Hydrogens must always get their own `_atom_info` entries.
+   - `_atom_info` must exist for SMILES, XYZ, MOL, and tuple input paths.
+
+3. Mapping policy
+   - Preserve all user-provided maps exactly.
+   - Preserve partial user mapping.
+   - Canonicalization must never overwrite existing user maps.
+   - `atom_index` and `atom_map` are separate and must stay separate.
+   - Canonical reorder may change `atom_index`.
+   - Canonical reorder must not change preserved `atom_map`.
+   - Missing maps are filled only after canonical reorder.
+   - Auto-generate missing atom maps at yarpecule creation, not later at enum.
+   - Enumeration should carry `_atom_info` forward from the parent yarpecule rather than regenerating it from scratch.
+
+4. Parser behavior
+   - Aromatic handling should try kekulization first.
+   - If kekulization fails, print a warning and fall back to the current aromatic policy.
+   - `strict=False` is the default planned behavior for caller-side YARP-to-RDKit fallback.
+   - Stereo should be retained as metadata in `_atom_info`, not necessarily emitted by the YARP path.
+
+5. RDKit and export behavior
+   - Canonical and mapped SMILES should come from RDKit.
+   - Atom maps should be injected from `_atom_info` before mapped SMILES generation.
+   - Temp-file MOL round-tripping is acceptable for the first implementation if it is the more robust path.
+   - XYZ comment lines should contain RDKit canonical SMILES.
+   - XYZ import should not try to read mapping metadata.
+   - MOL export should carry atom maps if the field placement validates.
+
+6. Isotope override behavior
+   - An optional YAML/config key `isotope` should be allowed.
+   - Proposed form:
+     - `isotope: {12: 14}`
+   - Keys are `atom_map` values.
+   - Values are overridden atomic masses.
+   - Default is absent or `{}`.
+   - When present, the override replaces the natural `mass` stored in `_atom_info` and in `self._masses`.
+   - Isotope overrides should persist through enumeration by preserving parent `_atom_info`.
+
+7. Verbose behavior
+   - All new verbose flags default to `False`.
+   - The dev notebook should call verbose paths with `verbose=True`.
+   - `verbose=True` should print:
+     - full RDKit mol dump before map injection
+     - full RDKit mol dump after map injection
+     - `atom_index -> atom_map` table
+     - written MOL contents used for inspection
+
+Notebook Status
+---------------
+- `dev/parser_dev.ipynb` currently compares:
+  - `smiles2adjmat()` old vs new
+  - `mol_parse()` old vs new
+  - `xyz_from_smiles()` old vs new
+  - `_read_structure()` old vs new on dummy objects
+  - `get_smiles()` and export on real yarpecules
+- The notebook now prints full `atom_info`, not just previews.
+- The notebook includes:
+  - unmapped HAA
+  - mapped HAA
+  - lowercase aromatic case
+  - mapped aromatic case
+  - lowercase naphthalene
+  - stereo case
+  - test XYZ input
+
+What Looks Good In The Draft
+----------------------------
+1. `smiles2adjmat_new()`
+   - Matches old adjacency and bond-electron outputs on the notebook’s tested HAA case.
+   - Preserves user-provided maps in the mapped test cases.
+   - Populates hydrogen entries in `_atom_info`.
+   - Handles lowercase aromatic inputs better than the old parser in the dev tests.
+   - Captures stereo metadata in `_atom_info["stereo"]`.
+
+2. `mol_parse_new()`
+   - Preserves current structural outputs.
+   - Adds full `_atom_info`.
+   - Carries formal charges where RDKit provides them.
+
+3. `xyz_from_smiles_new()`
+   - Preserves current geometry and adjacency outputs in both `yarp` and `rdkit` modes in the dev notebook.
+   - Returns `_atom_info` upward.
+
+4. `yarpecule_read_structure_new()`
+   - Works as intended on dummy objects in the notebook.
+   - Demonstrates the correct target behavior for production migration.
+
+Remaining Issues
+----------------
+1. Real production yarpecules still do not populate `_atom_info`.
+   - The notebook confirms that parser-side progress alone is not enough.
+   - Real `get_smiles()` and export comparisons are still blocked because production `yarpecule` objects do not yet carry populated `_atom_info`.
+   - Initializing `_atom_info = {}` alone is not sufficient; the records must actually be populated.
+
+2. Production return-shape changes must be coordinated.
+   - `yarp/yarpecule/yarpecule.py` currently unpacks four returns from `mol_parse()` and `xyz_from_smiles()`.
+   - `test/yarpecule/test_input_parser.py` currently unpacks four returns from `mol_parse()`.
+   - Those sites must be updated in the same migration step as the parser return changes.
+
+3. Parser tests currently assume list-based `atom_info`.
+   - `test/yarpecule/graph/test_smiles.py` uses list indexing assumptions like `label[0]`.
+   - Those tests must be rewritten for dict-based `_atom_info`.
+
+4. Exact mapped-SMILES expectations will change.
+   - `test/yarpecule/test_yarpecule.py` currently asserts exact `map_smi` strings based on RDKit atom-index-style mapping.
+   - Once mapped SMILES come from `_atom_info["atom_map"]`, those expected strings likely need intentional updates.
+
+5. Explicit hydrogen behavior still needs careful preservation in the production parser update.
+   - The important issue is not whether hydrogen atoms get `_atom_info` entries.
+   - They do.
+   - The real issue is preserving the current distinction between:
+     - explicit hydrogen annotations from the SMILES parse
+     - inferred hydrogens added afterward
+     - explicit hydrogen atoms already bonded in the graph
+
+6. Tuple-input per-atom formal charge remains fundamentally underdetermined.
+   - Tuple input only gives `(adj_mat, geo, elements, q)`.
+   - Total molecular charge is known.
+   - Per-atom formal charge assignment is not.
+   - The safe plan remains to use `formal_charge = None` or another clearly non-claimed default on that path.
+
+7. MOL atom-map field placement still needs validation.
+   - The draft format string is still only a proposal.
+   - The implementation should validate by writing a MOL, reading it back with RDKit, and checking recovered atom-map properties.
+   - If validation fails, fall back to the current map-free MOL layout with a warning.
+
+8. `export_geometry(format='xyz')` will likely start triggering `get_smiles()` implicitly.
+   - That is acceptable, but it is still a behavior change that should be implemented deliberately.
+
+9. Enumeration currently recreates products from 4-tuples and would overwrite parent `_atom_info`.
+   - `yarp/reaction/enum.py` repeatedly constructs products like:
+     - `yarpecule((adj_mat, y.geo, y.elements, y.q), canon=False)`
+   - With the current production pattern, that means atom metadata would be regenerated unless we explicitly carry it forward.
+   - The minimal planned fix is:
+     - extend tuple input support so `_read_structure()` also accepts `(adj_mat, geo, elements, q, atom_info)`
+     - have enum pass copied parent `_atom_info` into those tuple constructions
+     - keep `atom_map` and isotope-overridden `mass` on the carried records
+   - This is the cleanest way to make isotope overrides persist through enumeration without inventing a second metadata channel.
+
+Recommended Production Migration Order
+--------------------------------------
+1. Update `yarp/yarpecule/graph/smiles.py` in one coordinated pass.
+   - Update:
+     - `smiles2adjmat()`
+     - `add_hydrogens()`
+     - `reorder_by_mappings()`
+   - Keep the public `smiles2adjmat(smiles, verbose=False)` interface stable.
+   - Avoid a temporary compatibility layer that converts dict metadata back into the old list shape.
+
+2. Update `yarp/yarpecule/input_parsers.py`.
+   - Make `mol_parse()` return `_atom_info`.
+   - Make `xyz_from_smiles()` return `_atom_info`.
+
+3. Update `yarp/yarpecule/yarpecule.py`.
+   - Make `_read_structure()` populate `_atom_info` on every input path.
+   - Extend tuple input handling so a fifth `atom_info` item can be supplied and preserved.
+   - Make `_order_atoms()` carry `_atom_info` through reorder operations.
+   - Fill only missing atom maps after reorder.
+
+4. Update `yarp/util/input.py` and initialization call sites.
+   - Parse optional `isotope` config keyed by atom map.
+   - Apply overrides after `_atom_info` exists and missing maps are filled.
+   - Update both `_atom_info[i]["mass"]` and `self._masses[i]`.
+
+5. Update `yarp/reaction/enum.py`.
+   - Pass parent `_atom_info` into new tuple-created yarpecules instead of relying on fresh initialization.
+   - Preserve atom-map identity and overridden masses through product generation.
+
+6. Update parser and yarpecule tests at the same time.
+   - `test/yarpecule/graph/test_smiles.py`
+   - `test/yarpecule/test_input_parser.py`
+   - `test/yarpecule/test_yarpecule.py`
+   - add coverage for isotope config and isotope persistence through enumeration
+
+7. Only after that, move on to production `get_smiles()` and export changes.
+
+Open Questions
+--------------
+1. None are blocking the next production step.
+   - The remaining work is migration sequencing and implementation detail, not unresolved design.
+
+Immediate Next Step
+-------------------
+- Start the first production migration with:
+  - `yarp/yarpecule/graph/smiles.py`
+  - `yarp/yarpecule/input_parsers.py`
+  - `yarp/yarpecule/yarpecule.py`
+- Update the related parser tests in the same pass.

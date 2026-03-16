@@ -9,11 +9,12 @@ import sys
 from pathlib import Path
 
 import yaml
-from rdkit import Chem
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+from smiles_utils import normalize_smiles, normalize_smiles_text, split_smiles
 
 
 def default_config_path():
@@ -179,34 +180,6 @@ def ordered_reaction_items(rxns, reverse_seed_keys):
 
     ordered = reverse_items + forward_only_items
     return ordered, len(reverse_items)
-
-
-def split_smiles(smiles):
-    return [part.strip() for part in str(smiles).split(".") if part.strip()]
-
-
-def normalize_smiles(smiles):
-    smi = str(smiles or "").strip()
-    if not smi:
-        return None
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        return smi
-    Chem.RemoveStereochemistry(mol)
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
-
-
-def normalize_smiles_text(smiles):
-    parts = []
-    for part in split_smiles(smiles):
-        normalized = normalize_smiles(part)
-        if normalized:
-            parts.append(normalized)
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return ".".join(sorted(parts))
 
 
 def extract_smiles_from_state(state):

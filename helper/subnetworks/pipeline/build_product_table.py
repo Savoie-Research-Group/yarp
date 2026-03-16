@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
-from rdkit import Chem
+
+from smiles_utils import normalize_smiles_text, split_smiles
 
 
 def default_config_path():
@@ -28,18 +29,6 @@ def load_config(config_path):
     with config_path.open("r") as f:
         cfg = yaml.safe_load(f) or {}
     return cfg if isinstance(cfg, dict) else {}
-
-
-def split_smiles(smiles):
-    """Split dot-delimited SMILES into components."""
-    if smiles is None:
-        return []
-    try:
-        if pd.isna(smiles):
-            return []
-    except Exception:
-        pass
-    return [part.strip() for part in str(smiles).split(".") if part.strip()]
 
 
 def split_equation_side(side):
@@ -136,32 +125,6 @@ def parse_reaction_index(reaction_name):
         return int(str(reaction_name).split("_")[-1]) - 1
     except Exception:
         return -1
-
-
-def normalize_smiles(smiles):
-    """Normalize one SMILES by removing stereochemistry."""
-    smi = str(smiles or "").strip()
-    if not smi:
-        return None
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        return smi
-    Chem.RemoveStereochemistry(mol)
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
-
-
-def normalize_smiles_text(smiles):
-    """Normalize a (possibly multi-component) SMILES string."""
-    parts = []
-    for part in split_smiles(smiles):
-        normalized = normalize_smiles(part)
-        if normalized:
-            parts.append(normalized)
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return ".".join(sorted(parts))
 
 
 def smiles_counter(smiles):
@@ -1093,6 +1056,8 @@ def main():
         status_flag_value = "below_completion_target"
     else:
         status_flag_value = "ok"
+    solver_failed_meta = clean_text((cantera_run_meta or {}).get("status", "")).lower() == "solver_failed"
+    emit_empty_sentinel = bool(datatable_cfg.get("emit_empty_sentinel_row", True))
 
     state_hashes = state_hash_lookup(rxns)
     reaction_map_by_name = reaction_map if isinstance(reaction_map, dict) else {}
@@ -1539,10 +1504,91 @@ def main():
             }
         )
 
+    if not rows and emit_empty_sentinel and (not solver_failed_meta):
+        # Preserve simulated-but-unattributed products in production outputs.
+        rows.append(
+            {
+                "network_id": network_id,
+                "subnetwork_id": subnetwork_id,
+                "product_id": product_id,
+                "source_network_path": network_path,
+                "reagent_smiles": reagent_smiles,
+                "product_smiles": product_smiles,
+                "reaction_index": pd.NA,
+                "reaction_name": pd.NA,
+                "reaction_label": "no_terminal_reaction_rows",
+                "source_type": pd.NA,
+                "to_p_flux_class_for_row": pd.NA,
+                "orig_key": pd.NA,
+                "rxn_id": pd.NA,
+                "rxn_hash": pd.NA,
+                "from_smiles": pd.NA,
+                "to_smiles": pd.NA,
+                "from_yarpecule_hash_primary": pd.NA,
+                "to_yarpecule_hash_primary": pd.NA,
+                "r_to_i_forward_barrier": pd.NA,
+                "r_to_i_reverse_barrier": pd.NA,
+                "i_to_p_forward_barrier": pd.NA,
+                "i_to_p_reverse_barrier": pd.NA,
+                "r_to_p_forward_barrier": pd.NA,
+                "r_to_p_reverse_barrier": pd.NA,
+                "included_forward_r_to_i_in_yaml": pd.NA,
+                "included_reverse_i_to_r_in_yaml": pd.NA,
+                "included_forward_i_to_p_in_yaml": pd.NA,
+                "included_reverse_p_to_i_in_yaml": pd.NA,
+                "included_forward_r_to_p_in_yaml": bool(has_direct_r_to_p_in_yaml),
+                "included_reverse_p_to_r_in_yaml": bool(has_reverse_p_to_r_in_yaml),
+                "network_has_any_r_to_p_in_yaml": bool(has_direct_r_to_p_in_yaml),
+                "flux_to_final_species_for_row": 0.0,
+                "flux_to_final_species_std_for_row": 0.0,
+                "final_rate_of_progress_for_row": 0.0,
+                "final_rate_of_progress_std_for_row": 0.0,
+                "fraction_of_total_flux_into_p": 0.0,
+                "fraction_flux_into_p_label": 0.0,
+                "reaction_path_class": pd.NA,
+                "terminal_reaction_path_count": 0,
+                "terminal_reaction_unique_path_count": 0,
+                "terminal_reaction_path_indices": "",
+                "terminal_reaction_paths_smiles": "",
+                "dominant_terminal_path_smiles": pd.NA,
+                "dominant_terminal_path_class": pd.NA,
+                "terminal_reaction_weighted_path_flux": 0.0,
+                "terminal_reaction_weighted_path_fraction": 0.0,
+                "is_dominant_terminal_reaction_by_flux": False,
+                "is_dominant_terminal_reaction_by_path_flux": False,
+                "dominant_path_class_overall": pd.NA,
+                "dominant_path_smiles_overall": pd.NA,
+                "dominant_path_terminal_rxn_key": pd.NA,
+                "dominant_path_weighted_flux_overall": 0.0,
+                "intermediate_final_concentration": math.nan,
+                "terminal_completion_concentration": float(completion_terminal_concentration),
+                "completion_ratio": (
+                    float(completion_ratio) if math.isfinite(to_float(completion_ratio, default=math.nan)) else math.nan
+                ),
+                "kinetic_trap_flag": bool(kinetic_trap_flag),
+                "status_flag": "no_terminal_reaction_rows",
+                "cantera_temperature_K": run_conditions.get("cantera_temperature_K", math.nan),
+                "cantera_pressure_atm": run_conditions.get("cantera_pressure_atm", math.nan),
+                "cantera_time_sim_s": run_conditions.get("cantera_time_sim_s", math.nan),
+                "cantera_uncertainty_enabled": run_conditions.get("cantera_uncertainty_enabled", pd.NA),
+                "cantera_uncertainty_cycles": run_conditions.get("cantera_uncertainty_cycles", pd.NA),
+                "min_completion_time_s": run_conditions.get("min_completion_time_s", math.nan),
+                "final_sim_time_mean_s": run_conditions.get("final_sim_time_mean_s", math.nan),
+                "final_sim_time_max_s": run_conditions.get("final_sim_time_max_s", math.nan),
+                "path_record_count": int(len(path_records)),
+            }
+        )
+
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out_df = pd.DataFrame(rows)
     if not out_df.empty:
+        # Keep both flux-fraction column names populated while downstream code
+        # still references the older/newer variants inconsistently.
+        if "fraction_of_total_flux_into_p" not in out_df.columns:
+            out_df["fraction_of_total_flux_into_p"] = out_df.get("fraction_flux_into_p_label", 0.0)
+        if "fraction_flux_into_p_label" not in out_df.columns:
+            out_df["fraction_flux_into_p_label"] = out_df.get("fraction_of_total_flux_into_p", 0.0)
         out_df["_class_order"] = out_df["source_type"].map({"I": 0, "R": 1}).fillna(2)
         out_df = out_df.sort_values(
             ["_class_order", "fraction_of_total_flux_into_p", "reaction_index"],
@@ -1857,9 +1903,9 @@ def main():
         reaction_df["created_at_utc"] = now
         reaction_df["product_id"] = product_id
         reaction_df["reaction_label"] = (
-            reaction_df["from_smiles"].fillna("?")
+            reaction_df["from_smiles"].fillna("?").astype(str)
             + " -> "
-            + reaction_df["to_smiles"].fillna(product_smiles or "?")
+            + reaction_df["to_smiles"].fillna(product_smiles or "?").astype(str)
         )
         reaction_df["source_network_path"] = network_path
         reaction_df["terminal_product_states"] = ";".join(sorted(terminal_product_states))

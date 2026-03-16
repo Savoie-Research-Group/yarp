@@ -16,6 +16,8 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
+from smiles_utils import file_safe_label
+
 OUTPUT_MODE_PRESETS = {
     "debug": {
         "description": "retain all temp/profile artifacts and generate all network flux plots",
@@ -184,7 +186,7 @@ def task_index_from_env(env_name, verbose=False):
 
 def safe_label(text, verbose=False):
     """Convert arbitrary text into a filesystem-safe label."""
-    value = "".join(ch if (ch.isalnum() or ch in "-._") else "_" for ch in str(text))
+    value = file_safe_label(text)
     if verbose:
         print(f"[verbose] safe_label input={text} output={value}")
     return value

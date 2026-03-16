@@ -49,6 +49,8 @@ class state:
         self.paired_bem = None
 
         self._species = self._graph.separate(canon=canon)
+        # We probably want to rethink this...
+        # Can this be integrated with rxn.network_meta somehow?
         self.conc = dict()
         for _ in self.species:
             _.get_smiles()
@@ -86,34 +88,54 @@ class state:
     def species(self):
         return self._species
 
-    def opt_geom(self, target_geom, starting_geom="initial_geom", lot="uff"):
-        # Select a starting point 3D geometry (from self.conformers) and optimize it using requested LOT
-        # It will be saved using the label provided in target_geom (required input!!!)
+    # ==========================================
+    # STAGE 2: Initial Guess Generation Helpers
+    # ==========================================
+
+    def generate_conformers(self, lot, software, n_conformers=1):
+        """
+        Step 2.A: Generate an ensemble of conformers for this state.
+        Calls external tools (like CREST) and populates self.conformers 
+        with the resulting structures.
+        """
         pass
 
-    def gen_conformers(self, starting_geom="initial_geom", lot="uff", engine="crest", n_conf=1):
-        # Select a starting point 3D geometry (from self.conformers)
-        # Use selected software engine to generate the requested number of conformers
-        # with the requested level of theory
-        # Do I make a way to control the label it will be stored under self.conformers here?
-        # Yeah... I think that probably makes sense to do!
+    def bias_conformers_to_target(self, target_state_bem, lot, software):
+        """
+        Step 2.B: Perform joint optimization by applying constraints (using a paired BEM).
+        Biases the geometry of this state's conformers towards a target state 
+        (e.g., biasing reactants towards products).
+        """
         pass
 
-    def joint_opt(self, bem, starting_geom=["initial_geom"], lot="uff"):
-        # Generate conformers based on provided bem
-        # Not sure how to downselect yet only the desired conformers... maybe a list of keys?
-        # Provided BEM will be stored under self.paired_bem
+    def evaluate_and_rank_conformers(self, strategy="ml-rich"):
+        """
+        Step 2.C: Rank conformers based on energy, RMSD, or ML predictions.
+        Tags the best candidate(s) to be passed into the GSM/TS-guess stage.
+        """
         pass
 
-    def select_conformer(self):
-        # Apply ML prediction model to select the best conformer candidate for use in
-        # downstream reaction path characterization processes
+    # ==========================================
+    # STAGE 3: Refinement Helpers
+    # ==========================================
+
+    def optimize_conformers(self, conformer_keys, lot, software):
+        """
+        Step 3.A: Run high-level geometry optimization on specific conformers.
+        Reads the output and saves the refined conformers under new keys 
+        (e.g., 'rpopt-{lot}-{software}').
+        """
         pass
 
-    def _update_conf_from_calc(self):
-        # This will be used to read in data from completed calcs
-        # Hopefully, I can make this general enough to use whenever we are
-        # writing input files to / reading output files from disk
+    # ==========================================
+    # Utility / I-O Helpers
+    # ==========================================
+
+    def extract_lowest_energy_conformer(self, lot):
+        """
+        Returns the conformer object with the lowest Gibbs Free Energy or 
+        electronic energy for a given level of theory.
+        """
         pass
 
 

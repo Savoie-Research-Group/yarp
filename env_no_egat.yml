@@ -20,3 +20,4 @@ dependencies:
     - sphinx-rtd-theme
     - sphinx-autoapi 
     - sphinx
+    - pytest-mock

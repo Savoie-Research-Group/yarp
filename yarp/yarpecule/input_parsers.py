@@ -4,7 +4,7 @@ Consider moving this to util if anything outside of yarpecule needs to access it
 """
 import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
-from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet
+from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
 
 # Silence RDKit warnings/info globally for this runtime, keep errors.
@@ -197,16 +197,18 @@ def mol_parse(mol):
 
     Returns
     -------
-    (elements, geo, adj_mat, q): tuple
+    (elements, geo, adj_mat, q, atom_info): tuple
                                 `elements` is a list with the element labels, `geo` is an nx3 numpy array holding the rdkit
                                 generated geometry, `adj_mat` is an nxn array holding the adjacency matrix, `q` is an `int`
-                                holding the charge (based on the sum of formal charges).
+                                holding the charge (based on the sum of formal charges), and `atom_info` carries
+                                atom metadata keyed by local atom index.
     """
     m = rdmolfiles.MolFromMolFile(mol)
     N_atoms = len(m.GetAtoms())
     elements = []
     geo = np.zeros((N_atoms, 3))
     q = 0
+    atom_info = {}
 
     # Get elements, coordinates, and charge
     for i in range(N_atoms):
@@ -215,6 +217,20 @@ def mol_parse(mol):
         coord = m.GetConformer().GetAtomPosition(i)
         geo[i] = np.array([coord.x, coord.y, coord.z])
         q += atom.GetFormalCharge()
+        atom_map = None
+        if atom.HasProp("molAtomMapNumber"):
+            atom_map = int(atom.GetProp("molAtomMapNumber"))
+        isotope = atom.GetIsotope()
+        mass = float(isotope) if isotope else el_mass[atom.GetSymbol().lower()]
+        atom_info[i] = {
+            "atom_index": i,
+            "atom_map": atom_map,
+            "element": atom.GetSymbol().lower(),
+            "formal_charge": atom.GetFormalCharge(),
+            "mass": mass,
+            "stereo": {"atom": None, "bonds": {}},
+            "aromatic_input": atom.GetIsAromatic(),
+        }
 
     # Generate adjacency matrix
     adj_mat = np.zeros((N_atoms, N_atoms))
@@ -222,7 +238,7 @@ def mol_parse(mol):
         adj_mat[i[0], i[1]] = 1
         adj_mat[i[1], i[0]] = 1
 
-    return elements, geo, adj_mat, q
+    return elements, geo, adj_mat, q, atom_info
 
 
 def xyz_from_smiles(smiles, mode="yarp"):
@@ -245,11 +261,12 @@ def xyz_from_smiles(smiles, mode="yarp"):
     Returns
     -------
 
-    (elements, geo, adj_mat, q) : tuple
+    (elements, geo, adj_mat, q, atom_info) : tuple
             `elements` is a list with the element labels,
             `geo` is an nx3 numpy array holding the rdkit generated geometry,
             `adj_mat` is an nxn array holding the adjacency matrix,
-            `q` is an `int` holding the molecular charge (based on the sum of formal charges).
+            `q` is an `int` holding the molecular charge (based on the sum of formal charges),
+            and `atom_info` carries atom metadata keyed by local atom index.
     """
 
     # Initialize the preferred lone electron dictionary the first time this function is called
@@ -265,8 +282,8 @@ def xyz_from_smiles(smiles, mode="yarp"):
         # NOTE: bemat is used to generate geometry via RDKit, but not returned for
         # downstream use in yarpecule - ERM
         adj_mat, bemat, atom_info = smiles2adjmat(smiles)
-        elements = [_[0].lower() for _ in atom_info]
-        fc = [0 if _[1] is None else int(_[1]) for _ in atom_info]
+        elements = [atom_info[i]["element"] for i in atom_info]
+        fc = [int(atom_info[i]["formal_charge"]) for i in atom_info]
         q = int(sum(fc))
 
         # Array of atom-wise octet requirements for determining expanded octects
@@ -320,7 +337,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
             coord = mol.GetConformer().GetAtomPosition(i)
             geo[i] = np.array([coord.x, coord.y, coord.z])
 
-        return elements, geo, adj_mat, q
+        return elements, geo, adj_mat, q, atom_info
 
     # RDKit branch
     else:
@@ -331,6 +348,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
         elements = []  # initialize list to hold element labels
         geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
         q = 0  # total charge on the molecule
+        atom_info = {}
 
         # loop over atoms, save their labels, positions, and total charge
         for i in range(N_atoms):
@@ -339,6 +357,20 @@ def xyz_from_smiles(smiles, mode="yarp"):
             coord = m.GetConformer().GetAtomPosition(i)
             geo[i] = np.array([coord.x, coord.y, coord.z])
             q += atom.GetFormalCharge()
+            isotope = atom.GetIsotope()
+            mass = float(isotope) if isotope else el_mass[atom.GetSymbol().lower()]
+            atom_map = None
+            if atom.HasProp("molAtomMapNumber"):
+                atom_map = int(atom.GetProp("molAtomMapNumber"))
+            atom_info[i] = {
+                "atom_index": i,
+                "atom_map": atom_map,
+                "element": atom.GetSymbol().lower(),
+                "formal_charge": atom.GetFormalCharge(),
+                "mass": mass,
+                "stereo": {"atom": None, "bonds": {}},
+                "aromatic_input": atom.GetIsAromatic(),
+            }
 
         # Generate adjacency matrix
         adj_mat = np.zeros((N_atoms, N_atoms))
@@ -346,4 +378,4 @@ def xyz_from_smiles(smiles, mode="yarp"):
             adj_mat[i[0], i[1]] = 1
             adj_mat[i[1], i[0]] = 1
 
-    return elements, geo, adj_mat, q
+    return elements, geo, adj_mat, q, atom_info

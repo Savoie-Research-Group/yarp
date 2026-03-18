@@ -1,6 +1,58 @@
 Implementations And Questions Log
 ================================
 
+Current Status After Production Pass
+------------------------------------
+- Core YARP implementation is in production code.
+- The parser / yarpecule / enum migration is no longer a draft-only plan item.
+- Larger-molecule smoke workflow now passes through EGAT on the cluster.
+- Aromatic and isotope smoke workflows now pass through EGAT on the cluster.
+- Base depth-1 KHP smoke workflow passes through EGAT on the cluster.
+- Sparse-map and depth-2 workflows now complete the YARP stage, log exact failing AAM strings for EGAT datapoints, and still write pickles.
+- Duplicate atom maps are now a confirmed hard construction error and no longer fall through to RDKit fallback.
+- The remaining work is EGAT-side debugging / compatibility, not more core parser refactoring.
+
+Observed Cluster Outcomes
+-------------------------
+1. Passed
+   - `dev/main_inputs/yarp_egat_smoke.yaml`
+   - `dev/main_inputs/yarp_egat_smoke_larger.yaml`
+   - `dev/main_inputs/yarp_egat_smoke_aromatic.yaml`
+   - `dev/main_inputs/yarp_egat_smoke_isotope.yaml`
+
+2. Completed with EGAT datapoint failures logged
+   - `dev/main_inputs/yarp_egat_smoke_depth2.yaml`
+   - `dev/main_inputs/yarp_egat_smoke_sparse_map.yaml`
+   - `dev/main_inputs/yarp_failure_sparse_map_egat.yaml`
+   - current signature in aggregate logs:
+     - `tmp/egat_barriers.csv--<idx> failed because of 'u'`
+     - exact `AAM: reactant>>product` lines are now logged
+   - pickles are still written:
+     - `dev_smoke_depth2.pkl`
+     - `dev_smoke_sparse_map.pkl`
+     - `dev_failure_sparse_map_egat.pkl`
+
+3. Duplicate-map case
+   - now confirmed to fail hard during yarpecule construction
+   - current cluster result:
+     - `ValueError: Duplicate atom-map indices in input SMILES: [7]`
+   - this is the intended behavior
+
+4. EGAT logging/debugging
+   - `tmp/` cleanup has now been delayed until after dataset iteration
+   - dataset failure logging now creates the directory if needed and records the exact `AAM: reactant>>product`
+   - aggregate batch log now shows those exact AAM lines for sparse-map and depth-2 failures
+
+5. Representative EGAT failure cases now captured
+   - sparse-map failures include mapped reactants like:
+     - `[C:0]([H:3])([H:4])([C:10]([H:2])=[O:30])[C:22]([O:1][O:50])([H:5])[H:6]`
+   - depth-2 failures include simple second-generation products such as:
+     - `O=COO -> O=C1OO1.[H][H]`
+     - `C1CO1 -> C=CO`
+     - `C1CO1 -> CC=O`
+     - `O=CO -> C1OO1`
+     - `O=CO -> O=C=O.[H][H]`
+
 Current State
 -------------
 - Planning is converged enough to start production migration.
@@ -92,6 +144,7 @@ Confirmed Decisions
    - If kekulization fails, print a warning and fall back to the current aromatic policy.
    - `strict=False` is the default planned behavior for caller-side YARP-to-RDKit fallback.
    - Stereo should be retained as metadata in `_atom_info`, not necessarily emitted by the YARP path.
+   - Duplicate atom maps from the user should be rejected, not tolerated via fallback.
 
 5. RDKit and export behavior
    - Canonical and mapped SMILES should come from RDKit.
@@ -209,7 +262,54 @@ Remaining Issues
 9. EGAT-side atom-map assumptions are a known downstream risk.
    - Some EGAT helpers assume atom maps behave like simple contiguous positional ids.
    - That is not compatible with preserving arbitrary user-provided maps exactly.
-   - This is not in the first production edit scope, but it should be treated as a post-migration regression check.
+   - This is now confirmed by cluster failures on sparse-map and depth-2 runs.
+   - EGAT needs either:
+     - a boundary normalizer to dense `1..N` maps, or
+     - internal fixes so map-keyed metadata and position-based iteration are made consistent.
+
+Implemented Production Changes
+------------------------------
+1. Parser / input / yarpecule / enum
+   - `yarp/yarpecule/graph/smiles.py`
+   - `yarp/yarpecule/input_parsers.py`
+   - `yarp/yarpecule/yarpecule.py`
+   - `yarp/util/write_files.py`
+   - `yarp/reaction/enum.py`
+
+2. Metadata behavior now in production
+   - `_atom_info` exists on all input paths
+   - missing atom maps are generated at yarpecule creation
+   - mapped SMILES come from `_atom_info["atom_map"]`
+   - enum / join / separate preserve maps and masses
+   - enum / join / separate intentionally do not propagate stereo metadata
+   - enum / join / separate intentionally do not propagate per-atom formal charge metadata
+
+3. Duplicate-map handling
+   - duplicate atom maps are rejected in `smiles2adjmat()`
+   - duplicate-map `ValueError` is no longer supposed to silently fall through the YARP-to-RDKit fallback path
+   - normalized carried/input metadata is also checked for duplicate non-`None` atom maps
+
+4. EGAT debug support now in production
+   - `tmp/fail.txt` should now be writable during EGAT dataset failures
+   - failure logs should include exact `AAM` reaction strings
+
+Tomorrow / Next Session Priorities
+----------------------------------
+1. Rerun the 8-case batch script on cluster with the latest code:
+   - `dev/run_all_yaml_smokes.sh`
+
+2. Inspect:
+   - `tmp/fail.txt`
+   - `dev/logs/all_yaml_runs.log`
+
+3. Confirm duplicate-map hard failure now happens before EGAT.
+
+4. For sparse-map and depth-2 EGAT failures:
+   - collect the exact failing `AAM` lines
+   - inspect `self.AA`, `self.HY`, and related map-keyed dicts inside EGAT
+   - decide whether to:
+     - normalize maps only at the EGAT boundary, or
+     - repair EGAT’s atom-map/index bookkeeping directly
 
 Recommended Production Migration Order
 --------------------------------------

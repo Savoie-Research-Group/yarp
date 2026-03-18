@@ -521,26 +521,32 @@ class FastDataset(Dataset):
 
                 return info    
             except Exception as e:
+                os.makedirs(self.data_path, exist_ok=True)
                 with open(os.path.join(self.data_path,'fail.txt'),'a') as ff:
                     ff.write('{}\n'.format(Rind))
                     if not molecular:
                         ff.write(f'INNER TRY: The reaction between {Rsmiles} and {Psmiles} failed because of {e} \n')
+                        ff.write(f'AAM: {Rsmiles}>>{Psmiles}\n')
                         print(traceback.print_exc())
                         print(info)
                     else:
                         ff.write(f'INNER TRY: The reaction for {Rsmiles} failed because of {e} \n')
+                        ff.write(f'AAM: {Rsmiles}\n')
                         print(traceback.print_exc())
                         print(info)
                 return {}
         except Exception as e:
+            os.makedirs(self.data_path, exist_ok=True)
             with open(os.path.join(self.data_path,'fail.txt'),'a') as ff:
                 ff.write('{}\n'.format(Rind))
                 if not molecular:
                     ff.write(f'OUTER TRY: The reaction between {Rsmiles} and {Psmiles} failed because of {e} \n')
+                    ff.write(f'AAM: {Rsmiles}>>{Psmiles}\n')
                     print(traceback.print_exc())
                     print(info)
                 else:
                     ff.write(f'OUTER TRY: The reaction for {Rsmiles} failed because of {e} \n')
+                    ff.write(f'AAM: {Rsmiles}\n')
                     print(f'OUTER TRY: The reaction for {Rsmiles} failed because of {e} \n')
                     print(traceback.print_exc())
                     print(info)

@@ -1,0 +1,47 @@
+Script executing from /groups/bsavoie2/tburton2/smiles_parser_dev/yarp-again/yarp
+Welcome to
+                __   __ _    ____  ____  
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        
+First off, here's the input file you provided:
+=====================================
+egat:
+  method: ml_predict
+  model: egat_pretrain
+initialize:
+  bonds to break: 2
+  bonds to form: 2
+  enumerate: true
+  enumeration filters:
+    discard strained rings: false
+    formal charge: 2.0
+    lewis score: 0.0
+  initial species: c1ccccc1Cl.O
+  mode: concerted
+  output: dev_smoke_aromatic.pkl
+stages:
+- egat
+
+=====================================
+Product enumeration routine selected
+ - Initializing starting reactant node from c1ccccc1Cl.O
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 13 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 5 products after filtering
+Number of reaction objects initialized: 5
+ -- Reaction 0: MVPPADPHJFYWMZ-XLYOFNOQVPJJNP_to_ISWSIDIOOBJBQZ-VEXZGXHMUGYJMC == Clc1ccccc1.O -> Cl.Oc1ccccc1
+ -- Reaction 1: MVPPADPHJFYWMZ-XLYOFNOQVPJJNP_to_QWPPOHNGKGFGJK-UHOVQNZJYSORNB == Clc1ccccc1.O -> OCl.c1ccccc1
+ -- Reaction 2: MVPPADPHJFYWMZ-XLYOFNOQVPJJNP_to_ISPYQTSUDJAMAB-UFHFLCQGNIYNRP == Clc1ccccc1.O -> Oc1ccccc1Cl.[H][H]
+ -- Reaction 3: MVPPADPHJFYWMZ-XLYOFNOQVPJJNP_to_HORNXRXVQWOLPJ-UFHFLCQGNIYNRP == Clc1ccccc1.O -> Oc1cccc(Cl)c1.[H][H]
+ -- Reaction 4: MVPPADPHJFYWMZ-XLYOFNOQVPJJNP_to_UFHFLCQGNIYNRP-WXNZTHHGJRFXKQ == Clc1ccccc1.O -> Oc1ccc(Cl)cc1.[H][H]
+Processing stage egat
+Reaction characterization via ML model selected
+ - Loading egat_pretrain model
+ - Predicting barriers for 5 reactions
+Reactions dictionary has been pickled to dev_smoke_aromatic.pkl.

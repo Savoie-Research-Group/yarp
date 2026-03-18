@@ -9,6 +9,19 @@ These are not meant to be imported by production code.
 They are here so we can review exact edits side by side in code form.
 """
 
+# Status note:
+# - The core parser/yarpecule/enum production pass has been implemented.
+# - This file remains useful as an archival side-by-side reference, but it is no
+#   longer the source of truth for next work.
+# - Latest cluster state:
+#   - base depth-1, larger, aromatic, and isotope runs pass through EGAT
+#   - sparse-map and depth-2 runs now log exact failing AAM strings and still
+#     write pickles
+#   - duplicate-map input now fails hard at yarpecule construction
+# - Remaining active work is EGAT-side debugging / compatibility:
+#   sparse-map handling, depth-2 failures, and possible EGAT-boundary map
+#   normalization.
+
 import os
 import re
 import sys

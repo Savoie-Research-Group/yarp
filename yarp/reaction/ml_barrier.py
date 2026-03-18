@@ -29,26 +29,37 @@ def get_egat_barriers(yp_rxns, model, args, verbose=False):
         print("Dataframe generated from reaction objects")
         print(dataframe)
     os.makedirs('tmp', exist_ok=True)
-    dataframe.to_csv('tmp/egat_barriers.csv', index=False)
-    test_dataset = FastDataset(args, dataset='tmp/egat_barriers.csv')
-    os.remove('tmp/egat_barriers.csv')
-    os.rmdir('tmp')
-    for data_idx in range(len(test_dataset)):
-        datapoint = test_dataset[data_idx]
-        if datapoint is None:
-            dataframe.loc[data_idx, 'egat_barrier'] = None
-            print(f"Error building datapoint for {data_idx}")
-            continue
-        else:
-            dp_idx, rgraph, pgraph, strings = datapoint
-            if verbose:
-                print(rgraph)
-            try:
-                prediction = predict_activation_energy(model, rgraph, pgraph)
-                dataframe.loc[dp_idx, 'egat_barrier'] = prediction
-            except Exception as e:
-                print(f"Error predicting barrier for {strings}: {e}")
-                dataframe.loc[dp_idx, 'egat_barrier'] = None
+    csv_path = os.path.join('tmp', 'egat_barriers.csv')
+    dataframe.to_csv(csv_path, index=False)
+    test_dataset = FastDataset(args, dataset=csv_path)
+    try:
+        for data_idx in range(len(test_dataset)):
+            datapoint = test_dataset[data_idx]
+            if datapoint is None:
+                dataframe.loc[data_idx, 'egat_barrier'] = None
+                print(f"Error building datapoint for {data_idx}")
+                if data_idx < len(dataframe):
+                    print(f"  AAM: {dataframe.loc[data_idx, 'AAM']}")
+                continue
+            else:
+                dp_idx, rgraph, pgraph, strings = datapoint
+                if verbose:
+                    print(rgraph)
+                try:
+                    prediction = predict_activation_energy(model, rgraph, pgraph)
+                    dataframe.loc[dp_idx, 'egat_barrier'] = prediction
+                except Exception as e:
+                    print(f"Error predicting barrier for {strings}: {e}")
+                    dataframe.loc[dp_idx, 'egat_barrier'] = None
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+        fail_path = os.path.join('tmp', 'fail.txt')
+        exclude_path = os.path.join('tmp', 'exclude.txt')
+        if os.path.exists(fail_path):
+            print(f"EGAT datapoint failures logged to {fail_path}")
+        if os.path.exists(exclude_path):
+            print(f"EGAT datapoint exclusions logged to {exclude_path}")
 
     # Update reaction objects with EGAT barriers
     for rxn_idx, rxn in enumerate(rxn_list):
@@ -80,4 +91,3 @@ def get_egat_barries_from_csv(csv_path, model, args, verbose=False):
                 print(f"Error predicting barrier for {strings}: {e}")
                 df.loc[idx, 'egat_barrier'] = None
     return df
-

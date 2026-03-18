@@ -1,0 +1,297 @@
+Script executing from /groups/bsavoie2/tburton2/smiles_parser_dev/yarp-again/yarp
+Welcome to
+                __   __ _    ____  ____  
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        
+First off, here's the input file you provided:
+=====================================
+egat:
+  method: ml_predict
+  model: egat_pretrain
+initialize:
+  bonds to break: 2
+  bonds to form: 2
+  enumerate: true
+  enumeration filters:
+    barrier cutoff: 80.0
+    barrier source: egat
+    discard strained rings: false
+    formal charge: 2.0
+    lewis score: 0.0
+  initial species: dev_smoke_depth1.pkl
+  mode: concerted
+  output: dev_smoke_depth2.pkl
+  separate products: all
+stages:
+- egat
+
+=====================================
+Product enumeration routine selected
+ - Processing starting node(s) as YARP generated pickle file
+ - Reading in 10 total reactions
+ - Barrier filtering selected!
+   Reactions with egat dG above 80.0 kcal/mol will be excluded from enumeration.
+  + Excluding XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ (dG = 88.35195922851562) from enumeration
+  + Excluding XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN (dG = 84.11251068115234) from enumeration
+  + Excluding XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH (dG = 99.13723754882812) from enumeration
+ - Performing product separation on all reactions prior to enumeration
+  + Separating WGCNASOHLSPBMP-WSFSSNUMVMOOMR into 2 nodes
+  + Separating SCKXCAADGDQQCS-VGGSQFUCUMXWEO into 2 nodes
+  + Separating BDAGIHXWWSANSR-IAYPIBMASNFSPL into 2 nodes
+ - 10 unique products identified for enumeration
+ - Enumerating from WSFSSNUMVMOOMR (C=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from WGCNASOHLSPBMP (O=CCO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 11 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 11 products after filtering
+ - Enumerating from MQZTXKZTLDDYNK (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 36 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 36 products after filtering
+ - Enumerating from VGGSQFUCUMXWEO (C=C) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 1 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 1 products after filtering
+ - Enumerating from SCKXCAADGDQQCS (O=COO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 6 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 6 products after filtering
+ - Enumerating from JQQGJTHDBODIPT (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 42 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 42 products after filtering
+ - Enumerating from IAYPIBMASNFSPL (C1CO1) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 2 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 2 products after filtering
+ - Enumerating from BDAGIHXWWSANSR (O=CO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 2 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 2 products after filtering
+ - Enumerating from UKQJDWBNQNAJHB (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 35 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 35 products after filtering
+ - Enumerating from KYKDRUWGNWYQSD (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Enumerated 42 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 42 products after filtering
+Number of reaction objects initialized: 187
+ -- Reaction 0: XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ == O=CCCOO -> OOCC1CO1
+ -- Reaction 1: XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN == O=CCCOO -> C=COCOO
+ -- Reaction 2: XSASRUDTFFBDDK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=CCCOO -> C=O.O=CCO
+ -- Reaction 3: XSASRUDTFFBDDK_to_MQZTXKZTLDDYNK == O=CCCOO -> O=CCOCO
+ -- Reaction 4: XSASRUDTFFBDDK_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == O=CCCOO -> C=C.O=COO
+ -- Reaction 5: XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH == O=CCCOO -> OOOC1CC1
+ -- Reaction 6: XSASRUDTFFBDDK_to_JQQGJTHDBODIPT == O=CCCOO -> OOC1CCO1
+ -- Reaction 7: XSASRUDTFFBDDK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=CCCOO -> C1CO1.O=CO
+ -- Reaction 8: XSASRUDTFFBDDK_to_UKQJDWBNQNAJHB == O=CCCOO -> O=COCCO
+ -- Reaction 9: XSASRUDTFFBDDK_to_KYKDRUWGNWYQSD == O=CCCOO -> OC1CCOO1
+ -- Reaction 10: WGCNASOHLSPBMP_to_WSFSSNUMVMOOMR-WSFSSNUMVMOOMR == O=CCO -> C=O.C=O
+ -- Reaction 11: WGCNASOHLSPBMP_to_TZIHFWKZFHZASV == O=CCO -> COC=O
+ -- Reaction 12: WGCNASOHLSPBMP_to_IEZWOVIWXFLQTP == O=CCO -> C=COO
+ -- Reaction 13: WGCNASOHLSPBMP_to_DOAMZWOPDPPKJS == O=CCO -> O[C@H]1CO1
+ -- Reaction 14: WGCNASOHLSPBMP_to_CCGKOQOJPYTBIH-XLYOFNOQVPJJNP == O=CCO -> C=C=O.O
+ -- Reaction 15: WGCNASOHLSPBMP_to_QTBSBXVTEAMEQO == O=CCO -> CC(=O)O
+ -- Reaction 16: WGCNASOHLSPBMP_to_JMCRDEBJJPRTPV == O=CCO -> O/C=C\O
+ -- Reaction 17: WGCNASOHLSPBMP_to_UFHFLCQGNIYNRP-WVKOKNQPFFEMSR == O=CCO -> O=C=CO.[H][H]
+ -- Reaction 18: WGCNASOHLSPBMP_to_LEQAOMBKQFMDFZ-UFHFLCQGNIYNRP == O=CCO -> O=CC=O.[H][H]
+ -- Reaction 19: WGCNASOHLSPBMP_to_BVTJGGGYKAMDBN == O=CCO -> C1COO1
+ -- Reaction 20: WGCNASOHLSPBMP_to_HZSIFDFXFAXICF-UFHFLCQGNIYNRP == O=CCO -> O=C1CO1.[H][H]
+ -- Reaction 21: MQZTXKZTLDDYNK_to_UKQJDWBNQNAJHB == O=CCOCO -> O=COCCO
+ -- Reaction 22: MQZTXKZTLDDYNK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=CCOCO -> C=O.O=CCO
+ -- Reaction 23: MQZTXKZTLDDYNK_to_MNQZXJOMYWMBOU == O=CCOCO -> O=C[C@@H](O)CO
+ -- Reaction 24: MQZTXKZTLDDYNK_to_LEQAOMBKQFMDFZ-OKKJLVBELUTLKV == O=CCOCO -> CO.O=CC=O
+ -- Reaction 25: MQZTXKZTLDDYNK_to_BFPUSHWBRPMZFN == O=CCOCO -> OC[C@@H]1COO1
+ -- Reaction 26: MQZTXKZTLDDYNK_to_OCSVNKWAJGSUKI == O=CCOCO -> OCO[C@@H]1CO1
+ -- Reaction 27: MQZTXKZTLDDYNK_to_RXKJFZQQPQGTFL == O=CCOCO -> O=C(CO)CO
+ -- Reaction 28: MQZTXKZTLDDYNK_to_HZSIFDFXFAXICF-OKKJLVBELUTLKV == O=CCOCO -> CO.O=C1CO1
+ -- Reaction 29: MQZTXKZTLDDYNK_to_QWFOJYBHKFALKR == O=CCOCO -> COOCC=O
+ -- Reaction 30: MQZTXKZTLDDYNK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=CCOCO -> C1CO1.O=CO
+ -- Reaction 31: MQZTXKZTLDDYNK_to_XSASRUDTFFBDDK == O=CCOCO -> O=CCCOO
+ -- Reaction 32: MQZTXKZTLDDYNK_to_IWYRWIUNAVNFPE-XLYOFNOQVPJJNP == O=CCOCO -> O.O=C[C@H]1CO1
+ -- Reaction 33: MQZTXKZTLDDYNK_to_XKRYVGDYTMIZST == O=CCOCO -> CO[C@@H](O)C=O
+ -- Reaction 34: MQZTXKZTLDDYNK_to_WVFPEXSMTPRZJP == O=CCOCO -> OOC1COC1
+ -- Reaction 35: MQZTXKZTLDDYNK_to_TWGSXTJXQLNWNP == O=CCOCO -> O[C@@H]1COCO1
+ -- Reaction 36: MQZTXKZTLDDYNK_to_ROADCYAOHVSOLQ-XLYOFNOQVPJJNP == O=CCOCO -> O.O=C1COC1
+ -- Reaction 37: MQZTXKZTLDDYNK_to_RMIODHQZRUFFFF == O=CCOCO -> COCC(=O)O
+ -- Reaction 38: MQZTXKZTLDDYNK_to_DOAMZWOPDPPKJS-WSFSSNUMVMOOMR == O=CCOCO -> C=O.O[C@@H]1CO1
+ -- Reaction 39: MQZTXKZTLDDYNK_to_RGNLCYKNGPYALI == O=CCOCO -> O=CCC(O)O
+ -- Reaction 40: MQZTXKZTLDDYNK_to_BDAGIHXWWSANSR-IKHGUXGNUITLKF == O=CCOCO -> CC=O.O=CO
+ -- Reaction 41: MQZTXKZTLDDYNK_to_UFHFLCQGNIYNRP-URQJYCMMYPTYSF == O=CCOCO -> O=C[C@@H]1O[C@@H]1O.[H][H]
+ -- Reaction 42: MQZTXKZTLDDYNK_to_SUCKNXAQIMPMOC == O=CCOCO -> O[C@@H]1CO[C@@H]1O
+ -- Reaction 43: MQZTXKZTLDDYNK_to_VOZDABZCYIIVTM == O=CCOCO -> OC1OCCO1
+ -- Reaction 44: MQZTXKZTLDDYNK_to_LTRRBWARIDHOMC-UFHFLCQGNIYNRP == O=CCOCO -> O=C1CO[C@@H]1O.[H][H]
+ -- Reaction 45: MQZTXKZTLDDYNK_to_MFRMAQFRVTUENW-UFHFLCQGNIYNRP == O=CCOCO -> O=CCOC=O.[H][H]
+ -- Reaction 46: MQZTXKZTLDDYNK_to_GFAJOMHUNNCCJQ-WSFSSNUMVMOOMR == O=CCOCO -> C1OCO1.C=O
+ -- Reaction 47: MQZTXKZTLDDYNK_to_VKWJMTLAAJULGF == O=CCOCO -> COCOC=O
+ -- Reaction 48: MQZTXKZTLDDYNK_to_KQBGNBDMOJYJAO == O=CCOCO -> C=COOCO
+ -- Reaction 49: MQZTXKZTLDDYNK_to_CCGKOQOJPYTBIH-CKFGINPQOCXMAZ == O=CCOCO -> C=C=O.OCO
+ -- Reaction 50: MQZTXKZTLDDYNK_to_JYVNDCLJHKQUHE == O=CCOCO -> CC(=O)OCO
+ -- Reaction 51: MQZTXKZTLDDYNK_to_ASQQEOXYFGEFKQ-IKHGUXGNUITLKF == O=CCOCO -> C1OO1.CC=O
+ -- Reaction 52: MQZTXKZTLDDYNK_to_PHMDMSMEYYVXLZ == O=CCOCO -> O/C=C/OCO
+ -- Reaction 53: MQZTXKZTLDDYNK_to_JCTHKUNMWCUDLH-UFHFLCQGNIYNRP == O=CCOCO -> O=C=COCO.[H][H]
+ -- Reaction 54: MQZTXKZTLDDYNK_to_RBNCVQJDGSQYET-UFHFLCQGNIYNRP == O=CCOCO -> O=CC1OCO1.[H][H]
+ -- Reaction 55: MQZTXKZTLDDYNK_to_FQERLIOIVXPZKH == O=CCOCO -> C1COOCO1
+ -- Reaction 56: MQZTXKZTLDDYNK_to_GZTMCZAOQTVOJK-UFHFLCQGNIYNRP == O=CCOCO -> O=C1COCO1.[H][H]
+ -- Reaction 57: VGGSQFUCUMXWEO_to_HSFWRNGVRCDJHI-UFHFLCQGNIYNRP == C=C -> C#C.[H][H]
+ -- Reaction 58: SCKXCAADGDQQCS_to_MYMOFIZGZYHOMD-WSFSSNUMVMOOMR == O=COO -> C=O.O=O
+ -- Reaction 59: SCKXCAADGDQQCS_to_CVTVRXGPXQVJAU == O=COO -> OC1OO1
+ -- Reaction 60: SCKXCAADGDQQCS_to_BJMSRZLVEVUDIK == O=COO -> C1OOO1
+ -- Reaction 61: SCKXCAADGDQQCS_to_CURLTUGMZLYLDI-XLYOFNOQVPJJNP == O=COO -> O.O=C=O
+ -- Reaction 62: SCKXCAADGDQQCS_to_BVKZGUZCCUSVTD == O=COO -> O=C(O)O
+ -- Reaction 63: SCKXCAADGDQQCS_to_NPDDCAZCWJWIBW-UFHFLCQGNIYNRP == O=COO -> O=C1OO1.[H][H]
+ -- Reaction 64: JQQGJTHDBODIPT_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == OO[C@H]1CCO1 -> C=C.O=COO
+ -- Reaction 65: JQQGJTHDBODIPT_to_YLOCODGPXISXIR == OO[C@H]1CCO1 -> C[C@H]1O[C@H]1OO
+ -- Reaction 66: JQQGJTHDBODIPT_to_LZBZEBHQVXRLLN == OO[C@H]1CCO1 -> C=COCOO
+ -- Reaction 67: JQQGJTHDBODIPT_to_UKQJDWBNQNAJHB == OO[C@@H]1CCO1 -> O=COCCO
+ -- Reaction 68: JQQGJTHDBODIPT_to_VOZDABZCYIIVTM == OO[C@@H]1CCO1 -> OC1OCCO1
+ -- Reaction 69: JQQGJTHDBODIPT_to_JQTRCASVHDFDIY == OO[C@H]1CCO1 -> CCOC1OO1
+ -- Reaction 70: JQQGJTHDBODIPT_to_FQERLIOIVXPZKH == OO[C@@H]1CCO1 -> C1COOCO1
+ -- Reaction 71: JQQGJTHDBODIPT_to_PLXVTJBBUQBDRQ == OO[C@H]1CCO1 -> OOC[C@H]1CO1
+ -- Reaction 72: JQQGJTHDBODIPT_to_UVXJOOHEDLXZGH == OO[C@H]1CCO1 -> OOOC1CC1
+ -- Reaction 73: JQQGJTHDBODIPT_to_XSASRUDTFFBDDK == OO[C@H]1CCO1 -> O=CCCOO
+ -- Reaction 74: JQQGJTHDBODIPT_to_MHAJPDPJQMAIIY-SQRHNJRUPNFNHY == OO[C@H]1CCO1 -> C1[C@@H]2O[C@H]12.OO
+ -- Reaction 75: JQQGJTHDBODIPT_to_CRYATLIDHPPXDV-MHAJPDPJQMAIIY == OO[C@H]1CCO1 -> C1=COC1.OO
+ -- Reaction 76: JQQGJTHDBODIPT_to_WVFPEXSMTPRZJP == OO[C@@H]1CCO1 -> OOC1COC1
+ -- Reaction 77: JQQGJTHDBODIPT_to_AHHWIHXENZJRFG-MYMOFIZGZYHOMD == OO[C@@H]1CCO1 -> C1COC1.O=O
+ -- Reaction 78: JQQGJTHDBODIPT_to_IEZWOVIWXFLQTP-WSFSSNUMVMOOMR == OO[C@@H]1CCO1 -> C=COO.C=O
+ -- Reaction 79: JQQGJTHDBODIPT_to_YKZHDJKJFXCGCU == OO[C@@H]1CCO1 -> OO[C@@H]1C[C@@H]1O
+ -- Reaction 80: JQQGJTHDBODIPT_to_LGAKZZVAQHLFSN == OO[C@H]1CCO1 -> OC/C=C\OO
+ -- Reaction 81: JQQGJTHDBODIPT_to_KYKDRUWGNWYQSD == OO[C@@H]1CCO1 -> O[C@@H]1CCOO1
+ -- Reaction 82: JQQGJTHDBODIPT_to_DTXLZANOYCDGFH == OO[C@@H]1CCO1 -> OCCC1OO1
+ -- Reaction 83: JQQGJTHDBODIPT_to_KQBSGRWMSNFIPG == OO[C@@H]1CCO1 -> C1COOOC1
+ -- Reaction 84: JQQGJTHDBODIPT_to_XDOSUYFJXIIXIM == OO[C@@H]1CCO1 -> C[C@]1(OO)CO1
+ -- Reaction 85: JQQGJTHDBODIPT_to_PQLKATRRSMAICE == OO[C@@H]1CCO1 -> C=C(OC)OO
+ -- Reaction 86: JQQGJTHDBODIPT_to_SHEQRTRCYNGEEJ == OO[C@H]1CCO1 -> OOC1(O)CC1
+ -- Reaction 87: JQQGJTHDBODIPT_to_CZPZWMPYEINMCF == OO[C@H]1CCO1 -> CCC(=O)OO
+ -- Reaction 88: JQQGJTHDBODIPT_to_UFHFLCQGNIYNRP-YHAGBRCRSSOTCP == OO[C@@H]1CCO1 -> OO[C@]12C[C@H]1O2.[H][H]
+ -- Reaction 89: JQQGJTHDBODIPT_to_STDNQZPMIRKDCV-UFHFLCQGNIYNRP == OO[C@H]1CCO1 -> OOC1=CCO1.[H][H]
+ -- Reaction 90: JQQGJTHDBODIPT_to_VEZXCJBBBCKRPI-XLYOFNOQVPJJNP == OO[C@H]1CCO1 -> O.O=C1CCO1
+ -- Reaction 91: JQQGJTHDBODIPT_to_MOKACWHZOSFWEI == OO[C@H]1CCO1 -> OC1(O)CCO1
+ -- Reaction 92: JQQGJTHDBODIPT_to_ARCNIFKJKCNTNO-UFHFLCQGNIYNRP == OO[C@H]1CCO1 -> C1CC2(O1)OO2.[H][H]
+ -- Reaction 93: JQQGJTHDBODIPT_to_DNNLBMAZSCRRMG == OO[C@H]1CCO1 -> OCC1OCO1
+ -- Reaction 94: JQQGJTHDBODIPT_to_OCSVNKWAJGSUKI == OO[C@H]1CCO1 -> OCO[C@@H]1CO1
+ -- Reaction 95: JQQGJTHDBODIPT_to_IZHVFAKMAKGJLM == OO[C@H]1CCO1 -> C[C@H]1OCOO1
+ -- Reaction 96: JQQGJTHDBODIPT_to_HREKQTFXSLSXGY == OO[C@H]1CCO1 -> CO[C@@H]1COO1
+ -- Reaction 97: JQQGJTHDBODIPT_to_CXMXXUXSRBBZSC == OO[C@@H]1CCO1 -> C=C[C@H](O)OO
+ -- Reaction 98: JQQGJTHDBODIPT_to_AQKWQHQQWFSEQR == OO[C@@H]1CCO1 -> CCC1OOO1
+ -- Reaction 99: JQQGJTHDBODIPT_to_UFHFLCQGNIYNRP-ZXEDRBJDQBSWAI == OO[C@@H]1CCO1 -> OO[C@@H]1C=CO1.[H][H]
+ -- Reaction 100: JQQGJTHDBODIPT_to_WEOAOPULSHXPNT-XLYOFNOQVPJJNP == OO[C@@H]1CCO1 -> C1[C@H]2O[C@@H]1O2.O
+ -- Reaction 101: JQQGJTHDBODIPT_to_LMZBGVBKISSTKO == OO[C@@H]1CCO1 -> O[C@@H]1C[C@H](O)O1
+ -- Reaction 102: JQQGJTHDBODIPT_to_NGTHLWHNLJEPPD-UFHFLCQGNIYNRP == OO[C@@H]1CCO1 -> C1[C@@H]2OO[C@H]1O2.[H][H]
+ -- Reaction 103: JQQGJTHDBODIPT_to_IUBDIJVSWDMJLO-XLYOFNOQVPJJNP == OO[C@@H]1CCO1 -> C1O[C@@H]2O[C@H]12.O
+ -- Reaction 104: JQQGJTHDBODIPT_to_SUCKNXAQIMPMOC == OO[C@@H]1CCO1 -> O[C@H]1CO[C@@H]1O
+ -- Reaction 105: JQQGJTHDBODIPT_to_BNJDONXQWMZFOE-UFHFLCQGNIYNRP == OO[C@@H]1CCO1 -> C1O[C@@H]2OO[C@H]12.[H][H]
+ -- Reaction 106: IAYPIBMASNFSPL_to_IMROMDMJAWUWLK == C1CO1 -> C=CO
+ -- Reaction 107: IAYPIBMASNFSPL_to_IKHGUXGNUITLKF == C1CO1 -> CC=O
+ -- Reaction 108: BDAGIHXWWSANSR_to_ASQQEOXYFGEFKQ == O=CO -> C1OO1
+ -- Reaction 109: BDAGIHXWWSANSR_to_CURLTUGMZLYLDI-UFHFLCQGNIYNRP == O=CO -> O=C=O.[H][H]
+ -- Reaction 110: UKQJDWBNQNAJHB_to_MQZTXKZTLDDYNK == O=COCCO -> O=CCOCO
+ -- Reaction 111: UKQJDWBNQNAJHB_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=COCCO -> C=O.O=CCO
+ -- Reaction 112: UKQJDWBNQNAJHB_to_OCSVNKWAJGSUKI == O=COCCO -> OCO[C@H]1CO1
+ -- Reaction 113: UKQJDWBNQNAJHB_to_DNNLBMAZSCRRMG == O=COCCO -> OCC1OCO1
+ -- Reaction 114: UKQJDWBNQNAJHB_to_HZSIFDFXFAXICF-OKKJLVBELUTLKV == O=COCCO -> CO.O=C1CO1
+ -- Reaction 115: UKQJDWBNQNAJHB_to_GSJFXBNYJCXDGI == O=COCCO -> COC(=O)CO
+ -- Reaction 116: UKQJDWBNQNAJHB_to_VKWJMTLAAJULGF == O=COCCO -> COCOC=O
+ -- Reaction 117: UKQJDWBNQNAJHB_to_TZIHFWKZFHZASV-WSFSSNUMVMOOMR == O=COCCO -> C=O.COC=O
+ -- Reaction 118: UKQJDWBNQNAJHB_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == O=COCCO -> C=C.O=COO
+ -- Reaction 119: UKQJDWBNQNAJHB_to_BDAGIHXWWSANSR-IMROMDMJAWUWLK == O=COCCO -> C=CO.O=CO
+ -- Reaction 120: UKQJDWBNQNAJHB_to_JRUKHAIVAGVYRP == O=COCCO -> C[C@H](O)OC=O
+ -- Reaction 121: UKQJDWBNQNAJHB_to_DTXLZANOYCDGFH == O=COCCO -> OCCC1OO1
+ -- Reaction 122: UKQJDWBNQNAJHB_to_ALRHLSYJTWAHJZ == O=COCCO -> O=C(O)CCO
+ -- Reaction 123: UKQJDWBNQNAJHB_to_CURLTUGMZLYLDI-LFQSCWFLJHTTHZ == O=COCCO -> CCO.O=C=O
+ -- Reaction 124: UKQJDWBNQNAJHB_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=COCCO -> C1CO1.O=CO
+ -- Reaction 125: UKQJDWBNQNAJHB_to_COYCHYMPNMUQTC == O=COCCO -> CCOOC=O
+ -- Reaction 126: UKQJDWBNQNAJHB_to_GFJVXXWOPWLRNU-XLYOFNOQVPJJNP == O=COCCO -> C=COC=O.O
+ -- Reaction 127: UKQJDWBNQNAJHB_to_UFHFLCQGNIYNRP-UNOQYACVVFEUPE == O=COCCO -> O=CO/C=C\O.[H][H]
+ -- Reaction 128: UKQJDWBNQNAJHB_to_MNQZXJOMYWMBOU == O=COCCO -> O=C[C@H](O)CO
+ -- Reaction 129: UKQJDWBNQNAJHB_to_BDJBDLCUJNXGRX == O=COCCO -> OC[C@H]1O[C@H]1O
+ -- Reaction 130: UKQJDWBNQNAJHB_to_UFHFLCQGNIYNRP-UVFIISNPWKBTMO == O=COCCO -> O=C1O[C@@H]1CO.[H][H]
+ -- Reaction 131: UKQJDWBNQNAJHB_to_CGPGEDSPKFBZMV-UFHFLCQGNIYNRP == O=COCCO -> O=CO[C@H]1CO1.[H][H]
+ -- Reaction 132: UKQJDWBNQNAJHB_to_XSASRUDTFFBDDK == O=COCCO -> O=CCCOO
+ -- Reaction 133: UKQJDWBNQNAJHB_to_JQQGJTHDBODIPT == O=COCCO -> OO[C@H]1CCO1
+ -- Reaction 134: UKQJDWBNQNAJHB_to_VOZDABZCYIIVTM == O=COCCO -> OC1OCCO1
+ -- Reaction 135: UKQJDWBNQNAJHB_to_VEZXCJBBBCKRPI-XLYOFNOQVPJJNP == O=COCCO -> O.O=C1CCO1
+ -- Reaction 136: UKQJDWBNQNAJHB_to_CQDGTJPVBWZJAZ == O=COCCO -> CCOC(=O)O
+ -- Reaction 137: UKQJDWBNQNAJHB_to_DOAMZWOPDPPKJS-WSFSSNUMVMOOMR == O=COCCO -> C=O.O[C@@H]1CO1
+ -- Reaction 138: UKQJDWBNQNAJHB_to_SUCKNXAQIMPMOC == O=COCCO -> O[C@H]1CO[C@@H]1O
+ -- Reaction 139: UKQJDWBNQNAJHB_to_TWGSXTJXQLNWNP == O=COCCO -> O[C@H]1COCO1
+ -- Reaction 140: UKQJDWBNQNAJHB_to_LGUPRTLHPKMGHK-UFHFLCQGNIYNRP == O=COCCO -> O=C1OC[C@@H]1O.[H][H]
+ -- Reaction 141: UKQJDWBNQNAJHB_to_MFRMAQFRVTUENW-UFHFLCQGNIYNRP == O=COCCO -> O=CCOC=O.[H][H]
+ -- Reaction 142: UKQJDWBNQNAJHB_to_BVTJGGGYKAMDBN-WSFSSNUMVMOOMR == O=COCCO -> C1COO1.C=O
+ -- Reaction 143: UKQJDWBNQNAJHB_to_FQERLIOIVXPZKH == O=COCCO -> C1COOCO1
+ -- Reaction 144: UKQJDWBNQNAJHB_to_KMTRUDSVKNLOMY-UFHFLCQGNIYNRP == O=COCCO -> O=C1OCCO1.[H][H]
+ -- Reaction 145: KYKDRUWGNWYQSD_to_CVTVRXGPXQVJAU-VGGSQFUCUMXWEO == O[C@H]1CCOO1 -> C=C.OC1OO1
+ -- Reaction 146: KYKDRUWGNWYQSD_to_OYKWJRCDWIZWPU == O[C@H]1CCOO1 -> C[C@H]1OO[C@H]1O
+ -- Reaction 147: KYKDRUWGNWYQSD_to_KQBGNBDMOJYJAO == O[C@H]1CCOO1 -> C=COOCO
+ -- Reaction 148: KYKDRUWGNWYQSD_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O[C@H]1CCOO1 -> C1CO1.O=CO
+ -- Reaction 149: KYKDRUWGNWYQSD_to_VOZDABZCYIIVTM == O[C@H]1CCOO1 -> OC1OCCO1
+ -- Reaction 150: KYKDRUWGNWYQSD_to_COYCHYMPNMUQTC == O[C@H]1CCOO1 -> CCOOC=O
+ -- Reaction 151: KYKDRUWGNWYQSD_to_FQERLIOIVXPZKH == O[C@H]1CCOO1 -> C1COOCO1
+ -- Reaction 152: KYKDRUWGNWYQSD_to_TXHBRKKPPAECNB == O[C@H]1CCOO1 -> OC1COOC1
+ -- Reaction 153: KYKDRUWGNWYQSD_to_ASQQEOXYFGEFKQ-IMROMDMJAWUWLK == O[C@H]1CCOO1 -> C1OO1.C=CO
+ -- Reaction 154: KYKDRUWGNWYQSD_to_MYMOFIZGZYHOMD-YOXHCYXIAVIFCZ == O[C@H]1CCOO1 -> O=O.OC1CC1
+ -- Reaction 155: KYKDRUWGNWYQSD_to_YKZHDJKJFXCGCU == O[C@H]1CCOO1 -> OO[C@@H]1C[C@@H]1O
+ -- Reaction 156: KYKDRUWGNWYQSD_to_DTXLZANOYCDGFH == O[C@H]1CCOO1 -> OCCC1OO1
+ -- Reaction 157: KYKDRUWGNWYQSD_to_MFKZDADVASPENT == O[C@@H]1CCOO1 -> O/C=C\COO
+ -- Reaction 158: KYKDRUWGNWYQSD_to_BFPUSHWBRPMZFN == O[C@@H]1CCOO1 -> OC[C@@H]1COO1
+ -- Reaction 159: KYKDRUWGNWYQSD_to_XSASRUDTFFBDDK == O[C@@H]1CCOO1 -> O=CCCOO
+ -- Reaction 160: KYKDRUWGNWYQSD_to_KQBSGRWMSNFIPG == O[C@@H]1CCOO1 -> C1COOOC1
+ -- Reaction 161: KYKDRUWGNWYQSD_to_UVXJOOHEDLXZGH == O[C@H]1CCOO1 -> OOOC1CC1
+ -- Reaction 162: KYKDRUWGNWYQSD_to_UCZMEHHAPUYKNJ-XLYOFNOQVPJJNP == O[C@@H]1CCOO1 -> C1[C@@H]2OO[C@H]12.O
+ -- Reaction 163: KYKDRUWGNWYQSD_to_XKTYXVDYIKIYJP-XLYOFNOQVPJJNP == O[C@@H]1CCOO1 -> C1=COOC1.O
+ -- Reaction 164: KYKDRUWGNWYQSD_to_JQQGJTHDBODIPT == O[C@H]1CCOO1 -> OO[C@H]1CCO1
+ -- Reaction 165: KYKDRUWGNWYQSD_to_GAUCYLKCTZPVLB == O[C@@H]1CCOO1 -> C[C@]1(O)COO1
+ -- Reaction 166: KYKDRUWGNWYQSD_to_FNWLCNZUVROOFW == O[C@@H]1CCOO1 -> C=C(O)OOC
+ -- Reaction 167: KYKDRUWGNWYQSD_to_SHEQRTRCYNGEEJ == O[C@@H]1CCOO1 -> OOC1(O)CC1
+ -- Reaction 168: KYKDRUWGNWYQSD_to_WJFKCENNRPNHOE == O[C@@H]1CCOO1 -> CCC1(O)OO1
+ -- Reaction 169: KYKDRUWGNWYQSD_to_SKFZIELIUAHGPK-UFHFLCQGNIYNRP == O[C@H]1CCOO1 -> O[C@@]12C[C@@H]1OO2.[H][H]
+ -- Reaction 170: KYKDRUWGNWYQSD_to_GAJYHLUYMIZKMD-UFHFLCQGNIYNRP == O[C@@H]1CCOO1 -> OC1=CCOO1.[H][H]
+ -- Reaction 171: KYKDRUWGNWYQSD_to_ALRHLSYJTWAHJZ == O[C@@H]1CCOO1 -> O=C(O)CCO
+ -- Reaction 172: KYKDRUWGNWYQSD_to_MOKACWHZOSFWEI == O[C@H]1CCOO1 -> OC1(O)CCO1
+ -- Reaction 173: KYKDRUWGNWYQSD_to_PHILMFQVUWCHOQ-UFHFLCQGNIYNRP == O[C@H]1CCOO1 -> O=C1CCOO1.[H][H]
+ -- Reaction 174: KYKDRUWGNWYQSD_to_TWGSXTJXQLNWNP == O[C@@H]1CCOO1 -> O[C@@H]1COCO1
+ -- Reaction 175: KYKDRUWGNWYQSD_to_DOAMZWOPDPPKJS-WSFSSNUMVMOOMR == O[C@@H]1CCOO1 -> C=O.O[C@@H]1CO1
+ -- Reaction 176: KYKDRUWGNWYQSD_to_IZHVFAKMAKGJLM == O[C@H]1CCOO1 -> C[C@@H]1OCOO1
+ -- Reaction 177: KYKDRUWGNWYQSD_to_CKTASNZTAVBJSB == O[C@H]1CCOO1 -> COO[C@@H]1CO1
+ -- Reaction 178: KYKDRUWGNWYQSD_to_CXMXXUXSRBBZSC == O[C@@H]1CCOO1 -> C=C[C@@H](O)OO
+ -- Reaction 179: KYKDRUWGNWYQSD_to_AQKWQHQQWFSEQR == O[C@@H]1CCOO1 -> CCC1OOO1
+ -- Reaction 180: KYKDRUWGNWYQSD_to_FMGBGGSVWWXHHO-UFHFLCQGNIYNRP == O[C@@H]1CCOO1 -> O[C@@H]1C=COO1.[H][H]
+ -- Reaction 181: KYKDRUWGNWYQSD_to_LMZBGVBKISSTKO == O[C@@H]1CCOO1 -> O[C@@H]1C[C@@H](O)O1
+ -- Reaction 182: KYKDRUWGNWYQSD_to_RGNLCYKNGPYALI == O[C@@H]1CCOO1 -> O=CCC(O)O
+ -- Reaction 183: KYKDRUWGNWYQSD_to_NGTHLWHNLJEPPD-UFHFLCQGNIYNRP == O[C@@H]1CCOO1 -> C1[C@@H]2OO[C@H]1O2.[H][H]
+ -- Reaction 184: KYKDRUWGNWYQSD_to_BDJBDLCUJNXGRX == O[C@@H]1CCOO1 -> OC[C@@H]1O[C@@H]1O
+ -- Reaction 185: KYKDRUWGNWYQSD_to_YAFICCFLXARRNU == O[C@@H]1CCOO1 -> OC(O)[C@@H]1CO1
+ -- Reaction 186: KYKDRUWGNWYQSD_to_UFHFLCQGNIYNRP-YWCSBIRMAKNRIT == O[C@@H]1CCOO1 -> C1OO[C@@H]2O[C@H]12.[H][H]
+Processing stage egat
+Reaction characterization via ML model selected
+ - Loading egat_pretrain model
+ - Predicting barriers for 187 reactions

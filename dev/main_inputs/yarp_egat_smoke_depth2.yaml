@@ -1,0 +1,21 @@
+initialize:
+  enumerate: True
+  initial species: dev_smoke_depth1.pkl
+  output: dev_smoke_depth2.pkl
+  mode: concerted
+  bonds to break: 2
+  bonds to form: 2
+  separate products: all
+  enumeration filters:
+    lewis score: 0.0
+    formal charge: 2.0
+    discard strained rings: False
+    barrier cutoff: 80.00
+    barrier source: egat
+
+stages:
+  - egat
+
+egat:
+  method: ml_predict
+  model: egat_pretrain

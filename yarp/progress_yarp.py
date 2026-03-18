@@ -44,6 +44,7 @@ def progress_yarp(work_dir_str: str):
     
     # Initialize the correct job manager based on user input
     job_manager = get_job_manager(inp.scheduler)
+    container_runner = getattr(inp, 'container', 'docker')
     failed_rxns = {}
 
     print(f"Processing YARP progress in {work_dir}...")
@@ -60,7 +61,7 @@ def progress_yarp(work_dir_str: str):
             if meta["status"] == "submitted":
                 if not job_manager.is_running(meta["job_id"]):
                     # Job finished! Let's check if it succeeded.
-                    calc = get_calculator(pipeline_tasks[task_id], rxn_obj)
+                    calc = get_calculator(pipeline_tasks[task_id], rxn_obj, container_runner=container_runner)
                     calc.set_scratch_dir(Path(meta["scratch_dir"]))
                     
                     if calc.check_output():
@@ -100,7 +101,7 @@ def progress_yarp(work_dir_str: str):
         for task_id, meta in tasks_status.items():
             if meta["status"] == "ready":
                 task_def = pipeline_tasks[task_id]
-                calc = get_calculator(task_def, rxn_obj)
+                calc = get_calculator(task_def, rxn_obj, container_runner=container_runner)
                 
                 scratch_path = work_dir / "SCRATCH" / f"{rxn_hash}_{task_id}"
                 calc.set_scratch_dir(scratch_path)

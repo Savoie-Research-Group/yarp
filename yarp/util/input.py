@@ -111,6 +111,7 @@ class InputParser:
             raise RuntimeError("Please provide an initial species for enumeration.")
         self.out_file = initnode.get("output", "reactions.pkl")
         self.scheduler = initnode.get("scheduler", "slurm") # throw this in the initialize block for now!
+        self.scheduler = initnode.get("container", "docker") # throw this in the initialize block for now!
 
         self.enum = self._parse_enum_config(initnode)
         self.enum_filters = self._parse_enum_filters(initnode)

@@ -1,199 +1,215 @@
 """
-Definition of the YARP Calculator base class and software-specific subclasses.
+Definition of the YARP Calculator base classes and software-specific implementations.
 """
 import shutil
-import subprocess
 from pathlib import Path
 
-class YarpCalculator:
-    """
-    Base class for managing external software calculations in YARP.
-    """
-    def __init__(self, job_name, scratch_base="./SCRATCH", runner="docker", n_threads=1):
-        self.job_name = job_name
-        self.job_dir = Path(scratch_base).resolve() / job_name
-        self.runner = runner
-        self.n_threads = n_threads
-        
-        # Will hold the parsed results to be passed back to YARP
-        self.results = None 
+from yarp.reaction.external.crest import CrestConfCalculator
 
-    def execute(self):
-        """
-        The main orchestrator method. This executes the 5 stages of a calculation's lifecycle.
-        """
-        self.job_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Starting job: {self.job_name} in {self.job_dir}")
-
-        try:
-            # Step 1: Generate Input
-            self.generate_input()
-            
-            # Step 2: Run Container
-            self.run_container()
-            
-            return None
-
-        except Exception as e:
-            print(f"ERROR: Calculation {self.job_name} failed!")
-            self._write_crash_log(str(e))
-            print(f"Files retained in {self.job_dir} for debugging.")
-            return None
-
-    def _write_crash_log(self, error_msg):
-        with open(self.job_dir / "crash_log.txt", "w") as f:
-            f.write(f"YARP Calculator Exception:\n{error_msg}")
-
-    # ==========================================
-    # Abstract Methods (To be implemented by subclasses)
-    # ==========================================
-    def generate_input(self): pass
-    def run_container(self): pass
-    def validate_outputs(self): pass
-    def extract_data(self): pass
-    
-    def clean_up(self):
-        """Step 5: Default cleanup behavior (can be overridden)."""
-        print(f"Calculation successful. Cleaning up {self.job_dir}...")
-        shutil.rmtree(self.job_dir)
-
-
-class CrestCalculator(YarpCalculator):
-    """
-    Subclass specifically for handling CREST conformer generation.
-    """
-    def __init__(self, init_xyz, job_id, lot="gfn2", **kwargs):
-        self.lot = lot
-        self.xyz_str = init_xyz
-        self.xyz_file = "input.xyz"
-        
-        # Initialize the base class
-        job_name = f"crest_{lot}_{job_id}"
-        super().__init__(job_name=job_name, **kwargs)
-
-    def generate_input(self):
-        """Step 1: Write the specific input files CREST needs."""
-        input_xyz_path = self.job_dir / self.xyz_file
-        with open(input_xyz_path, "w") as f:
-             f.write(self.xyz_str)
-
-    def run_container(self):
-        """Step 2: Construct and execute the container command."""
-        if self.runner == "docker":
-            cmd = [
-                "docker", "run", "--rm", 
-                "-v", f"{self.job_dir}:/work", 
-                "yarp_crest:latest", 
-                "crest", self.xyz_file, f"--{self.lot}", "-T", str(self.n_threads)
-            ]
-        elif self.runner == "apptainer":
-            cmd = [
-                "apptainer", "exec", 
-                "--bind", f"{self.job_dir}:/work", 
-                "yarp_crest.sif", 
-                "crest", self.xyz_file, f"--{self.lot}", "-T", str(self.n_threads)
-            ]
-        else:
-            raise ValueError(f"Unknown runner: {self.runner}")
-
-        # Execute and check for container-level errors
-        result = subprocess.run(cmd, cwd=self.job_dir, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"CREST failed:\n{result.stderr}")
-
-    def validate_outputs(self):
-        """Step 4: Check if CREST successfully generated what we need."""
-        self.out_xyz = self.job_dir / "crest_conformers.xyz"
-        self.out_ene = self.job_dir / "crest.energies"
-        
-        if not self.out_xyz.exists() or not self.out_ene.exists():
-            raise FileNotFoundError("CREST completed, but required output files are missing.")
-
-    def extract_data(self):
-        """Step 3: Read the files and package the data."""
-        # Using a placeholder for your actual parsing logic
-        # elements, geometries = xyz_parse(self.out_xyz, multiple=True)
-        
-        # Let's assume we package the parsed data into a neat dictionary or list 
-        # to hand back to the state object
-        self.results = {
-            "software": "crest",
-            "lot": self.lot,
-            "geometries": [], # Insert parsed geometries here
-            "energies": []    # Insert parsed energies here
-        }
-
+# =====================================================================
+#   THE ROOT BASE CLASS
+# =====================================================================
 class AsyncYarpCalculator:
-    """Base calculator class defining the required interface."""
+    """
+    Base class defining the asynchronous lifecycle interface required by progress_yarp.py.
+    """
     def __init__(self, task_def, rxn_obj):
         self.task_def = task_def
         self.rxn = rxn_obj
         self.config = task_def.config
         self.scratch_dir = None
-        
+
     def set_scratch_dir(self, path: Path):
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
-        
+
+    def get_container_prefix(self, image_name: str) -> str:
+        """
+        The universal toggle for container execution.
+        Maps the scratch directory to /work inside the container.
+        """
+        if self.container_runner == "docker":
+            # --rm removes the container after it finishes
+            # -v mounts the host scratch dir to /work
+            # -u $(id -u):$(id -g) ensures files aren't created as root (optional but good practice)
+            return f"docker run --rm -v {self.scratch_dir}:/work {image_name}"
+            
+        elif self.container_runner == "apptainer":
+            # Apptainer automatically mounts the current working directory, 
+            # but explicit binding is safer.
+            # Assuming the user has downloaded the .sif file to a known location, or pulls it.
+            # E.g., docker://ghcr.io/username/yarp_crest:latest
+            return f"apptainer exec --bind {self.scratch_dir}:/work {image_name}.sif"
+            
+        else:
+            raise ValueError(f"Unsupported container runner: {self.container_runner}")
+
+    # --- Pre-flight Check (Overridden by Task classes) ---
     def has_prerequisites(self) -> bool:
-        """Data dependency check before submission. Overridden by subclasses."""
         return True
-        
+
+    # --- The 5 Lifecycle Methods (Overridden by Software classes) ---
     def generate_input(self):
-        """Writes the necessary input files to the scratch directory."""
-        pass
-        
+        """1. Write input files (e.g., .xyz, .inp) based on self.rxn geometries."""
+        raise NotImplementedError
+
     def write_submission_script(self) -> Path:
-        """Writes the SLURM script and returns its path."""
-        script_path = self.scratch_dir / "submit.sh"
-        # Mocking script generation
-        with open(script_path, "w") as f:
-            f.write("#!/bin/bash\n#SBATCH --time=01:00:00\necho 'Running job'")
-        return script_path
-        
+        """2. Write the SLURM/QSE bash script (including container commands) and return its Path."""
+        raise NotImplementedError
+
     def check_output(self) -> bool:
-        """Checks if the external calculation terminated normally."""
-        return True # Mocked logic
-        
+        """3. Validate completeness (e.g., check for 'Normal termination' or expected files)."""
+        raise NotImplementedError
+
     def scrape_data(self):
-        """Extracts data from output files and updates self.rxn."""
-        pass
-        
+        """4. Extract data from outputs and update self.rxn in memory."""
+        raise NotImplementedError
+
     def cleanup(self):
-        """Deletes large scratch files after successful scraping."""
+        """5. Clean up large unneeded files, but keep logs if necessary."""
+        # Default behavior: nuke the whole folder
+        if self.scratch_dir and self.scratch_dir.exists():
+            shutil.rmtree(self.scratch_dir)
+
+
+# =====================================================================
+#    TASK BASE CLASSES (Handles pre-flight checks)
+# =====================================================================
+class MLPredictTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        # ML usually just needs the 2D graph (SMILES/InChI), which is guaranteed to exist.
+        return True
+
+class ConfTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        return True # Just needs the base yarpecule graph
+
+class TSGuessTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        if not self.rxn.reactant.conformers or not self.rxn.product.conformers:
+            print(f"[{self.rxn.hash}] Missing R/P conformers for TS Guess.")
+            return False
+        return True
+
+class MinOptTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        # Needs at least an initial unoptimized geometry
+        return True 
+
+class TSOptTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        if not getattr(self.rxn, 'ts_geom', None):
+            print(f"[{self.rxn.hash}] Missing TS guess for TS Opt.")
+            return False
+        return True
+
+class IRCValTask(AsyncYarpCalculator):
+    def has_prerequisites(self) -> bool:
+        if not getattr(self.rxn, 'ts_geom', None) or not self.rxn.ts_geom.get("optimized"):
+            print(f"[{self.rxn.hash}] Missing optimized TS geometry for IRC.")
+            return False
+        return True
+
+
+# =====================================================================
+#    SOFTWARE-SPECIFIC IMPLEMENTATIONS (The "Meat and Potatoes")
+# =====================================================================
+
+# --- TASK 1: ML PREDICT ---
+class EgatMLPredict(MLPredictTask):
+    def generate_input(self):
+        # Write SMILES to a text file for EGAT to read
+        pass
+    def write_submission_script(self) -> Path:
+        # Write script calling the EGAT container
+        pass
+    def check_output(self) -> bool:
+        return (self.scratch_dir / "egat_results.csv").exists()
+    def scrape_data(self):
+        # Read CSV, assign self.rxn.barrier['egat'] = value
+        pass
+    def cleanup(self):
+        # EGAT is lightweight, maybe just delete the folder
+        shutil.rmtree(self.scratch_dir)
+
+
+# --- TASK 3: TS GUESS ---
+class PysisyphusTSGuessCalculator(TSGuessTask):
+    def generate_input(self):
+        # Write reactant.xyz, product.xyz, and pysisyphus.ini
+        pass
+    def write_submission_script(self) -> Path:
+        # Write script calling pysisyphus container
+        pass
+    def check_output(self) -> bool:
+        # Look for the GSM output string or the specific TS guess xyz
+        pass
+    def scrape_data(self):
+        # Extract TS guess, save to self.rxn.ts_geom['ts_guess_xtb']
+        pass
+    def cleanup(self):
         pass
 
 
-class RefineRxnPathCalculator(AsyncYarpCalculator):
-    def has_prerequisites(self) -> bool:
-        # Pre-flight data checks
-        if self.task_def.task_type == "transition_state_optimization":
-            if not getattr(self.rxn, 'ts_geom', None):
-                print(f"Reaction {self.rxn.hash} missing TS guess. Cannot run TS Opt.")
-                return False
-        elif self.task_def.task_type == "irc_validation":
-            # Just an example: maybe your rxn object tracks whether TS is verified
-            if not self.rxn.ts_geom.get("optimized"): 
-                print(f"Reaction {self.rxn.hash} missing optimized TS. Cannot run IRC.")
-                return False
-        return True
+# --- TASK 4/5: OPTIMIZATIONS (ORCA Example) ---
+class OrcaOptCalculator(MinOptTask):
+    """Can be used for Min Opt (or subclassed further for TS Opt)."""
+    def generate_input(self):
+        # Write ORCA .inp file using self.rxn conformer coords
+        pass
+    def write_submission_script(self) -> Path:
+        # Write script calling ORCA container
+        pass
+    def check_output(self) -> bool:
+        # Read orca.out and check for "ORCA TERMINATED NORMALLY"
+        out_file = self.scratch_dir / "orca.out"
+        if not out_file.exists(): return False
+        with open(out_file, 'r') as f:
+            return "ORCA TERMINATED NORMALLY" in f.read()
+    def scrape_data(self):
+        # Extract optimized geometry and energy
+        pass
+    def cleanup(self):
+        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
+        pass
 
 
-class InitRxnPathCalculator(AsyncYarpCalculator):
-    def has_prerequisites(self) -> bool:
-        if self.task_def.task_type == "gsm":
-            if not self.rxn.reactant.conformers or not self.rxn.product.conformers:
-                print(f"Reaction {self.rxn.hash} missing conformers for GSM.")
-                return False
-        return True
+# =====================================================================
+#    THE FACTORY ROUTER
+# =====================================================================
+def get_calculator(task_def, rxn_obj, container_runner="docker") -> AsyncYarpCalculator:
+    """
+    Routes the task to the specific combination of Task Type and Software.
+    """
+    t_type = task_def.task_type
+    software = getattr(task_def.config, 'software', 'unknown').lower()
 
+    # Task 1: ML Predict
+    if t_type == "ml_predict":
+        if software == "egat" or software == "unknown": # Fallback for now
+            return EgatMLPredict(task_def, rxn_obj)
 
-def get_calculator(task_def, rxn_obj) -> AsyncYarpCalculator:
-    """Factory function to instantiate the right calculator."""
-    # Maps task types to their respective calculator classes
-    if task_def.task_type in ["reactant_optimization", "product_optimization", "transition_state_optimization", "irc_validation"]:
-        return RefineRxnPathCalculator(task_def, rxn_obj)
-    elif task_def.task_type in ["reactant_conformer", "product_conformer", "gsm"]:
-        return InitRxnPathCalculator(task_def, rxn_obj)
-    else:
-        return AsyncYarpCalculator(task_def, rxn_obj) # Fallback
+    # Task 2: Conformers
+    elif t_type in ["reactant_conformer", "product_conformer"]:
+        if software == "crest":
+            return CrestConfCalculator(task_def, rxn_obj, container_runner)
+
+    # Task 3: TS Guess
+    elif t_type == "gsm":
+        if software == "pysisyphus":
+            return PysisyphusTSGuessCalculator(task_def, rxn_obj)
+
+    # Tasks 4 & 5: Optimizations
+    elif t_type in ["reactant_optimization", "product_optimization", "transition_state_optimization"]:
+        if software == "orca":
+            return OrcaOptCalculator(task_def, rxn_obj)
+        elif software == "pysisyphus":
+            # Would return a PysisyphusOptCalculator(...)
+            pass
+
+    # Task 6: IRC Validation
+    elif t_type == "irc_validation":
+        # Would return your IRC calculator
+        pass
+
+    raise ValueError(f"No calculator implemented for Task: '{t_type}' with Software: '{software}'")

@@ -5,7 +5,7 @@ Current State
 -------------
 - Planning is converged enough to start production migration.
 - The parser-side draft is in better shape than the yarpecule-side draft.
-- The development notebook is useful for parser and `_read_structure()` comparisons, but real `get_smiles()` and export comparisons are still blocked until production `yarpecule` objects populate `_atom_info`.
+- The development notebook is useful for parser and `_read_structure()` comparisons, but the draft still needed explicit carry-through handling for enum/join/separate before the production pass could be treated as end-to-end.
 - Lowercase naphthalene has been added to the notebook parser cases.
 
 Latest Planning Update
@@ -23,13 +23,24 @@ Latest Planning Update
 2. Enumeration carry-through is now explicit in the plan.
    - Current enum code repeatedly creates products from 4-tuples.
    - Without an explicit carry-through path, parent `_atom_info` would be lost.
-   - The planned fix is to let enum pass parent metadata into new yarpecules via `atom_info=...`.
+   - The draft fix should no longer rely on `atom_info=...` alone.
+   - The planned production shape is:
+     - support `(adj_mat, geo, elements, q, atom_info)` tuple input directly in `_read_structure()`
+     - have enum construct tuple-created products with that fifth item populated
    - That preserves:
      - user-provided atom maps
      - generated atom maps
      - isotope-overridden masses
 
-3. Isotope override planning is now tied to atom maps.
+3. `join()` and `separate()` are now part of the same carry-through plan.
+   - Both currently rebuild new yarpecules from 4-tuples.
+   - That would drop `_atom_info` in exactly the same way as enum.
+   - The draft plan should therefore include:
+     - a join-side metadata merge
+     - a separate-side metadata slice/reindex step
+   - `separate()` specifically needs this so downstream distance/state workflows keep correct metadata after graph splitting.
+
+4. Isotope override planning is now tied to atom maps.
    - Proposed config form:
      - `isotope: {12: 14}`
    - Keys are `atom_map` values.
@@ -69,9 +80,12 @@ Confirmed Decisions
    - `atom_index` and `atom_map` are separate and must stay separate.
    - Canonical reorder may change `atom_index`.
    - Canonical reorder must not change preserved `atom_map`.
-   - Missing maps are filled only after canonical reorder.
-   - Auto-generate missing atom maps at yarpecule creation, not later at enum.
+   - Missing maps should be generated at yarpecule creation whether `canon` is on or off.
+   - Canonical reorder must carry already-generated maps forward rather than being the step that creates them.
+   - Enum must never be the place where missing maps are first created.
    - Enumeration should carry `_atom_info` forward from the parent yarpecule rather than regenerating it from scratch.
+   - `join()` should merge parent `_atom_info` blocks into one local index space.
+   - `separate()` should slice `_atom_info` onto fragment-local indices while preserving `atom_map`.
 
 4. Parser behavior
    - Aromatic handling should try kekulization first.
@@ -86,6 +100,7 @@ Confirmed Decisions
    - XYZ comment lines should contain RDKit canonical SMILES.
    - XYZ import should not try to read mapping metadata.
    - MOL export should carry atom maps if the field placement validates.
+   - We are not building a new YARP SMILES writer for output.
 
 6. Isotope override behavior
    - An optional YAML/config key `isotope` should be allowed.
@@ -143,30 +158,25 @@ What Looks Good In The Draft
    - Returns `_atom_info` upward.
 
 4. `yarpecule_read_structure_new()`
-   - Works as intended on dummy objects in the notebook.
-   - Demonstrates the correct target behavior for production migration.
+   - The draft direction is correct.
+   - The remaining issue was that tuple-carried metadata had not yet been made explicit enough for enum/join/separate use.
 
 Remaining Issues
 ----------------
-1. Real production yarpecules still do not populate `_atom_info`.
-   - The notebook confirms that parser-side progress alone is not enough.
-   - Real `get_smiles()` and export comparisons are still blocked because production `yarpecule` objects do not yet carry populated `_atom_info`.
-   - Initializing `_atom_info = {}` alone is not sufficient; the records must actually be populated.
-
-2. Production return-shape changes must be coordinated.
+1. Production return-shape changes must be coordinated.
    - `yarp/yarpecule/yarpecule.py` currently unpacks four returns from `mol_parse()` and `xyz_from_smiles()`.
    - `test/yarpecule/test_input_parser.py` currently unpacks four returns from `mol_parse()`.
    - Those sites must be updated in the same migration step as the parser return changes.
 
-3. Parser tests currently assume list-based `atom_info`.
+2. Parser tests currently assume list-based `atom_info`.
    - `test/yarpecule/graph/test_smiles.py` uses list indexing assumptions like `label[0]`.
    - Those tests must be rewritten for dict-based `_atom_info`.
 
-4. Exact mapped-SMILES expectations will change.
+3. Exact mapped-SMILES expectations will change.
    - `test/yarpecule/test_yarpecule.py` currently asserts exact `map_smi` strings based on RDKit atom-index-style mapping.
    - Once mapped SMILES come from `_atom_info["atom_map"]`, those expected strings likely need intentional updates.
 
-5. Explicit hydrogen behavior still needs careful preservation in the production parser update.
+4. Explicit hydrogen behavior still needs careful preservation in the production parser update.
    - The important issue is not whether hydrogen atoms get `_atom_info` entries.
    - They do.
    - The real issue is preserving the current distinction between:
@@ -174,29 +184,32 @@ Remaining Issues
      - inferred hydrogens added afterward
      - explicit hydrogen atoms already bonded in the graph
 
-6. Tuple-input per-atom formal charge remains fundamentally underdetermined.
-   - Tuple input only gives `(adj_mat, geo, elements, q)`.
+5. Tuple-input per-atom formal charge remains fundamentally underdetermined.
+   - Tuple input without carried metadata only gives `(adj_mat, geo, elements, q)`.
    - Total molecular charge is known.
    - Per-atom formal charge assignment is not.
    - The safe plan remains to use `formal_charge = None` or another clearly non-claimed default on that path.
 
-7. MOL atom-map field placement still needs validation.
+6. MOL atom-map field placement still needs validation.
    - The draft format string is still only a proposal.
    - The implementation should validate by writing a MOL, reading it back with RDKit, and checking recovered atom-map properties.
    - If validation fails, fall back to the current map-free MOL layout with a warning.
 
-8. `export_geometry(format='xyz')` will likely start triggering `get_smiles()` implicitly.
+7. `export_geometry(format='xyz')` will likely start triggering `get_smiles()` implicitly.
    - That is acceptable, but it is still a behavior change that should be implemented deliberately.
 
-9. Enumeration currently recreates products from 4-tuples and would overwrite parent `_atom_info`.
-   - `yarp/reaction/enum.py` repeatedly constructs products like:
-     - `yarpecule((adj_mat, y.geo, y.elements, y.q), canon=False)`
-   - With the current production pattern, that means atom metadata would be regenerated unless we explicitly carry it forward.
-   - The minimal planned fix is:
-     - extend tuple input support so `_read_structure()` also accepts `(adj_mat, geo, elements, q, atom_info)`
-     - have enum pass copied parent `_atom_info` into those tuple constructions
-     - keep `atom_map` and isotope-overridden `mass` on the carried records
-   - This is the cleanest way to make isotope overrides persist through enumeration without inventing a second metadata channel.
+8. Draft-side enum/join/separate carry-through needed to be made concrete before the production pass.
+   - The draft now needs explicit code blocks for:
+     - tuple input with a fifth `atom_info` item
+     - enum tuple constructions that carry copied metadata
+     - join metadata merge
+     - separate metadata slice/reindex
+   - Without those draft updates, the production pass would still be under-specified.
+
+9. EGAT-side atom-map assumptions are a known downstream risk.
+   - Some EGAT helpers assume atom maps behave like simple contiguous positional ids.
+   - That is not compatible with preserving arbitrary user-provided maps exactly.
+   - This is not in the first production edit scope, but it should be treated as a post-migration regression check.
 
 Recommended Production Migration Order
 --------------------------------------
@@ -216,7 +229,9 @@ Recommended Production Migration Order
    - Make `_read_structure()` populate `_atom_info` on every input path.
    - Extend tuple input handling so a fifth `atom_info` item can be supplied and preserved.
    - Make `_order_atoms()` carry `_atom_info` through reorder operations.
-   - Fill only missing atom maps after reorder.
+   - Generate missing atom maps at yarpecule creation even when `canon=False`.
+   - Preserve those generated maps through any later reorder.
+   - Update `join()` and `separate()` to preserve metadata instead of dropping it.
 
 4. Update `yarp/util/input.py` and initialization call sites.
    - Parse optional `isotope` config keyed by atom map.
@@ -231,19 +246,57 @@ Recommended Production Migration Order
    - `test/yarpecule/graph/test_smiles.py`
    - `test/yarpecule/test_input_parser.py`
    - `test/yarpecule/test_yarpecule.py`
+   - `test/reaction/test_enum.py`
    - add coverage for isotope config and isotope persistence through enumeration
 
-7. Only after that, move on to production `get_smiles()` and export changes.
+7. Update export behavior in the same coordinated pass.
+   - `get_smiles()` must inject `_atom_info["atom_map"]`
+   - `export_geometry()` must preserve maps/comments consistently
+   - `xyz_write()` must keep `append_opt` support while adding the optional comment line
+
+Tests Needing Direct Edits
+--------------------------
+- `test/yarpecule/graph/test_smiles.py`
+  - migrate list-based `atom_info` assertions to dict-based assertions
+- `test/yarpecule/test_input_parser.py`
+  - unpack the fifth `atom_info` return from `mol_parse()`
+- `test/yarpecule/test_yarpecule.py`
+  - update exact `map_smi` expectations to reflect preserved `_atom_info["atom_map"]`
+- `test/reaction/test_enum.py`
+  - add metadata-persistence coverage for enum-created products
+
+Test Ownership For The Production Pass
+--------------------------------------
+- The implementation pass should not include assistant-written test rewrites.
+- During implementation, the assistant should point directly to the functions/assertions that need manual user edits.
+- The main user-owned test sites are:
+  - `test/yarpecule/graph/test_smiles.py`
+  - `test/yarpecule/test_input_parser.py`
+  - `test/yarpecule/test_yarpecule.py`
+  - `test/reaction/test_enum.py`
+
+Tests To Rerun As Regression Coverage
+-------------------------------------
+- `test/yarpecule/test_hashes.py`
+- `test/reaction/test_filters.py`
+- plus the direct-edit test files above
+- manually rerun a full `main_yarp` enumeration + EGAT workflow from a dev YAML and capture terminal output to a text log
+
+Notes And Questions
+-------------------
+- The draft should prefer tuple-carried `atom_info` for enum/join/separate because it keeps the production call sites explicit and avoids hidden constructor-side coupling.
+- `join()` and `separate()` were missing from the earlier migration order even though they have the same metadata-loss problem as enum.
+- The draft `xyz_write_new()` must preserve `append_opt`; otherwise helper code like `helper/convert_to_classy.py` would regress.
+- A lightweight post-implementation smoke input should live in `dev/main_inputs/` so the whole YARP + EGAT workflow can be rerun from the terminal without touching the tutorial directories.
+- No blocking design questions remain for the draft update itself.
+- The main post-draft question is whether EGAT will need a follow-on normalization layer for sparse user atom maps after the core migration lands.
 
 Open Questions
 --------------
 1. None are blocking the next production step.
-   - The remaining work is migration sequencing and implementation detail, not unresolved design.
+   - The remaining work is migration sequencing, production edits, and regression cleanup.
 
 Immediate Next Step
 -------------------
-- Start the first production migration with:
-  - `yarp/yarpecule/graph/smiles.py`
-  - `yarp/yarpecule/input_parsers.py`
-  - `yarp/yarpecule/yarpecule.py`
-- Update the related parser tests in the same pass.
+- Keep the draft authoritative first.
+- Then execute the production pass in one coordinated step using the now-complete draft implementations.

@@ -1226,6 +1226,42 @@ def yarpecule_init_new(self, mol, mode='yarp', canon=True, strict=False, atom_in
     self._inchi = None
 
 
+def clone_atom_info_new(atom_info, elements, el_mass):
+    """
+    Draft helper for yarpecule-side metadata normalization.
+
+    Difference:
+    - centralizes the "copy carried records or generate defaults" logic so
+      tuple, xyz, join, separate, and enum all use the same shape.
+    - supports either a dict keyed by local atom index or a list/tuple already
+      ordered to local atom index.
+    """
+
+    normalized = {}
+    for i in range(len(elements)):
+        if atom_info is None:
+            record = {}
+        elif isinstance(atom_info, dict):
+            record = dict(atom_info[i])
+        else:
+            record = dict(atom_info[i])
+
+        normalized[i] = {
+            "atom_index": i,
+            "atom_map": record.get("atom_map", None),
+            "element": elements[i].lower(),
+            "formal_charge": record.get("formal_charge", None),
+            "mass": record.get("mass", el_mass[elements[i].lower()]),
+            "stereo": {
+                "atom": record.get("stereo", {}).get("atom", None),
+                "bonds": dict(record.get("stereo", {}).get("bonds", {})),
+            },
+            "aromatic_input": record.get("aromatic_input", False),
+        }
+
+    return normalized
+
+
 def yarpecule_read_structure_old(self, mol, mode, np, xyz_parse, table_generator, xyz_q_parse, mol_parse, xyz_from_smiles, el_mass):
     """
     Old code from yarp/yarpecule/yarpecule.py.
@@ -1270,12 +1306,15 @@ def yarpecule_read_structure_new(self, mol, mode, strict, atom_info, np, xyz_par
 
     Difference:
     - adds call-site `strict=False` fallback behavior.
-    - accepts atom_info=None so parent yarpecules can pass metadata through enum/join/separate.
+    - accepts atom_info=None and also supports tuple-carried atom_info so
+      enum/join/separate can pass metadata through without a side channel.
     - every yarpecule gets full _atom_info.
     - xyz path creates atom_info after adjacency generation.
     """
 
-    if isinstance(mol, (tuple, list)) and len(mol) == 4:
+    carried_atom_info = atom_info
+
+    if isinstance(mol, (tuple, list)) and len(mol) in [4, 5]:
         if (isinstance(mol[0], np.ndarray) is False or
             isinstance(mol[1], np.ndarray) is False or
             isinstance(mol[2], list) is False or
@@ -1283,59 +1322,22 @@ def yarpecule_read_structure_new(self, mol, mode, strict, atom_info, np, xyz_par
             raise TypeError("The yarpecule constructor expects a string or a tuple containing (adj_mat,geo,elements,q).")
         elif (len(mol[0]) != len(mol[1]) or len(mol[0]) != len(mol[2])):
             raise TypeError("The size of the adjacency array, geometry array, and elements list do not match.")
+        elif len(mol) == 5 and carried_atom_info is not None:
+            raise TypeError("Pass carried atom_info either as the fifth tuple item or as atom_info=..., not both.")
 
         self._adj_mat = mol[0]
         self._geo = mol[1]
         self._elements = mol[2]
         self._q = mol[3]
-        if atom_info is not None:
-            self._atom_info = {
-                i: dict(atom_info[i])
-                for i in range(len(self._elements))
-            }
-            for i in self._atom_info:
-                self._atom_info[i]["atom_index"] = i
-                if self._atom_info[i].get("mass", None) is None:
-                    self._atom_info[i]["mass"] = el_mass[self._elements[i].lower()]
-        else:
-            self._atom_info = {
-                i: {
-                    "atom_index": i,
-                    "atom_map": None,
-                    "element": self._elements[i].lower(),
-                    "formal_charge": None,
-                    "mass": el_mass[self._elements[i].lower()],
-                    "stereo": {"atom": None, "bonds": {}},
-                    "aromatic_input": False,
-                }
-                for i in range(len(self._elements))
-            }
+        if len(mol) == 5:
+            carried_atom_info = mol[4]
+
+        self._atom_info = clone_atom_info_new(carried_atom_info, self._elements, el_mass)
     elif len(mol) > 4 and mol[-4:] == ".xyz":
         self._elements, self._geo = xyz_parse(mol)
         self._adj_mat = table_generator(self._elements, self._geo)
         self._q = xyz_q_parse(mol)
-        if atom_info is not None:
-            self._atom_info = {
-                i: dict(atom_info[i])
-                for i in range(len(self._elements))
-            }
-            for i in self._atom_info:
-                self._atom_info[i]["atom_index"] = i
-                if self._atom_info[i].get("mass", None) is None:
-                    self._atom_info[i]["mass"] = el_mass[self._elements[i].lower()]
-        else:
-            self._atom_info = {
-                i: {
-                    "atom_index": i,
-                    "atom_map": None,
-                    "element": self._elements[i].lower(),
-                    "formal_charge": None,
-                    "mass": el_mass[self._elements[i].lower()],
-                    "stereo": {"atom": None, "bonds": {}},
-                    "aromatic_input": False,
-                }
-                for i in range(len(self._elements))
-            }
+        self._atom_info = clone_atom_info_new(carried_atom_info, self._elements, el_mass)
     elif len(mol) > 4 and mol[-4:] == ".mol":
         self._elements, self._geo, self._adj_mat, self._q, self._atom_info = mol_parse(mol)
     else:
@@ -1350,6 +1352,7 @@ def yarpecule_read_structure_new(self, mol, mode, strict, atom_info, np, xyz_par
 
     self._elements = [_.lower() for _ in self._elements]
     self._masses = np.array([el_mass[_] for _ in self._elements])
+    self._atom_info = clone_atom_info_new(self._atom_info, self._elements, el_mass)
 
 
 def yarpecule_order_atoms_old(self, canon, canon_order, atom_hash, np):
@@ -1375,8 +1378,20 @@ def yarpecule_order_atoms_new(self, canon, canon_order, atom_hash, np):
     - _atom_info is reordered with the graph.
     - atom_index is refreshed.
     - existing user maps are preserved.
-    - only missing maps are generated after canonical reorder.
+    - missing maps are generated at yarpecule creation regardless of canon.
+    - reorder carries those maps forward; it is not the place that first creates them.
     """
+
+    if self._atom_info is not None:
+        used = {self._atom_info[i]["atom_map"] for i in self._atom_info if self._atom_info[i]["atom_map"] is not None}
+        next_map = 0
+        for i in self._atom_info:
+            if self._atom_info[i]["atom_map"] is None:
+                while next_map in used:
+                    next_map += 1
+                self._atom_info[i]["atom_map"] = next_map
+                used.add(next_map)
+                next_map += 1
 
     if canon:
         self._elements, self._adj_mat, self._atom_hashes, self._mapping, self._geo, self._masses = canon_order(
@@ -1389,18 +1404,88 @@ def yarpecule_order_atoms_new(self, canon, canon_order, atom_hash, np):
                 record["atom_index"] = new_idx
                 reordered_atom_info[new_idx] = record
             self._atom_info = reordered_atom_info
-
-            used = {self._atom_info[i]["atom_map"] for i in self._atom_info if self._atom_info[i]["atom_map"] is not None}
-            next_map = 0
-            for i in self._atom_info:
-                if self._atom_info[i]["atom_map"] is None:
-                    while next_map in used:
-                        next_map += 1
-                    self._atom_info[i]["atom_map"] = next_map
-                    used.add(next_map)
-                    next_map += 1
     else:
         self._atom_hashes = np.array([atom_hash(_, self._adj_mat, self._masses) for _ in range(len(self._elements))])
+
+
+def carry_atom_info_by_index_new(parent_atom_info):
+    """
+    Draft helper for enum-created products that keep atom ordering unchanged.
+
+    Difference:
+    - makes it explicit that enumeration should preserve parent metadata by
+      copying records indexed by the current local atom order.
+    """
+
+    return {
+        i: {
+            **dict(parent_atom_info[i]),
+            "atom_index": i,
+            "stereo": {
+                "atom": parent_atom_info[i].get("stereo", {}).get("atom", None),
+                "bonds": dict(parent_atom_info[i].get("stereo", {}).get("bonds", {})),
+            },
+        }
+        for i in parent_atom_info
+    }
+
+
+def join_atom_info_new(all_y):
+    """
+    Draft helper for yarpecule.join().
+
+    Difference:
+    - merges `_atom_info` blocks from all parents into a single local index
+      space so join does not silently drop user maps or isotope-adjusted masses.
+    """
+
+    merged_atom_info = {}
+    offset = 0
+    for y in all_y:
+        for i in range(len(y.elements)):
+            merged_atom_info[offset + i] = {
+                **dict(y._atom_info[i]),
+                "atom_index": offset + i,
+                "stereo": {
+                    "atom": y._atom_info[i].get("stereo", {}).get("atom", None),
+                    "bonds": {
+                        offset + nbr: flag
+                        for nbr, flag in y._atom_info[i].get("stereo", {}).get("bonds", {}).items()
+                    },
+                },
+            }
+        offset += len(y.elements)
+
+    return merged_atom_info
+
+
+def separate_atom_info_new(parent_atom_info, group):
+    """
+    Draft helper for yarpecule.separate().
+
+    Difference:
+    - slices `_atom_info` onto fragment-local indices so separate() products
+      retain atom maps and isotope-adjusted masses.
+    """
+
+    old_to_new = {old_idx: new_idx for new_idx, old_idx in enumerate(group)}
+    fragment_atom_info = {}
+    for old_idx in group:
+        new_idx = old_to_new[old_idx]
+        fragment_atom_info[new_idx] = {
+            **dict(parent_atom_info[old_idx]),
+            "atom_index": new_idx,
+            "stereo": {
+                "atom": parent_atom_info[old_idx].get("stereo", {}).get("atom", None),
+                "bonds": {
+                    old_to_new[nbr]: flag
+                    for nbr, flag in parent_atom_info[old_idx].get("stereo", {}).get("bonds", {}).items()
+                    if nbr in old_to_new
+                },
+            },
+        }
+
+    return fragment_atom_info
 
 
 def mol_write_yp_old(file, elements, geo, bond_mat, adj_mat, return_formals, np):
@@ -1579,16 +1664,20 @@ def xyz_write_old(name, elements, geo):
     out.close()
 
 
-def xyz_write_new(name, elements, geo, comment=None):
+def xyz_write_new(name, elements, geo, comment=None, append_opt=False):
     """
     New proposed code for yarp/util/write_files.py.
 
     Difference:
     - adds optional comment line content.
     - comment should hold the RDKit canonical smiles.
+    - preserves append_opt so existing multi-structure XYZ workflows keep working.
     """
 
-    out = open(name, 'w+')
+    if append_opt is False:
+        out = open(name, 'w+')
+    else:
+        out = open(name, 'a+')
     elements = [el.upper() for el in elements]
     if comment is None:
         comment = ""
@@ -1632,6 +1721,7 @@ def yarpecule_get_smiles_new(self, os, Chem, mol_write_yp, verbose=False):
     Difference:
     - adds verbose=False.
     - canonical and mapped smiles still come from RDKit.
+    - this is not a new YARP SMILES writer path.
     - mapped smiles uses _atom_info atom_map values.
     - verbose prints full RDKit mol dumps and atom_index -> atom_map table.
     - this is the planned fix for user-provided atom maps not appearing in final mapped outputs.
@@ -1711,6 +1801,159 @@ def yarpecule_export_geometry_new(self, filename, format, xyz_write, mol_write_y
         raise RuntimeError("Valid export formats: xyz or mol")
 
 
+def yarpecule_join_old(self, yarpecules, canon, prepare_list, np, merge_arrays, yarpecule):
+    """
+    Old code from yarp/yarpecule/yarpecule.py.
+
+    Difference:
+    - join rebuilds from a 4-tuple and drops parent `_atom_info`.
+    """
+
+    yarpecules = prepare_list(yarpecules)
+    all_y = [self] + yarpecules
+
+    adj_mat = merge_arrays([y.adj_mat for y in all_y])
+    geo = np.vstack([y.geo for y in all_y])
+    elements = [e for y in all_y for e in y.elements]
+    q = int(sum([y.q for y in all_y]))
+
+    return yarpecule((adj_mat, geo, elements, q), canon=canon)
+
+
+def yarpecule_join_new(self, yarpecules, canon, prepare_list, np, merge_arrays, yarpecule):
+    """
+    New proposed code for yarp/yarpecule/yarpecule.py.
+
+    Difference:
+    - join carries merged parent `_atom_info` into the tuple-created yarpecule.
+    """
+
+    yarpecules = prepare_list(yarpecules)
+    all_y = [self] + yarpecules
+
+    adj_mat = merge_arrays([y.adj_mat for y in all_y])
+    geo = np.vstack([y.geo for y in all_y])
+    elements = [e for y in all_y for e in y.elements]
+    q = int(sum([y.q for y in all_y]))
+    atom_info = join_atom_info_new(all_y)
+
+    return yarpecule((adj_mat, geo, elements, q, atom_info), canon=canon)
+
+
+def yarpecule_separate_old(self, canon, graph_seps, np, return_formals, yarpecule):
+    """
+    Old code from yarp/yarpecule/yarpecule.py.
+
+    Difference:
+    - separate rebuilds from 4-tuples and drops `_atom_info` on all outputs.
+    """
+
+    gs = graph_seps(self.adj_mat)
+    groups = []
+    loop_ind = []
+    for i in range(len(gs)):
+        if i not in loop_ind:
+            new_group = [count_j for count_j, j in enumerate(gs[i, :]) if j >= 0]
+            loop_ind += new_group
+            groups += [new_group]
+
+    if len(groups) == 1:
+        return [yarpecule((self.adj_mat, self.geo, self.elements, self.q), canon=canon)]
+
+    mols = []
+    for g in groups:
+        frag_adj = self.adj_mat[g][:, g]
+        frag_e = [self.elements[ind] for ind in g]
+        N_atom = len(g)
+        frag_geo = np.zeros([N_atom, 3])
+        for count_i, i in enumerate(g):
+            frag_geo[count_i, :] = self.geo[i, :]
+        frag_bem = [self.bond_mats[0][i] for i in g]
+        frag_formals = return_formals(frag_bem, frag_e)
+        frag_q = int(sum(frag_formals))
+        mols.append(yarpecule((frag_adj, frag_geo, frag_e, frag_q), canon=canon))
+
+    return mols
+
+
+def yarpecule_separate_new(self, canon, graph_seps, np, return_formals, yarpecule):
+    """
+    New proposed code for yarp/yarpecule/yarpecule.py.
+
+    Difference:
+    - separate carries fragment-local `_atom_info` so downstream distance/state
+      workflows keep metadata after splitting disconnected species.
+    """
+
+    gs = graph_seps(self.adj_mat)
+    groups = []
+    loop_ind = []
+    for i in range(len(gs)):
+        if i not in loop_ind:
+            new_group = [count_j for count_j, j in enumerate(gs[i, :]) if j >= 0]
+            loop_ind += new_group
+            groups += [new_group]
+
+    if len(groups) == 1:
+        atom_info = carry_atom_info_by_index_new(self._atom_info)
+        return [yarpecule((self.adj_mat, self.geo, self.elements, self.q, atom_info), canon=canon)]
+
+    mols = []
+    for g in groups:
+        frag_adj = self.adj_mat[g][:, g]
+        frag_e = [self.elements[ind] for ind in g]
+        N_atom = len(g)
+        frag_geo = np.zeros([N_atom, 3])
+        for count_i, i in enumerate(g):
+            frag_geo[count_i, :] = self.geo[i, :]
+        frag_bem = [self.bond_mats[0][i] for i in g]
+        frag_formals = return_formals(frag_bem, frag_e)
+        frag_q = int(sum(frag_formals))
+        frag_atom_info = separate_atom_info_new(self._atom_info, g)
+        mols.append(yarpecule((frag_adj, frag_geo, frag_e, frag_q, frag_atom_info), canon=canon))
+
+    return mols
+
+
+def enum_tuple_call_sites_old(yarpecule, adj_mat, y, c, np, vstack):
+    """
+    Old representative tuple constructions from yarp/reaction/enum.py.
+
+    Difference:
+    - enum recreates yarpecules from 4-tuples and drops parent metadata.
+    """
+
+    product_a = yarpecule((adj_mat, y.geo, y.elements, y.q), canon=False)
+    product_b = yarpecule((adj_mat, vstack([c[0][1].geo, c[1][1].geo]), c[0][1].elements + c[1][1].elements, c[0][1].q + c[1][1].q), canon=False)
+    product_c = yarpecule((np.where(adj_mat > 0, 1, 0).astype(int), y.geo, y.elements, y.q), canon=False)
+    return product_a, product_b, product_c
+
+
+def enum_tuple_call_sites_new(yarpecule, adj_mat, y, c, np, vstack):
+    """
+    New proposed tuple constructions for yarp/reaction/enum.py.
+
+    Difference:
+    - enum passes copied `_atom_info` into every tuple-created product.
+    - intramolecular tuple calls preserve ordering by direct copy.
+    - intermolecular tuple calls merge both parents into one local index space.
+    """
+
+    product_a = yarpecule((adj_mat, y.geo, y.elements, y.q, carry_atom_info_by_index_new(y._atom_info)), canon=False)
+    product_b = yarpecule(
+        (
+            adj_mat,
+            vstack([c[0][1].geo, c[1][1].geo]),
+            c[0][1].elements + c[1][1].elements,
+            c[0][1].q + c[1][1].q,
+            join_atom_info_new([c[0][1], c[1][1]]),
+        ),
+        canon=False,
+    )
+    product_c = yarpecule((np.where(adj_mat > 0, 1, 0).astype(int), y.geo, y.elements, y.q, carry_atom_info_by_index_new(y._atom_info)), canon=False)
+    return product_a, product_b, product_c
+
+
 def test_input_parser_call_sites_old(mol_parse, ethanol_mol, acetate_mol, betaine_mol):
     """
     Old production-adjacent call sites from test/yarpecule/test_input_parser.py.
@@ -1738,6 +1981,66 @@ def test_input_parser_call_sites_new(mol_parse, ethanol_mol, acetate_mol, betain
     elements, geo, adj_mat, q, atom_info = mol_parse(acetate_mol)
     elements, geo, adj_mat, q, atom_info = mol_parse(betaine_mol)
     return elements, geo, adj_mat, q, atom_info
+
+
+def test_smiles_call_sites_old(smiles2adjmat, cases):
+    """
+    Old representative test-site assumptions from test/yarpecule/graph/test_smiles.py.
+
+    Difference:
+    - tests currently assume list-based atom_info rows like `label[0]`.
+    """
+
+    outputs = []
+    for case in cases:
+        adjmat, bemat, atom_info = smiles2adjmat(case)
+        elements = [label[0] for label in atom_info]
+        outputs.append((adjmat, bemat, atom_info, elements))
+    return outputs
+
+
+def test_smiles_call_sites_new(smiles2adjmat, cases):
+    """
+    New proposed test-site assumptions for test/yarpecule/graph/test_smiles.py.
+
+    Difference:
+    - tests now read dict-based atom_info with explicit field access.
+    - this is the required test migration for the parser metadata shape change.
+    """
+
+    outputs = []
+    for case in cases:
+        adjmat, bemat, atom_info = smiles2adjmat(case)
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
+        atom_maps = [atom_info[i]["atom_map"] for i in atom_info]
+        outputs.append((adjmat, bemat, atom_info, elements, atom_maps))
+    return outputs
+
+
+def planned_test_inventory_new():
+    """
+    Draft test inventory for the production migration.
+
+    Difference:
+    - distinguishes tests that need assertion rewrites from tests that should be
+      rerun as regression coverage because enum/get_smiles/separate behavior changes.
+    - the implementation pass should point the user to these test sites rather
+      than having the assistant rewrite the tests.
+    """
+
+    tests_to_update = [
+        "test/yarpecule/graph/test_smiles.py",
+        "test/yarpecule/test_input_parser.py",
+        "test/yarpecule/test_yarpecule.py",
+        "test/reaction/test_enum.py",
+    ]
+
+    tests_to_run = tests_to_update + [
+        "test/yarpecule/test_hashes.py",
+        "test/reaction/test_filters.py",
+    ]
+
+    return tests_to_update, tests_to_run
 
 
 def parser_dev_notebook_call_sites_old(xyz_from_smiles, mol_parse, smiles_case, mol_file):

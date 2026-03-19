@@ -89,6 +89,8 @@ def progress_yarp(work_dir_str: str):
                         meta["error_log"] = "External calculation failed or expected output missing."
                         failed_rxns[rxn_hash] = rxn_obj
                         print(f"   * [{rxn_hash}] Task '{task_id}' finished with errors.")
+                else:
+                    print(f"   * [{rxn_hash}] Task '{task_id}' is still running, check back later.")
 
         # --- PHASE 2: Update Pending -> Ready based on DAG ---
         for task_id, meta in tasks_status.items():

@@ -66,8 +66,8 @@ def progress_yarp(work_dir_str: str):
 
         # --- PHASE 1: Check currently running jobs ---
         for task_id, meta in tasks_status.items():
-            print(f" - Processing Task {task_id}...")
             if meta["status"] == "submitted":
+                print(f" - Checking status of Task {task_id}...")
                 if not job_manager.is_running(meta["job_id"]):
                     # Job finished! Let's check if it succeeded.
                     calc = get_calculator(pipeline_tasks[task_id], rxn_obj, container_runner=container_runner)
@@ -78,7 +78,7 @@ def progress_yarp(work_dir_str: str):
                             calc.scrape_data()
                             calc.cleanup()
                             meta["status"] = "terminated_normally"
-                            print(f"[{rxn_hash}] Task '{task_id}' completed successfully.")
+                            print(f"   * [{rxn_hash}] Task '{task_id}' completed successfully.")
                         except Exception as e:
                             meta["status"] = "finished_with_error"
                             meta["error_log"] = f"Scraping failed: {str(e)}"
@@ -93,6 +93,7 @@ def progress_yarp(work_dir_str: str):
         # --- PHASE 2: Update Pending -> Ready based on DAG ---
         for task_id, meta in tasks_status.items():
             if meta["status"] == "pending":
+                print(f" - Checking status of Task {task_id}...")
                 task_def = pipeline_tasks[task_id]
                 
                 # Check if all execution dependencies are met
@@ -100,6 +101,7 @@ def progress_yarp(work_dir_str: str):
                 for dep_id in task_def.depends_on:
                     if tasks_status[dep_id]["status"] != "terminated_normally":
                         dependencies_met = False
+                        print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites NOT met. Continue as PENDING.")
                         break
                         
                 if dependencies_met:
@@ -109,6 +111,7 @@ def progress_yarp(work_dir_str: str):
         # --- PHASE 3: Submit Ready Jobs ---
         for task_id, meta in tasks_status.items():
             if meta["status"] == "ready":
+                print(f" - Preparing submission of Task {task_id}...")
                 task_def = pipeline_tasks[task_id]
                 calc = get_calculator(task_def, rxn_obj, container_runner=container_runner)
                 

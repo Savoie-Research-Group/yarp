@@ -47,7 +47,7 @@ class TestXYZQParser:
 
 class TestMolParser:
     def test_single_mol_no_charge(self, ethanol_mol):
-        elements, geo, adj_mat, q = mol_parse(ethanol_mol)
+        elements, geo, adj_mat, q, atom_info = mol_parse(ethanol_mol)
         
         # elements, heavy atoms only
         assert elements == ['C','C',"O"]
@@ -76,9 +76,13 @@ class TestMolParser:
         
         # charge
         assert q == pytest.approx(0, rel=1e-5)
+        
+        # atom info
+        assert isinstance(atom_info, dict)
+        assert sorted(atom_info) == list(range(len(elements)))
     
     def test_single_mol_with_charge(self, acetate_mol):
-        elements, geo, adj_mat, q = mol_parse(acetate_mol)
+        elements, geo, adj_mat, q, atom_info = mol_parse(acetate_mol)
         
         # Elements, heavy atoms only
         assert elements == ['C','C',"O","O"]
@@ -121,7 +125,7 @@ class TestMolParser:
         assert q == pytest.approx(-1, rel=1e-5)
         
     def test_mol_with_zwitterion(self, betaine_mol):
-        elements, geo, adj_mat, q = mol_parse(betaine_mol)
+        elements, geo, adj_mat, q, atom_info = mol_parse(betaine_mol)
         
         # Elements, heavy atoms only
         assert elements == ['C','N','C','C','C','C','O','O']

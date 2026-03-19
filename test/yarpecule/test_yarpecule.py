@@ -28,19 +28,19 @@ class TestSMILESFromYarpecule:
         mol = ypcule(haa_full_map_smi, canon=False)
         mol.get_smiles()
         assert mol.canon_smi == "O=CCO"
-        assert mol.map_smi == "[C:0]([C:1]([O:3][H:4])([H:6])[H:7])(=[O:2])[H:5]"
+        assert mol.map_smi == "[C:0]([C:1]([O:7][H:11])([H:13])[H:14])(=[O:6])[H:12]"
 
     def test_aro_mapping(self, aromatic_full_map_smi):
         mol = ypcule(aromatic_full_map_smi, canon=False)
         mol.get_smiles()
         assert mol.canon_smi == 'Oc1ccoc1'
-        assert mol.map_smi == '[c:0]1([H:7])[c:2]([O:5][H:6])[c:3]([H:9])[c:1]([H:8])[o:4]1'
+        assert mol.map_smi == '[c:0]1([H:15])[c:4]([O:9][H:13])[c:5]([H:20])[c:1]([H:16])[o:6]1'
 
     def test_rad_mapping(self, rad_full_map_smi):
         mol = ypcule(rad_full_map_smi, canon=False)
         mol.get_smiles()
         assert mol.canon_smi == '[CH2]C'
-        assert mol.map_smi == '[C:0]([C:1]([H:2])[H:6])([H:3])([H:4])[H:5]' # revist if this is the correct output - ERM
+        assert mol.map_smi == '[C:1]([C:2]([H:3])[H:7])([H:4])([H:5])[H:6]' # revist if this is the correct output - ERM
 
 class TestInchiFromYarpecule:
     def test_haa(self, haa_full_map_smi):

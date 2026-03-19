@@ -7,11 +7,6 @@ from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs,
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
 
-# Silence RDKit warnings/info globally for this runtime, keep errors.
-from rdkit import RDLogger
-RDLogger.DisableLog("rdApp.warning")
-RDLogger.DisableLog("rdApp.info")
-
 def xyz_parse(xyz, read_types=False, multiple=False):
     """
     Simple wrapper function for grabbing the coordinates and elements from an xyz file.

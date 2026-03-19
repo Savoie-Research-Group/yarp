@@ -12,3 +12,10 @@ initialize:
     discard strained rings: False
     barrier cutoff: 96.00 # kcal/mol
     barrier source: 'egat'
+
+stages:
+  - egat
+
+egat:
+  method: ml_predict
+  model: egat_pretrain

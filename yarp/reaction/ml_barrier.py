@@ -97,12 +97,18 @@ def get_egat_barriers(yp_rxns, model, args, verbose=False):
     finally:
         if os.path.exists(csv_path):
             os.remove(csv_path)
-        fail_path = os.path.join('tmp', 'fail.txt')
-        exclude_path = os.path.join('tmp', 'exclude.txt')
+        tmp_dir = 'tmp'
+        fail_path = os.path.join(tmp_dir, 'fail.txt')
+        exclude_path = os.path.join(tmp_dir, 'exclude.txt')
         if os.path.exists(fail_path):
             print(f"EGAT datapoint failures logged to {fail_path}")
         if os.path.exists(exclude_path):
             print(f"EGAT datapoint exclusions logged to {exclude_path}")
+        if os.path.isdir(tmp_dir) and not os.path.exists(fail_path) and not os.path.exists(exclude_path):
+            try:
+                os.rmdir(tmp_dir)
+            except OSError:
+                pass
 
     # Update reaction objects with EGAT barriers
     for rxn_idx, rxn in enumerate(rxn_list):

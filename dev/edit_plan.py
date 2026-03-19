@@ -2080,3 +2080,296 @@ def parser_dev_notebook_call_sites_new(xyz_from_smiles, mol_parse, smiles_case, 
     elements, geo, adj_mat, q, atom_info = xyz_from_smiles(smiles_case, mode="yarp")
     elements_mol, geo_mol, adj_mol, q_mol, atom_info_mol = mol_parse(mol_file)
     return elements, geo, adj_mat, q, atom_info, elements_mol, geo_mol, adj_mol, q_mol, atom_info_mol
+
+"""
+Development-only draft helpers for EGAT-boundary atom-map normalization.
+
+Why this exists
+---------------
+YARP now preserves atom maps exactly, including fragment-local subsets carried
+through `separate()` and enum. EGAT does not reliably tolerate those preserved
+labels because some of its feature builders assume dense positional map labels.
+
+The intended production use is:
+1. Keep YARP reaction objects untouched.
+2. Build a temporary normalized mapped-SMILES copy just before EGAT.
+3. Feed the temporary copy to EGAT.
+4. Discard the temporary copy after prediction.
+
+This file is for review and experimentation only.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Iterable, Tuple
+
+from rdkit import Chem
+
+
+@dataclass(frozen=True)
+class NormalizedMappedReaction:
+    reactant_smiles: str
+    product_smiles: str
+    reaction_smiles: str
+    old_to_new_map: Dict[int, int]
+
+
+def _mapped_mol_from_smiles(smiles: str) -> Chem.Mol:
+    mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    if mol is None:
+        raise ValueError(f"Could not parse mapped SMILES: {smiles}")
+    return mol
+
+
+def _atom_maps(mol: Chem.Mol) -> list[int]:
+    maps = [atom.GetAtomMapNum() for atom in mol.GetAtoms()]
+    if any(m is None for m in maps):
+        raise ValueError("Encountered missing atom-map value.")
+    if any(m < 0 for m in maps):
+        raise ValueError(f"Negative atom-map values are not allowed: {maps}")
+    if len(set(maps)) != len(maps):
+        dupes = sorted({m for m in maps if maps.count(m) > 1})
+        raise ValueError(f"Duplicate atom-map labels are not allowed: {dupes}")
+    return maps
+
+
+def _require_identical_map_sets(r_maps: Iterable[int], p_maps: Iterable[int]) -> list[int]:
+    r_set = set(r_maps)
+    p_set = set(p_maps)
+    if r_set != p_set:
+        raise ValueError(
+            "Reactant/product mapped atom sets differ and cannot be normalized "
+            f"as one reaction.\nReactant-only: {sorted(r_set - p_set)}\n"
+            f"Product-only: {sorted(p_set - r_set)}"
+        )
+    return sorted(r_set)
+
+
+def _apply_map_renumbering(mol: Chem.Mol, old_to_new_map: Dict[int, int]) -> Chem.Mol:
+    mol = Chem.Mol(mol)
+    for atom in mol.GetAtoms():
+        atom.SetAtomMapNum(old_to_new_map[atom.GetAtomMapNum()])
+    return mol
+
+
+def normalize_reaction_maps_for_egat(
+    reactant_smiles: str,
+    product_smiles: str,
+    *,
+    start_at: int = 1,
+) -> NormalizedMappedReaction:
+    """
+    Return a temporary EGAT-only mapped-SMILES copy with dense atom maps.
+
+    Parameters
+    ----------
+    reactant_smiles, product_smiles
+        Atom-mapped SMILES strings already known to correspond to the same
+        reaction.
+    start_at
+        Dense atom-map start. Use `1` for EGAT compatibility.
+
+    Notes
+    -----
+    `start_at=1` is the preferred choice for EGAT because:
+    - `GenerateBondFeature()` hard-codes `edge_index + 1` when it looks up
+      bond-map keyed metadata.
+    - `GenerateAtomFeature()` already has a nonzero-start branch (`ind + 1`).
+    """
+
+    if start_at not in (0, 1):
+        raise ValueError(f"Only dense starts of 0 or 1 are supported, got {start_at}.")
+
+    r_mol = _mapped_mol_from_smiles(reactant_smiles)
+    p_mol = _mapped_mol_from_smiles(product_smiles)
+
+    r_maps = _atom_maps(r_mol)
+    p_maps = _atom_maps(p_mol)
+    ordered_old_maps = _require_identical_map_sets(r_maps, p_maps)
+
+    old_to_new_map = {
+        old_map: new_map
+        for new_map, old_map in enumerate(ordered_old_maps, start=start_at)
+    }
+
+    nr_mol = _apply_map_renumbering(r_mol, old_to_new_map)
+    np_mol = _apply_map_renumbering(p_mol, old_to_new_map)
+
+    normalized_reactant = Chem.MolToSmiles(nr_mol)
+    normalized_product = Chem.MolToSmiles(np_mol)
+    return NormalizedMappedReaction(
+        reactant_smiles=normalized_reactant,
+        product_smiles=normalized_product,
+        reaction_smiles=f"{normalized_reactant}>>{normalized_product}",
+        old_to_new_map=old_to_new_map,
+    )
+
+
+def yarp_package_warning_policy_new(RDLogger, ob):
+    """
+    Draft for the package-level warning policy now living in `yarp/__init__.py`.
+
+    Why this logic change was made
+    ------------------------------
+    During the branch we accumulated warning silencing in several production
+    modules:
+    - `input_parsers.py` disabled RDKit warnings/info
+    - `yarpecule.py` suppressed Open Babel warnings
+
+    That scattered global side effects across import sites and made it harder to
+    reason about why a given run or test emitted warnings. The branch now moves
+    package-wide warning policy to one import point:
+    - silence RDKit warning/info globally for YARP runtime
+    - silence Open Babel warnings globally for YARP runtime
+
+    This centralization does not replace function-local logger handling that is
+    intentionally scoped to a single helper call.
+    """
+
+    RDLogger.DisableLog("rdApp.warning")
+    RDLogger.DisableLog("rdApp.info")
+    ob.obErrorLog.SetOutputLevel(ob.obError)
+
+
+def get_egat_barriers_new(yp_rxns, model, args, pd, os, predict_activation_energy, FastDataset):
+    """
+    Draft for the later `yarp/reaction/ml_barrier.py` branch updates.
+
+    Why this logic change was made
+    ------------------------------
+    Two distinct fixes landed after the core parser migration:
+
+    1. EGAT-boundary atom-map normalization
+       YARP now preserves atom maps exactly, including fragment-local subsets
+       produced by `separate()`. EGAT assumed dense positional map labels and
+       broke on depth-2 / sparse-map reactions. The production fix normalizes
+       mapped smiles only for EGAT, using one shared renumbering for reactant
+       and product, then discards that temporary mapping after prediction.
+
+    2. `tmp/` lifecycle cleanup
+       EGAT diagnostics originally deleted `tmp/` too early, which hid the
+       failing AAM strings. The branch changed this in two phases:
+       - keep `tmp/` alive until dataset iteration finishes so `fail.txt` can be written
+       - after debugging was complete, remove `tmp/` again on clean runs while
+         preserving it when `fail.txt` or `exclude.txt` exists
+
+    Net effect:
+    - depth-2 and sparse-map EGAT runs now succeed
+    - failed EGAT datapoints still leave debuggable traces when they exist
+    - successful runs stop littering the working directory with `tmp/`
+    """
+
+    rxn_list = list(yp_rxns.values())
+    dataframe = []
+    for rxn in rxn_list:
+        rsmiles, psmiles = normalize_reaction_maps_for_egat(
+            rxn.reactant.map_smi,
+            rxn.product.map_smi,
+            start_at=1,
+        ).reactant_smiles, normalize_reaction_maps_for_egat(
+            rxn.reactant.map_smi,
+            rxn.product.map_smi,
+            start_at=1,
+        ).product_smiles
+        dataframe.append(f"{rsmiles}>>{psmiles}")
+
+    dataframe = pd.DataFrame(dataframe, columns=["AAM"])
+    os.makedirs("tmp", exist_ok=True)
+    csv_path = os.path.join("tmp", "egat_barriers.csv")
+    dataframe.to_csv(csv_path, index=False)
+    test_dataset = FastDataset(args, dataset=csv_path)
+
+    try:
+        for data_idx in range(len(test_dataset)):
+            datapoint = test_dataset[data_idx]
+            if datapoint is None:
+                dataframe.loc[data_idx, "egat_barrier"] = None
+                continue
+            dp_idx, rgraph, pgraph, strings = datapoint
+            try:
+                dataframe.loc[dp_idx, "egat_barrier"] = predict_activation_energy(model, rgraph, pgraph)
+            except Exception:
+                dataframe.loc[dp_idx, "egat_barrier"] = None
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+        fail_path = os.path.join("tmp", "fail.txt")
+        exclude_path = os.path.join("tmp", "exclude.txt")
+        if os.path.isdir("tmp") and not os.path.exists(fail_path) and not os.path.exists(exclude_path):
+            try:
+                os.rmdir("tmp")
+            except OSError:
+                pass
+
+    for rxn_idx, rxn in enumerate(rxn_list):
+        rxn.barrier["egat"] = dataframe.loc[rxn_idx, "egat_barrier"]
+    return yp_rxns
+
+
+def update_yarp_pickles_branch_notes_new():
+    """
+    Draft notes for `helper/update_yarp_pickles.py` branch changes.
+
+    Why this logic change was made
+    ------------------------------
+    Late in the branch it became clear that some old test fixtures should not be
+    regenerated by rerunning chemistry at all. They already encoded the intended
+    historical reaction sets and only needed a schema upgrade so that modern
+    YARP objects would have `_atom_info`.
+
+    The existing pickle-upgrade helper turned out to be the correct mechanism.
+    The branch only needed to extend it so it could operate on the new schema:
+    - add `_atom_info` to the yarpecule guardrail
+    - keep rebuilding yarpecules through the live constructor so `_atom_info`
+      is populated by current production code
+    - preserve higher-level reaction metadata such as stored EGAT barriers
+    - add the same lightweight Open Babel stub used elsewhere so helper runs are
+      possible even when local environments lack Open Babel
+
+    This is an important branch-level decision:
+    - when the goal is “same old chemistry, new object schema”, prefer pickle
+      migration over fresh enumeration
+    """
+
+    return {
+        "yarpecule_guardrail_addition": "_atom_info",
+        "rebuild_strategy": "constructor_rebuild_with_metadata_backfill",
+        "local_openbabel_stub": True,
+    }
+
+
+def regenerate_test_pickles_branch_notes_new():
+    """
+    Draft notes for `dev/regenerate_test_pickles.py` and related test-fixture work.
+
+    Why this logic change was made
+    ------------------------------
+    Some tests truly do depend on fresh chemistry outputs rather than migrated
+    old pickles. During the branch the helper evolved to make those regenerations
+    explicit and reproducible.
+
+    Two key lessons were learned and are worth preserving in the plan:
+    1. `haa_heavy_b2f2_d1.pkl` must be regenerated as the five-product
+       unrestricted depth-1 fixture with EGAT barriers, not as the restricted
+       two-product heavy-atom-only case. Otherwise the downstream depth-2 tests
+       collapse to the same count and produce misleading “behavior drift”.
+    2. `3hp_heavy_b2f2_d1.pkl` also needs EGAT enabled when regenerated so test
+       fixtures remain internally consistent.
+    """
+
+    return {
+        "haa_fixture_shape": "unrestricted_b2f2_depth1_with_egat",
+        "3hp_fixture_shape": "depth1_with_egat",
+        "depth2_proxy_helper": "dev/check_depth2_counts.py",
+    }
+
+
+if __name__ == "__main__":
+    # Representative depth-2 failure that should normalize cleanly.
+    example = normalize_reaction_maps_for_egat(
+        "[O:0]=[C:1]([O:4][O:5][H:11])[H:6]",
+        "[H:6][H:11].[O:0]=[C:1]1[O:4][O:5]1",
+        start_at=1,
+    )
+    print(example)

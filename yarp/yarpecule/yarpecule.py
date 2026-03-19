@@ -16,9 +16,7 @@ from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
-# RDKit warning suppression is configured in input_parsers.py.
-from openbabel import openbabel as ob
-ob.obErrorLog.SetOutputLevel(ob.obError)  # keep only errors, hide warnings
+# Package-level warning suppression is configured in yarp/__init__.py.
 
 class yarpecule:
     """
@@ -545,11 +543,22 @@ class yarpecule:
 
         atom_info = {}
         offset = 0
-        for y in all_y:
+        map_order = sorted(
+            range(len(all_y)),
+            key=lambda idx: (-sum(1 for e in all_y[idx].elements if e != "h"), idx),
+        )
+        map_offsets = {}
+        next_map = 0
+        for idx in map_order:
+            map_offsets[idx] = next_map
+            next_map += len(all_y[idx].elements)
+
+        for count_y, y in enumerate(all_y):
             for i in range(len(y.elements)):
                 atom_info[offset + i] = {
                     **dict(y._atom_info[i]),
                     "atom_index": offset + i,
+                    "atom_map": map_offsets[count_y] + i,
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
                 }

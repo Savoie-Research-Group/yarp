@@ -47,7 +47,7 @@ def test_egat_minimal(egat_min_options):
     assert len(saved_reactions) == 2
 
     rxns = list(saved_reactions.values())
-    assert rxns[0].barrier['egat'] == pytest.approx(97.13385772705078, rel=1e-5)
+    assert rxns[0].barrier['egat'] == pytest.approx(95.54852294921875, rel=1e-5)
     assert rxns[1].barrier['egat'] == pytest.approx(73.41398620605469, rel=1e-5)
 
 def test_d2_default(d2_default_enum, d1_path):

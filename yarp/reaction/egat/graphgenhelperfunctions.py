@@ -2,7 +2,7 @@ import sys
 import os,sys,subprocess
 import numpy as np
 from scipy.spatial.distance import cdist
-from rdkit import Chem
+from rdkit import Chem, rdBase
 
 from yarp.reaction.egat.utility import *
 
@@ -41,7 +41,11 @@ def return_reactive(E,Rbond_mat,Pbond_mat):
 
 def return_matrix(AM_smiles:str,sanitize:bool=False) -> tuple[list[str], np.ndarray, np.ndarray, list[int]]:
     # load in mol
-    mol = Chem.MolFromSmiles(AM_smiles,sanitize=sanitize)
+    blocker = rdBase.BlockLogs()
+    try:
+        mol = Chem.MolFromSmiles(AM_smiles,sanitize=sanitize)
+    finally:
+        del blocker
     # Get the list of atoms sorted by their atom-mapping number
     sorted_atoms = sorted(mol.GetAtoms(), key=lambda atom: atom.GetAtomMapNum())
 
@@ -109,8 +113,12 @@ def find_stereochemistry(AM_smiles):
     atom_aromatic,bond_aromatic = {},{}
 
     # generate two mols, one with origianl sequence and one wit sanitize
-    mol = Chem.MolFromSmiles(AM_smiles, sanitize=False)
-    mol_sanitized = Chem.MolFromSmiles(AM_smiles)
+    blocker = rdBase.BlockLogs()
+    try:
+        mol = Chem.MolFromSmiles(AM_smiles, sanitize=False)
+        mol_sanitized = Chem.MolFromSmiles(AM_smiles)
+    finally:
+        del blocker
 
     if mol_sanitized is not None:
         # Get the atom chiral centers from the sanitized molecule

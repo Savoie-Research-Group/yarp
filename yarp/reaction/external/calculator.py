@@ -4,6 +4,9 @@ Definition of the YARP Calculator base classes and software-specific implementat
 import shutil
 from pathlib import Path
 
+from yarp.yarpecule.input_parsers import xyz_parse
+from yarp.reaction.conformer import conformer
+
 # from yarp.reaction.external.crest import CrestConfCalculator
 
 # =====================================================================
@@ -79,17 +82,36 @@ class AsyncYarpCalculator:
 class MLPredictTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
         # ML usually just needs the 2D graph (SMILES/InChI), which is guaranteed to exist.
+        # ERM: Ehhhhh is it though? We should put an actual check in this slot eventually...
         return True
 
 class ConfTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
-        return True # Just needs the base yarpecule graph
+        if not self.rxn.reactant.conformers.get('initial_geom') or not self.rxn.product.conformers.get('initial_geom'):
+            return False
+        return True
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
-        if not self.rxn.reactant.conformers or not self.rxn.product.conformers:
-            print(f"[{self.rxn.hash}] Missing R/P conformers for TS Guess.")
+        r_node = self.rxn.reactant
+        p_node = self.rxn.product
+        if not r_node.conformers or not p_node.conformers:
             return False
+
+        r_keys = r_node.conformers.keys()
+        r_match = False
+        for rk in r_keys:
+            if 'conf_gen' in rk and r_node.conformers[rk].geo is not None: 
+                r_match = True
+        p_keys = p_node.conformers.keys()
+        p_match = False
+        for pk in p_keys:
+            if 'conf_gen' in pk and p_node.conformers[pk].geo is not None:
+                p_match = True
+
+        if not r_match or not p_match:
+            return False
+
         return True
 
 class MinOptTask(AsyncYarpCalculator):
@@ -100,14 +122,12 @@ class MinOptTask(AsyncYarpCalculator):
 class TSOptTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
         if not getattr(self.rxn, 'ts_geom', None):
-            print(f"[{self.rxn.hash}] Missing TS guess for TS Opt.")
             return False
         return True
 
 class IRCValTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
         if not getattr(self.rxn, 'ts_geom', None) or not self.rxn.ts_geom.get("optimized"):
-            print(f"[{self.rxn.hash}] Missing optimized TS geometry for IRC.")
             return False
         return True
 
@@ -134,17 +154,20 @@ class EgatMLPredict(MLPredictTask):
         shutil.rmtree(self.scratch_dir)
 
 class CrestConfCalculator(ConfTask):
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "yarp_crest:latest" # Change to ghcr.io/url later!
+        self.image_name = "yarp_crest:latest" # Change to ghcr.io/url later???
         self.xyz_file = "input.xyz"
-        
+        self.lot = getattr(self.config, 'lot', 'gfn2')
+        self.n_cpus = getattr(self.config, 'n_cpus', 1)
+        self.n_conf = getattr(self.config, 'n_conf', 1)
+
         # Determine if we are working on the reactant or the product
         if "reactant" in self.task_def.task_type:
-            self.target_species = self.rxn.reactant.conformers.get('initial_geom')
+            self.target_species = self.rxn.reactant
         else:
-            self.target_species = self.rxn.product.conformers.get('initial_geom')
+            self.target_species = self.rxn.product
 
     def generate_input(self):
         """Write the initial 3D geometry for CREST to start from."""
@@ -152,19 +175,15 @@ class CrestConfCalculator(ConfTask):
         with open(input_xyz_path, "w") as f:
             # Assuming yarpecule has a method to get a basic 3D string
             # (e.g., generated via RDKit/ETKDG during initialization)
-            f.write(self.target_species.to_xyz_string())
+            f.write(self.target_species.conformers.get('initial_geom').to_xyz_string())
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""
-        script_path = self.scratch_dir / "submit.sh"
-        
-        # Get user configuration (defaulting to sensible fallbacks)
-        lot = getattr(self.config, 'lot', 'gfn2')
-        n_cpus = getattr(self.config, 'n_cpus', 4)
-        
+        script_path = self.scratch_dir / "run_crest_cmd.sh"
+
         # Construct the core command
         prefix = self.get_container_prefix(self.image_name)
-        crest_cmd = f"crest {self.xyz_file} --{lot} -T {n_cpus}"
+        crest_cmd = self._get_crest_command()
         full_command = f"{prefix} {crest_cmd}"
 
         with open(script_path, "w") as f:
@@ -172,30 +191,85 @@ class CrestConfCalculator(ConfTask):
             f.write(f"cd {self.scratch_dir}\n")
             # Pipe output to a log file so it doesn't flood the local terminal
             f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
-            
+
         # Make the script executable (important for LocalJobManager)
         script_path.chmod(0x755)
-        
+
         return script_path
 
     def check_output(self) -> bool:
         """Verify CREST actually finished and produced conformers."""
-        xyz_exists = (self.scratch_dir / "crest_conformers.xyz").exists()
-        energies_exists = (self.scratch_dir / "crest.energies").exists()
-        return xyz_exists and energies_exists
+        # ERM: Should we add a check here to make sure there are at minimum n_conf available?
+        xyz_file_name = self.scratch_dir / "crest_conformers.xyz"
+        ene_file_name = self.scratch_dir / "crest.energies"
+
+        xyz_exists = xyz_file_name.exists()
+        energies_exists = ene_file_name.exists()
+
+        termination_msg_exists = False
+        outfile = self.scratch_dir / "crest_run.log"
+        if outfile.exists():
+            try: 
+                lines = open(outfile, 'r', encoding="utf-8").readlines()
+                for n_line, line in enumerate(reversed(lines)):
+                    if 'CREST terminated normally.' in line:
+                        termination_msg_exists = True
+            except:
+                termination_msg_exists = False
+
+        return xyz_exists and energies_exists and termination_msg_exists
 
     def scrape_data(self):
-        """To be implemented next! Parse the XYZ and update self.target_species."""
-        print(f"[{self.rxn.hash}] Data scraping for {self.task_def.task_type} not yet implemented.")
+        """Parse the XYZ and update self.target_species."""
+        confs = self._get_all_conformers()
+        for conf in confs:
+            if conf['conf_rank'] < self.n_conf:
+                conf['lot'] = self.lot
+                conf['software'] = 'crest'
+                conf_obj = conformer(calc_type='conf_gen', calc_data=conf)
+                self.target_species.conformers[conf_obj.type] = conf_obj
+            else:
+                # We don't need to save more conformers than the user requested!
+                break
 
     def cleanup(self):
-        """Delete massive temporary files generated by CREST."""
-        print(f"[{self.rxn.hash}] Data cleanup for {self.task_def.task_type} not yet implemented.")
+        """Delete files generated by CREST."""
+        print(f"  * [{self.rxn.hash}] Data cleanup for {self.task_def.task_type} not yet implemented.")
         # for file in self.scratch_dir.iterdir():
         #     keep_files = ["crest_conformers.xyz", "crest.energies", "submit.sh", "crest_run.log", self.xyz_file]
         #     if file.name not in keep_files:
         #         if file.is_file(): file.unlink()
         #         elif file.is_dir(): shutil.rmtree(file)
+
+    def _get_crest_command(self):
+
+        # basic command
+        cmd = f"crest {self.xyz_file} --{self.lot} -nozs -T {self.n_cpus}"
+
+        # expand this later to allow for full user-input specifications
+        # ERM: no current way to cap CREST outputs at a set number of generated conformers!
+        # You can damp down via adjusting the energy window threshold, but that's it
+        return cmd
+
+    def _get_all_conformers(self):
+        """
+        Get the entire set of geometry (and elements) from crest output files.
+        Returns a dictionary for each conformer with the geometry, elements,
+        relative energy ranking, and total energy in Eh
+        """
+        xyz_file_name = self.scratch_dir / "crest_conformers.xyz"
+
+        confs=[]
+        elements, geometries = xyz_parse(xyz_file_name, multiple=True)
+        for count_i, i in enumerate(elements):
+            conf = {
+                'conf_rank': count_i,
+                'elements': elements[count_i],
+                'geometry': geometries[count_i]
+            }
+            confs.append(conf)
+
+        return confs
 
 
 # --- TASK 3: TS GUESS ---

@@ -67,6 +67,15 @@ class conformer:
             self.geo = calc_data.geo
             self.elements = calc_data.elements
             self.type = "initial_mol_graph"
+        elif calc_type == 'conf_gen':
+            self.geo = calc_data.get('geometry')
+            self.elements = calc_data.get('elements')
+            self.lot = calc_data.get('lot')
+            self.software = calc_data.get('software')
+
+            rank = calc_data.get('conf_rank')
+
+            self.type = f'conf_gen_rank{rank}_{self.software}_{self.lot}'
         else:
             pass
 

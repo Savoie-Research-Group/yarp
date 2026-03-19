@@ -4,7 +4,6 @@ import json
 import pickle
 from pathlib import Path
 
-# In a real environment, you'd import these from your yarp modules
 from yarp.util.input import InputParser
 from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calculator import get_calculator
@@ -35,29 +34,39 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
 
 def progress_yarp(work_dir_str: str):
     work_dir = Path(work_dir_str).resolve()
+    print(f"Processing YARP progress in {work_dir}...")
+
     status_tracker, reactions = load_state(work_dir)
+    print(f"Loading in {len(reactions)} reactions for analysis!")
+    for hash in reactions.keys():
+        print(f" - {hash}")
     
     # We need the task definitions to know dependencies. 
     # We reconstruct the InputParser from the saved config.
     inp = InputParser(status_tracker["input_config"])
     pipeline_tasks = inp.pipeline_tasks
+    print("User-specified pipeline tasks:")
+    for task in pipeline_tasks:
+        print(f" - {task}")
     
     # Initialize the correct job manager based on user input
     job_manager = get_job_manager(inp.scheduler)
     container_runner = getattr(inp, 'container', 'docker')
+    print(f"Jobs will be run using {inp.scheduler} scheduler and {container_runner} containers")
+
     failed_rxns = {}
-
-    print(f"Processing YARP progress in {work_dir}...")
-
     for rxn_hash, rxn_state in status_tracker["reactions"].items():
+        print(f"Processing reaction {rxn_hash}...")
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj:
+            print(f" - Reaction not found in YARP_RXNS.pkl, skipping!")
             continue
-            
+
         tasks_status = rxn_state["tasks"]
 
         # --- PHASE 1: Check currently running jobs ---
         for task_id, meta in tasks_status.items():
+            print(f" - Processing Task {task_id}...")
             if meta["status"] == "submitted":
                 if not job_manager.is_running(meta["job_id"]):
                     # Job finished! Let's check if it succeeded.
@@ -74,12 +83,12 @@ def progress_yarp(work_dir_str: str):
                             meta["status"] = "finished_with_error"
                             meta["error_log"] = f"Scraping failed: {str(e)}"
                             failed_rxns[rxn_hash] = rxn_obj
-                            print(f"[{rxn_hash}] Task '{task_id}' failed during data scraping.")
+                            print(f"   * [{rxn_hash}] Task '{task_id}' failed during data scraping.")
                     else:
                         meta["status"] = "finished_with_error"
                         meta["error_log"] = "External calculation failed or expected output missing."
                         failed_rxns[rxn_hash] = rxn_obj
-                        print(f"[{rxn_hash}] Task '{task_id}' finished with errors.")
+                        print(f"   * [{rxn_hash}] Task '{task_id}' finished with errors.")
 
         # --- PHASE 2: Update Pending -> Ready based on DAG ---
         for task_id, meta in tasks_status.items():
@@ -95,7 +104,7 @@ def progress_yarp(work_dir_str: str):
                         
                 if dependencies_met:
                     meta["status"] = "ready"
-                    print(f"[{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
+                    print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
 
         # --- PHASE 3: Submit Ready Jobs ---
         for task_id, meta in tasks_status.items():
@@ -111,11 +120,11 @@ def progress_yarp(work_dir_str: str):
                     meta["status"] = "finished_with_error"
                     meta["error_log"] = "Pre-flight check failed: Missing required data in reaction object."
                     failed_rxns[rxn_hash] = rxn_obj
-                    print(f"[{rxn_hash}] Task '{task_id}' aborted: Pre-flight check failed.")
+                    print(f"   * [{rxn_hash}] Task '{task_id}' aborted: Pre-flight check failed.")
                     continue
                 
                 # Generate and Submit
-                print(f"[{rxn_hash}] Submitting task '{task_id}'...")
+                print(f"   * [{rxn_hash}] Submitting task '{task_id}'...")
                 calc.generate_input()
                 script_path = calc.write_submission_script()
                 

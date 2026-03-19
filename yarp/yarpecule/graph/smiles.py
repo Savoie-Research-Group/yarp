@@ -291,21 +291,62 @@ def smiles2adjmat(smiles, verbose=False):
                 break
 
     if any(atom_info[i]["aromatic_input"] for i in atom_info):
+        aromatic_rings = []
         try:
-            for ring in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=True):
-                if all(atom_info[idx]["element"] in smiles2adjmat.aromatics for idx in ring):
-                    for ind in range(1, len(ring)):
-                        if (ind - 1) % 2 == 0:
-                            adjmat[ring[ind], ring[ind - 1]] = 2
-                            adjmat[ring[ind - 1], ring[ind]] = 2
+            aromatic_atoms = []
+            for idx, info in atom_info.items():
+                if info["aromatic_input"] and info["element"] in smiles2adjmat.aromatics:
+                    aromatic_atoms.append(idx)
+            aromatic_atoms = set(aromatic_atoms)
+
+            for ring in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=False):
+                if all(idx in aromatic_atoms for idx in ring):
+                    aromatic_rings.append(ring)
+
+            fused_components = []
+            for ring in aromatic_rings:
+                ring = set(ring)
+                merged = True
+                while merged:
+                    merged = False
+                    next_components = []
+                    for comp in fused_components:
+                        if comp & ring:
+                            ring |= comp
+                            merged = True
+                        else:
+                            next_components.append(comp)
+                    fused_components = next_components
+                fused_components.append(ring)
+
+            for component in fused_components:
+                component = sorted(component)
+                component_edges = []
+                for count_i, i in enumerate(component):
+                    for j in component[count_i + 1:]:
+                        if adjmat[i, j] == 1:
+                            component_edges.append((i, j))
+
+                target_size = len(component) // 2
+                promoted_edges, best_partial = choose_aromatic_matching(component_edges, target_size)
+                if promoted_edges is None:
+                    promoted_edges = best_partial
+
+                for i, j in promoted_edges:
+                    adjmat[i, j] = 2
+                    adjmat[j, i] = 2
+
         except Exception as err:
             print(f"WARNING: kekulization/aromatic assignment fallback used: {err}")
             for ring in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=True):
-                if all(atom_info[idx]["element"] in smiles2adjmat.aromatics for idx in ring):
-                    for ind in range(1, len(ring)):
-                        if (ind - 1) % 2 == 0:
-                            adjmat[ring[ind], ring[ind - 1]] = 2
-                            adjmat[ring[ind - 1], ring[ind]] = 2
+                if not all(atom_info[idx]["element"] in smiles2adjmat.aromatics for idx in ring):
+                    continue
+                if any(sum(idx in other for other in aromatic_rings) > 1 for idx in ring):
+                    continue
+                for ind in range(1, len(ring)):
+                    if (ind - 1) % 2 == 0:
+                        adjmat[ring[ind], ring[ind - 1]] = 2
+                        adjmat[ring[ind - 1], ring[ind]] = 2
 
     adjmat, atom_info = add_hydrogens(adjmat, atom_info, atom_parse_meta)
 
@@ -327,6 +368,36 @@ def smiles2adjmat(smiles, verbose=False):
         bond_electron_mat[i, i] = el_valence[atom_info[i]["element"]] - atom_info[i]["formal_charge"] - sum(adjmat[i])
 
     return np.where(adjmat > 0, 1, 0), bond_electron_mat, atom_info
+
+
+def choose_aromatic_matching(component_edges, target_size):
+    """
+    Return the first valid deterministic matching of `target_size` edges and
+    also track the best partial matching if a full one is unavailable.
+    """
+    best_partial = []
+    stack = [(0, set(), [])]
+
+    while stack:
+        edge_index, used_atoms, chosen_edges = stack.pop()
+
+        if len(chosen_edges) > len(best_partial):
+            best_partial = chosen_edges.copy()
+        if len(chosen_edges) == target_size:
+            return chosen_edges.copy(), best_partial
+        if edge_index >= len(component_edges):
+            continue
+
+        i, j = component_edges[edge_index]
+        stack.append((edge_index + 1, used_atoms.copy(), chosen_edges.copy()))
+        if i not in used_atoms and j not in used_atoms:
+            next_used = used_atoms.copy()
+            next_used.update((i, j))
+            next_edges = chosen_edges.copy()
+            next_edges.append((i, j))
+            stack.append((edge_index + 1, next_used, next_edges))
+
+    return None, best_partial
 
 
 def add_hydrogens(adjmat, atom_info, atom_parse_meta):

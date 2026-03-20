@@ -298,7 +298,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
-        self.n_pairs = getattr(self.config, 'n_conf', 1)
+        self.n_pairs = self.config.n_conf
         self.pairs_to_run = []
 
     def generate_input(self):
@@ -312,33 +312,18 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         # Write inputs for each pair
         for i, pair in enumerate(self.pairs_to_run):
             idx = i + 1
-            r_xyz_path = self.scratch_dir / f"reactant_{idx}.xyz"
-            p_xyz_path = self.scratch_dir / f"product_{idx}.xyz"
-            ini_path = self.scratch_dir / f"gsm_{idx}.ini"
+            r_xyz_path = self.scratch_dir / f"gsm_run{idx}" / f"reactant_{idx}.xyz"
+            p_xyz_path = self.scratch_dir / f"gsm_run{idx}" / f"product_{idx}.xyz"
+            inp_path = self.scratch_dir / f"gsm_run{idx}" / f"gsm_{idx}_input.yaml"
             
             # Write XYZs
             with open(r_xyz_path, "w") as f:
                 f.write(pair["r_conf"].to_xyz_string())
             with open(p_xyz_path, "w") as f:
                 f.write(pair["p_conf"].to_xyz_string())
-                
-            # Write a standard Pysisyphus INI file (template example)
-            # You can adapt this to whatever specific Pysisyphus parameters you use
-            lot = getattr(self.config, 'lot', 'xtb')
-            ini_content = f"""[geometry]
-type = string
-r_xyz = reactant_{idx}.xyz
-p_xyz = product_{idx}.xyz
-
-[calculator]
-type = {lot}
-
-[opt]
-type = gsm
-max_cycles = 100
-"""
-            with open(ini_path, "w") as f:
-                f.write(ini_content)
+            
+            # Write a Pysisyphus input file for GSM
+            self._write_pysis_gsm_input(inp_path, r_xyz_path, p_xyz_path)
 
     def write_submission_script(self) -> Path:
         """Writes a bash script that executes all N pairs sequentially."""
@@ -352,15 +337,10 @@ max_cycles = 100
             # Loop over however many pairs were actually generated
             for i in range(len(self.pairs_to_run)):
                 idx = i + 1
-                cmd = f"pysisyphus gsm_{idx}.ini"
+                f.write(f"cd {self.scratch_dir}/gsm_run{idx}")
+                cmd = f"pysis gsm_{idx}_input.yaml"
                 f.write(f"echo 'Running GSM for Pair {idx}...'\n")
-                f.write(f"{prefix} {cmd} > gsm_{idx}.log 2>&1\n")
-                
-                # Pysisyphus usually generates a specific output file like 'gsm_ts_guess.xyz'. 
-                # We rename it so it isn't overwritten by the next loop iteration.
-                f.write(f"if [ -f \"gsm_ts_guess.xyz\" ]; then\n")
-                f.write(f"    mv gsm_ts_guess.xyz ts_guess_{idx}.xyz\n")
-                f.write(f"fi\n\n")
+                f.write(f"{prefix} {cmd} > gsm_{idx}.log 2> {cmd} > gsm_{idx}.err\n")
                 
         script_path.chmod(0x755)
         return script_path
@@ -370,10 +350,11 @@ max_cycles = 100
         Returns True if AT LEAST ONE of the N pairs generated a TS guess.
         We don't want to fail the whole reaction just because 1 out of 3 strings broke.
         """
-        for i in range(len(self.pairs_to_run)):
-            if (self.scratch_dir / f"ts_guess_{i+1}.xyz").exists():
-                return True
-        return False
+        # for i in range(len(self.pairs_to_run)):
+        #     if (self.scratch_dir / f"ts_guess_{i+1}.xyz").exists():
+        #         return True
+        # return False
+        pass
 
     def scrape_data(self):
         """Scrape all successful TS guesses into the reaction object."""
@@ -403,6 +384,27 @@ max_cycles = 100
         #     if file.is_file(): file.unlink()
         #     elif file.is_dir(): shutil.rmtree(file)
 
+    def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
+        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+        lot = self.config.gsm_lot.lower()
+        assert (self.config.gsm_lot.lower() == 'xtb'), "GSM with Pysisyphus is xTB or bust right now, friend..."
+
+        # Write the file! Yay, YAML friend!
+        with open(input_path, 'a') as f:
+            # set geom block
+            input_geo = [r_xyz_path, p_xyz_path]
+            f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
+
+            # set calc block
+            # ERM: I left out the option for solvent,
+            # because what I saw in classy YARP didn't make sense to me...
+            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+
+            # set cos block
+            f.write(f'cos:\n type: gs\n max_nodes: {self.config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
+
+            # set opt block
+            f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
 # --- TASK 4/5: OPTIMIZATIONS (ORCA Example) ---
 class OrcaOptCalculator(MinOptTask):

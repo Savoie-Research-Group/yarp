@@ -21,3 +21,4 @@ dependencies:
     - sphinx-autoapi 
     - sphinx
     - pytest-mock
+    - ase

@@ -54,7 +54,11 @@ class reaction:
     def __init__(self, reactant, product):
         self.reactant = state(reactant)
         self.product = state(product)
-        self.bond_changes = None # TODO: Compare R/P adj mats upon init
+
+        # Set up bond change information
+        self.bond_changes = self.reactant.graph.adj_mat - self.product.graph.adj_mat
+        self.reactant.paired_bem = self.product.graph.bond_mats[0]
+        self.product.paired_bem = self.reactant.graph.bond_mats[0]
 
         # Geometries
         self.ts_geom = dict() 

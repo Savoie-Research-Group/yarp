@@ -43,18 +43,30 @@ class NetworkConfig:
 
 @dataclass
 class ConformerConfig:
-    n_conf: int = 1
+    """Single Source of Truth for Conformer Generation parameter defaults!"""
     software: str = "crest"
     lot: str = "gfn2"
-    n_cpus: int = 1
-    selector: str = "rich"
-    joint_opt: str = "dual"
+    n_cpus: int = 4
+    mem_per_cpu: int = 1000
+    energy_window: float = 6.0
+    solvent: Dict[str, str] = field(default_factory=dict)
+    charge: int = 0
+    multiplicity: int = 1
 
 @dataclass
 class GSMConfig:
+    """Single Source of Truth for Growing String Method parameter defaults!"""
     software: str = "pysisyphus"
-    lot: str = "xtb"
-    n_cpus: int = 1
+    selector: str = "rich"
+    joint_opt: str = "dual"
+    n_conf: int = 1
+    n_cpus: int = 4
+    mem_per_cpu: int = 1000
+    bias_lot: str = "uff"
+    gsm_lot: str = "xtb"
+    max_gsm_nodes: int = 30
+    charge: int = 0
+    multiplicity: int = 1
 
 @dataclass
 class RPOptConfig:
@@ -100,22 +112,31 @@ class InputParser:
     Parses the raw input dictionary and organizes settings into specific Config objects.
     """
     def __init__(self, file_dict: dict):
-        # Process initialize node
+        # ---------------------------------------------------------
+        # 1. Parse Initialize Node
+        # ---------------------------------------------------------
         initnode = file_dict.get('initialize', None)
         if not initnode:
             raise RuntimeError("Hey bro beans, I need some molecules or reactions to work with. "
                                "Missing `initialize` node in YAML file.")
 
+        # Core level inputs
         self.d0_node = initnode.get("initial species", None)
         if not self.d0_node:
             raise RuntimeError("Please provide an initial species for enumeration.")
-        self.out_file = initnode.get("output", "reactions.pkl")
-        self.scheduler = initnode.get("scheduler", "slurm") # throw this in the initialize block for now!
-        self.container = initnode.get("container", "docker") # throw this in the initialize block for now!
+        self.out_file = initnode.get("output", "YARP_RXNS.pkl")
 
-        self.enum = self._parse_enum_config(initnode)
-        self.enum_filters = self._parse_enum_filters(initnode)
-        self.net_explore = self._parse_network_config(initnode)
+        # Job manager configuration
+        jm_node = initnode.get("job manager", {})
+        self.scheduler = jm_node.get("scheduler", "slurm")
+        self.container = jm_node.get("container", "docker")
+        self.max_active_jobs = jm_node.get("max active jobs", 100) # Default to a safe large number
+
+        # Enumeration configs
+        enum_node = initnode.get("enumeration", {})
+        self.enum = self._parse_enum_config(enum_node)
+        self.enum_filters = self._parse_enum_filters(enum_node)
+        self.net_explore = self._parse_network_config(enum_node)
 
         # Process stages node
         self.stage_names = file_dict.get('stages', [])
@@ -160,31 +181,31 @@ class InputParser:
 
         raise RuntimeError(f"Invalid value for separate products: {raw_value}")
 
-    def _parse_enum_config(self, initnode: dict) -> EnumerationConfig:
+    def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
         """Extracts enumeration settings and returns a clean EnumerationConfig object."""
 
         # Handle the reactive atoms list-to-set conversion
-        raw_react = initnode.get("reactive atoms", None)
+        raw_react = enum_node.get("reactive atoms", None)
         react_atoms_processed = []
         if raw_react:
             react_atoms_processed = [set(raw_react)]
 
         return EnumerationConfig(
-            enumerate=initnode.get("enumerate", False),
-            mode=initnode.get("mode", "concerted"),
-            n_break=initnode.get("bonds to break", 2),
-            n_form=initnode.get("bonds to form", 2),
+            enumerate=enum_node.get("enumerate", False),
+            mode=enum_node.get("mode", "concerted"),
+            n_break=enum_node.get("bonds to break", 2),
+            n_form=enum_node.get("bonds to form", 2),
             react_atoms=react_atoms_processed,
         )
 
-    def _parse_enum_filters(self, initnode: dict) -> EnumFilterConfig:
+    def _parse_enum_filters(self, enum_node: dict) -> EnumFilterConfig:
         """Extracts enumeration filtering settings and returns a clean EnumFilterConfig object."""
 
         # Handle complex "separate products" logic using a helper method
-        separate_prods = self._parse_separate_prods(initnode.get("separate products"))
+        separate_prods = self._parse_separate_prods(enum_node.get("separate products"))
 
         # Handle nested filters
-        filters = initnode.get('enumeration filters', {})
+        filters = enum_node.get('enumeration filters', {})
         # If filters is None (yaml key exists but is empty), treat as empty dict
         if filters is None: 
             filters = {}
@@ -198,11 +219,11 @@ class InputParser:
             separate_prods=separate_prods
         )
 
-    def _parse_network_config(self, initnode: dict) -> NetworkConfig:
+    def _parse_network_config(self, enum_node: dict) -> NetworkConfig:
         """Extracts network exploration settings and returns a clean NetworkConfig object."""
 
         # Handle nested filters
-        netconfig = initnode.get('network exploration', {})
+        netconfig = enum_node.get('network exploration', {})
         # If netconfig is None (yaml key exists but is empty), treat as empty dict
         if netconfig is None: 
             netconfig = {}
@@ -233,21 +254,10 @@ class InputParser:
 
         if method == 'init_rxn_path':
             conf_data = data.get('conformers', {})
-            conf_cfg = ConformerConfig(
-                n_conf=conf_data.get('n_conf', 1),
-                software=conf_data.get('software', 'crest'),
-                lot=conf_data.get('lot', 'gfn2'),
-                n_cpus=conf_data.get('n_cpus', 1),
-                selector=conf_data.get('selector', 'rich'),
-                joint_opt=conf_data.get('joint_opt', 'dual')
-            )
+            conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})
 
             gsm_data = data.get('gsm', {})
-            gsm_cfg = GSMConfig(
-                software=gsm_data.get('software', 'pysisyphus'),
-                lot=gsm_data.get('lot', 'xtb'),
-                n_cpus=gsm_data.get('n_cpus', 1)
-            )
+            gsm_cfg = GSMConfig(**{k: v for k, v in gsm_data.items() if k in GSMConfig.__dataclass_fields__})
 
             # Define Unique Task IDs
             r_conf_id = f"{name}.reactant_conformer"

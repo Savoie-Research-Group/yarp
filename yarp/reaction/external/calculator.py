@@ -6,6 +6,7 @@ from pathlib import Path
 
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
+from yarp.reaction.conf_bias_select import select_gsm_pairs
 
 # from yarp.reaction.external.crest import CrestConfCalculator
 
@@ -274,20 +275,114 @@ class CrestConfCalculator(ConfTask):
 
 # --- TASK 3: TS GUESS ---
 class PysisyphusTSGuessCalculator(TSGuessTask):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+        self.n_pairs = getattr(self.config, 'n_conf', 1)
+        self.pairs_to_run = []
+
     def generate_input(self):
-        # Write reactant.xyz, product.xyz, and pysisyphus.ini
-        pass
+        """
+        Runs the Joint Opt + ML Selection, then writes the files 
+        required for the Pysisyphus GSM run.
+        """
+        print(f"  * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
+        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
+        
+        # Write inputs for each pair
+        for i, pair in enumerate(self.pairs_to_run):
+            idx = i + 1
+            r_xyz_path = self.scratch_dir / f"reactant_{idx}.xyz"
+            p_xyz_path = self.scratch_dir / f"product_{idx}.xyz"
+            ini_path = self.scratch_dir / f"gsm_{idx}.ini"
+            
+            # Write XYZs
+            with open(r_xyz_path, "w") as f:
+                f.write(pair["r_conf"].to_xyz_string())
+            with open(p_xyz_path, "w") as f:
+                f.write(pair["p_conf"].to_xyz_string())
+                
+            # Write a standard Pysisyphus INI file (template example)
+            # You can adapt this to whatever specific Pysisyphus parameters you use
+            lot = getattr(self.config, 'lot', 'xtb')
+            ini_content = f"""[geometry]
+type = string
+r_xyz = reactant_{idx}.xyz
+p_xyz = product_{idx}.xyz
+
+[calculator]
+type = {lot}
+
+[opt]
+type = gsm
+max_cycles = 100
+"""
+            with open(ini_path, "w") as f:
+                f.write(ini_content)
+
     def write_submission_script(self) -> Path:
-        # Write script calling pysisyphus container
-        pass
+        """Writes a bash script that executes all N pairs sequentially."""
+        script_path = self.scratch_dir / "submit.sh"
+        prefix = self.get_container_prefix(self.image_name)
+        
+        with open(script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write(f"cd {self.scratch_dir}\n\n")
+            
+            # Loop over however many pairs were actually generated
+            for i in range(len(self.pairs_to_run)):
+                idx = i + 1
+                cmd = f"pysisyphus gsm_{idx}.ini"
+                f.write(f"echo 'Running GSM for Pair {idx}...'\n")
+                f.write(f"{prefix} {cmd} > gsm_{idx}.log 2>&1\n")
+                
+                # Pysisyphus usually generates a specific output file like 'gsm_ts_guess.xyz'. 
+                # We rename it so it isn't overwritten by the next loop iteration.
+                f.write(f"if [ -f \"gsm_ts_guess.xyz\" ]; then\n")
+                f.write(f"    mv gsm_ts_guess.xyz ts_guess_{idx}.xyz\n")
+                f.write(f"fi\n\n")
+                
+        script_path.chmod(0x755)
+        return script_path
+
     def check_output(self) -> bool:
-        # Look for the GSM output string or the specific TS guess xyz
-        pass
+        """
+        Returns True if AT LEAST ONE of the N pairs generated a TS guess.
+        We don't want to fail the whole reaction just because 1 out of 3 strings broke.
+        """
+        for i in range(len(self.pairs_to_run)):
+            if (self.scratch_dir / f"ts_guess_{i+1}.xyz").exists():
+                return True
+        return False
+
     def scrape_data(self):
-        # Extract TS guess, save to self.rxn.ts_geom['ts_guess_xtb']
+        """Scrape all successful TS guesses into the reaction object."""
         pass
+        # self.rxn.ts_geom = {} # Ensure dict exists
+        
+        # for i, pair in enumerate(self.pairs_to_run):
+        #     idx = i + 1
+        #     ts_file = self.scratch_dir / f"ts_guess_{idx}.xyz"
+            
+        #     if ts_file.exists():
+        #         # Parse the XYZ and create a conformer object
+        #         # ts_calc_data = parse_xyz(ts_file) 
+        #         # ts_conf = conformer(calc_type='conf_gen', calc_data=ts_calc_data)
+                
+        #         # Save it with a unique key
+        #         key = f"tsguess_pysis_{idx}"
+        #         # self.rxn.ts_geom[key] = ts_conf
+        #         print(f"[{self.rxn.hash}] Scraped TS guess from pair {idx} into '{key}'.")
+
     def cleanup(self):
+        """Clean up but keep logs and final TS xyz files."""
         pass
+        # for file in self.scratch_dir.iterdir():
+        #     if file.name.startswith("ts_guess_") or file.name.startswith("gsm_") or file.name == "submit.sh":
+        #         continue
+        #     if file.is_file(): file.unlink()
+        #     elif file.is_dir(): shutil.rmtree(file)
 
 
 # --- TASK 4/5: OPTIMIZATIONS (ORCA Example) ---

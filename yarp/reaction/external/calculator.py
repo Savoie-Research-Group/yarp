@@ -241,32 +241,32 @@ class CrestConfCalculator(ConfTask):
         cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"
 
         # molecular descriptors
-        cmd += f" -chrg {self.config.charge} -uhf {self.config.multiplicity}"
+        cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!
         # You can damp down via adjusting the energy window threshold, but that's it
-        cmd += f" - ewin {self.config.energy_window}"
+        # cmd += f" -ewin {self.config.energy_window}"
 
         # implicit solvation models
-        alpb_solv = set(
+        alpb_solv = set([
             'acetone', 'acetonitrile', 'aniline', 'benzaldehyde', 'benzene',
             'ch2cl2', 'chcl3', 'cs2', 'dioxane', 'dmf', 'dmso', 'ether',
             'ethylacetate', 'furane', 'hexandecane', 'hexane', 'methanol',
             'nitromethane', 'octanol', 'woctanol', 'phenol', 'toluene',
             'thf', 'water'
-        )
-        gbsa_solv = set(
+        ])
+        gbsa_solv = set([
             'acetone', 'acetonitrile', 'aniline', 'benzaldehyde',
             'CH2Cl2', 'CHCl3', 'CS2', 'DMSO', 'ether', 'H2O', 'methanol',
             'THF', 'toluene'
-        )
+        ])
         if self.config.solvent is not None:
-            model = self.config.solvent.get('model', None)
-            solv = self.config.solvent.get('solvent', None)
-            if model == 'alpb' and solv in alpb_solv:
+            model = self.config.solvent.get('model', '')
+            solv = self.config.solvent.get('solvent', '')
+            if model == 'alpb' and solv.lower() in alpb_solv:
                 cmd += f" --{model} {solv}"
-            elif model == 'gbsa' and solv in gbsa_solv:
+            elif model == 'gbsa' and solv.lower() in gbsa_solv:
                 cmd += f" --{model} {solv}"
 
         return cmd

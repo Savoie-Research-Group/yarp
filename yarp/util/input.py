@@ -51,7 +51,7 @@ class ConformerConfig:
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
     charge: int = 0
-    multiplicity: int = 1
+    n_unpaired_electrons: int = 0
 
 @dataclass
 class GSMConfig:

@@ -49,7 +49,7 @@ class ConformerConfig:
     n_cpus: int = 4
     mem_per_cpu: int = 1000
     energy_window: float = 6.0
-    solvent: Dict[str, str] = field(default_factory=dict)
+    solvent: Optional[Dict[str, str]] = None
     charge: int = 0
     multiplicity: int = 1
 

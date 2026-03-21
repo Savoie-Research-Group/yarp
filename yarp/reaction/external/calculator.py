@@ -1,6 +1,7 @@
 """
 Definition of the YARP Calculator base classes and software-specific implementations.
 """
+import os
 import shutil
 from pathlib import Path
 
@@ -28,7 +29,7 @@ class AsyncYarpCalculator:
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_container_prefix(self, image_name: str) -> str:
+    def get_container_prefix(self, image_name: str, work_dir: str) -> str:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
@@ -37,14 +38,14 @@ class AsyncYarpCalculator:
             # --rm removes the container after it finishes
             # -v mounts the host scratch dir to /work
             # -u $(id -u):$(id -g) ensures files aren't created as root (optional but good practice)
-            return f"docker run --rm -v {self.scratch_dir}:/work {image_name}"
+            return f"docker run --rm -v {work_dir}:/work {image_name}"
             
         elif self.container_runner == "apptainer":
             # Apptainer automatically mounts the current working directory, 
             # but explicit binding is safer.
             # Assuming the user has downloaded the .sif file to a known location, or pulls it.
             # E.g., docker://ghcr.io/username/yarp_crest:latest
-            return f"apptainer exec --bind {self.scratch_dir}:/work {image_name}.sif"
+            return f"apptainer exec --bind {work_dir}:/work {image_name}.sif"
             
         else:
             raise ValueError(f"Unsupported container runner: {self.container_runner}")
@@ -180,7 +181,7 @@ class CrestConfCalculator(ConfTask):
         script_path = self.scratch_dir / "run_crest_cmd.sh"
 
         # Construct the core command
-        prefix = self.get_container_prefix(self.image_name)
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
         crest_cmd = self._get_crest_command()
         full_command = f"{prefix} {crest_cmd}"
 
@@ -312,9 +313,11 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         # Write inputs for each pair
         for i, pair in enumerate(self.pairs_to_run):
             idx = i + 1
-            r_xyz_path = self.scratch_dir / f"gsm_run{idx}" / f"reactant_{idx}.xyz"
-            p_xyz_path = self.scratch_dir / f"gsm_run{idx}" / f"product_{idx}.xyz"
-            inp_path = self.scratch_dir / f"gsm_run{idx}" / f"gsm_{idx}_input.yaml"
+            pair_dir = self.scratch_dir / f"gsm_run{idx}"
+            os.makedirs(pair_dir, exist_ok=True)
+            r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
+            p_xyz_path = pair_dir / f"product_{idx}.xyz"
+            inp_path = pair_dir / f"gsm_{idx}_input.yaml"
             
             # Write XYZs
             with open(r_xyz_path, "w") as f:
@@ -323,27 +326,51 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 f.write(pair["p_conf"].to_xyz_string())
             
             # Write a Pysisyphus input file for GSM
-            self._write_pysis_gsm_input(inp_path, r_xyz_path, p_xyz_path)
+            self._write_pysis_gsm_input(inp_path, f"reactant_{idx}.xyz", f"product_{idx}.xyz")
 
-    def write_submission_script(self) -> Path:
-        """Writes a bash script that executes all N pairs sequentially."""
-        script_path = self.scratch_dir / "submit.sh"
-        prefix = self.get_container_prefix(self.image_name)
+    def write_submission_script(self):
+        """
+        Creates a sequential runner script for inside the container, 
+        and a host submission script to launch the container.
+        """
+        # ---------------------------------------------------------
+        # 1. The INNER Script (Runs inside the Docker container)
+        # ---------------------------------------------------------
+        inner_script_path = self.scratch_dir / "run_pysis_inner.sh"
         
-        with open(script_path, "w") as f:
-            f.write("#!/bin/bash\n")
-            f.write(f"cd {self.scratch_dir}\n\n")
+        with open(inner_script_path, "w") as f:
+            f.write("#!/bin/bash\n\n")
+            f.write("echo 'Starting YARP serial GSM execution...'\n\n")
             
-            # Loop over however many pairs were actually generated
-            for i in range(len(self.pairs_to_run)):
-                idx = i + 1
-                f.write(f"cd {self.scratch_dir}/gsm_run{idx}")
-                cmd = f"pysis gsm_{idx}_input.yaml"
-                f.write(f"echo 'Running GSM for Pair {idx}...'\n")
-                f.write(f"{prefix} {cmd} > gsm_{idx}.log 2> {cmd} > gsm_{idx}.err\n")
+            for i in range(1, len(self.pairs_to_run) + 1):
+                f.write(f"echo '--- Running GSM pair {i} ---'\n")
+                # The container mounts self.scratch_dir to /work
+                f.write(f"cd /work/gsm_run{i}\n") 
                 
-        script_path.chmod(0x755)
-        return script_path
+                # Execute pysis within the specific folder, saving logs locally
+                f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
+                f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
+                
+        # Make executable
+        inner_script_path.chmod(0o755)
+
+        # ---------------------------------------------------------
+        # 2. The OUTER Script (Runs on the Host / Job Manager)
+        # ---------------------------------------------------------
+        submit_script_path = self.scratch_dir / "submit_gsm.sh"
+        
+        # Pulls the docker prefix (e.g., 'docker run --rm -v /scratch:/work -u UID:GID yarp_pysisyphus')
+        docker_cmd_prefix = self.get_container_prefix("yarp_pysisyphus", str(self.scratch_dir))
+        
+        with open(submit_script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            # Launch the container and tell it to run the inner script
+            f.write(f"{docker_cmd_prefix} bash /work/run_pysis_inner.sh\n")
+            
+        submit_script_path.chmod(0o755)
+        
+        # Return the outer script for the Job Manager to execute
+        return str(submit_script_path)
 
     def check_output(self) -> bool:
         """
@@ -356,24 +383,79 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         # return False
         pass
 
-    def scrape_data(self):
-        """Scrape all successful TS guesses into the reaction object."""
-        pass
-        # self.rxn.ts_geom = {} # Ensure dict exists
+    def scrape_data(self) -> bool:
+        """
+        Validates the Pysisyphus GSM run and extracts the geometries into 
+        the reaction object. Returns True if ALL runs were successful.
+        """
+        all_successful = True
         
-        # for i, pair in enumerate(self.pairs_to_run):
-        #     idx = i + 1
-        #     ts_file = self.scratch_dir / f"ts_guess_{idx}.xyz"
+        # Assuming self.num_runs was set during generate_input()
+        for i in range(1, len(self.pairs_to_run) + 1):
+            run_dir = self.scratch_dir / f"gsm_run{i}"
+            log_file = run_dir / f"gsm_{i}.log"
+            trj_file = run_dir / "final_geometries.trj"
+            xyz_file = run_dir / "splined_hei.xyz"
+
+            # 1. File existence check
+            if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
+                print(f"   * Run {i} failed: Missing expected output files.")
+                all_successful = False
+                continue
+
+            # 2. Log file termination check
+            with open(log_file, "r") as f:
+                log_text = f.read()
+
+            if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
+                print(f"   * Run {i} failed: Did not find successful termination message in log.")
+                all_successful = False
+                continue
+
+            # --- If we made it here, the run for this conformer pair was a success! ---
             
-        #     if ts_file.exists():
-        #         # Parse the XYZ and create a conformer object
-        #         # ts_calc_data = parse_xyz(ts_file) 
-        #         # ts_conf = conformer(calc_type='conf_gen', calc_data=ts_calc_data)
+            # 3. Parse and store the splined TS guess
+            ts_elements, ts_geo = xyz_parse(xyz_file, multiple=False)
+            
+            ts_conf = conformer()
+            ts_conf.elements = ts_elements
+            ts_conf.geo = ts_geo
+            ts_conf.lot = self.config.gsm_lot
+            ts_conf.software = self.config.software
+            ts_conf.type = f"ts_guess_{i}_{ts_conf.lot}_{ts_conf.software}"
+            
+            # Store in the reaction object's TS dictionary
+            self.rxn.ts_geom[ts_conf.type] = ts_conf
+
+            # 4. Parse the final geometries trajectory for Reactant/Product pairs
+            trj_elements, trj_geo = xyz_parse(trj_file, multiple=True)
+            
+            if len(trj_elements) >= 2:
+                # Store Reactant guess (first frame)
+                r_conf = conformer()
+                r_conf.elements = trj_elements[0]
+                r_conf.geo = trj_geo[0]
+                r_conf.lot = self.config.gsm_lot
+                r_conf.software = self.config.software
+                r_conf.type = f"guess_conf_{i}_{r_conf.lot}_{r_conf.software}"
                 
-        #         # Save it with a unique key
-        #         key = f"tsguess_pysis_{idx}"
-        #         # self.rxn.ts_geom[key] = ts_conf
-        #         print(f"[{self.rxn.hash}] Scraped TS guess from pair {idx} into '{key}'.")
+                # Assuming you have a place to put this in your state object
+                self.rxn.reactant.conformers[r_conf.type] = r_conf
+                
+                # Store Product guess (last frame)
+                p_conf = conformer()
+                p_conf.elements = trj_elements[-1]
+                p_conf.geo = trj_geo[-1]
+                p_conf.lot = self.config.gsm_lot
+                p_conf.software = self.config.software
+                p_conf.type = f"guess_conf_{i}_{p_conf.lot}_{p_conf.software}"
+                
+                self.rxn.product.conformers[p_conf.type] = p_conf
+
+        print(f'Reaction TS guess keys:\n {self.rxn.ts_geom.keys()}')
+        print(f'Reactant state conformer keys:\n {self.rxn.reactant.conformers.keys()}')
+        print(f'Product state conformer keys:\n {self.rxn.product.conformers.keys()}')
+        return all_successful
 
     def cleanup(self):
         """Clean up but keep logs and final TS xyz files."""

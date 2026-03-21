@@ -58,8 +58,8 @@ def align_conformers(r_conf, p_conf):
     Uses ASE to minimize rotation and translation (RMSD) between product and reactant.
     Returns a NEW product conformer that is aligned to the reactant.
     """
-    r_atoms = Atoms(symbols=r_conf.elements, positions=r_conf.geo)
-    p_atoms = Atoms(symbols=p_conf.elements, positions=p_conf.geo)
+    r_atoms = Atoms(symbols=[el.upper() for el in r_conf.elements], positions=r_conf.geo)
+    p_atoms = Atoms(symbols=[el.upper() for el in r_conf.elements], positions=p_conf.geo)
     
     # ASE modifies the moving atoms (p_atoms) in-place to align with the target (r_atoms)
     minimize_rotation_and_translation(r_atoms, p_atoms)

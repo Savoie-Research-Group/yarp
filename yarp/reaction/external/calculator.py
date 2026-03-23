@@ -7,7 +7,7 @@ from pathlib import Path
 
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
-from yarp.reaction.conf_bias_select import select_gsm_pairs
+from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
 
 # from yarp.reaction.external.crest import CrestConfCalculator
 

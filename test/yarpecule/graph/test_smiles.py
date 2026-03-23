@@ -408,3 +408,11 @@ class TestSmi2Adj:
         assert adjmat.shape == (10, 10)
         assert bemat.shape == (10, 10)
         # To-do: add explicit adjmat element checks
+
+    def test_aromatic_lactam(self):
+        adjmat, bemat, atom_info = smiles2adjmat("Oc1ncc(c(=O)[nH]1)C")
+
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
+        assert elements == ['O', 'C', 'N', 'C', 'C', 'C', 'O', 'N', 'C', 'H', 'H', 'H', 'H', 'H', 'H']
+        assert adjmat.shape == (15, 15)
+        assert bemat.shape == (15, 15)

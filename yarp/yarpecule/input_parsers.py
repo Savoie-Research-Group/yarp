@@ -7,6 +7,7 @@ from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs,
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
 
+
 def xyz_parse(xyz, read_types=False, multiple=False):
     """
     Simple wrapper function for grabbing the coordinates and elements from an xyz file.
@@ -292,6 +293,13 @@ def xyz_from_smiles(smiles, mode="yarp"):
             e) if not el_expand_octet[elements[count]] and _-e_exp[count] > 0]
         # Raise error if octet violations exist
         if violations:
+            if any(atom_info[i]["aromatic_input"] for i in atom_info):
+                print(
+                    "WARNING: yarp aromatic SMILES geometry fallback used RDKit "
+                    f"for {smiles} after octet validation failed at atoms {violations}."
+                )
+                geo = geo_via_rdkit(smiles, atom_info)
+                return elements, geo, adj_mat, q, atom_info
             raise OctetError(violations)
 
         # Throwaway molecule
@@ -374,3 +382,47 @@ def xyz_from_smiles(smiles, mode="yarp"):
             adj_mat[i[1], i[0]] = 1
 
     return elements, geo, adj_mat, q, atom_info
+
+def geo_via_rdkit(smiles, atom_info):
+    """
+    Generate a geometry with RDKit and align it to the atom ordering used by
+    the in-house SMILES parser.
+
+    This is used as a fallback for aromatic systems where the in-house parser
+    identifies the correct graph but its bond-electron matrix is too crude to
+    survive octet validation.
+    """
+    m = MolFromSmiles(smiles)
+    if m is None:
+        raise ValueError(f"RDKit could not parse SMILES: {smiles}")
+    m = AddHs(m)
+    AllChem.EmbedMolecule(m, randomSeed=0xf00d)
+
+    rdkit_elements = [atom.GetSymbol().lower() for atom in m.GetAtoms()]
+    yarp_elements = [atom_info[i]["element"] for i in atom_info]
+
+    yarp_maps = [atom_info[i].get("atom_map", None) for i in atom_info]
+    rdkit_maps = []
+    for atom in m.GetAtoms():
+        if atom.HasProp("molAtomMapNumber"):
+            rdkit_maps.append(int(atom.GetProp("molAtomMapNumber")))
+        else:
+            rdkit_maps.append(None)
+
+    if all(_ is not None for _ in yarp_maps):
+        rdkit_by_map = {atom_map: idx for idx, atom_map in enumerate(rdkit_maps) if atom_map is not None}
+        missing = [atom_map for atom_map in yarp_maps if atom_map not in rdkit_by_map]
+        if missing:
+            raise ValueError(f"RDKit fallback could not align mapped atoms: missing maps {missing}")
+        order = [rdkit_by_map[atom_map] for atom_map in yarp_maps]
+    elif yarp_elements == rdkit_elements:
+        order = list(range(len(yarp_elements)))
+    else:
+        raise ValueError("RDKit fallback atom order did not match the in-house parser ordering.")
+
+    geo = np.zeros((len(order), 3))
+    for i, rdkit_idx in enumerate(order):
+        coord = m.GetConformer().GetAtomPosition(rdkit_idx)
+        geo[i] = np.array([coord.x, coord.y, coord.z])
+
+    return geo

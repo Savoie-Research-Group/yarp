@@ -321,10 +321,11 @@ def smiles2adjmat(smiles, verbose=False):
 
             for component in fused_components:
                 component = sorted(component)
+                component_set = set(component)
                 component_edges = []
                 for count_i, i in enumerate(component):
                     for j in component[count_i + 1:]:
-                        if adjmat[i, j] == 1:
+                        if adjmat[i, j] == 1 and can_promote_aromatic_edge(i, j, component_set, adjmat):
                             component_edges.append((i, j))
 
                 target_size = len(component) // 2
@@ -398,6 +399,21 @@ def choose_aromatic_matching(component_edges, target_size):
             stack.append((edge_index + 1, next_used, next_edges))
 
     return None, best_partial
+
+
+def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
+    """
+    Guard aromatic promotion against ring atoms that already carry an exocyclic
+    multiple bond outside the aromatic component.
+
+    This prevents cases like `Oc1ncc(c(=O)[nH]1)C` from promoting an additional
+    double bond onto the carbonyl-bearing ring carbon.
+    """
+    for atom in (i, j):
+        for neighbor, bond_order in enumerate(adjmat[atom]):
+            if neighbor not in component_atoms and bond_order > 1:
+                return False
+    return True
 
 
 def add_hydrogens(adjmat, atom_info, atom_parse_meta):

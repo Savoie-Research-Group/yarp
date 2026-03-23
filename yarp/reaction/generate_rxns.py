@@ -37,7 +37,6 @@ def generate_rxns(inp):
     if inp.enum.enumerate:
 
         print("Product enumeration routine selected")
-        output_rxns = None
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
             print(" - Processing starting node(s) as YARP generated pickle file")
 
@@ -91,7 +90,17 @@ def generate_rxns(inp):
                 output[r2p.hash] = r2p
 
     else:
-        raise RuntimeError("Non-enumeration routines are not yet implemented!")
+        print("Loading reactions")
+        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+            print(" - Processing starting node(s) as YARP generated pickle file")
+
+            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
+            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+
+            output = og_rxns
+        else:
+            raise RuntimeError("We can only start from a YARP pickle file currently, sorry friend!")
 
     return output
 

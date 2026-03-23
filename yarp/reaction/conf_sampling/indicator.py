@@ -2,28 +2,36 @@ import numpy as np
 import pandas as pd
 
 from yarp.yarpecule.graph.adjacency import table_generator
+from ase import Atoms
 from ase.build import minimize_rotation_and_translation
-import io
-import os
-from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.util.write_files import xyz_write
 
-def return_indicator(E,RG,PG,namespace='node'):
-    '''
-    Function to find indicators for reactant-product alignments
-    Input:
-          E:   elements
-          RG:  reactant geometry
-          PG:  product  geometry
-    Output:
-          RMSD: mass-weighted RMSD between reactant and product, threshold < 1.6
-          max_dis:  maximum bond length change between non-H atoms, threshold < 4.0
-          min_cross_dis: shorted distance between atoms' path (non-H atoms) to original bonds, threshold > 0.6
-          path_cross: if all atoms involved in bond changes are non-H, path_cross refers to the distance between two bond changes, threshold > 0.6
-          max_Hdis: maximum bond length change if contains H, threshold < 4.5 (* optional)
-          min_Hcross_dis: shorted distance between atoms' path (H atoms involves) to original bonds, threshold > 0.4 (* optional)
-          h = RMSD/1.6 + max_dis/4.0 + 0.6/min_cross_dis + 0.6/path_cross + 0.5 * max_Hdis/4.5 + 0.1/min_cross_dis
-    '''
+def return_indicator(E, RG, PG):
+    """
+    Computes a set of six physically-motivated geometric indicators that describe 
+    the transformation between a reactant and product conformation pair. These features 
+    are used downstream by an ML classifier to predict whether the conformer pair 
+    will lead to a successful transition state search.
+
+    Parameters:
+    -----------
+    E : list of str
+        List of atomic elements.
+    RG : numpy.ndarray
+        Cartesian coordinates of the reactant geometry (N_atoms, 3).
+    PG : numpy.ndarray
+        Cartesian coordinates of the product geometry (N_atoms, 3).
+
+    Returns:
+    --------
+    pandas.DataFrame
+        A 1-row DataFrame containing the 6 computed features:
+        - RMSD: Mass-weighted root mean square displacement between the aligned geometries.
+        - max_dis: Maximum spatial separation of heavy-atom bonds undergoing breakage/formation.
+        - max_Hdis: Maximum spatial separation of hydrogen-involved bonds undergoing breakage/formation.
+        - min_cross_dis: Minimum distance between segments of heavy-atom bond changes and persistent bonds.
+        - min_Hcross_dis: Minimum distance between segments of hydrogen bond changes and persistent bonds.
+        - path_cross: Minimum distance between segments of multiple bond changes (computed if purely heavy atoms).
+    """
 
     # calculate adj_mat
     Radj = table_generator(E, RG)
@@ -36,6 +44,7 @@ def return_indicator(E,RG,PG,namespace='node'):
         for j in range(i+1, len(E)):
             if del_adj[i][j]==-1: bond_break+=[(i, j)]
             if del_adj[i][j]==1: bond_form+=[(i, j)]
+
     # identify hydrogen atoms, atoms involved in the reactions
     H_index=[i for i, e in enumerate(E) if e=='H']
     involve=list(set(list(sum(bond_break+bond_form, ()))))
@@ -57,7 +66,7 @@ def return_indicator(E,RG,PG,namespace='node'):
                 if Radj[i][j]>0 and i not in bond and j not in bond: bond_dict[bond]+=[(i, j)]
 
     # Compute indicator
-    rmsd = return_RMSD(E,RG,PG,rotate=False,mass_weighted=True,namespace=namespace)
+    rmsd = return_RMSD(E, RG, PG, rotate=False, mass_weighted=True)
     Hbond_dis = np.array([i[1] for bond,i in bond_seg.items() if (bond[0] in H_index or bond[1] in H_index)])
     bond_dis  = np.array([i[1] for bond,i in bond_seg.items() if (bond[0] not in H_index and bond[1] not in H_index)])
     if len(Hbond_dis)>0: 
@@ -232,8 +241,11 @@ def closestDistanceBetweenLines(a0,a1,b0,b1,clampAll=True,clampA0=False,clampA1=
     return pA,pB,np.linalg.norm(pA-pB)
 
 
-def return_RMSD(E,G1,G2,rotate=True,mass_weighted=False,namespace='node'):
-    ''' Calcualte RMSD (Root-mean-square-displacement)'''
+def return_RMSD(E, G1, G2, rotate=True, mass_weighted=False):
+    """
+    Calculates the Root-Mean-Square-Displacement (RMSD) between two geometries.
+    Utilizes ASE Atoms to perform optimal rotation/translation alignment entirely in-memory.
+    """
     # Initialize mass_dict (used for identifying the dihedral among a coincident set that will be explicitly scanned)
     mass_dict = {'H':1.00794,'He':4.002602,'Li':6.941,'Be':9.012182,'B':10.811,'C':12.011,'N':14.00674,'O':15.9994,'F':18.9984032,'Ne':20.1797,\
                  'Na':22.989768,'Mg':24.3050,'Al':26.981539,'Si':28.0855,'P':30.973762,'S':32.066,'Cl':35.4527,'Ar':39.948,\
@@ -245,35 +257,22 @@ def return_RMSD(E,G1,G2,rotate=True,mass_weighted=False,namespace='node'):
                  'Tl':204.3833,'Pb':207.2,'Bi':208.98038,'Po':209.0,'At':210.0,'Rn':222.0}
 
     if rotate:
+        node1 = Atoms(symbols=[el.upper() for el in E], positions=G1)
+        node2 = Atoms(symbols=[el.upper() for el in E], positions=G2)
+        minimize_rotation_and_translation(node1, node2)
+        # Update G2 with the translated/rotated coordinates
+        G2 = node2.positions
 
-        # write two xyz file
-        xyz_write('{}1.xyz'.format(namespace),E,G1)
-        xyz_write('{}2.xyz'.format(namespace),E,G2)
-        node1 = io.read('{}1.xyz'.format(namespace))
-        node2 = io.read('{}2.xyz'.format(namespace))
-        minimize_rotation_and_translation(node1,node2)
-        io.write('{}2.xyz'.format(namespace),node2)
-
-        # reload node 2 geometry and compute RMSD
-        _,G2  = xyz_parse('{}2.xyz'.format(namespace))
-
-        try:
-            os.remove('{}1.xyz'.format(namespace))
-            os.remove('{}2.xyz'.format(namespace))
-        except:
-            pass
-    # compute RMSD
+    # Compute RMSD
     DG = G1 - G2
     RMSD = 0
     if mass_weighted:
+        total_mass = sum([mass_dict[Ei] for Ei in E])
         for i in range(len(E)):
-            RMSD += sum(DG[i]**2)*mass_dict[E[i]]
-
-        return np.sqrt(RMSD / sum([mass_dict[Ei] for Ei in E]))
-
+            RMSD += sum(DG[i]**2) * mass_dict[E[i]]
+        return np.sqrt(RMSD / total_mass)
     else:
         for i in range(len(E)):
             RMSD += sum(DG[i]**2)
-
         return np.sqrt(RMSD / len(E))
 

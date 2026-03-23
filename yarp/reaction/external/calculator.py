@@ -375,23 +375,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     def check_output(self) -> bool:
         """
         Returns True if AT LEAST ONE of the N pairs generated a TS guess.
-        We don't want to fail the whole reaction just because 1 out of 3 strings broke.
         """
-        # for i in range(len(self.pairs_to_run)):
-        #     if (self.scratch_dir / f"ts_guess_{i+1}.xyz").exists():
-        #         return True
-        # return False
-        pass
+        num_runs = self._get_num_runs()
+        if num_runs == 0:
+            return False # No runs found at all!
 
-    def scrape_data(self) -> bool:
-        """
-        Validates the Pysisyphus GSM run and extracts the geometries into 
-        the reaction object. Returns True if ALL runs were successful.
-        """
-        all_successful = True
+        one_successful = False
         
-        # Assuming self.num_runs was set during generate_input()
-        for i in range(1, len(self.pairs_to_run) + 1):
+        for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"gsm_run{i}"
             log_file = run_dir / f"gsm_{i}.log"
             trj_file = run_dir / "final_geometries.trj"
@@ -400,7 +391,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             # 1. File existence check
             if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
                 print(f"   * Run {i} failed: Missing expected output files.")
-                all_successful = False
                 continue
 
             # 2. Log file termination check
@@ -409,12 +399,36 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
 
             if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
                 print(f"   * Run {i} failed: Did not find successful termination message in log.")
-                all_successful = False
                 continue
 
-            # --- If we made it here, the run for this conformer pair was a success! ---
-            
-            # 3. Parse and store the splined TS guess
+            # If it passes all checks, at least one run succeeded!
+            one_successful = True
+        
+        # We only care if at least one succeeded
+        return one_successful
+
+    def scrape_data(self) -> bool:
+        """
+        Validates the Pysisyphus GSM run and extracts the geometries into 
+        the reaction object. 
+        """
+        num_runs = self._get_num_runs()
+        
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"gsm_run{i}"
+            log_file = run_dir / f"gsm_{i}.log"
+            trj_file = run_dir / "final_geometries.trj"
+            xyz_file = run_dir / "splined_hei.xyz"
+
+            # --- SAFEGUARD: Skip failed runs during partial success ---
+            if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
+                continue
+            with open(log_file, "r") as f:
+                if "Wrote splined HEI" not in f.read():
+                    continue
+            # ---------------------------------------------------------
+
+            # Parse and store the splined TS guess
             ts_elements, ts_geo = xyz_parse(xyz_file, multiple=False)
             
             ts_conf = conformer()
@@ -427,7 +441,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             # Store in the reaction object's TS dictionary
             self.rxn.ts_geom[ts_conf.type] = ts_conf
 
-            # 4. Parse the final geometries trajectory for Reactant/Product pairs
+            # Parse the final geometries trajectory for Reactant/Product pairs
             trj_elements, trj_geo = xyz_parse(trj_file, multiple=True)
             
             if len(trj_elements) >= 2:
@@ -439,7 +453,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 r_conf.software = self.config.software
                 r_conf.type = f"guess_conf_{i}_{r_conf.lot}_{r_conf.software}"
                 
-                # Assuming you have a place to put this in your state object
                 self.rxn.reactant.conformers[r_conf.type] = r_conf
                 
                 # Store Product guess (last frame)
@@ -452,10 +465,11 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 
                 self.rxn.product.conformers[p_conf.type] = p_conf
 
-        print(f'Reaction TS guess keys:\n {self.rxn.ts_geom.keys()}')
-        print(f'Reactant state conformer keys:\n {self.rxn.reactant.conformers.keys()}')
-        print(f'Product state conformer keys:\n {self.rxn.product.conformers.keys()}')
-        return all_successful
+        print(f'Reaction TS guess keys:\n {list(self.rxn.ts_geom.keys())}')
+        print(f'Reactant state conformer keys:\n {list(self.rxn.reactant.conformers.keys())}')
+        print(f'Product state conformer keys:\n {list(self.rxn.product.conformers.keys())}')
+        
+        return True
 
     def cleanup(self):
         """Clean up but keep logs and final TS xyz files."""
@@ -487,6 +501,15 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
 
             # set opt block
             f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
+
+    def _get_num_runs(self) -> int:
+            """
+            Dynamically counts the number of gsm_run subdirectories.
+            Crucial for stateless execution where self.pairs_to_run is lost between runs.
+            """
+            # Finds all directories matching 'gsm_run*' in the scratch folder
+            run_dirs = list(self.scratch_dir.glob("gsm_run*"))
+            return len(run_dirs)
 
 # --- TASK 4/5: OPTIMIZATIONS (ORCA Example) ---
 class OrcaOptCalculator(MinOptTask):

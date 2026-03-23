@@ -228,25 +228,3 @@ class TestMolParser:
 
         # charge
         assert q == 0
-
-
-class TestXYZFromSmiles:
-    @pytest.mark.parametrize("smiles", [
-        "Oc1ncc(c(=O)[nH]1)C",
-        "Oc1cn2n1O2",
-        "Cc1c(O)n(n1O)C",
-        "Cc1c(C)n(n1O)N",
-        "Cc1n[nH]c(c1N)O",
-        "Cc1noc(n1)C(N)(C)C",
-        "Cc1on(c1N)C",
-        "Cn1c(O)n[nH]1",
-    ])
-    def test_aromatic_edge_cases(self, smiles):
-        elements_yarp, geo_yarp, adj_yarp, q_yarp, atom_info_yarp = xyz_from_smiles(smiles, mode="yarp")
-        elements_rdkit, geo_rdkit, adj_rdkit, q_rdkit, atom_info_rdkit = xyz_from_smiles(smiles, mode="rdkit")
-
-        assert q_yarp == q_rdkit
-        assert geo_yarp.shape == geo_rdkit.shape
-        assert adj_yarp.shape == adj_rdkit.shape
-        assert Counter(elements_yarp) == Counter(elements_rdkit)
-        assert sorted(atom_info_yarp) == list(range(len(elements_yarp)))

@@ -118,14 +118,35 @@ class TSGuessTask(AsyncYarpCalculator):
 
 class MinOptTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
-        # Needs at least an initial unoptimized geometry
-        return True 
+        r_node = self.rxn.reactant
+        p_node = self.rxn.product
+        if not r_node.conformers or not p_node.conformers:
+            return False
+
+        r_keys = r_node.conformers.keys()
+        r_match = False
+        for rk in r_keys:
+            if r_node.conformers[rk].geo is not None: 
+                r_match = True
+
+        p_keys = p_node.conformers.keys()
+        p_match = False
+        for pk in p_keys:
+            if p_node.conformers[pk].geo is not None:
+                p_match = True
+
+        return r_match and p_match 
 
 class TSOptTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
-        if not getattr(self.rxn, 'ts_geom', None):
-            return False
-        return True
+
+        ts_keys = self.rxn.ts_geom.keys()
+        ts_match = False
+        for k in ts_keys:
+            if 'ts_guess' in k and self.rxn.ts_geom[k].geo is not None: 
+                ts_match = True
+        
+        return ts_match
 
 class IRCValTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:

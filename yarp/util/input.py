@@ -73,18 +73,27 @@ class RPOptConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    do_hess: bool = False
+    hessian_recalc: int = 3
+    max_cycles: int = 300
 
 @dataclass
 class TSOptConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    do_hess: bool = False
+    hessian_recalc: int = 3
+    max_cycles: int = 300
+    conv_thresh: str = 'gau'
 
 @dataclass
 class IRCValConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    max_cycles: int = 300
+    conv_thresh: str = 'gau'
 
 @dataclass
 class TaskDef:
@@ -289,19 +298,19 @@ class InputParser:
                 parent_stage=name, 
                 depends_on=[r_conf_id, p_conf_id],
                 config=gsm_cfg,
-                requires_data=["reactant_conf", "product_conf"],
+                requires_data=["reactant_conf", "product_conf"], # Needs 2 starting nodes to run!
                 provides_data=["ts_guess"]
             )
 
         elif method == 'refine_rxn_path':
             rp_data = data.get('rp_opt', {})
-            rp_cfg = RPOptConfig(software=rp_data.get('software', 'pysisyphus'), lot=rp_data.get('lot', 'xtb'), n_cpus=rp_data.get('n_cpus', 1))
+            rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
 
             ts_data = data.get('ts_opt', {})
-            ts_cfg = TSOptConfig(software=ts_data.get('software', 'pysisyphus'), lot=ts_data.get('lot', 'xtb'), n_cpus=ts_data.get('n_cpus', 1))
+            ts_cfg = TSOptConfig(**{k: v for k, v in ts_data.items() if k in TSOptConfig.__dataclass_fields__})
 
             irc_data = data.get('irc_val', {})
-            irc_cfg = IRCValConfig(software=irc_data.get('software', 'pysisyphus'), lot=irc_data.get('lot', 'xtb'), n_cpus=irc_data.get('n_cpus', 1))
+            irc_cfg = IRCValConfig(**{k: v for k, v in irc_data.items() if k in IRCValConfig.__dataclass_fields__})
 
             # Define Unique Task IDs
             r_opt_id = f"{name}.reactant_optimization"
@@ -314,7 +323,7 @@ class InputParser:
                 task_id=r_opt_id,
                 task_type="reactant_optimization",
                 parent_stage=name,
-                depends_on=[],
+                depends_on=[], # Might be populated dynamically in __init__
                 config=rp_cfg,
                 requires_data=["reactant_conf"], # Needs a guess to run!
             )
@@ -323,7 +332,7 @@ class InputParser:
                 task_id=p_opt_id,
                 task_type="product_optimization",
                 parent_stage=name,
-                depends_on=[],
+                depends_on=[], # Might be populated dynamically in __init__
                 config=rp_cfg,
                 requires_data=["product_conf"], # Needs a guess to run!
             )
@@ -331,7 +340,7 @@ class InputParser:
             config.tasks[ts_opt_id] = TaskDef(
                 task_id=ts_opt_id, 
                 task_type="transition_state_optimization", 
-                parent_stage=name, 
+                parent_stage=name,
                 depends_on=[], # Might be populated dynamically in __init__
                 config=ts_cfg,
                 requires_data=["ts_guess"], # Needs a guess to run!
@@ -342,7 +351,7 @@ class InputParser:
                 task_id=irc_id, 
                 task_type="irc_validation", 
                 parent_stage=name, 
-                depends_on=[ts_opt_id], 
+                depends_on=[ts_opt_id],
                 config=irc_cfg,
                 requires_data=["ts_opt"] # Needs an optimized TS to run!
             )

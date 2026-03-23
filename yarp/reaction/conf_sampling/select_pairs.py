@@ -4,6 +4,7 @@ Logic for joint optimization, ASE alignment, and ML-based conformer selection.
 import copy
 import numpy as np
 import pickle
+from pathlib import Path
 
 from ase import Atoms
 from ase.build import minimize_rotation_and_translation
@@ -33,10 +34,14 @@ def select_gsm_pairs(rxn, config):
     n_conf = config.n_conf
     total_conf = len(r_confs) + len(p_confs)
 
+    module_dir = Path(__file__).parent.resolve()
     if n_conf / total_conf > 3.0:
-        model = pickle.load(open('rich_model.sav', 'rb'))
+        model_path = module_dir / 'rich_model.sav'
     else:
-        model = pickle.load(open('poor_model.sav', 'rb'))
+        model_path = module_dir / 'poor_model.sav'
+
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
 
     approved_pairs = []
     approved_indicators = []
@@ -53,7 +58,7 @@ def select_gsm_pairs(rxn, config):
             prob_aligned = model.predict_proba(ind_aligned)
             
             # 3. The Tournament (keep the higher probability setup)
-            if prob_aligned > prob_unaligned:
+            if prob_aligned[0][1] > prob_unaligned[0][1]:
                 best_p = aligned_p_c
                 best_ind = ind_aligned
                 best_prob = prob_aligned
@@ -63,12 +68,12 @@ def select_gsm_pairs(rxn, config):
                 best_prob = prob_unaligned
             
             # 4. Quality Control & Deduplication
-            if best_prob > 0.0 and check_uniqueness(best_ind, approved_indicators):
+            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
                 approved_indicators.append(best_ind)
                 approved_pairs.append({
                     "r_conf": r_c,
                     "p_conf": best_p,
-                    "score": best_prob
+                    "score": best_prob[0][1]
                 })
 
     # --- STEP C: Sort and Select Top N ---

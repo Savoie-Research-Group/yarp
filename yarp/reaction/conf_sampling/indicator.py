@@ -256,9 +256,10 @@ def return_RMSD(E, G1, G2, rotate=True, mass_weighted=False):
                  'Cs':132.90545,'Ba':137.327,'La':138.9055,'Hf':178.49,'Ta':180.9479,'W':183.84,'Re':186.207,'Os':190.23,'Ir':192.217,'Pt':195.078,'Au':196.96655,'Hg':200.59,\
                  'Tl':204.3833,'Pb':207.2,'Bi':208.98038,'Po':209.0,'At':210.0,'Rn':222.0}
 
+    clean_E = [el.upper() for el in E]
     if rotate:
-        node1 = Atoms(symbols=[el.upper() for el in E], positions=G1)
-        node2 = Atoms(symbols=[el.upper() for el in E], positions=G2)
+        node1 = Atoms(symbols=clean_E, positions=G1)
+        node2 = Atoms(symbols=clean_E, positions=G2)
         minimize_rotation_and_translation(node1, node2)
         # Update G2 with the translated/rotated coordinates
         G2 = node2.positions
@@ -267,12 +268,12 @@ def return_RMSD(E, G1, G2, rotate=True, mass_weighted=False):
     DG = G1 - G2
     RMSD = 0
     if mass_weighted:
-        total_mass = sum([mass_dict[Ei] for Ei in E])
-        for i in range(len(E)):
-            RMSD += sum(DG[i]**2) * mass_dict[E[i]]
+        total_mass = sum([mass_dict[Ei] for Ei in clean_E])
+        for i in range(len(clean_E)):
+            RMSD += sum(DG[i]**2) * mass_dict[clean_E[i]]
         return np.sqrt(RMSD / total_mass)
     else:
-        for i in range(len(E)):
+        for i in range(len(clean_E)):
             RMSD += sum(DG[i]**2)
-        return np.sqrt(RMSD / len(E))
+        return np.sqrt(RMSD / len(clean_E))
 

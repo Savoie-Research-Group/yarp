@@ -76,6 +76,8 @@ class RPOptConfig:
     do_hess: bool = False
     hessian_recalc: int = 3
     max_cycles: int = 300
+    charge: int = 0
+    multiplicity: int = 1
 
 @dataclass
 class TSOptConfig:
@@ -86,6 +88,8 @@ class TSOptConfig:
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau'
+    charge: int = 0
+    multiplicity: int = 1
 
 @dataclass
 class IRCValConfig:
@@ -94,6 +98,8 @@ class IRCValConfig:
     n_cpus: int = 1
     max_cycles: int = 300
     conv_thresh: str = 'gau'
+    charge: int = 0
+    multiplicity: int = 1
 
 @dataclass
 class TaskDef:

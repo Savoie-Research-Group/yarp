@@ -314,7 +314,6 @@ class CrestConfCalculator(ConfTask):
         return confs
 
 
-# --- TASK 3: TS GUESS ---
 class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
@@ -532,27 +531,166 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             run_dirs = list(self.scratch_dir.glob("gsm_run*"))
             return len(run_dirs)
 
-# --- TASK 4/5: OPTIMIZATIONS (ORCA Example) ---
-class OrcaOptCalculator(MinOptTask):
-    """Can be used for Min Opt (or subclassed further for TS Opt)."""
+class PysisyphusMinOptCalculator(MinOptTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+
     def generate_input(self):
-        # Write ORCA .inp file using self.rxn conformer coords
-        pass
+        inp_path = self.scratch_dir / "min_opt.yaml"
+        xyz_file = "initial_geom.xyz" # need to figure out how to set this!!!
+        self._write_pysis_rp_opt_input(inp_path, xyz_file)
+
     def write_submission_script(self) -> Path:
-        # Write script calling ORCA container
-        pass
+        """Write the bash script that the JobManager will execute."""
+        script_path = self.scratch_dir / "run_pysis_rpopt.sh"
+
+        # Construct the core command
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
+        pysis_cmd = "pysis min_opt.yaml > min_opt.log 2> min_opt.err"
+        full_command = f"{prefix} {pysis_cmd}"
+
+        with open(script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write(f"cd {self.scratch_dir}\n")
+            f.write(f"{full_command}\n")
+
+        # Make the script executable (important for LocalJobManager)
+        script_path.chmod(0x755)
+
+        return script_path
+
     def check_output(self) -> bool:
-        # Read orca.out and check for "ORCA TERMINATED NORMALLY"
-        out_file = self.scratch_dir / "orca.out"
-        if not out_file.exists(): return False
-        with open(out_file, 'r') as f:
-            return "ORCA TERMINATED NORMALLY" in f.read()
+        pass
     def scrape_data(self):
         # Extract optimized geometry and energy
         pass
     def cleanup(self):
         # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
         pass
+
+    def _write_pysis_rp_opt_input(self, input_path, input_geo_xyz):
+        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+        lot = self.config.lot.lower()
+        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
+
+        # Write the file! Yay, YAML friend!
+        with open(input_path, 'a') as f:
+            # set geom block
+            f.write(f'geom:\n type: cart\n fn: {input_geo_xyz}\n')
+
+            # set calc block
+            # ERM: I left out the option for solvent,
+            # because what I saw in classy YARP didn't make sense to me...
+            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+
+            # set opt block
+            if self.config.do_hess:
+                f.write(f'opt:\n type: rfo\n max_cycles: {self.config.max_cycles}\n overachieve_factor: 3\n hessian_recalc: {self.config.hessian_recalc}\n do_hess: True\n')
+            else:
+                f.write(f'opt:\n type: rfo\n max_cycles: {self.config.max_cycles}\n overachieve_factor: 3\n')
+
+
+class PysisyphusTSOptCalculator(TSOptTask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+
+    def generate_input(self):
+        initial_guesses = []
+        for k in self.rxn.ts_geom.keys():
+            if "ts_guess" in k:
+                initial_guesses.append(self.rxn.ts_geom[k])
+
+        # Write inputs for each guess
+        for i, conf in enumerate(initial_guesses):
+            idx = i + 1
+            guess_dir = self.scratch_dir / f"tsopt_run{idx}"
+            os.makedirs(guess_dir, exist_ok=True)
+            xyz_file = guess_dir / f"ts_guess_{idx}.xyz"
+            inp_path = guess_dir / f"tsopt_{idx}_input.yaml"
+            
+            # Write XYZs
+            with open(xyz_file, "w") as f:
+                f.write(conf.to_xyz_string())
+            
+            # Write a Pysisyphus input file for GSM
+            self._write_pysis_ts_opt_input(inp_path, xyz_file)
+
+
+    def write_submission_script(self):
+        """
+        Creates a sequential runner script for inside the container, 
+        and a host submission script to launch the container.
+        """
+        # ---------------------------------------------------------
+        # 1. The INNER Script (Runs inside the Docker container)
+        # ---------------------------------------------------------
+        inner_script_path = self.scratch_dir / "run_pysis_inner.sh"
+        
+        with open(inner_script_path, "w") as f:
+            f.write("#!/bin/bash\n\n")
+            f.write("echo 'Starting YARP serial TSOPT execution...'\n\n")
+            
+            for i in range(1, len(self.pairs_to_run) + 1):
+                f.write(f"echo '--- Running TSOPT {i} ---'\n")
+                # The container mounts self.scratch_dir to /work
+                f.write(f"cd /work/tsopt_run{i}\n") 
+                
+                # Execute pysis within the specific folder, saving logs locally
+                f.write(f"pysis tsopt_{i}_input.yaml > tsopt_{i}.log 2> tsopt_{i}.err\n")
+                f.write(f"echo '--- Finished TSOPT {i} ---'\n\n")
+                
+        # Make executable
+        inner_script_path.chmod(0o755)
+
+        # ---------------------------------------------------------
+        # 2. The OUTER Script (Runs on the Host / Job Manager)
+        # ---------------------------------------------------------
+        submit_script_path = self.scratch_dir / "submit_tsopt.sh"
+        
+        # Pulls the docker prefix (e.g., 'docker run --rm -v /scratch:/work -u UID:GID yarp_pysisyphus')
+        docker_cmd_prefix = self.get_container_prefix("yarp_pysisyphus", str(self.scratch_dir))
+        
+        with open(submit_script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            # Launch the container and tell it to run the inner script
+            f.write(f"{docker_cmd_prefix} bash /work/run_pysis_inner.sh\n")
+            
+        submit_script_path.chmod(0o755)
+        
+        # Return the outer script for the Job Manager to execute
+        return str(submit_script_path)
+
+    def check_output(self) -> bool:
+        pass
+    def scrape_data(self):
+        # Extract optimized geometry and energy
+        pass
+    def cleanup(self):
+        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
+        pass
+
+    def _write_pysis_ts_opt_input(self, input_path, input_geo_xyz):
+        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+        lot = self.config.lot.lower()
+        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
+
+        # Write the file! Yay, YAML friend!
+        with open(input_path, 'a') as f:
+            # set geom block
+            f.write(f'geom:\n type: cart\n fn: {input_geo_xyz}\n')
+
+            # set calc block
+            # ERM: I left out the option for solvent,
+            # because what I saw in classy YARP didn't make sense to me...
+            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+
+            # set opt block
+            if self.config.do_hess:
+                f.write(f'tsopt:\n type: rsprfo\n do_hess: True\n hessian_recalc: {self.config.hessian_recalc}\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')
+            else:
+                f.write(f'tsopt:\n type: rsprfo\n do_hess: False\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')
 
 
 # =====================================================================
@@ -582,10 +720,12 @@ def get_calculator(task_def, rxn_obj, container_runner="docker") -> AsyncYarpCal
 
     # Tasks 4 & 5: Optimizations
     elif t_type in ["reactant_optimization", "product_optimization", "transition_state_optimization"]:
-        if software == "orca":
-            return OrcaOptCalculator(task_def, rxn_obj)
-        elif software == "pysisyphus":
-            # Would return a PysisyphusOptCalculator(...)
+        if software == "pysisyphus":
+            if t_type in ["reactant_optimization", "product_optimization"]:
+                return PysisyphusMinOptCalculator(task_def, t_type, rxn_obj)
+            elif t_type == "transition_state_optimization":
+                return PysisyphusTSOptCalculator(task_def, rxn_obj)
+        else:
             pass
 
     # Task 6: IRC Validation

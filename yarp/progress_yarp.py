@@ -6,7 +6,7 @@ from pathlib import Path
 
 from yarp.util.input import InputParser
 from yarp.reaction.external.job_manager import get_job_manager
-from yarp.reaction.external.calculator import get_calculator
+from yarp.reaction.external.calc_factory import get_calculator
 
 def load_state(work_dir: Path):
     with open(work_dir / "STATUS.json", "r") as f:

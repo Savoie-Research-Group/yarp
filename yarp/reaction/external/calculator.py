@@ -2,12 +2,16 @@
 Definition of the YARP Calculator base classes and software-specific implementations.
 """
 import os
+import re
+import h5py
 import shutil
 from pathlib import Path
+import numpy as np
 
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
+from yarp.util.constants import Constants
 
 # from yarp.reaction.external.crest import CrestConfCalculator
 
@@ -572,10 +576,59 @@ class PysisyphusMinOptCalculator(MinOptTask):
         return script_path
 
     def check_output(self) -> bool:
-        pass
+        log_file = self.scratch_dir / f"min_opt.log"
+        xyz_file = self.scratch_dir / "final_geometry.xyz"
+        hess_file = self.scratch_dir / "final_hessian.h5"
+
+        success = True
+
+        # 1. File existence check
+        if not (log_file.exists() and xyz_file.exists()):
+            print(f"   * Run failed: Missing expected output files.")
+            success = False
+
+        # 2. Log file termination check
+        with open(log_file, "r") as f:
+            log_text = f.read()
+
+        if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
+            print(f"   * Run failed: Did not find successful termination message in log.")
+            success = False
+
+        # 3. Hessian file termination check
+        if self.config.do_hess:
+            if not os.path.exists(hess_file):
+                print(f"   * Run failed: Did not find final hessian file.")
+                success = False
+
+        return success            
+
     def scrape_data(self):
-        # Extract optimized geometry and energy
-        pass
+        conf = conformer()
+        conf.lot = self.config.lot
+        conf.software = self.config.software
+        conf.type = f"rpopt_{self.config.lot}_{self.config.software}"
+
+        opt_elements, opt_geo = self._parse_opt_geo()
+        conf.elements = opt_elements
+        conf.geo = opt_geo
+
+        conf.properties['internal_energy_Eh'] = self._parse_energy()
+
+        if self.config.do_hess:
+            hess, freq = self._parse_hessian_freq()
+            conf.vibrational_freqs = freq
+            conf.hessian = hess
+        
+        if self.task_def.task_type == "reactant_optimization":
+            self.rxn.reactant.conformers[conf.type] = conf
+        elif self.task_def.task_type == "product_optimization":
+            self.rxn.product.conformers[conf.type] = conf
+        else:
+            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
+
+        return True
+
     def cleanup(self):
         # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
         pass
@@ -601,6 +654,28 @@ class PysisyphusMinOptCalculator(MinOptTask):
             else:
                 f.write(f'opt:\n type: rfo\n max_cycles: {self.config.max_cycles}\n overachieve_factor: 3\n')
 
+    def _parse_opt_geo(self):
+        xyz_file = self.scratch_dir / "final_geometry.xyz"
+        opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
+        return opt_elements, opt_geo
+    
+    def _parse_energy(self):
+        log_file = self.scratch_dir / f"min_opt.log"
+        with open(log_file, "r") as f:
+            log_text = f.read()
+        pattern = r"energy:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+hartree"
+        energy = float(re.search(pattern, log_text))
+        return energy
+    
+    def _parse_hessian_freq(self):
+        hess_file = self.scratch_dir / f"final_hessian.h5"
+        if os.path.exists(hess_file):
+            data = h5py.File(hess_file, 'r')
+            hessian = np.array(data['hessian']) / Constants.a0_to_ang**2
+            freq = np.array(data['vibfreqs'])
+            return hessian, freq
+        else:
+            return None, None
 
 class PysisyphusTSOptCalculator(TSOptTask):
     def __init__(self, *args, **kwargs):
@@ -674,10 +749,73 @@ class PysisyphusTSOptCalculator(TSOptTask):
         return str(submit_script_path)
 
     def check_output(self) -> bool:
-        pass
+        """
+        Returns True if AT LEAST ONE of the TS optimizations finished
+        """
+        num_runs = self._get_num_runs()
+        if num_runs == 0:
+            return False # No runs found at all!
+
+        one_successful = False
+        
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"tsopt_run{i}"
+            log_file = run_dir / f"tsopt_{i}.log"
+            xyz_file = run_dir / "ts_final_geometry.xyz"
+            hess_file = run_dir / "ts_final_hessian.h5"
+            imag_file = run_dir / "ts_imaginary_mode_000.trj"
+
+            # 1. File existence check
+            if not (log_file.exists() and xyz_file.exists()):
+                print(f"   * Run {i} failed: Missing expected output files.")
+                continue
+
+            # 2. Log file termination check
+            with open(log_file, "r") as f:
+                log_text = f.read()
+
+            if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
+                print(f"   * Run {i} failed: Did not find successful termination message in log.")
+                continue
+
+            # 3. Hessian file termination check
+            if self.config.do_hess:
+                if not os.path.exists(hess_file) and not os.path.exists(imag_file):
+                    print(f"   * Run {i} failed: Did not find final hessian or imaginary frequencies.")
+                    continue
+
+            # If it passes all checks, at least one run succeeded!
+            one_successful = True
+        
+        # We only care if at least one succeeded
+        return one_successful
+
     def scrape_data(self):
-        # Extract optimized geometry and energy
-        pass
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            conf = conformer()
+            conf.lot = self.config.lot
+            conf.software = self.config.software
+            conf.type = f"tsopt_{i}_{self.config.lot}_{self.config.software}"
+
+            run_dir = self.scratch_dir / f"tsopt_run{i}"
+            log_file = run_dir / f"tsopt_{i}.log"
+            conf.properties['internal_energy_Eh'] = self._parse_energy(log_file)
+
+            xyz_file = run_dir / "ts_final_geometry.xyz"
+            opt_elements, opt_geo = self._parse_energy(xyz_file)
+            conf.elements = opt_elements
+            conf.geo = opt_geo
+
+            if self.config.do_hess:
+                hess_file = run_dir / "ts_final_hessian.h5"
+                hess, freq = self._parse_hessian_freq(hess_file)
+                conf.hessian = hess
+                conf.vibrational_freqs = freq
+
+                imag_file = run_dir / "ts_imaginary_mode_000.trj"
+                conf.imaginary_freq_mode = self._parse_imag_freq_mode(imag_file)
+
     def cleanup(self):
         # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
         pass
@@ -706,6 +844,31 @@ class PysisyphusTSOptCalculator(TSOptTask):
     def _get_num_runs(self) -> int:
             run_dirs = list(self.scratch_dir.glob("tsopt_run*"))
             return len(run_dirs)
+
+    def _parse_opt_geo(self, xyz_file):
+        opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
+        return opt_elements, opt_geo
+    
+    def _parse_energy(self, log_file):
+        with open(log_file, "r") as f:
+            log_text = f.read()
+        pattern = r"energy:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+hartree"
+        energy = float(re.search(pattern, log_text))
+        return energy
+    
+    def _parse_hessian_freq(self, hess_file):
+        data = h5py.File(hess_file, 'r')
+        hessian = np.array(data['hessian']) / Constants.a0_to_ang**2
+        freq = np.array(data['vibfreqs'])
+        return hessian, freq
+    
+    def _parse_imag_freq_mode(self, imag_file):
+        elements, geometries = xyz_parse(imag_file, multiple=True)
+        imag_freq_mode = []
+        for count, el in enumerate(elements):
+            imag_freq_mode.append((el, geometries[count]))
+        
+        return imag_freq_mode
 
 # =====================================================================
 #    THE FACTORY ROUTER

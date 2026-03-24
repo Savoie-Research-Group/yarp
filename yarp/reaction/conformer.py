@@ -43,7 +43,9 @@ class conformer:
         self.software = ""
         self.type = ""
         
-        self.imaginary_freqs = []
+        self.vibrational_freqs = None
+        self.hessian = None
+        self.imaginary_freq_mode = None
 
         self.properties = {
             "internal_energy_Eh": None,

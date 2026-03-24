@@ -74,7 +74,7 @@ class RPOptConfig:
     lot: str = "xtb"
     n_cpus: int = 1
     mem_per_cpu: int = 1000
-    do_hess: bool = False
+    do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
     charge: int = 0
@@ -86,7 +86,7 @@ class TSOptConfig:
     lot: str = "xtb"
     n_cpus: int = 1
     mem_per_cpu: int = 1000
-    do_hess: bool = False
+    do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau'

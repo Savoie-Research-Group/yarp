@@ -4,6 +4,7 @@ from yarp.reaction.external.conf_gen import CrestConfCalculator
 from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator
 from yarp.reaction.external.min_opt import PysisyphusMinOptCalculator
 from yarp.reaction.external.ts_opt import PysisyphusTSOptCalculator
+from yarp.reaction.external.irc_val import PysisyphusIRCValCalculator
 
 def get_calculator(task_def, rxn_obj, container_runner="docker") -> AsyncYarpCalculator:
     """
@@ -39,7 +40,9 @@ def get_calculator(task_def, rxn_obj, container_runner="docker") -> AsyncYarpCal
 
     # Task 6: IRC Validation
     elif t_type == "irc_validation":
-        # Would return your IRC calculator
-        pass
+        if software == "pysisyphus":
+            return PysisyphusIRCValCalculator(task_def, rxn_obj)
+        else:
+            pass
 
     raise ValueError(f"No calculator implemented for Task: '{t_type}' with Software: '{software}'")

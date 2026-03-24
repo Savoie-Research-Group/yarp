@@ -5,7 +5,7 @@ import re
 import numpy as np
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist
 from yarp.yarpecule.graph.fragment import return_rings
-from yarp.util.properties import el_valence, el_metals, el_expand_octet, el_mass
+from yarp.util.properties import el_valence, el_metals, el_expand_octet, el_mass, el_to_an
 from yarp.yarpecule.atom_mapping import canon_order
 
 
@@ -290,6 +290,7 @@ def smiles2adjmat(smiles, verbose=False):
                     adjmat[i, j] = adjmat[j, i] = 1
                 break
 
+    ambiguous_aromatic_assignment = False
     if any(atom_info[i]["aromatic_input"] for i in atom_info):
         aromatic_rings = []
         try:
@@ -331,6 +332,7 @@ def smiles2adjmat(smiles, verbose=False):
                 target_size = len(component) // 2
                 promoted_edges, best_partial = choose_aromatic_matching(component_edges, target_size)
                 if promoted_edges is None:
+                    ambiguous_aromatic_assignment = True
                     promoted_edges = best_partial
 
                 for i, j in promoted_edges:
@@ -368,6 +370,10 @@ def smiles2adjmat(smiles, verbose=False):
     for i in atom_info:
         bond_electron_mat[i, i] = el_valence[atom_info[i]["element"]] - atom_info[i]["formal_charge"] - sum(adjmat[i])
 
+    if ambiguous_aromatic_assignment:
+        interpreted_smiles = bemat_to_smiles(bond_electron_mat, atom_info)
+        print(f"WARNING: ambiguous SMILES provided; interpreted as: {interpreted_smiles}")
+
     return np.where(adjmat > 0, 1, 0), bond_electron_mat, atom_info
 
 
@@ -399,6 +405,49 @@ def choose_aromatic_matching(component_edges, target_size):
             stack.append((edge_index + 1, next_used, next_edges))
 
     return None, best_partial
+
+
+def bemat_to_smiles(bond_electron_mat, atom_info):
+    """
+    Render the current interpreted graph as a kekulized SMILES string for
+    diagnostics.
+    """
+    from rdkit import Chem
+
+    bond_to_type = {
+        1: Chem.BondType.SINGLE,
+        2: Chem.BondType.DOUBLE,
+        3: Chem.BondType.TRIPLE,
+        4: Chem.BondType.QUADRUPLE,
+    }
+
+    mol = Chem.RWMol()
+    for idx in range(len(atom_info)):
+        info = atom_info[idx]
+        atom = Chem.Atom(el_to_an[info["element"]])
+        atom.SetFormalCharge(int(info["formal_charge"]))
+        if info.get("mass", None) not in (None, el_mass[info["element"]]):
+            atom.SetIsotope(int(round(info["mass"])))
+        atom.SetNumRadicalElectrons(int(bond_electron_mat[idx, idx] % 2))
+        mol.AddAtom(atom)
+
+    for i in range(len(atom_info)):
+        for j in range(i + 1, len(atom_info)):
+            bond_order = int(bond_electron_mat[i, j])
+            if bond_order > 0:
+                mol.AddBond(i, j, bond_to_type.get(bond_order, Chem.BondType.SINGLE))
+
+    mol = mol.GetMol()
+    mol.UpdatePropertyCache(strict=False)
+    Chem.SanitizeMol(
+        mol,
+        sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_KEKULIZE,
+        catchErrors=True,
+    )
+    try:
+        return Chem.MolToSmiles(Chem.RemoveHs(mol), canonical=True, kekuleSmiles=True)
+    except Exception:
+        return Chem.MolToSmiles(mol, canonical=True, kekuleSmiles=True)
 
 
 def can_promote_aromatic_edge(i, j, component_atoms, adjmat):

@@ -370,12 +370,12 @@ def smiles2adjmat(smiles, verbose=False):
     for i in atom_info:
         bond_electron_mat[i, i] = el_valence[atom_info[i]["element"]] - atom_info[i]["formal_charge"] - sum(adjmat[i])
 
-    if ambiguous_aromatic_assignment:
+    heavy_radicals = [
+        i for i in atom_info
+        if atom_info[i]["element"] != "h" and int(bond_electron_mat[i, i]) % 2 == 1
+    ]
+    if ambiguous_aromatic_assignment or (any(atom_info[i]["aromatic_input"] for i in atom_info) and heavy_radicals):
         interpreted_smiles = bemat_to_smiles(bond_electron_mat, atom_info)
-        heavy_radicals = [
-            i for i in atom_info
-            if atom_info[i]["element"] != "h" and int(bond_electron_mat[i, i]) % 2 == 1
-        ]
         if heavy_radicals:
             print(f"WARNING: ambiguous SMILES provided; interpreted as radical structure: {interpreted_smiles}")
         else:

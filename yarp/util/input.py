@@ -73,6 +73,7 @@ class RPOptConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    mem_per_cpu: int = 1000
     do_hess: bool = False
     hessian_recalc: int = 3
     max_cycles: int = 300
@@ -84,6 +85,7 @@ class TSOptConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    mem_per_cpu: int = 1000
     do_hess: bool = False
     hessian_recalc: int = 3
     max_cycles: int = 300
@@ -96,6 +98,7 @@ class IRCValConfig:
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
+    mem_per_cpu: int = 1000
     max_cycles: int = 300
     conv_thresh: str = 'gau'
     charge: int = 0

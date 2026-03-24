@@ -126,13 +126,13 @@ class MinOptTask(AsyncYarpCalculator):
         r_keys = r_node.conformers.keys()
         r_match = False
         for rk in r_keys:
-            if r_node.conformers[rk].geo is not None: 
+            if 'conf_gen' in rk and r_node.conformers[rk].geo is not None: 
                 r_match = True
 
         p_keys = p_node.conformers.keys()
         p_match = False
         for pk in p_keys:
-            if p_node.conformers[pk].geo is not None:
+            if 'conf_gen' in pk and p_node.conformers[pk].geo is not None:
                 p_match = True
 
         return r_match and p_match 
@@ -537,9 +537,20 @@ class PysisyphusMinOptCalculator(MinOptTask):
         self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
 
     def generate_input(self):
+        if self.task_def.task_type == "reactant_optimization":
+            node = self.rxn.reactant
+        elif self.task_def.task_type == "product_optimization":
+            node = self.rxn.product
+        else:
+            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
+
+        initial_guess = next(v for k, v in node.conformers.items() if 'conf_gen_rank0' in k)
+        xyz_file = self.scratch_dir / "initial_geom.xyz"
+        with open(xyz_file, "w") as f:
+            f.write(initial_guess.to_xyz_string())
+
         inp_path = self.scratch_dir / "min_opt.yaml"
-        xyz_file = "initial_geom.xyz" # need to figure out how to set this!!!
-        self._write_pysis_rp_opt_input(inp_path, xyz_file)
+        self._write_pysis_rp_opt_input(inp_path, "initial_geom.xyz")
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""
@@ -615,7 +626,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
                 f.write(conf.to_xyz_string())
             
             # Write a Pysisyphus input file for GSM
-            self._write_pysis_ts_opt_input(inp_path, xyz_file)
+            self._write_pysis_ts_opt_input(inp_path, f"ts_guess_{idx}.xyz")
 
 
     def write_submission_script(self):
@@ -632,7 +643,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
             f.write("#!/bin/bash\n\n")
             f.write("echo 'Starting YARP serial TSOPT execution...'\n\n")
             
-            for i in range(1, len(self.pairs_to_run) + 1):
+            for i in range(1, self._get_num_runs() + 1):
                 f.write(f"echo '--- Running TSOPT {i} ---'\n")
                 # The container mounts self.scratch_dir to /work
                 f.write(f"cd /work/tsopt_run{i}\n") 
@@ -692,6 +703,9 @@ class PysisyphusTSOptCalculator(TSOptTask):
             else:
                 f.write(f'tsopt:\n type: rsprfo\n do_hess: False\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')
 
+    def _get_num_runs(self) -> int:
+            run_dirs = list(self.scratch_dir.glob("tsopt_run*"))
+            return len(run_dirs)
 
 # =====================================================================
 #    THE FACTORY ROUTER
@@ -722,7 +736,7 @@ def get_calculator(task_def, rxn_obj, container_runner="docker") -> AsyncYarpCal
     elif t_type in ["reactant_optimization", "product_optimization", "transition_state_optimization"]:
         if software == "pysisyphus":
             if t_type in ["reactant_optimization", "product_optimization"]:
-                return PysisyphusMinOptCalculator(task_def, t_type, rxn_obj)
+                return PysisyphusMinOptCalculator(task_def, rxn_obj)
             elif t_type == "transition_state_optimization":
                 return PysisyphusTSOptCalculator(task_def, rxn_obj)
         else:

@@ -664,8 +664,10 @@ class PysisyphusMinOptCalculator(MinOptTask):
         with open(log_file, "r") as f:
             log_text = f.read()
         pattern = r"energy:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+hartree"
-        energy = float(re.search(pattern, log_text))
-        return energy
+        matches = re.findall(pattern, log_text)
+        if not matches:
+            raise RuntimeError(f"Could not find energy in {log_file}")
+        return float(matches[-1])
     
     def _parse_hessian_freq(self):
         hess_file = self.scratch_dir / f"final_hessian.h5"
@@ -803,7 +805,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
             conf.properties['internal_energy_Eh'] = self._parse_energy(log_file)
 
             xyz_file = run_dir / "ts_final_geometry.xyz"
-            opt_elements, opt_geo = self._parse_energy(xyz_file)
+            opt_elements, opt_geo = self._parse_opt_geo(xyz_file)
             conf.elements = opt_elements
             conf.geo = opt_geo
 
@@ -815,6 +817,11 @@ class PysisyphusTSOptCalculator(TSOptTask):
 
                 imag_file = run_dir / "ts_imaginary_mode_000.trj"
                 conf.imaginary_freq_mode = self._parse_imag_freq_mode(imag_file)
+
+            self.rxn.ts_geom[conf.type] = conf
+
+        print(f'Reaction TS guess keys:\n {list(self.rxn.ts_geom.keys())}')
+        return True
 
     def cleanup(self):
         # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
@@ -853,8 +860,10 @@ class PysisyphusTSOptCalculator(TSOptTask):
         with open(log_file, "r") as f:
             log_text = f.read()
         pattern = r"energy:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+hartree"
-        energy = float(re.search(pattern, log_text))
-        return energy
+        matches = re.findall(pattern, log_text)
+        if not matches:
+            raise RuntimeError(f"Could not find energy in {log_file}")
+        return float(matches[-1])
     
     def _parse_hessian_freq(self, hess_file):
         data = h5py.File(hess_file, 'r')

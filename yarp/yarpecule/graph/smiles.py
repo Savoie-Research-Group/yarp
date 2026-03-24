@@ -372,7 +372,14 @@ def smiles2adjmat(smiles, verbose=False):
 
     if ambiguous_aromatic_assignment:
         interpreted_smiles = bemat_to_smiles(bond_electron_mat, atom_info)
-        print(f"WARNING: ambiguous SMILES provided; interpreted as: {interpreted_smiles}")
+        heavy_radicals = [
+            i for i in atom_info
+            if atom_info[i]["element"] != "h" and int(bond_electron_mat[i, i]) % 2 == 1
+        ]
+        if heavy_radicals:
+            print(f"WARNING: ambiguous SMILES provided; interpreted as radical structure: {interpreted_smiles}")
+        else:
+            print(f"WARNING: ambiguous SMILES provided; interpreted as: {interpreted_smiles}")
 
     return np.where(adjmat > 0, 1, 0), bond_electron_mat, atom_info
 

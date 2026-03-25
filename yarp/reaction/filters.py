@@ -125,6 +125,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
     """
     if target_yp.canon_smi is None:
         target_yp.get_smiles()
+    target_dist_smi = target_yp.map_smi if dist == "am_ged" else target_yp.canon_smi
 
     candidates = []
     if mode == 'beam':
@@ -139,7 +140,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             mol = rxn.product.graph
             if mol.hash in mol_set: continue # Throw away all duplicate candidates
             mol_set.add(mol.hash)
-            mol2dist[mol.hash] = compute_min_distance(mol, target_yp.canon_smi, metric=dist)
+            mol2dist[mol.hash] = compute_min_distance(mol, target_dist_smi, metric=dist)
 
         # Sort all hashes by distance (lowest to highest)
         sorted_hashes = sorted(mol2dist, key=mol2dist.get)
@@ -178,8 +179,8 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         print(f"    Target species: {target_yp.canon_smi}")
         print(f"    Distance metric: {dist}")
         for rxn in raw_rxns.values():
-            r_dist = compute_min_distance(rxn.reactant.graph, target_yp.canon_smi, metric=dist)
-            p_dist = compute_min_distance(rxn.product.graph, target_yp.canon_smi, metric=dist)
+            r_dist = compute_min_distance(rxn.reactant.graph, target_dist_smi, metric=dist)
+            p_dist = compute_min_distance(rxn.product.graph, target_dist_smi, metric=dist)
             diff = r_dist - p_dist
             if cap == 'moderate':
                 if diff >= 0.0:
@@ -269,4 +270,3 @@ def separate_molecules(node):
             mol.get_smiles()
 
     return sep_mols
-

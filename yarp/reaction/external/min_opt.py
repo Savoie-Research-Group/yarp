@@ -11,24 +11,23 @@ from yarp.util.constants import Constants
 
 class MinOptTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
-        r_node = self.rxn.reactant
-        p_node = self.rxn.product
-        if not r_node.conformers or not p_node.conformers:
+        # 1. Determine which state we care about for this specific task
+        if self.task_def.task_type == "reactant_optimization":
+            node = self.rxn.reactant
+        elif self.task_def.task_type == "product_optimization":
+            node = self.rxn.product
+        else:
+            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
+
+        if not node.conformers:
             return False
 
-        r_keys = r_node.conformers.keys()
-        r_match = False
-        for rk in r_keys:
-            if 'conf_gen' in rk and r_node.conformers[rk].geo is not None: 
-                r_match = True
+        # 2. Check if the rank0 conformer exists in that specific state
+        for key in node.conformers.keys():
+            if 'conf_gen_rank0' in key and node.conformers[key].geo is not None: 
+                return True
 
-        p_keys = p_node.conformers.keys()
-        p_match = False
-        for pk in p_keys:
-            if 'conf_gen' in pk and p_node.conformers[pk].geo is not None:
-                p_match = True
-
-        return r_match and p_match
+        return False
 
 class PysisyphusMinOptCalculator(MinOptTask):
     def __init__(self, *args, **kwargs):
@@ -98,7 +97,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
 
         return success            
 
-    def scrape_data(self):
+    def scrape_data(self) -> bool:
         conf = conformer()
         conf.lot = self.config.lot
         conf.software = self.config.software

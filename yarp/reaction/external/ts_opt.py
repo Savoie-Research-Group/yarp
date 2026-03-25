@@ -133,7 +133,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
         # We only care if at least one succeeded
         return one_successful
 
-    def scrape_data(self):
+    def scrape_data(self) -> bool:
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
             conf = conformer()
@@ -161,7 +161,6 @@ class PysisyphusTSOptCalculator(TSOptTask):
 
             self.rxn.ts_geom[conf.type] = conf
 
-        print(f'Reaction TS guess keys:\n {list(self.rxn.ts_geom.keys())}')
         return True
 
     def cleanup(self):

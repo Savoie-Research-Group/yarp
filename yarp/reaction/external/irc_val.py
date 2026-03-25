@@ -119,7 +119,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
         # We only care if at least one succeeded
         return one_successful
 
-    def scrape_data(self):
+    def scrape_data(self) -> bool:
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
             rxn_key = f'irc_{i}_{self.config.lot}_{self.config.software}'
@@ -145,6 +145,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
             else:
                 self.rxn.barrier[rxn_key + "_kcal_per_mol"] = f_barrier
                 self.rxn.reverse_barrier[rxn_key + "_kcal_per_mol"] = b_barrier
+
+        return True
 
     def cleanup(self):
         pass

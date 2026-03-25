@@ -198,10 +198,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 p_conf.type = f"guess_conf_{i}_{p_conf.lot}_{p_conf.software}"
                 
                 self.rxn.product.conformers[p_conf.type] = p_conf
-
-        print(f'Reaction TS guess keys:\n {list(self.rxn.ts_geom.keys())}')
-        print(f'Reactant state conformer keys:\n {list(self.rxn.reactant.conformers.keys())}')
-        print(f'Product state conformer keys:\n {list(self.rxn.product.conformers.keys())}')
         
         return True
 

@@ -32,94 +32,108 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
         with open(fail_file, "wb") as f:
             pickle.dump(existing_fails, f)
 
-def progress_yarp(work_dir_str: str):
-    work_dir = Path(work_dir_str).resolve()
+def progress_yarp(work_dir: Path):
     print(f"Processing YARP progress in {work_dir}...")
 
+    # 1. Load the state
     status_tracker, reactions = load_state(work_dir)
-    print(f"Loading in {len(reactions)} reactions for analysis!")
-    for hash in reactions.keys():
-        print(f" - {hash}")
-    
-    # We need the task definitions to know dependencies. 
-    # We reconstruct the InputParser from the saved config.
-    inp = InputParser(status_tracker["input_config"])
-    pipeline_tasks = inp.pipeline_tasks
-    print("User-specified pipeline tasks:")
-    for task in pipeline_tasks:
-        print(f" - {task}")
-    
-    # Initialize the correct job manager based on user input
-    job_manager = get_job_manager(inp.scheduler)
-    container_runner = getattr(inp, 'container', 'docker')
-    print(f"Jobs will be run using {inp.scheduler} scheduler and {container_runner} containers")
-
     failed_rxns = {}
-    for rxn_hash, rxn_state in status_tracker["reactions"].items():
-        print(f"Processing reaction {rxn_hash}...")
+
+    # 2. Parse the configuration
+    config = InputParser(status_tracker["input_config"])
+
+    # Notice these are direct attributes of `config` based on your InputParser!
+    scheduler = config.scheduler
+    container_runner = config.container
+    max_active_jobs = config.max_active_jobs
+
+    job_manager = get_job_manager(scheduler)
+
+    print(f"Jobs will be run using '{scheduler}' scheduler and '{container_runner}' containers.")
+    print(f"Max active jobs allowed: {max_active_jobs}")
+
+    # =================================================================
+    # PASS 1: Check Status of Submitted Jobs & Tally Active Jobs
+    # =================================================================
+    active_jobs = 0
+    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         rxn_obj = reactions.get(rxn_hash)
-        if not rxn_obj:
-            print(f" - Reaction not found in YARP_RXNS.pkl, skipping!")
-            continue
+        if not rxn_obj: continue
 
-        tasks_status = rxn_state["tasks"]
-
-        # --- PHASE 1: Check currently running jobs ---
-        for task_id, meta in tasks_status.items():
+        for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] == "submitted":
-                print(f" - Checking status of Task {task_id}...")
-                if not job_manager.is_running(meta["job_id"]):
-                    # Job finished! Let's check if it succeeded.
-                    calc = get_calculator(pipeline_tasks[task_id], rxn_obj, container_runner=container_runner)
+                task_def = config.pipeline_tasks[task_id]
+                calc = get_calculator(task_def, rxn_obj, container_runner)
+
+                if meta["scratch_dir"]:
                     calc.set_scratch_dir(Path(meta["scratch_dir"]))
-                    
+
+                if job_manager.is_running(meta["job_id"]):
+                    # Job is still going, add it to our tally!
+                    active_jobs += 1
+                else:
+                    # Job finished! Time to process it.
+                    print(f"   * [{rxn_hash}] Task '{task_id}' finished running. Checking output...")
                     if calc.check_output():
-                        try:
-                            calc.scrape_data()
+                        if calc.scrape_data():
                             calc.cleanup()
                             meta["status"] = "terminated_normally"
                             print(f"   * [{rxn_hash}] Task '{task_id}' completed successfully.")
-                        except Exception as e:
+                        else:
                             meta["status"] = "finished_with_error"
-                            meta["error_log"] = f"Scraping failed: {str(e)}"
+                            meta["error_log"] = "Data scraping failed."
                             failed_rxns[rxn_hash] = rxn_obj
                             print(f"   * [{rxn_hash}] Task '{task_id}' failed during data scraping.")
                     else:
                         meta["status"] = "finished_with_error"
-                        meta["error_log"] = "External calculation failed or expected output missing."
+                        meta["error_log"] = "Output validation failed."
                         failed_rxns[rxn_hash] = rxn_obj
-                        print(f"   * [{rxn_hash}] Task '{task_id}' finished with errors.")
-                else:
-                    print(f"   * [{rxn_hash}] Task '{task_id}' is still running, check back later.")
-
-        # --- PHASE 2: Update Pending -> Ready based on DAG ---
-        for task_id, meta in tasks_status.items():
+                        print(f"   * [{rxn_hash}] Task '{task_id}' failed output validation.")
+ 
+    # =================================================================
+    # PASS 2: Update Dependencies
+    # =================================================================
+    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] == "pending":
-                print(f" - Checking status of Task {task_id}...")
-                task_def = pipeline_tasks[task_id]
-                
-                # Check if all execution dependencies are met
-                dependencies_met = True
-                for dep_id in task_def.depends_on:
-                    if tasks_status[dep_id]["status"] != "terminated_normally":
-                        dependencies_met = False
-                        print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites NOT met. Continue as PENDING.")
+                task_def = config.pipeline_tasks[task_id]
+                parents_done = True
+
+                for parent_id in task_def.depends_on:
+                    if rxn_meta["tasks"][parent_id]["status"] != "terminated_normally":
+                        parents_done = False
                         break
-                        
-                if dependencies_met:
+
+                if parents_done:
                     meta["status"] = "ready"
                     print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
 
-        # --- PHASE 3: Submit Ready Jobs ---
-        for task_id, meta in tasks_status.items():
+    # =================================================================
+    # PASS 3: Submit New Jobs (Respecting the Limit)
+    # =================================================================
+    print(f"Current active jobs: {active_jobs} / {max_active_jobs}")
+
+    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        # Global limit check
+        if active_jobs >= max_active_jobs:
+            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.")
+            break
+
+        rxn_obj = reactions.get(rxn_hash)
+        if not rxn_obj: continue
+
+        for task_id, meta in rxn_meta["tasks"].items():
+            # Inner limit check (in case we hit the limit mid-reaction)
+            if active_jobs >= max_active_jobs:
+                break 
+
             if meta["status"] == "ready":
-                print(f" - Preparing submission of Task {task_id}...")
-                task_def = pipeline_tasks[task_id]
-                calc = get_calculator(task_def, rxn_obj, container_runner=container_runner)
-                
+                task_def = config.pipeline_tasks[task_id]
+                calc = get_calculator(task_def, rxn_obj, container_runner)
+
                 scratch_path = work_dir / "SCRATCH" / f"{rxn_hash}_{task_id}"
                 calc.set_scratch_dir(scratch_path)
-                
+
                 # Pre-flight Data Check
                 if not calc.has_prerequisites():
                     meta["status"] = "finished_with_error"
@@ -127,18 +141,19 @@ def progress_yarp(work_dir_str: str):
                     failed_rxns[rxn_hash] = rxn_obj
                     print(f"   * [{rxn_hash}] Task '{task_id}' aborted: Pre-flight check failed.")
                     continue
-                
+
                 # Generate and Submit
                 print(f"   * [{rxn_hash}] Submitting task '{task_id}'...")
                 calc.generate_input()
                 script_path = calc.write_submission_script()
-                
+
                 job_id = job_manager.submit(script_path)
-                
+
                 if job_id:
                     meta["status"] = "submitted"
                     meta["job_id"] = job_id
                     meta["scratch_dir"] = str(scratch_path)
+                    active_jobs += 1 # Increment our tally!
                 else:
                     meta["status"] = "finished_with_error"
                     meta["error_log"] = "Job manager failed to submit job."
@@ -152,4 +167,5 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python progress_yarp.py /path/to/working/dir")
         sys.exit(1)
-    progress_yarp(sys.argv[1])
+    absolute_work_dir = Path(sys.argv[1]).resolve()
+    progress_yarp(absolute_work_dir)

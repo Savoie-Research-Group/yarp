@@ -1,6 +1,7 @@
 .DS_Store
 debug/*
 .vscode
+containers/*.sif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

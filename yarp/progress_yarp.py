@@ -43,9 +43,9 @@ def progress_yarp(work_dir: Path):
     config = InputParser(status_tracker["input_config"])
 
     # Notice these are direct attributes of `config` based on your InputParser!
-    scheduler = config.scheduler
-    container_runner = config.container
-    max_active_jobs = config.max_active_jobs
+    scheduler = config.job_manager.scheduler
+    container_runner = config.job_manager.container
+    max_active_jobs = config.job_manager.max_active_jobs
 
     job_manager = get_job_manager(scheduler)
 
@@ -63,7 +63,7 @@ def progress_yarp(work_dir: Path):
         for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] == "submitted":
                 task_def = config.pipeline_tasks[task_id]
-                calc = get_calculator(task_def, rxn_obj, container_runner)
+                calc = get_calculator(task_def, rxn_obj, config.job_manager)
 
                 if meta["scratch_dir"]:
                     calc.set_scratch_dir(Path(meta["scratch_dir"]))
@@ -129,7 +129,7 @@ def progress_yarp(work_dir: Path):
 
             if meta["status"] == "ready":
                 task_def = config.pipeline_tasks[task_id]
-                calc = get_calculator(task_def, rxn_obj, container_runner)
+                calc = get_calculator(task_def, rxn_obj, config.job_manager)
 
                 scratch_path = work_dir / "SCRATCH" / f"{rxn_hash}_{task_id}"
                 calc.set_scratch_dir(scratch_path)

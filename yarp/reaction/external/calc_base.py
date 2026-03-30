@@ -1,16 +1,17 @@
 from pathlib import Path
 import shutil
+import subprocess
 
 class AsyncYarpCalculator:
     """
     Base class defining the asynchronous lifecycle interface required by progress_yarp.py.
     """
-    def __init__(self, task_def, rxn_obj, container_runner="docker"):
+    def __init__(self, task_def, rxn_obj, job_config):
         self.task_def = task_def
         self.rxn = rxn_obj
         self.config = task_def.config
         self.scratch_dir = None
-        self.container_runner = container_runner
+        self.job_manager = job_config
 
     def set_scratch_dir(self, path: Path):
         self.scratch_dir = path
@@ -20,22 +21,74 @@ class AsyncYarpCalculator:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
+        Automatically checks for and pulls missing images.
         """
-        if self.container_runner == "docker":
-            # --rm removes the container after it finishes
-            # -v mounts the host scratch dir to /work
-            # -u $(id -u):$(id -g) ensures files aren't created as root (optional but good practice)
+        if self.job_manager.container == "docker":
+            # 1. Check if the image exists locally
+            inspect_cmd = subprocess.run(
+                ["docker", "image", "inspect", image_name], 
+                capture_output=True
+            )
+            
+            # 2. If returncode is non-zero, it doesn't exist. Pull it!
+            if inspect_cmd.returncode != 0:
+                print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
+                subprocess.run(["docker", "pull", image_name], check=True)
+
             return f"docker run --rm -v {work_dir}:/work {image_name}"
-            
-        elif self.container_runner == "apptainer":
-            # Apptainer automatically mounts the current working directory, 
-            # but explicit binding is safer.
-            # Assuming the user has downloaded the .sif file to a known location, or pulls it.
-            # E.g., docker://ghcr.io/username/yarp_crest:latest
-            return f"apptainer exec --bind {work_dir}:/work {image_name}.sif"
-            
+
+        elif self.job_manager.container == "apptainer":
+            # Sanitize the image name so it works as a safe, flat filename
+            # e.g., "erm42/yarp:crest" -> "erm42_yarp_crest.sif"
+            safe_filename = image_name.replace("/", "_").replace(":", "_") + ".sif"
+            sif_path = Path(self.job_manager.sif_location) / safe_filename
+
+            # 1. Check if the .sif file exists on disk
+            if not sif_path.exists():
+                print(f"Apptainer image not found at {sif_path}. Pulling from Docker Hub...")
+                
+                # Ensure the target directory actually exists before pulling
+                sif_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # 2. Pull the docker image and convert it to a .sif file
+                subprocess.run(
+                    ["apptainer", "pull", str(sif_path), f"docker://{image_name}"], 
+                    check=True
+                )
+
+            return f"apptainer exec --bind {work_dir}:/work {sif_path}"
+
         else:
-            raise ValueError(f"Unsupported container runner: {self.container_runner}")
+            raise ValueError(f"Unsupported container runner: {self.job_manager.container}")
+
+    def write_scheduler_headers(self, f):
+        """Writes the top portion of the bash script based on scheduler type."""
+        scheduler = self.job_manager.scheduler
+        job_name = self.job_manager.job_name
+        cpus = self.config.n_cpus
+        mem = self.config.mem_per_cpu
+
+        if scheduler == "slurm":
+            f.write(f"#SBATCH --job-name={job_name}\n")
+            if self.job_manager.queue:
+                f.write(f"#SBATCH --partition={self.job_manager.queue}\n")
+            f.write("#SBATCH --tasks-per-node=1\n")
+            f.write(f"#SBATCH --cpus-per-task={cpus}\n")
+            f.write(f"#SBATCH --mem-per-cpu={mem}M\n\n")
+
+            if self.job_manager.module_container:
+                f.write(f"{self.job_manager.module_container}\n\n")
+
+        elif scheduler == "qse":
+            f.write(f"#$ -N {job_name}\n")
+            if self.job_manager.queue:
+                f.write(f"#$ -q {self.job_manager.queue}\n")
+            f.write(f"#$ -pe smp {cpus}\n\n")
+
+            if self.job_manager.module_container:
+                f.write(f"{self.job_manager.module_container}\n\n")
+
+        # If 'local', we don't need scheduler headers!
 
     # --- Pre-flight Check (Overridden by Task classes) ---
     def has_prerequisites(self) -> bool:

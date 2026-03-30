@@ -12,6 +12,11 @@ def initialize_from_dict(file_dict):
     Generates the reactions and the status tracker dictionary.
     """
     inp = InputParser(file_dict)
+
+    if inp.job_manager.container == "apptainer":
+        sif_path = Path(inp.job_manager.sif_location)
+        if not sif_path.exists() or not sif_path.is_dir():
+            raise FileNotFoundError(f"Fatal: The specified Apptainer SIF location does not exist or is not a directory: {sif_path}")
     
     print("Let's generate some initial reaction objects...")
     raw_reactions = generate_rxns(inp)

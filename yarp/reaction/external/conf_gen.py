@@ -15,7 +15,7 @@ class CrestConfCalculator(ConfTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "yarp_crest:latest" # Change to ghcr.io/url later???
+        self.image_name = "erm42/yarp:crest"
         self.xyz_file = "input.xyz"
 
         # Determine if we are working on the reactant or the product

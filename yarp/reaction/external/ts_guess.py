@@ -32,7 +32,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+        self.image_name = "erm42/yarp:pysis_xtb"
         self.n_pairs = self.config.n_conf
         self.pairs_to_run = []
 

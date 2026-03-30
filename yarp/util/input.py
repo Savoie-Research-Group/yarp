@@ -3,11 +3,43 @@ Definition of input object class
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Dict, Any
+from pathlib import Path
 from yarp.yarpecule.yarpecule import yarpecule
 
 
 # --- CONFIGURATION OBJECTS ---
 # These classes act as simple containers for user provided settings.
+@dataclass
+class JobManagerConfig:
+    """Holds settings for job scheduling and container execution."""
+    scheduler: str = "local"
+    container: str = "docker"
+    sif_location: Optional[str] = None
+    module_container: Optional[str] = None
+    max_active_jobs: int = 100
+    queue: Optional[str] = None
+    job_name: str = "yarp"
+
+    def __post_init__(self):
+        # Normalize inputs for easier checking
+        self.scheduler = self.scheduler.lower()
+        self.container = self.container.lower()
+
+        # Sanity Check 1: Schedulers that require a queue
+        if self.scheduler in ["qse", "slurm"] and not self.queue:
+            raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
+
+        # Sanity Check 2: Apptainer/Singularity environments
+        if self.container == "apptainer" and not self.sif_location:
+            # Dynamically resolve the path relative to this file
+            # __file__       == base_git_repo/yarp/util/input.py
+            # .resolve()     == converts to absolute path resolving any symlinks
+            # .parents[0]    == base_git_repo/yarp/util
+            # .parents[1]    == base_git_repo/yarp
+            # .parents[2]    == base_git_repo
+            base_repo_path = Path(__file__).resolve().parents[2]
+            
+            self.sif_location = str(base_repo_path / "containers")
 
 @dataclass
 class EnumerationConfig:
@@ -146,9 +178,7 @@ class InputParser:
 
         # Job manager configuration
         jm_node = initnode.get("job manager", {})
-        self.scheduler = jm_node.get("scheduler", "slurm")
-        self.container = jm_node.get("container", "docker")
-        self.max_active_jobs = jm_node.get("max active jobs", 100) # Default to a safe large number
+        self.job_manager = self._parse_job_manager(jm_node)
 
         # Enumeration configs
         enum_node = initnode.get("enumeration", {})
@@ -185,6 +215,19 @@ class InputParser:
                     promised_data[prov] = task_id
 
                 self.pipeline_tasks[task_id] = task_def
+
+    def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
+        """Extracts job manager settings and returns a clean JobManagerConfig object."""
+        return JobManagerConfig(
+            scheduler=jm_node.get("scheduler", "slurm"),
+            container=jm_node.get("container", "docker"),
+            sif_location=jm_node.get("sif_location"),
+            module_container=jm_node.get("module_container"),
+            # Check both underscore and space versions just in case
+            max_active_jobs=jm_node.get("max_active_jobs", jm_node.get("max active jobs", 100)),
+            queue=jm_node.get("queue"),
+            job_name=jm_node.get("job_name", "yarp")
+        )
 
     def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:
         """Handles the logic for the 'separate products' input."""

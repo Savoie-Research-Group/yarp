@@ -37,7 +37,6 @@ def progress_yarp(work_dir: Path):
 
     # 1. Load the state
     status_tracker, reactions = load_state(work_dir)
-    failed_rxns = {}
 
     # 2. Parse the configuration
     config = InputParser(status_tracker["input_config"])
@@ -56,6 +55,35 @@ def progress_yarp(work_dir: Path):
     # PASS 1: Check Status of Submitted Jobs & Tally Active Jobs
     # =================================================================
     active_jobs = 0
+    failed_rxns = {}
+
+    # =================================================================
+    # PASS 1A: Check Status of Submitted GLOBAL Jobs
+    # =================================================================
+    for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
+        if g_meta["status"] == "submitted":
+            task_def = config.global_tasks[g_task_id]
+
+            calc = get_calculator(task_def, reactions, job_manager)
+
+            if g_meta["scratch_dir"]:
+                calc.set_scratch_dir(Path(g_meta["scratch_dir"]))
+
+            if not job_manager.is_running(g_meta["job_id"]):
+                if calc.check_output():
+                    print(f" * Global Task '{g_task_id}' finished successfully!")
+                    g_meta["status"] = "terminated_normally"
+                    calc.scrape_data()
+                    calc.cleanup()
+                else:
+                    print(f" * Global Task '{g_task_id}' failed.")
+                    g_meta["status"] = "finished_with_error"
+            else:
+                active_jobs += 1
+
+    # =================================================================
+    # PASS 1B: Check Status of Submitted PIPELINE Jobs
+    # =================================================================
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
@@ -91,20 +119,28 @@ def progress_yarp(work_dir: Path):
                         print(f"   * [{rxn_hash}] Task '{task_id}' failed output validation.")
  
     # =================================================================
-    # PASS 2: Update Dependencies
+    # PASS 2: Update Pending Tasks to Ready
     # =================================================================
-    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
-        for task_id, meta in rxn_meta["tasks"].items():
+    for rxn_hash, rxn_data in status_tracker["reactions"].items():
+        tasks_status = rxn_data["tasks"]
+        for task_id, meta in tasks_status.items():
             if meta["status"] == "pending":
                 task_def = config.pipeline_tasks[task_id]
-                parents_done = True
-
-                for parent_id in task_def.depends_on:
-                    if rxn_meta["tasks"][parent_id]["status"] != "terminated_normally":
-                        parents_done = False
-                        break
-
-                if parents_done:
+                
+                deps_met = True
+                for dep_id in task_def.depends_on:
+                    # Check if the dependency is a global task
+                    if dep_id in status_tracker.get("global_tasks", {}):
+                        if status_tracker["global_tasks"][dep_id]["status"] != "terminated_normally":
+                            deps_met = False
+                            break
+                    # Otherwise, check the local pipeline tasks
+                    else:
+                        if tasks_status[dep_id]["status"] != "terminated_normally":
+                            deps_met = False
+                            break
+                
+                if deps_met:
                     meta["status"] = "ready"
                     print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
 
@@ -113,6 +149,46 @@ def progress_yarp(work_dir: Path):
     # =================================================================
     print(f"Current active jobs: {active_jobs} / {max_active_jobs}")
 
+    # =================================================================
+    # PASS 3A: Submit New GLOBAL Jobs
+    # =================================================================
+    for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
+        # Global limit check
+        if active_jobs >= max_active_jobs:
+            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.")
+            break
+
+        if g_meta["status"] == "ready":
+                
+            task_def = config.global_tasks[g_task_id]
+            calc = get_calculator(task_def, reactions, job_manager)
+            
+            scratch_path = work_dir / "SCRATCH" / f"GLOBAL_{g_task_id}"
+            calc.set_scratch_dir(scratch_path)
+
+            if not calc.has_prerequisites():
+                g_meta["status"] = "finished_with_error"
+                print(f" * Global Task '{g_task_id}' aborted: Pre-flight check failed.")
+                continue
+
+            print(f" * Submitting global task '{g_task_id}'...")
+            calc.generate_input()
+            script_path = calc.write_submission_script()
+
+            job_id = job_manager.submit(script_path)
+
+            if job_id:
+                g_meta["status"] = "submitted"
+                g_meta["job_id"] = job_id
+                g_meta["scratch_dir"] = str(scratch_path)
+                active_jobs += 1
+            else:
+                g_meta["status"] = "finished_with_error"
+
+
+    # =================================================================
+    # PASS 3B: Submit New PIPELINE Jobs
+    # =================================================================
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         # Global limit check
         if active_jobs >= max_active_jobs:

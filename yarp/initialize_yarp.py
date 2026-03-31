@@ -25,11 +25,22 @@ def initialize_from_dict(file_dict):
     
     # Initialize the STATUS dictionary
     status_tracker = {
-        "pipeline_tasks": list(inp.pipeline_tasks.keys()), 
+        "pipeline_tasks": list(inp.pipeline_tasks.keys()),
+        "global_tasks_list": list(inp.global_tasks.keys()),
+        "global_tasks": {},
         "input_config": file_dict,
         "reactions": {}
     }
-    
+
+    # Process global tasks
+    for task_id, task_def in inp.global_tasks.items():
+        status_tracker["global_tasks"][task_id] = {
+            "status": "ready" if not task_def.depends_on else "pending", 
+            "job_id": None,          
+            "scratch_dir": None      
+        }
+
+    # Process pipeline tasks
     for rxn_hash in reactions.keys():
         tasks_status = {}
         for task_id, task_def in inp.pipeline_tasks.items():

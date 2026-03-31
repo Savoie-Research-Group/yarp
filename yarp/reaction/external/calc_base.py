@@ -6,12 +6,17 @@ class AsyncYarpCalculator:
     """
     Base class defining the asynchronous lifecycle interface required by progress_yarp.py.
     """
-    def __init__(self, task_def, rxn_obj, job_config):
+    def __init__(self, task_def, rxn_data, job_config):
         self.task_def = task_def
-        self.rxn = rxn_obj
         self.config = task_def.config
-        self.scratch_dir = None
+        if isinstance(rxn_data, dict):
+            self.reactions = rxn_data
+            self.rxn = None
+        else:
+            self.rxn = rxn_data
+            self.reactions = None
         self.job_manager = job_config
+        self.scratch_dir = None
 
     def set_scratch_dir(self, path: Path):
         self.scratch_dir = path

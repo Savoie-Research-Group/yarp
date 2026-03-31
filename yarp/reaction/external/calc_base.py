@@ -88,7 +88,7 @@ class AsyncYarpCalculator:
             f.write(f"#$ -N {job_name}\n")
             f.write(f"#$ -q {queue}\n")
             f.write(f"#$ -pe smp {cpus}\n") # ERM: this might be specific to CRC at ND
-            f.write(f"#$ -l h_vmem={mem}M\n")
+            f.write(f"#$ -l h_vmem={mem * cpus}M\n")
             f.write(f"#$ -l h_rt={time}\n")
             f.write("#$ -o /dev/null\n")
             f.write("#$ -e /dev/null\n\n")

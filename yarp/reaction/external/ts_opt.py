@@ -23,7 +23,7 @@ class TSOptTask(AsyncYarpCalculator):
 class PysisyphusTSOptCalculator(TSOptTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+        self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
         initial_guesses = []
@@ -78,13 +78,12 @@ class PysisyphusTSOptCalculator(TSOptTask):
         # ---------------------------------------------------------
         submit_script_path = self.scratch_dir / "submit_tsopt.sh"
         
-        # Pulls the docker prefix (e.g., 'docker run --rm -v /scratch:/work -u UID:GID yarp_pysisyphus')
-        docker_cmd_prefix = self.get_container_prefix("yarp_pysisyphus", str(self.scratch_dir))
+        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
         
         with open(submit_script_path, "w") as f:
             f.write("#!/bin/bash\n")
-            # Launch the container and tell it to run the inner script
-            f.write(f"{docker_cmd_prefix} bash /work/run_pysis_inner.sh\n")
+            self.write_scheduler_headers(f)
+            f.write(f"{prefix} bash /work/run_pysis_inner.sh\n")
             
         submit_script_path.chmod(0o755)
         

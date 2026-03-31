@@ -32,7 +32,7 @@ class MinOptTask(AsyncYarpCalculator):
 class PysisyphusMinOptCalculator(MinOptTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "yarp_pysisyphus:latest" # Future GHCR link
+        self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
         if self.task_def.task_type == "reactant_optimization":
@@ -61,6 +61,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n")
+            self.write_scheduler_headers(f)
             f.write(f"cd {self.scratch_dir}\n")
             f.write(f"{full_command}\n")
 

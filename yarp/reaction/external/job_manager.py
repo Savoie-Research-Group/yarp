@@ -28,11 +28,11 @@ class SlurmJobManager(BaseJobManager):
         except subprocess.CalledProcessError:
             return False
 
-class QSEJobManager(BaseJobManager):
+class SGEJobManager(BaseJobManager):
     def submit(self, script_path: str) -> str:
         # Assuming qsub returns the job ID directly
         result = subprocess.run(["qsub", str(script_path)], capture_output=True, text=True, check=True)
-        return result.stdout.strip()
+        return result.stdout.strip().split()[2]
 
     def is_running(self, job_id: str) -> bool:
         if not job_id: return False
@@ -46,8 +46,8 @@ class QSEJobManager(BaseJobManager):
 def get_job_manager(scheduler_type: str) -> BaseJobManager:
     if scheduler_type.lower() == "slurm":
         return SlurmJobManager()
-    elif scheduler_type.lower() == "qse":
-        return QSEJobManager()
+    elif scheduler_type.lower() == "sge":
+        return SGEJobManager()
     elif scheduler_type.lower() == "local":
             return LocalJobManager()
     else:

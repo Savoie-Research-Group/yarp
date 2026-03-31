@@ -65,25 +65,33 @@ class AsyncYarpCalculator:
         """Writes the top portion of the bash script based on scheduler type."""
         scheduler = self.job_manager.scheduler
         job_name = self.job_manager.job_name
+        queue = self.job_manager.queue
         cpus = self.config.n_cpus
         mem = self.config.mem_per_cpu
+        time = self.config.max_runtime
 
         if scheduler == "slurm":
             f.write(f"#SBATCH --job-name={job_name}\n")
-            if self.job_manager.queue:
-                f.write(f"#SBATCH --partition={self.job_manager.queue}\n")
-            f.write("#SBATCH --tasks-per-node=1\n")
+            f.write(f"#SBATCH --partition={queue}\n")
+            f.write("#SBATCH -N 1\n") # nodes
+            f.write("#SBATCH -n 1\n") # tasks
             f.write(f"#SBATCH --cpus-per-task={cpus}\n")
-            f.write(f"#SBATCH --mem-per-cpu={mem}M\n\n")
+            f.write(f"#SBATCH --mem-per-cpu={mem}M\n")
+            f.write(f"#SBATCH --time={time}\n")
+            f.write("#SBATCH --output /dev/null\n")
+            f.write("#SBATCH --error /dev/null\n\n")
 
             if self.job_manager.module_container:
                 f.write(f"{self.job_manager.module_container}\n\n")
 
-        elif scheduler == "qse":
+        elif scheduler == "sge":
             f.write(f"#$ -N {job_name}\n")
-            if self.job_manager.queue:
-                f.write(f"#$ -q {self.job_manager.queue}\n")
-            f.write(f"#$ -pe smp {cpus}\n\n")
+            f.write(f"#$ -q {queue}\n")
+            f.write(f"#$ -pe smp {cpus}\n") # ERM: this might be specific to CRC at ND
+            f.write(f"#$ -l h_vmem={mem}M\n")
+            f.write(f"#$ -l h_rt={time}\n")
+            f.write("#$ -o /dev/null\n")
+            f.write("#$ -e /dev/null\n\n")
 
             if self.job_manager.module_container:
                 f.write(f"{self.job_manager.module_container}\n\n")

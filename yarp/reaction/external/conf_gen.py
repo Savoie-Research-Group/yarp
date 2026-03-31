@@ -43,6 +43,7 @@ class CrestConfCalculator(ConfTask):
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n")
+            self.write_scheduler_headers(f)
             f.write(f"cd {self.scratch_dir}\n")
             # Pipe output to a log file so it doesn't flood the local terminal
             f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")

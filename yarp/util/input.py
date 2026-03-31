@@ -26,7 +26,7 @@ class JobManagerConfig:
         self.container = self.container.lower()
 
         # Sanity Check 1: Schedulers that require a queue
-        if self.scheduler in ["qse", "slurm"] and not self.queue:
+        if self.scheduler in ["sge", "slurm"] and not self.queue:
             raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
 
         # Sanity Check 2: Apptainer/Singularity environments
@@ -75,11 +75,12 @@ class NetworkConfig:
 
 @dataclass
 class ConformerConfig:
-    """Single Source of Truth for Conformer Generation parameter defaults!"""
+    """Holds settings specific to generating a reactant/product conformers"""
     software: str = "crest"
     lot: str = "gfn2"
-    n_cpus: int = 4
+    n_cpus: int = 1
     mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
     charge: int = 0
@@ -87,13 +88,14 @@ class ConformerConfig:
 
 @dataclass
 class GSMConfig:
-    """Single Source of Truth for Growing String Method parameter defaults!"""
+    """Holds settings specific to generating transition state guesses via GSM"""
     software: str = "pysisyphus"
     selector: str = "rich"
     joint_opt: str = "dual"
     n_conf: int = 1
-    n_cpus: int = 4
+    n_cpus: int = 1
     mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
     bias_lot: str = "uff"
     gsm_lot: str = "xtb"
     max_gsm_nodes: int = 30
@@ -102,10 +104,12 @@ class GSMConfig:
 
 @dataclass
 class RPOptConfig:
+    """Holds settings specific to optimizing reactant/product conformers"""
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
     mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
     do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
@@ -114,10 +118,12 @@ class RPOptConfig:
 
 @dataclass
 class TSOptConfig:
+    """Holds settings specific to optimizing transition state conformers"""
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
     mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
     do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
@@ -127,10 +133,12 @@ class TSOptConfig:
 
 @dataclass
 class IRCValConfig:
+    """Holds settings specific to validating transition states with IRC"""
     software: str = "pysisyphus"
     lot: str = "xtb"
     n_cpus: int = 1
     mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
     max_cycles: int = 300
     conv_thresh: str = 'gau'
     charge: int = 0

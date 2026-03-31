@@ -35,7 +35,7 @@ class AsyncYarpCalculator:
                 print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
                 subprocess.run(["docker", "pull", image_name], check=True)
 
-            return f"docker run --rm -v {work_dir}:/work {image_name}"
+            return f"docker run --rm -v {work_dir}:/work -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
@@ -56,7 +56,7 @@ class AsyncYarpCalculator:
                     check=True
                 )
 
-            return f"apptainer exec --bind {work_dir}:/work {sif_path}"
+            return f"apptainer exec --bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")

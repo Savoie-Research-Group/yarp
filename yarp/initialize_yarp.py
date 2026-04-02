@@ -25,10 +25,12 @@ def initialize_from_dict(file_dict):
     
     # Initialize the STATUS dictionary
     status_tracker = {
+        "status_output_file": inp.status_file,
         "pipeline_tasks": list(inp.pipeline_tasks.keys()),
         "global_tasks_list": list(inp.global_tasks.keys()),
         "global_tasks": {},
         "input_config": file_dict,
+        "reaction_output_file": inp.out_file,
         "reactions": {}
     }
 
@@ -60,18 +62,17 @@ def initialize_from_dict(file_dict):
 
 def save_state(work_dir, reactions, status_tracker):
     """Writes the generated state to disk."""
-    with open(work_dir / "YARP_RXNS.pkl", "wb") as f:
+    rxn_output = status_tracker.get('reaction_output_file')
+    with open(work_dir / rxn_output, "wb") as f:
         pickle.dump(reactions, f)
-        
-    with open(work_dir / "STATUS.json", "w") as f:
+
+    status_output = status_tracker.get('status_output_file')
+    with open(work_dir / status_output, "w") as f:
         json.dump(status_tracker, f, indent=4)
         
     print(f"Initialized {len(reactions)} reactions and saved to disk!")
 
-def main(yaml_file):
-    with open(yaml_file, 'r') as f:
-        file_dict = yaml.safe_load(f)
-
+def main(file_dict):
     # Figure out a way to print the current version/commit hash
     print("First off, here's the input file you provided:")
     print("=====================================")
@@ -94,5 +95,7 @@ if __name__ == "__main__":
                  |_/_/   \_\_| \_\_|
                         // Yet Another Reaction Program
     """)
+    with open(sys.argv[1], 'r') as f:
+        file_dict = yaml.safe_load(f)
 
-    main(sys.argv[1])
+    main(file_dict)

@@ -9,16 +9,26 @@ from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calc_factory import get_calculator
 
 def load_state(work_dir: Path):
-    with open(work_dir / "STATUS.json", "r") as f:
+    json_files = list(work_dir.glob("*.json"))
+    if not json_files:
+        raise FileNotFoundError(f"No JSON file found in {work_dir}")
+    json_path = json_files[0]
+    with open(work_dir / json_path, "r") as f:
         status_tracker = json.load(f)
-    with open(work_dir / "YARP_RXNS.pkl", "rb") as f:
+    # ERM: I don't love this, as it's fragile, but it's the only way I can see to
+    # allow for pytest to write the STATUS.json file to a temp dir during testing...
+
+    rxn_file = status_tracker.get('reaction_output_file')
+    with open(work_dir / rxn_file, "rb") as f:
         reactions = pickle.load(f)
     return status_tracker, reactions
 
 def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxns: dict):
-    with open(work_dir / "STATUS.json", "w") as f:
+    status_file = status_tracker.get('status_output_file')
+    with open(work_dir / status_file, "w") as f:
         json.dump(status_tracker, f, indent=4)
-    with open(work_dir / "YARP_RXNS.pkl", "wb") as f:
+    rxn_file = status_tracker.get('reaction_output_file')
+    with open(work_dir / rxn_file, "wb") as f:
         pickle.dump(reactions, f)
         
     if failed_rxns:

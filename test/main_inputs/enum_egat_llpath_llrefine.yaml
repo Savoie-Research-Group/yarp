@@ -6,6 +6,7 @@ initialize:
     mode: concerted
     bonds to break: 2
     bonds to form: 2
+    reactive atoms: [0, 1, 2, 3] # only enumerate between heavy atoms
     enumeration filters:
       lewis score: 0.0
       formal charge: 2.0
@@ -17,8 +18,10 @@ stages:
  - ll_refine
 
 egat:
-  method: ml_predict
-  model: egat_pretrain
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 1
+  mem_per_cpu: 1000 # in MB
 
 ll_path:
   method: init_rxn_path
@@ -27,7 +30,6 @@ ll_path:
      software: crest
      lot: gfn
      n_cpus: 4
-     selector: rich # other option: poor
      joint_opt: dual # other options: r_only, p_only
   gsm:
      software: pysisyphus

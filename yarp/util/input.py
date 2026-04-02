@@ -22,8 +22,10 @@ class JobManagerConfig:
 
     def __post_init__(self):
         # Normalize inputs for easier checking
-        self.scheduler = self.scheduler.lower()
-        self.container = self.container.lower()
+        if self.scheduler is not None:
+            self.scheduler = self.scheduler.lower()
+        if self.container is not None:
+            self.container = self.container.lower()
 
         # Sanity Check 1: Schedulers that require a queue
         if self.scheduler in ["sge", "slurm"] and not self.queue:
@@ -198,6 +200,7 @@ class InputParser:
         if not self.d0_node:
             raise RuntimeError("Please provide an initial species for enumeration.")
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
+        self.status_file = initnode.get("status", "STATUS.json")
 
         # Job manager configuration
         jm_node = initnode.get("job manager", {})
@@ -248,14 +251,14 @@ class InputParser:
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
         return JobManagerConfig(
-            scheduler=jm_node.get("scheduler", "slurm"),
-            container=jm_node.get("container", "docker"),
+            scheduler=jm_node.get("scheduler"),
+            container=jm_node.get("container"),
             sif_location=jm_node.get("sif_location"),
             module_container=jm_node.get("module_container"),
             # Check both underscore and space versions just in case
-            max_active_jobs=jm_node.get("max_active_jobs", jm_node.get("max active jobs", 100)),
+            max_active_jobs=jm_node.get("max_active_jobs"),
             queue=jm_node.get("queue"),
-            job_name=jm_node.get("job_name", "yarp")
+            job_name=jm_node.get("job_name")
         )
 
     def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:

@@ -19,19 +19,29 @@ class EgatMLPredict(MLPredictTask):
         
         # We need a way to track which SMILES string belongs to which reaction hash
         # so we can parse the results back to the right object later!
-        self.smiles_to_hash = {}
+        self.forward_smiles_to_hash = {}
+        self.reverse_smiles_to_hash = {}
 
     def generate_input(self):
-        in_csv_path = self.scratch_dir / "in.csv"
-        with open(in_csv_path, "w", newline="") as f:
+        forward_csv = self.scratch_dir / "forward_in.csv"
+        with open(forward_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["reactions"])
 
             for rxn_hash, rxn in self.reactions.items():
                 mapped_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
-                self.smiles_to_hash[mapped_smiles] = rxn_hash
+                self.forward_smiles_to_hash[mapped_smiles] = rxn_hash
                 writer.writerow([mapped_smiles])
-    
+
+        reverse_csv = self.scratch_dir / "reverse_in.csv"
+        with open(reverse_csv, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["reactions"])
+
+            for rxn_hash, rxn in self.reactions.items():
+                mapped_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
+                self.reverse_smiles_to_hash[mapped_smiles] = rxn_hash
+                writer.writerow([mapped_smiles])
 
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"
@@ -46,19 +56,21 @@ class EgatMLPredict(MLPredictTask):
 
             f.write(f"cd {self.scratch_dir}\n")
 
-            cmd = f"{prefix} --input in.csv --output out.csv"
-            f.write(f"{cmd} > egat.log 2> egat.err\n")
+            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
+            f.write(f"{cmd1} > forward.log 2> forward.err\n")
+
+            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
+            f.write(f"{cmd2} > reverse.log 2> reverse.err\n")
 
         script_path.chmod(0o755)
         return script_path
 
     def check_output(self) -> bool:
-        return (self.scratch_dir / "out.csv").exists()
+        return (self.scratch_dir / "forward_out.csv").exists() and (self.scratch_dir / "reverse_out.csv").exists()
 
     def scrape_data(self):
-        out_csv_path = self.scratch_dir / "out.csv"
-
-        with open(out_csv_path, "r") as f:
+        forward_out_csv = self.scratch_dir / "forward_out.csv"
+        with open(forward_out_csv, "r") as f:
             reader = csv.DictReader(f)
 
             for row in reader:
@@ -67,12 +79,27 @@ class EgatMLPredict(MLPredictTask):
                 enthalpy = float(row["reaction_enthalpy"])
 
                 # Retrieve the original reaction hash
-                rxn_hash = self.smiles_to_hash.get(rxn_smiles)
+                rxn_hash = self.forward_smiles_to_hash.get(rxn_smiles)
 
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.barrier[self.config.model] = barrier
                     rxn.heat_of_rxn[self.config.model] = enthalpy
+
+        reverse_out_csv = self.scratch_dir / "reverse_out.csv"
+        with open(reverse_out_csv, "r") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                rxn_smiles = row["reaction_smiles"]
+                barrier = float(row["activation_barrier"])
+
+                # Retrieve the original reaction hash
+                rxn_hash = self.reverse_smiles_to_hash.get(rxn_smiles)
+
+                if rxn_hash:
+                    rxn = self.reactions[rxn_hash]
+                    rxn.reverse_barrier[self.config.model] = barrier
 
     def cleanup(self):
         # # EGAT is lightweight, maybe just delete the folder

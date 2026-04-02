@@ -64,7 +64,7 @@ def progress_yarp(work_dir: Path):
         if g_meta["status"] == "submitted":
             task_def = config.global_tasks[g_task_id]
 
-            calc = get_calculator(task_def, reactions, job_manager)
+            calc = get_calculator(task_def, reactions, config.job_manager)
 
             if g_meta["scratch_dir"]:
                 calc.set_scratch_dir(Path(g_meta["scratch_dir"]))
@@ -161,7 +161,7 @@ def progress_yarp(work_dir: Path):
         if g_meta["status"] == "ready":
                 
             task_def = config.global_tasks[g_task_id]
-            calc = get_calculator(task_def, reactions, job_manager)
+            calc = get_calculator(task_def, reactions, config.job_manager)
             
             scratch_path = work_dir / "SCRATCH" / f"GLOBAL_{g_task_id}"
             calc.set_scratch_dir(scratch_path)

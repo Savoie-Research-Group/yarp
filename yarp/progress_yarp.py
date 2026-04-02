@@ -98,6 +98,7 @@ def progress_yarp(work_dir: Path):
 
                 if job_manager.is_running(meta["job_id"]):
                     # Job is still going, add it to our tally!
+                    print(f"   * [{rxn_hash}] Task '{task_id}' is still running. Come back later...")
                     active_jobs += 1
                 else:
                     # Job finished! Time to process it.
@@ -141,6 +142,41 @@ def progress_yarp(work_dir: Path):
                             break
                 
                 if deps_met:
+                    # --- NEW: Evaluate Pre-Process Filters ---
+                    stage_filter = config.stage_filters.get(task_def.parent_stage)
+
+                    # Only evaluate at the entry points of the pipeline
+                    if stage_filter and task_def.task_type in ["reactant_conformer", "product_conformer"]:
+                        rxn_obj = reactions[rxn_hash]
+
+                        # Dynamically grab the dictionary from the reaction object (e.g. rxn.barrier)
+                        prop_dict = getattr(rxn_obj, stage_filter.property, None)
+
+                        if prop_dict is not None and stage_filter.source in prop_dict:
+                            val = prop_dict[stage_filter.source]
+
+                            # If it exceeds the threshold, kill the run cleanly
+                            if val > stage_filter.threshold:
+                                meta["status"] = "filtered_out"
+                                meta["error_log"] = f"Filtered out: {stage_filter.property} ({val:.2f}) > threshold ({stage_filter.threshold})"
+
+                                # Prevent printing the error twice (once for reactant, once for product)
+                                if rxn_hash not in failed_rxns:
+                                    failed_rxns[rxn_hash] = rxn_obj
+                                    print(f"   * [{rxn_hash}] Filtered out! {stage_filter.property} ({val:.2f}) > {stage_filter.threshold}")
+
+                                continue # Skip setting this task to 'ready'
+                        else:
+                            # If EGAT finished but data is missing entirely, fail it out
+                            meta["status"] = "finished_with_error"
+                            meta["error_log"] = f"Missing filter property: {stage_filter.property} from {stage_filter.source}"
+
+                            if rxn_hash not in failed_rxns:
+                                failed_rxns[rxn_hash] = rxn_obj
+                                print(f"   * [{rxn_hash}] Pipeline aborted: Missing ML property '{stage_filter.property}' from '{stage_filter.source}'.")
+
+                            continue # Skip setting this task to 'ready'
+
                     meta["status"] = "ready"
                     print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
 

@@ -44,10 +44,9 @@ class EgatMLPredict(MLPredictTask):
 
             self.write_scheduler_headers(f)
 
-            if self.job_manager.module_container:
-                f.write(f"{self.job_manager.module_container}\n\n")
+            f.write(f"cd {self.scratch_dir}\n")
 
-            cmd = f"{prefix} egat --input in.csv --output out.csv"
+            cmd = f"{prefix} --input in.csv --output out.csv"
             f.write(f"{cmd} > egat.log 2> egat.err\n")
 
         script_path.chmod(0o755)

@@ -24,15 +24,11 @@ def load_state(work_dir: Path):
     return status_tracker, reactions
 
 def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxns: dict):
-    status_file = status_tracker.get('status_output_file')
-    with open(work_dir / status_file, "w") as f:
-        json.dump(status_tracker, f, indent=4)
-    rxn_file = status_tracker.get('reaction_output_file')
-    with open(work_dir / rxn_file, "wb") as f:
-        pickle.dump(reactions, f)
-        
+    # ====================================================================
+    # 1. PROCESS FAILURES (Extract Data & Save to Failed Logs)
+    # ====================================================================
     if failed_rxns:
-        # Append or create a separate pickle file for failed runs
+        # A. Update the Pickle file for programmatic recovery
         fail_file = work_dir / "failed_rxns.pkl"
         existing_fails = {}
         if fail_file.exists():
@@ -41,6 +37,48 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
         existing_fails.update(failed_rxns)
         with open(fail_file, "wb") as f:
             pickle.dump(existing_fails, f)
+
+        # B. Create/Update the human-readable JSON log
+        fail_json_file = work_dir / "failed_status.json"
+        existing_fail_status = {}
+        if fail_json_file.exists():
+            with open(fail_json_file, "r") as f:
+                existing_fail_status = json.load(f)
+
+        # Extract the human-readable error reasons from the status_tracker
+        for rxn_hash in failed_rxns.keys():
+            if rxn_hash not in existing_fail_status:
+                existing_fail_status[rxn_hash] = {}
+
+            rxn_tasks = status_tracker.get("reactions", {}).get(rxn_hash, {}).get("tasks", {})
+            for task_id, task_meta in rxn_tasks.items():
+                # Catch both standard errors and programmatic filters (like IRC)
+                if task_meta.get("status") in ["finished_with_error", "filtered_out"]:
+                    existing_fail_status[rxn_hash][task_id] = {
+                        "error_log": task_meta.get("error_log", "Unknown error"),
+                        "scratch_dir": task_meta.get("scratch_dir", "N/A")
+                    }
+
+        with open(fail_json_file, "w") as f:
+            json.dump(existing_fail_status, f, indent=4)
+
+        # C. CLEANUP: Now that errors are extracted, delete from the active pool!
+        for failed_hash in failed_rxns.keys():
+            if failed_hash in reactions:
+                del reactions[failed_hash]
+            if "reactions" in status_tracker and failed_hash in status_tracker["reactions"]:
+                del status_tracker["reactions"][failed_hash]
+
+    # ====================================================================
+    # 2. SAVE ACTIVE STATE (Dump cleanly purged boards to disk)
+    # ====================================================================
+    status_file = status_tracker.get('status_output_file')
+    with open(work_dir / status_file, "w") as f:
+        json.dump(status_tracker, f, indent=4)
+
+    rxn_file = status_tracker.get('reaction_output_file')
+    with open(work_dir / rxn_file, "wb") as f:
+        pickle.dump(reactions, f)
 
 def progress_yarp(work_dir: Path):
     print(f"Processing YARP progress in {work_dir}...")
@@ -118,6 +156,24 @@ def progress_yarp(work_dir: Path):
                             calc.cleanup()
                             meta["status"] = "terminated_normally"
                             print(f"   * [{rxn_hash}] Task '{task_id}' completed successfully.")
+
+                            # --- Evaluate IRC Outcome ---
+                            if task_def.task_type == "irc_validation":
+                                lot = getattr(task_def.config, 'lot', 'unknown')
+                                software = getattr(task_def.config, 'software', 'unknown')
+                                outcome_key = f"{lot}_{software}"
+
+                                # Access the saved label safely
+                                outcome = getattr(rxn_obj, 'outcome_label', {}).get(outcome_key)
+
+                                if outcome not in ["intended", "inverse_intended"]:
+                                    meta["status"] = "filtered_out"
+                                    meta["error_log"] = f"IRC validation failed: Outcome was '{outcome}'."
+
+                                    if rxn_hash not in failed_rxns:
+                                        failed_rxns[rxn_hash] = rxn_obj
+
+                                    print(f"   * [{rxn_hash}] Reaction failed IRC validation (Outcome: '{outcome}'). Routing to failed_rxns.")
                         else:
                             meta["status"] = "finished_with_error"
                             meta["error_log"] = "Data scraping failed."
@@ -152,7 +208,7 @@ def progress_yarp(work_dir: Path):
                             break
                 
                 if deps_met:
-                    # --- NEW: Evaluate Pre-Process Filters ---
+                    # --- Evaluate Pre-Process Filters ---
                     stage_filter = config.stage_filters.get(task_def.parent_stage)
 
                     # Only evaluate at the entry points of the pipeline

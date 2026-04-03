@@ -109,7 +109,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
 
             # 1. File existence check
             if not (log_file.exists() and xyz_file.exists()):
-                print(f"   * Run {i} failed: Missing expected output files.")
+                print(f"     * Run {i} failed: Missing expected output files.")
                 continue
 
             # 2. Log file termination check
@@ -117,13 +117,13 @@ class PysisyphusTSOptCalculator(TSOptTask):
                 log_text = f.read()
 
             if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"   * Run {i} failed: Did not find successful termination message in log.")
+                print(f"     * Run {i} failed: Did not find successful termination message in log.")
                 continue
 
             # 3. Hessian file termination check
             if self.config.do_hess:
                 if not os.path.exists(hess_file) and not os.path.exists(imag_file):
-                    print(f"   * Run {i} failed: Did not find final hessian or imaginary frequencies.")
+                    print(f"     * Run {i} failed: Did not find final hessian or imaginary frequencies.")
                     continue
 
             # If it passes all checks, at least one run succeeded!

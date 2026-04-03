@@ -41,7 +41,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         Runs the Joint Opt + ML Selection, then writes the files 
         required for the Pysisyphus GSM run.
         """
-        print(f"  * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
+        print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
         self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
         
         # Write inputs for each pair
@@ -125,7 +125,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
 
             # 1. File existence check
             if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
-                print(f"   * Run {i} failed: Missing expected output files.")
+                print(f"     * Run {i} failed: Missing expected output files.")
                 continue
 
             # 2. Log file termination check
@@ -133,7 +133,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 log_text = f.read()
 
             if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"   * Run {i} failed: Did not find successful termination message in log.")
+                print(f"     * Run {i} failed: Did not find successful termination message in log.")
                 continue
 
             # If it passes all checks, at least one run succeeded!

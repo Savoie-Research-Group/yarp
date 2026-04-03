@@ -79,7 +79,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
 
         # 1. File existence check
         if not (log_file.exists() and xyz_file.exists()):
-            print(f"   * Run failed: Missing expected output files.")
+            print(f"     * Run failed: Missing expected output files.")
             success = False
 
         # 2. Log file termination check
@@ -87,13 +87,13 @@ class PysisyphusMinOptCalculator(MinOptTask):
             log_text = f.read()
 
         if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
-            print(f"   * Run failed: Did not find successful termination message in log.")
+            print(f"     * Run failed: Did not find successful termination message in log.")
             success = False
 
         # 3. Hessian file termination check
         if self.config.do_hess:
             if not os.path.exists(hess_file):
-                print(f"   * Run failed: Did not find final hessian file.")
+                print(f"     * Run failed: Did not find final hessian file.")
                 success = False
 
         return success            

@@ -250,16 +250,26 @@ class InputParser:
 
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
-        return JobManagerConfig(
-            scheduler=jm_node.get("scheduler"),
-            container=jm_node.get("container"),
-            sif_location=jm_node.get("sif_location"),
-            module_container=jm_node.get("module_container"),
-            # Check both underscore and space versions just in case
-            max_active_jobs=jm_node.get("max_active_jobs"),
-            queue=jm_node.get("queue"),
-            job_name=jm_node.get("job_name")
-        )
+        # If the user omitted the block entirely, use all dataclass defaults
+        if not jm_node:
+            return JobManagerConfig()
+
+        # 1. Normalize keys (spaces to underscores) and drop None values.
+        # Dropping None ensures we don't accidentally overwrite a dataclass default.
+        kwargs = {
+            key.replace(" ", "_"): value 
+            for key, value in jm_node.items() 
+            if value is not None
+        }
+
+        # 2. Unpack the clean dictionary into the dataclass
+        try:
+            return JobManagerConfig(**kwargs)
+        except TypeError as e:
+            # Python's dataclass automatically raises a TypeError for two reasons:
+            # A) A required field (one without a default) is missing.
+            # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
+            raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
 
     def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:
         """Handles the logic for the 'separate products' input."""

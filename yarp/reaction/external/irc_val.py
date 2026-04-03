@@ -17,6 +17,112 @@ class IRCValTask(AsyncYarpCalculator):
         
         return ts_match
 
+    def _get_rxn_label(self, forward, backward):
+        """
+        Classify a given IRC outcome based on how forward/backward
+        geometries align with original reactant/product graphs
+        """
+        label = None
+
+        f_b_diff = np.abs(forward - backward)
+        if f_b_diff.sum() == 0:
+            # forward and reverse reactions have the same connectivity, uh oh...
+            label = 'no_adjmat_change'
+            return label
+
+        r_adj = self.rxn.reactant.graph.adj_mat
+        p_adj = self.rxn.product.graph.adj_mat
+
+        r_f_diff = np.abs(forward - r_adj)
+        r_b_diff = np.abs(backward - r_adj)
+        p_f_diff = np.abs(forward - p_adj)
+        p_b_diff = np.abs(backward - p_adj)
+
+        if p_f_diff.sum() == 0 and r_b_diff.sum() == 0:
+            label = 'intended'
+        elif p_b_diff.sum() == 0 and r_f_diff.sum() == 0:
+            # forward and reverse barriers are inverted from IRC outputs!
+            label = 'inverse_intended'
+        # ERM: All of the "unintended" types are going to be thrown out for now
+        # Will revisit later how we can incorporate them in a future development
+        elif (p_f_diff.sum() == 0 or p_b_diff.sum() == 0) and not (r_f_diff.sum() != 0 or r_b_diff.sum() != 0):
+            # product is reproduced, but reactant is not
+            label = 'reactant_unintended'
+        elif (r_f_diff.sum() == 0 or r_b_diff.sum() == 0) and not (p_f_diff.sum() != 0 or p_b_diff.sum() != 0):
+            # reactant is reproduced, but product is not
+            label = 'product_unintended'
+        else:
+            # neither the reactant nor the product is reproduced
+            label = 'unintended'
+
+        return label
+
+    def _get_final_results(self, irc_runs_dict):
+        """
+        Determine which TS, label, and barriers to use as the final result for this reaction.
+        Preferentially return intended > unintended > reaction-less TS
+        If multiple in each category, return TS with lowest forward barrier
+        """
+
+        intended = []
+        no_rxn = []
+        unintended = []
+        for data in irc_runs_dict.values():
+            label = data['outcome']
+
+            if label == "intended" or label == "inverse_intended":
+                intended.append(data)
+            elif label == "no_adjmat_change":
+                no_rxn.append(data)
+            else:
+                unintended.append(data)
+
+        # First, check for intended TS and return if present
+        if len(intended) >= 1:
+            best_ts = None
+            best_label = None
+            best_f_bar = 100000.00
+            best_r_bar = 100000.00
+            for data in intended:
+                if data['lhs_barrier'] < best_f_bar and data['ts_geom'] is not None:
+                    best_ts = data['ts_geom']
+                    best_label = data['outcome']
+                    best_f_bar = data['lhs_barrier']
+                    best_r_bar = data['rhs_barrier']
+            
+            return best_ts, best_label, best_f_bar, best_r_bar
+
+        # Second, check for unintended TS and return if present
+        elif len(unintended) >= 1:
+            best_ts = None
+            best_label = None
+            best_f_bar = 100000.00
+            best_r_bar = 100000.00
+            for data in unintended:
+                if data['lhs_barrier'] < best_f_bar and data['ts_geom'] is not None:
+                    best_ts = data['ts_geom']
+                    best_label = data['outcome']
+                    best_f_bar = data['lhs_barrier']
+                    best_r_bar = data['rhs_barrier']
+            
+            return best_ts, best_label, best_f_bar, best_r_bar
+
+        # If no other option, return "reaction-less" TS
+        else:
+            best_ts = None
+            best_label = None
+            best_f_bar = 100000.00
+            best_r_bar = 100000.00
+            for data in no_rxn:
+                if data['lhs_barrier'] < best_f_bar and data['ts_geom'] is not None:
+                    best_ts = data['ts_geom']
+                    best_label = data['outcome']
+                    best_f_bar = data['lhs_barrier']
+                    best_r_bar = data['rhs_barrier']
+            
+            return best_ts, best_label, best_f_bar, best_r_bar
+
+
 class PysisyphusIRCValCalculator(IRCValTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,7 +131,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
     def generate_input(self):
         initial_guesses = []
         for k in self.rxn.ts_geom.keys():
-            if "tsopt" in k:
+            if "tsopt" in k: # ERM: Need to add a check here for LOT/Software
                 initial_guesses.append(self.rxn.ts_geom[k])
 
         # Write inputs for each guess
@@ -102,7 +208,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
 
             # 1. File existence check
             if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
-                print(f"   * Run {i} failed: Missing expected output files.")
+                print(f"     * Run {i} failed: Missing expected output files.")
                 continue
 
             # 2. Log file termination check
@@ -110,7 +216,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
                 log_text = f.read()
 
             if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"   * Run {i} failed: Did not find successful termination message in log.")
+                print(f"     * Run {i} failed: Did not find successful termination message in log.")
                 continue
 
             # If it passes all checks, at least one run succeeded!
@@ -120,10 +226,15 @@ class PysisyphusIRCValCalculator(IRCValTask):
         return one_successful
 
     def scrape_data(self) -> bool:
+        # Pull out barriers and outcome labels for all IRC runs
+        irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
-            rxn_key = f'irc_{i}_{self.config.lot}_{self.config.software}'
+            irc_key = f'{i}_{self.config.lot}_{self.config.software}'
             run_dir = self.scratch_dir / f"irc_run{i}"
+
+            log_file = run_dir / f"irc_{i}.log"
+            f_barrier, b_barrier = self._get_barriers(log_file)
 
             forward_xyz_file = run_dir / "forward_end_opt.xyz"
             f_elements, f_geometry = self._parse_opt_geo(forward_xyz_file)
@@ -133,18 +244,31 @@ class PysisyphusIRCValCalculator(IRCValTask):
             b_elements, b_geometry = self._parse_opt_geo(backward_xyz_file)
             b_adj_mat = table_generator(b_elements, b_geometry)
 
-            rxn_outcome = self._get_rxn_label(forward=f_adj_mat, backward=b_adj_mat)
-            self.rxn.outcome_label[rxn_key] = rxn_outcome
+            irc_outcome = self._get_rxn_label(forward=f_adj_mat, backward=b_adj_mat)
 
-            log_file = run_dir / f"irc_{i}.log"
-            f_barrier, b_barrier = self._get_barriers(log_file)
-
-            if rxn_outcome == 'inverse_intended':
-                self.rxn.barrier[rxn_key + "_kcal_per_mol"] = b_barrier
-                self.rxn.reverse_barrier[rxn_key + "_kcal_per_mol"] = f_barrier
+            if irc_outcome == 'inverse_intended':
+                lhs = b_barrier
+                rhs = f_barrier
             else:
-                self.rxn.barrier[rxn_key + "_kcal_per_mol"] = f_barrier
-                self.rxn.reverse_barrier[rxn_key + "_kcal_per_mol"] = b_barrier
+                lhs = f_barrier
+                rhs= b_barrier
+            
+            irc_runs[irc_key] = {
+                "outcome": irc_outcome,
+                # ERM: this *should* be safe because we always optimize TS before IRC...
+                "ts_geom": self.rxn.ts_geom.get("tsopt_" + irc_key, None),
+                "lhs_barrier": lhs,
+                "rhs_barrier": rhs
+            }
+            print(f"     * TS {i} validated: {irc_outcome} with barrier of {lhs} kcal/mol")
+        
+        # Choose final TS opt structure and reaction outcome label to save to reaction object
+        ts, outcome, f_barrier, b_barrier = self._get_final_results(irc_runs)
+
+        self.rxn.ts_geom[f"validated_ts_{self.config.lot}_{self.config.software}"] = ts
+        self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
+        self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
+        self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
 
         return True
 
@@ -179,41 +303,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
     def _parse_opt_geo(self, xyz_file):
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
         return opt_elements, opt_geo
-    
-    def _get_rxn_label(self, forward, backward):
-        label = None
 
-        f_b_diff = np.abs(forward - backward)
-        if f_b_diff.sum() == 0:
-            # forward and reverse reactions have the same connectivity, uh oh...
-            label = 'no_adjmat_change'
-            return label
-
-        r_adj = self.rxn.reactant.graph.adj_mat
-        p_adj = self.rxn.product.graph.adj_mat
-
-        r_f_diff = np.abs(forward - r_adj)
-        r_b_diff = np.abs(backward - r_adj)
-        p_f_diff = np.abs(forward - p_adj)
-        p_b_diff = np.abs(backward - p_adj)
-
-        if p_f_diff.sum() == 0 and r_b_diff.sum() == 0:
-            label = 'intended'
-        elif p_b_diff.sum() == 0 and r_f_diff.sum() == 0:
-            # forward and reverse barriers are inverted from IRC outputs!
-            label = 'inverse_intended'
-        elif (p_f_diff.sum() == 0 or p_b_diff.sum() == 0) and not (r_f_diff.sum() != 0 or r_b_diff.sum() != 0):
-            # product is reproduced, but reactant is not
-            label = 'reactant_unintended'
-        elif (r_f_diff.sum() == 0 or r_b_diff.sum() == 0) and not (p_f_diff.sum() != 0 or p_b_diff.sum() != 0):
-            # reactant is reproduced, but product is not
-            label = 'product_unintended'
-        else:
-            # neither the reactant nor the product is reproduced
-            label = 'unintended'
-        
-        return label
-        
     def _get_barriers(self, log_file):
         """
         Returns left-hand-side (forward) and right-hand-side (backward) barriers

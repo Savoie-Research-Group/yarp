@@ -5,7 +5,6 @@ from copy import deepcopy
 
 from yarp.reaction.conformer import conformer
 
-
 class state:
     """
     Attributes:
@@ -49,7 +48,8 @@ class state:
         self.paired_bem = None
 
         self._species = self._graph.separate(canon=canon)
-        # We probably want to rethink this...
+
+        # ERM: We probably want to rethink this...
         # Can this be integrated with rxn.network_meta somehow?
         self.conc = dict()
         for _ in self.species:
@@ -67,11 +67,11 @@ class state:
     @property
     def inchi(self):
         return self._graph.inchi
-    
+
     @property
     def canon_smi(self):
         return self._graph.canon_smi
-    
+
     @property
     def map_smi(self):
         return self._graph.map_smi
@@ -87,56 +87,4 @@ class state:
     @property
     def species(self):
         return self._species
-
-    # ==========================================
-    # STAGE 2: Initial Guess Generation Helpers
-    # ==========================================
-
-    def generate_conformers(self, lot='gfn2', software='crest', source="initial_geom", n_conformers=1):
-        """
-        Step 2.A: Generate an ensemble of conformers for this state.
-        Calls external tools (like CREST) and populates self.conformers 
-        with the resulting structures.
-        """
-        pass
-
-    def bias_conformers_to_target(self, target_state_bem, lot, software):
-        """
-        Step 2.B: Perform joint optimization by applying constraints (using a paired BEM).
-        Biases the geometry of this state's conformers towards a target state 
-        (e.g., biasing reactants towards products).
-        """
-        pass
-
-    def evaluate_and_rank_conformers(self, strategy="ml-rich"):
-        """
-        Step 2.C: Rank conformers based on energy, RMSD, or ML predictions.
-        Tags the best candidate(s) to be passed into the GSM/TS-guess stage.
-        """
-        pass
-
-    # ==========================================
-    # STAGE 3: Refinement Helpers
-    # ==========================================
-
-    def optimize_conformers(self, conformer_keys, lot, software):
-        """
-        Step 3.A: Run high-level geometry optimization on specific conformers.
-        Reads the output and saves the refined conformers under new keys 
-        (e.g., 'rpopt-{lot}-{software}').
-        """
-        pass
-
-    # ==========================================
-    # Utility / I-O Helpers
-    # ==========================================
-
-    def extract_lowest_energy_conformer(self, lot):
-        """
-        Returns the conformer object with the lowest Gibbs Free Energy or 
-        electronic energy for a given level of theory.
-        """
-        pass
-
-
 

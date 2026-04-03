@@ -1,5 +1,5 @@
 """
-Definition of the conformer class and related helper functions.
+Definition of the conformer object class.
 """
 from yarp.util.write_files import xyz_generate_string
 

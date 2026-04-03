@@ -83,6 +83,18 @@ class PreProcessFilterConfig:
     threshold: float
 
 @dataclass
+class GeomSourceConfig:
+    label: str
+    lot: str
+    software: str
+
+@dataclass
+class InitialGeomConfig:
+    reactant: GeomSourceConfig
+    product: GeomSourceConfig
+    transition_state: GeomSourceConfig
+
+@dataclass
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
     model: str
@@ -132,6 +144,7 @@ class RPOptConfig:
     max_cycles: int = 300
     charge: int = 0
     multiplicity: int = 1
+    initial_geom: Optional[InitialGeomConfig] = None
 
 @dataclass
 class TSOptConfig:
@@ -147,6 +160,7 @@ class TSOptConfig:
     conv_thresh: str = 'gau'
     charge: int = 0
     multiplicity: int = 1
+    initial_geom: Optional[InitialGeomConfig] = None
 
 @dataclass
 class IRCValConfig:
@@ -247,6 +261,9 @@ class InputParser:
                     promised_data[prov] = task_id
 
                 self.pipeline_tasks[task_id] = task_def
+        
+        # Dynamically link inter-stage dependencies for path refinement
+        self._link_refine_dependencies()
 
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
@@ -430,11 +447,23 @@ class InputParser:
             )
 
         elif method == 'refine_rxn_path':
+            ig_node = data.get("initial_geom")
+            if not ig_node:
+                raise ValueError(f"Stage '{name}' uses 'refine_rxn_path' but is missing the required 'initial_geom' block.")
+
+            ig_config = InitialGeomConfig(
+                reactant=GeomSourceConfig(**ig_node.get("reactant", {})),
+                product=GeomSourceConfig(**ig_node.get("product", {})),
+                transition_state=GeomSourceConfig(**ig_node.get("transition_state", {}))
+            )
+
             rp_data = data.get('rp_opt', {})
             rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
+            rp_cfg.initial_geom = ig_config
 
             ts_data = data.get('ts_opt', {})
             ts_cfg = TSOptConfig(**{k: v for k, v in ts_data.items() if k in TSOptConfig.__dataclass_fields__})
+            ts_cfg.initial_geom = ig_config
 
             irc_data = data.get('irc_val', {})
             irc_cfg = IRCValConfig(**{k: v for k, v in irc_data.items() if k in IRCValConfig.__dataclass_fields__})
@@ -450,27 +479,27 @@ class InputParser:
                 task_id=r_opt_id,
                 task_type="reactant_optimization",
                 parent_stage=name,
-                depends_on=[], # Might be populated dynamically in __init__
+                depends_on=[], # Populated dynamically in __init__ via _link_refine_dependencies
                 config=rp_cfg,
-                requires_data=["reactant_conf"], # Needs a guess to run!
+                requires_data=[] # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
             )
 
             config.tasks[p_opt_id] = TaskDef(
                 task_id=p_opt_id,
                 task_type="product_optimization",
                 parent_stage=name,
-                depends_on=[], # Might be populated dynamically in __init__
+                depends_on=[], # Populated dynamically in __init__ via _link_refine_dependencies
                 config=rp_cfg,
-                requires_data=["product_conf"], # Needs a guess to run!
+                requires_data=[] # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
             )
 
             config.tasks[ts_opt_id] = TaskDef(
                 task_id=ts_opt_id, 
                 task_type="transition_state_optimization", 
                 parent_stage=name,
-                depends_on=[], # Might be populated dynamically in __init__
+                depends_on=[], # Populated dynamically in __init__ via _link_refine_dependencies
                 config=ts_cfg,
-                requires_data=["ts_guess"], # Needs a guess to run!
+                requires_data=[], # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
                 provides_data=["ts_opt"]
             )
 
@@ -484,3 +513,63 @@ class InputParser:
             )
 
         return config
+
+    def _link_refine_dependencies(self):
+        """
+        Scans pipeline tasks for 'refine_rxn_path' tasks. Looks backward to find the 
+        exact task that generated the requested initial_geom, and injects the dependency.
+        Raises a fail-fast error if the requested geometry source cannot be found.
+        """
+        for task_id, task_def in self.pipeline_tasks.items():
+            
+            # Check if this task has an initial_geom requirement attached
+            ig = getattr(task_def.config, "initial_geom", None)
+            if not ig:
+                continue
+
+            # Determine what type of task we are hunting for
+            if task_def.task_type == "reactant_optimization":
+                source = ig.reactant
+                target_type = "reactant_conformer" if source.label == "conf_gen" else "reactant_optimization"
+                
+            elif task_def.task_type == "product_optimization":
+                source = ig.product
+                target_type = "product_conformer" if source.label == "conf_gen" else "product_optimization"
+                
+            elif task_def.task_type == "transition_state_optimization":
+                source = ig.transition_state
+                # CRITICAL: If the user requests 'ts_opt', we must wait for the IRC task 
+                # of that refinement layer, because IRC produces the validated_ts dict!
+                target_type = "gsm" if source.label == "ts_guess" else "irc_validation"
+                
+            else:
+                continue # Skip IRC tasks (they link statically to ts_opt)
+
+            # Search BACKWARD through the pipeline to find the matching task
+            match_found = False
+            for prev_id, prev_task in self.pipeline_tasks.items():
+                if prev_id == task_id:
+                    break # Stop looking once we reach ourselves
+
+                if prev_task.task_type == target_type:
+                    # Check LOT and Software match
+                    if target_type == "gsm":
+                        prev_lot = getattr(prev_task.config, "gsm_lot", "").lower()
+                    else:
+                        prev_lot = getattr(prev_task.config, "lot", "").lower()
+                    prev_soft = getattr(prev_task.config, "software", "").lower()
+
+                    if prev_lot == source.lot.lower() and prev_soft == source.software.lower():
+                        task_def.depends_on.append(prev_id)
+                        match_found = True
+                        break # Successfully linked!
+
+            if not match_found:
+                raise ValueError(
+                    f"\n[FAIL-FAST] Incompatible Workflow Detected!\n"
+                    f"Task '{task_id}' requested an initial geometry with:\n"
+                    f"  - Label:    {source.label}\n"
+                    f"  - LOT:      {source.lot}\n"
+                    f"  - Software: {source.software}\n"
+                    f"...but no preceding task in the pipeline matches these criteria."
+                )

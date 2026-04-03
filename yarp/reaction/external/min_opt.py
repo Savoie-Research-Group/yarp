@@ -14,17 +14,27 @@ class MinOptTask(AsyncYarpCalculator):
         # 1. Determine which state we care about for this specific task
         if self.task_def.task_type == "reactant_optimization":
             node = self.rxn.reactant
+            source = self.config.initial_geom.reactant
         elif self.task_def.task_type == "product_optimization":
             node = self.rxn.product
+            source = self.config.initial_geom.reactant
         else:
             raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
 
         if not node.conformers:
             return False
 
-        # 2. Check if the rank0 conformer exists in that specific state
+        # 2. Determine the target key to look for
+        if source.label == "conf_gen":
+            expected_key = "conf_gen_rank0"
+        elif source.label == "rp_opt":
+            expected_key = f"rpopt_{source.lot}_{source.software}"
+        else:
+            raise ValueError(f"Unknown initial geom label for R/P MinOpt: {source.label}")
+
+        # 3. Check if the target conformer exists
         for key in node.conformers.keys():
-            if 'conf_gen_rank0' in key and node.conformers[key].geo is not None: 
+            if expected_key in key and node.conformers[key].geo is not None: 
                 return True
 
         return False
@@ -37,15 +47,30 @@ class PysisyphusMinOptCalculator(MinOptTask):
     def generate_input(self):
         if self.task_def.task_type == "reactant_optimization":
             node = self.rxn.reactant
+            source = self.config.initial_geom.reactant
         elif self.task_def.task_type == "product_optimization":
             node = self.rxn.product
+            source = self.config.initial_geom.product
         else:
             raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
 
-        initial_guess = next(v for k, v in node.conformers.items() if 'conf_gen_rank0' in k)
-        xyz_file = self.scratch_dir / "initial_geom.xyz"
-        with open(xyz_file, "w") as f:
-            f.write(initial_guess.to_xyz_string())
+        if source.label == "conf_gen":
+            expected_key = "conf_gen_rank0"
+        elif source.label == "rp_opt":
+            expected_key = f"rpopt_{source.lot}_{source.software}"
+
+        initial_conf = None
+        for key in node.conformers.keys():
+            if expected_key in key:
+                initial_conf = node.conformers[key]
+                break
+                
+        if not initial_conf:
+            raise ValueError(f"Could not find requested geometry: {expected_key}")
+
+        input_xyz_path = self.scratch_dir / "initial_geom.xyz"
+        with open(input_xyz_path, "w") as f:
+            f.write(initial_conf.to_xyz_string())
 
         inp_path = self.scratch_dir / "min_opt.yaml"
         self._write_pysis_rp_opt_input(inp_path, "initial_geom.xyz")

@@ -11,14 +11,19 @@ from yarp.util.constants import Constants
 
 class TSOptTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
+        source = self.config.initial_geom.transition_state
+        if source.label == "ts_guess":
+            expected_key = "ts_guess"
+        elif source.label == "ts_opt":
+            expected_key = f"validated_ts_{source.lot}_{source.software}"
+        else:
+            raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
 
-        ts_keys = self.rxn.ts_geom.keys()
-        ts_match = False
-        for k in ts_keys:
-            if 'ts_guess' in k and self.rxn.ts_geom[k].geo is not None: 
-                ts_match = True
-        
-        return ts_match
+        for k in self.rxn.ts_geom.keys():
+            if expected_key in k and self.rxn.ts_geom[k].geo is not None: 
+                return True
+
+        return False
 
 class PysisyphusTSOptCalculator(TSOptTask):
     def __init__(self, *args, **kwargs):
@@ -26,9 +31,17 @@ class PysisyphusTSOptCalculator(TSOptTask):
         self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
+        source = self.config.initial_geom.transition_state
+        if source.label == "ts_guess":
+            expected_key = "ts_guess"
+        elif source.label == "ts_opt":
+            expected_key = f"validated_ts_{source.lot}_{source.software}"
+        else:
+            raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
+
         initial_guesses = []
         for k in self.rxn.ts_geom.keys():
-            if "ts_guess" in k:
+            if expected_key in k:
                 initial_guesses.append(self.rxn.ts_geom[k])
 
         # Write inputs for each guess
@@ -138,7 +151,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
             conf = conformer()
             conf.lot = self.config.lot
             conf.software = self.config.software
-            conf.type = f"tsopt_{i}_{self.config.lot}_{self.config.software}"
+            conf.type = f"{i}_tsopt_{self.config.lot}_{self.config.software}"
 
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             log_file = run_dir / f"tsopt_{i}.log"

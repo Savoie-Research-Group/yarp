@@ -10,12 +10,15 @@ from yarp.util.constants import Constants
 class IRCValTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
         ts_keys = self.rxn.ts_geom.keys()
-        ts_match = False
-        for k in ts_keys:
-            if 'tsopt' in k and self.rxn.ts_geom[k].geo is not None: 
-                ts_match = True
         
-        return ts_match
+        # Check specifically for this stage's LOT and Software
+        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
+        
+        for k in ts_keys:
+            if expected_key in k and self.rxn.ts_geom[k].geo is not None: 
+                return True
+        
+        return False
 
     def _get_rxn_label(self, forward, backward):
         """
@@ -130,8 +133,10 @@ class PysisyphusIRCValCalculator(IRCValTask):
 
     def generate_input(self):
         initial_guesses = []
+        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
+        
         for k in self.rxn.ts_geom.keys():
-            if "tsopt" in k: # ERM: Need to add a check here for LOT/Software
+            if expected_key in k: 
                 initial_guesses.append(self.rxn.ts_geom[k])
 
         # Write inputs for each guess
@@ -230,7 +235,6 @@ class PysisyphusIRCValCalculator(IRCValTask):
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
-            irc_key = f'{i}_{self.config.lot}_{self.config.software}'
             run_dir = self.scratch_dir / f"irc_run{i}"
 
             log_file = run_dir / f"irc_{i}.log"
@@ -252,11 +256,13 @@ class PysisyphusIRCValCalculator(IRCValTask):
             else:
                 lhs = f_barrier
                 rhs= b_barrier
-            
-            irc_runs[irc_key] = {
+
+            target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
+            target_ts = self.rxn.ts_geom.get(target_ts_key, None)
+            irc_runs[i] = {
                 "outcome": irc_outcome,
                 # ERM: this *should* be safe because we always optimize TS before IRC...
-                "ts_geom": self.rxn.ts_geom.get("tsopt_" + irc_key, None),
+                "ts_geom": target_ts,
                 "lhs_barrier": lhs,
                 "rhs_barrier": rhs
             }

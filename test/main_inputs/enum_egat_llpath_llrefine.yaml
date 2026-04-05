@@ -38,6 +38,19 @@ ll_path:
 
 ll_refine:
   method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus  
   rp_opt:
      software: pysisyphus
      lot: xtb

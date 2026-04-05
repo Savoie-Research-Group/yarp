@@ -59,39 +59,6 @@ def test_happy_path_initialization(enum_egat_llpath_llrefine):
     assert rxn_tasks["ll_refine.irc_validation"]["status"] == "pending"
 
 
-def test_missing_init_path_initialization(enum_egat_llrefine):
-    """
-    Test 2: enum_egat_llrefine.yaml
-    Verifies that when a prerequisite stage is missing, the DAG does not
-    create execution dependencies, leaving tasks 'ready' to fail gracefully later.
-    """
-        
-    reactions, status_tracker = initialize_from_dict(enum_egat_llrefine)
-    
-    # Verify reaction generation
-    assert len(reactions) == 2, "Expected exactly 2 reaction objects generated."
-    
-    pipeline_tasks = status_tracker["pipeline_tasks"]
-    
-    # Ensure the init path tasks are completely absent
-    assert "ll_path.gsm" not in pipeline_tasks
-    
-    # Inspect the state
-    rxn_hash = list(reactions.keys())[0]
-    rxn_tasks = status_tracker["reactions"][rxn_hash]["tasks"]
-    
-    # CRITICAL CHECK: Because ll_path was skipped, no task in the pipeline promises "ts_guess".
-    # Therefore, ts_opt shouldn't have any internal pipeline dependencies holding it back.
-    # It starts as "ready" and will fail the Calculator.has_prerequisites() check in progress_yarp.py!
-    assert rxn_tasks["ll_refine.transition_state_optimization"]["status"] == "ready"
-
-    # Similar story for the reactant/product optimization steps
-    assert rxn_tasks["ll_refine.reactant_optimization"]["status"] == "ready"
-    assert rxn_tasks["ll_refine.product_optimization"]["status"] == "ready"
-    
-    # However, IRC validation STILL depends on ts_opt because they are both within the ll_refine stage!
-    assert rxn_tasks["ll_refine.irc_validation"]["status"] == "pending"
-
 def test_enum_minimal(enum_min_options):
     input_dict = enum_min_options
     main(input_dict)

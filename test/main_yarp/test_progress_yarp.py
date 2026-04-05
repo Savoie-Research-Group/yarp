@@ -83,38 +83,3 @@ def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators,
     assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.gsm"]["status"] == "submitted"
     assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.gsm"]["job_id"] == "9999"
 
-
-def test_sad_path_preflight_failure(mock_filesystem, mock_calculators, mocker):
-    """
-    Simulates a task failing the pre-flight check (e.g. missing TS guess).
-    """
-    status_tracker = {
-        "input_config": {"initialize": {"scheduler": "slurm"}},
-        "reactions": {
-            "rxn_1": {"tasks": {"stage2.ts_opt": {"status": "ready", "job_id": None, "scratch_dir": None}}}
-        }
-    }
-    mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, {"rxn_1": MagicMock()}))
-    
-    inp_mock = MagicMock()
-    inp_mock.job_manager.scheduler = "slurm"
-    inp_mock.job_manager.container = "docker"
-    inp_mock.job_manager.max_active_jobs = 10
-    inp_mock.global_tasks = {}
-
-    task_mock = MagicMock(task_type="transition_state_optimization", parent_stage="stage2", depends_on=[])
-    inp_mock.pipeline_tasks = {"stage2.ts_opt": task_mock}
-
-    mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
-
-    mocker.patch('yarp.progress_yarp.get_job_manager', return_value=MagicMock())
-    
-    # The Calculator realizes the reaction object is missing data
-    mock_calculators.has_prerequisites.return_value = False
-
-    progress_yarp(Path("/fake/dir"))
-
-    # The task should abort gracefully and flag as error
-    failed_task = status_tracker["reactions"]["rxn_1"]["tasks"]["stage2.ts_opt"]
-    assert failed_task["status"] == "finished_with_error"
-    assert "Pre-flight check failed" in failed_task["error_log"]

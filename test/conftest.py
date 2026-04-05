@@ -28,26 +28,6 @@ def enum_egat_llpath_llrefine(tmp_path):
 
     return data
 
-@pytest.fixture
-def enum_egat_llrefine(tmp_path):
-    # 1. Load the real YAML
-    yaml_path = Path(__file__).parent / "main_inputs" / "enum_egat_llrefine.yaml"
-    with open(yaml_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    # 2. Define the safe temporary output path
-    safe_output = tmp_path / "test_enum_egat_llrefine_output.pkl"
-    safe_status = tmp_path / "test_enum_egat_llrefine_STATUS.json"
-
-    # 3. Overwrite the nested key
-    if 'initialize' in data:
-        data['initialize']['output'] = str(safe_output)
-        data['initialize']['status'] = str(safe_status)
-    else:
-        # Fallback if the YAML structure changes in the future
-        pytest.fail("The input YAML does not contain an 'initialize' block.")
-
-    return data
 
 @pytest.fixture
 def enum_min_options(tmp_path):

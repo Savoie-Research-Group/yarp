@@ -2,6 +2,8 @@
 debug/*
 .vscode
 containers/*.sif
+containers/orca/*.tar.*
+containers/orca/example
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

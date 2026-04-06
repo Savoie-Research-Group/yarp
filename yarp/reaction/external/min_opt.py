@@ -346,11 +346,11 @@ class OrcaMinOptCalculator(MinOptTask):
         log_file = self.scratch_dir / f"min_opt.out"
         with open(log_file, "r") as f:
             log_text = f.read()
-        pattern = r"FINAL SINGLE POINT ENERGY:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)"
+        pattern = r"FINAL SINGLE POINT ENERGY\s+([-+]?\d*\.\d+)"
         matches = re.findall(pattern, log_text)
         if not matches:
             raise RuntimeError(f"Could not find energy in {log_file}")
         return float(matches[-1])
     
     def _parse_hessian_freq(self):
-        return False
+        return False, False

@@ -244,7 +244,7 @@ class OrcaMinOptCalculator(MinOptTask):
 
         # Construct the core command
         prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
-        orca_cmd = "orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err"
+        orca_cmd = "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'"
         full_command = f"{prefix} {orca_cmd}"
 
         with open(script_path, "w") as f:
@@ -259,30 +259,23 @@ class OrcaMinOptCalculator(MinOptTask):
         return script_path
 
     def check_output(self) -> bool:
-        log_file = self.scratch_dir / f"min_opt.log"
-        xyz_file = self.scratch_dir / "final_geometry.xyz"
-        hess_file = self.scratch_dir / "final_hessian.h5"
+        out_file = self.scratch_dir / f"min_opt.out"
+        xyz_file = self.scratch_dir / "min_opt.xyz"
 
         success = True
 
         # 1. File existence check
-        if not (log_file.exists() and xyz_file.exists()):
+        if not (out_file.exists() and xyz_file.exists()):
             print(f"     * Run failed: Missing expected output files.")
             success = False
 
         # 2. Log file termination check
-        with open(log_file, "r") as f:
+        with open(out_file, "r") as f:
             log_text = f.read()
 
-        if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
-            print(f"     * Run failed: Did not find successful termination message in log.")
+        if "THE OPTIMIZATION HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
+            print(f"     * Run failed: Did not find successful termination message in output.")
             success = False
-
-        # 3. Hessian file termination check
-        if self.config.do_hess:
-            if not os.path.exists(hess_file):
-                print(f"     * Run failed: Did not find final hessian file.")
-                success = False
 
         return success            
 
@@ -341,30 +334,23 @@ class OrcaMinOptCalculator(MinOptTask):
 
             # set XYZ input file
             f.write(f'*xyzfile {self.config.charge} {self.config.multiplicity} {input_geo_xyz}\n')
-            f.write('\nNever forget your bonus lines!!!\n')
+            f.write('\n# Never forget your bonus lines!!!\n')
 
 
     def _parse_opt_geo(self):
-        xyz_file = self.scratch_dir / "final_geometry.xyz"
+        xyz_file = self.scratch_dir / "min_opt.xyz"
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
         return opt_elements, opt_geo
     
     def _parse_energy(self):
-        log_file = self.scratch_dir / f"min_opt.log"
+        log_file = self.scratch_dir / f"min_opt.out"
         with open(log_file, "r") as f:
             log_text = f.read()
-        pattern = r"energy:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+hartree"
+        pattern = r"FINAL SINGLE POINT ENERGY:\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)"
         matches = re.findall(pattern, log_text)
         if not matches:
             raise RuntimeError(f"Could not find energy in {log_file}")
         return float(matches[-1])
     
     def _parse_hessian_freq(self):
-        hess_file = self.scratch_dir / f"final_hessian.h5"
-        if os.path.exists(hess_file):
-            data = h5py.File(hess_file, 'r')
-            hessian = np.array(data['hessian']) / Constants.a0_to_ang**2
-            freq = np.array(data['vibfreqs'])
-            return hessian, freq
-        else:
-            return None, None
+        return False

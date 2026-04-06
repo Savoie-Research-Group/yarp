@@ -414,7 +414,7 @@ class OrcaTSOptCalculator(TSOptTask):
 
             # set XYZ input file
             f.write(f'*xyzfile {self.config.charge} {self.config.multiplicity} {input_geo_xyz}\n')
-            f.write('\nNever forget your bonus lines!!!\n')
+            f.write('\n# Never forget your bonus lines!!!\n')
 
     def _parse_opt_geo(self, xyz_file):
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)

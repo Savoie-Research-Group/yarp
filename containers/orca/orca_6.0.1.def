@@ -2,8 +2,8 @@ Bootstrap: docker
 From: debian:bookworm-slim
 
 %files
-    # Copy the ORCA tarball from your host machine into the container's /tmp directory
-    orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /tmp/orca_installer.tar.xz
+    # Copy the ORCA tarball from your host machine into the container's /opt directory
+    orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /opt/orca_installer.tar.xz
 
 %environment
     # Set locale
@@ -48,10 +48,10 @@ From: debian:bookworm-slim
 
     # Extract the ORCA tarball we copied in the %files section into /opt/orca
     mkdir -p /opt/orca
-    tar -xf /tmp/orca_installer.tar.xz -C /opt/orca --strip-components=1
+    tar -xf /opt/orca_installer.tar.xz -C /opt/orca --strip-components=1
     
     # Clean up the installer
-    rm /tmp/orca_installer.tar.xz
+    rm /opt/orca_installer.tar.xz
 
 %runscript
     # This acts like the CMD in Docker. If you just 'apptainer run' the image, it opens bash.

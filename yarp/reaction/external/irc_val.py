@@ -9,20 +9,36 @@ from yarp.util.constants import Constants
 
 class IRCValTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
+        """
+        Ensure R, P, and TS with the same LOT and software are available.
+        Also check that TS is a valid saddle point
+        """
+        found_ts = False
         ts_keys = self.rxn.ts_geom.keys()
-        
-        # Check specifically for this stage's LOT and Software
-        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
-        
+        expected_ts = f"tsopt_{self.config.lot}_{self.config.software}"
         for k in ts_keys:
-            if expected_key in k and self.rxn.ts_geom[k].geo is not None: 
-                return True
-        
-        return False
+            if expected_ts in k and self.rxn.ts_geom[k].is_valid_ts():
+                found_ts = True
+
+        found_r = False
+        r_keys = self.rxn.reactant.conformers.keys()
+        expected_r = f"rpopt_{self.config.lot}_{self.config.software}"
+        for k in r_keys:
+            if expected_r in k:
+                found_r = True
+
+        found_p = False
+        p_keys = self.rxn.product.conformers.keys()
+        expected_p = f"rpopt_{self.config.lot}_{self.config.software}"
+        for k in p_keys:
+            if expected_p in k:
+                found_p = True
+
+        return found_ts and found_r and found_p
 
     def _get_num_runs(self) -> int:
-            run_dirs = list(self.scratch_dir.glob("irc_run*"))
-            return len(run_dirs)
+        run_dirs = list(self.scratch_dir.glob("irc_run*"))
+        return len(run_dirs)
 
     def _get_rxn_label(self, forward, backward):
         """
@@ -339,6 +355,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
 class OrcaIRCValCalculator(IRCValTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # ERM: Add a failure check here if the user hasn't built these already
         if self.job_manager.container == "docker":
             self.image_name = "orca:6.0.1"
         elif self.job_manager.container == "apptainer":
@@ -387,7 +404,7 @@ class OrcaIRCValCalculator(IRCValTask):
                 f.write(f"cd /work/irc_run{i}\n") 
                 
                 # Execute orca within the specific folder, saving logs locally
-                f.write(f"orca=$(which orca)")
+                f.write(f"orca=$(which orca)\n")
                 f.write(f"$orca irc_{i}.inp > irc_{i}.out 2> irc_{i}.err\n")
                 f.write(f"echo '--- Finished IRC {i} ---'\n\n")
                 
@@ -420,9 +437,9 @@ class OrcaIRCValCalculator(IRCValTask):
         
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"irc_run{i}"
-            log_file = run_dir / f"irc_{i}.log"
-            backward_xyz_file = run_dir / "backward_end_opt.xyz"
-            forward_xyz_file = run_dir / "forward_end_opt.xyz"
+            log_file = run_dir / f"irc_{i}.out"
+            backward_xyz_file = run_dir / f"irc_{i}_IRC_B.xyz"
+            forward_xyz_file = run_dir / f"irc_{i}_IRC_F.xyz"
 
             # 1. File existence check
             if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
@@ -433,7 +450,7 @@ class OrcaIRCValCalculator(IRCValTask):
             with open(log_file, "r") as f:
                 log_text = f.read()
 
-            if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
+            if "THE IRC HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
                 print(f"     * Run {i} failed: Did not find successful termination message in log.")
                 continue
 
@@ -445,19 +462,26 @@ class OrcaIRCValCalculator(IRCValTask):
 
     def scrape_data(self) -> bool:
         # Pull out barriers and outcome labels for all IRC runs
+        expected_rp = f"rpopt_{self.config.lot}_{self.config.software}"
+        gibbs_r = self.rxn.reactant.conformers[expected_rp].properties['gibbs_free_energy_kcal_per_mol']
+        gibbs_p = self.rxn.product.conformers[expected_rp].properties['gibbs_free_energy_kcal_per_mol']
+
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"irc_run{i}"
 
-            log_file = run_dir / f"irc_{i}.log"
-            f_barrier, b_barrier = self._get_barriers(log_file)
+            target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
+            target_ts = self.rxn.ts_geom.get(target_ts_key, None)
+            gibbs_ts = target_ts.properties['gibbs_free_energy_kcal_per_mol']
+            f_barrier = gibbs_ts - gibbs_r
+            b_barrier = gibbs_ts - gibbs_p
 
-            forward_xyz_file = run_dir / "forward_end_opt.xyz"
+            forward_xyz_file = run_dir / f"irc_{i}_IRC_F.xyz"
             f_elements, f_geometry = self._parse_opt_geo(forward_xyz_file)
             f_adj_mat = table_generator(f_elements, f_geometry)
 
-            backward_xyz_file = run_dir / "backward_end_opt.xyz"
+            backward_xyz_file = run_dir / f"irc_{i}_IRC_B.xyz"
             b_elements, b_geometry = self._parse_opt_geo(backward_xyz_file)
             b_adj_mat = table_generator(b_elements, b_geometry)
 
@@ -470,8 +494,6 @@ class OrcaIRCValCalculator(IRCValTask):
                 lhs = f_barrier
                 rhs= b_barrier
 
-            target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
-            target_ts = self.rxn.ts_geom.get(target_ts_key, None)
             irc_runs[i] = {
                 "outcome": irc_outcome,
                 # ERM: this *should* be safe because we always optimize TS before IRC...
@@ -502,7 +524,7 @@ class OrcaIRCValCalculator(IRCValTask):
             f.write(f'! {self.config.lot}\n\n')
 
             # set keywords to specify IRC calculation
-            f.write(f'! IRC\n\n')
+            f.write(f'! Freq IRC\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")
@@ -524,29 +546,3 @@ class OrcaIRCValCalculator(IRCValTask):
     def _parse_opt_geo(self, xyz_file):
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
         return opt_elements, opt_geo
-
-    def _get_barriers(self, log_file):
-        """
-        Returns left-hand-side (forward) and right-hand-side (backward) barriers
-        in units of kcal per mol
-        """
-        with open(log_file, "r") as f:
-            log_text = f.read()
-
-        anchor_pattern = r"Minimum energy of .*? at '(\w+)'\."
-        anchors = list(re.finditer(anchor_pattern, log_text))
-        if not anchors:
-            return None, None
-        
-        last_anchor_pos = anchors[-1].start()
-        relevant_text = log_text[last_anchor_pos:]
-        energy_pattern = r"^\s+(Left|TS|Right):\s+([\d.]+)\s+kJ mol"
-        matches = re.findall(energy_pattern, relevant_text, re.MULTILINE)
-        results = {}
-        for label, value in matches:
-            results[label] = float(value)
-        
-        forward_barrier = results['TS'] - results['Left']
-        reverse_barrier = results['TS'] - results['Right']
-        
-        return forward_barrier / Constants.kcal2kJ, reverse_barrier / Constants.kcal2kJ

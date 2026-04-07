@@ -139,7 +139,6 @@ class RPOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
-    do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
     charge: int = 0
@@ -154,7 +153,6 @@ class TSOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
-    do_hess: bool = True
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau'
@@ -481,7 +479,8 @@ class InputParser:
                 parent_stage=name,
                 depends_on=[], # Populated dynamically in __init__ via _link_refine_dependencies
                 config=rp_cfg,
-                requires_data=[] # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
+                requires_data=[], # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
+                provides_data=["reactant_opt"]
             )
 
             config.tasks[p_opt_id] = TaskDef(
@@ -490,7 +489,8 @@ class InputParser:
                 parent_stage=name,
                 depends_on=[], # Populated dynamically in __init__ via _link_refine_dependencies
                 config=rp_cfg,
-                requires_data=[] # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
+                requires_data=[], # Explicitly removed! (ERM: Wonder if this will break "refine only" workflows...)
+                provides_data=["product_opt"]
             )
 
             config.tasks[ts_opt_id] = TaskDef(
@@ -509,7 +509,7 @@ class InputParser:
                 parent_stage=name, 
                 depends_on=[ts_opt_id],
                 config=irc_cfg,
-                requires_data=["ts_opt"] # Needs an optimized TS to run!
+                requires_data=["ts_opt", "reactant_opt", "product_opt"] # IRC does barrier calculations, so needs all 3 prior stages
             )
 
         return config

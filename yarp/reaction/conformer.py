@@ -1,6 +1,7 @@
 """
 Definition of the conformer object class.
 """
+import numpy as np
 from yarp.util.write_files import xyz_generate_string
 
 class conformer:
@@ -49,11 +50,9 @@ class conformer:
 
         self.properties = {
             "internal_energy_Eh": None,
-            "Gibbs_free_energy_kcal_per_mol": None,
-            "heat_of_formation_0K_kcal_per_mol": None,
-            "heat_of_formation_298K_kcal_per_mol": None,
-            "standard_entropy_kcal_per_mol": None,
-            "heat_capacity_joule_per_K": None # assume starting temp/pressure of 25C and 1 atm?
+            "gibbs_free_energy_kcal_per_mol": None,
+            "enthalpy_kcal_per_mol": None,
+            "entropy_temp_kcal_per_mol": None
         }
 
         if calc_type is not None and calc_data is not None:
@@ -81,19 +80,25 @@ class conformer:
         else:
             pass
 
-    def is_valid_minimum(self):
+    def is_valid_minimum(self, tolerance=-1e-2):
         """
         Checks if the structure is a valid local minimum (i.e., exactly zero imaginary frequencies).
         Returns bool.
         """
-        pass
+        if self.vibrational_freqs is None: return False
 
-    def is_valid_ts(self):
+        n_imaginary = np.sum(self.vibrational_freqs < tolerance)
+        return n_imaginary == 0
+
+    def is_valid_ts(self, tolerance=-1e-2):
         """
-        Checks if the structure is a valid saddle point (i.e., exactly one imaginary frequency).
+        Checks if the structure is a valid 1st order saddle point (i.e., exactly one imaginary frequency).
         Returns bool.
         """
-        pass
+        if self.vibrational_freqs is None: return False
+
+        n_imaginary = np.sum(self.vibrational_freqs < tolerance)
+        return n_imaginary == 1
     
     def to_xyz_string(self):
         """

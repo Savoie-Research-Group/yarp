@@ -283,7 +283,7 @@ class OrcaMinOptCalculator(MinOptTask):
         log_file = self.scratch_dir / f"min_opt.out"
         conf.properties['internal_energy_Eh'] = self._parse_energy(log_file)
 
-        enthalpy, entropy, gibbs = self._parse_thermo(log_file)
+        enthalpy, entropy, gibbs = self._parse_orca_thermo(log_file)
         conf.properties['gibbs_free_energy_kcal_per_mol'] = gibbs
         conf.properties['enthalpy_kcal_per_mol'] = enthalpy
         conf.properties['entropy_temp_kcal_per_mol'] = entropy

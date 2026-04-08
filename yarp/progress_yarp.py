@@ -107,6 +107,51 @@ def progress_yarp(work_dir: Path):
     print(f"Max active jobs allowed: {max_active_jobs}")
 
     # =================================================================
+    # PASS 0: Fast-Forward Previously Characterized Reactions
+    # =================================================================
+    print("Performing pre-flight checks to skip already characterized reactions...")
+
+    # 0A. Fast-Forward Pipeline Tasks (Local)
+    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        rxn_obj = reactions.get(rxn_hash)
+        if not rxn_obj: continue
+
+        for task_id, meta in rxn_meta["tasks"].items():
+            if meta["status"] in ["ready", "pending"]:
+                task_def = config.pipeline_tasks[task_id]
+
+                lot = getattr(task_def.config, 'lot', None)
+                software = getattr(task_def.config, 'software', None)
+
+                if lot and software:
+                    barrier_key = f"{lot}_{software}"
+
+                    has_outcome = hasattr(rxn_obj, 'outcome_label') and barrier_key in rxn_obj.outcome_label
+                    has_barrier = hasattr(rxn_obj, 'barrier') and barrier_key in rxn_obj.barrier
+
+                    if has_outcome or has_barrier:
+                        meta["status"] = "terminated_normally"
+                        print(f"   * [{rxn_hash}] Task '{task_id}' ({barrier_key}) already characterized. Fast-forwarding...")
+
+    # 0B. Fast-Forward Global Tasks
+    for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
+        if g_meta["status"] in ["ready", "pending"]:
+            task_def = config.global_tasks[g_task_id]
+            model = getattr(task_def.config, 'model', None)
+
+            if model:
+                all_completed = True
+                for rxn_hash in status_tracker["reactions"].keys():
+                    rxn_obj = reactions.get(rxn_hash)
+                    if not rxn_obj or not hasattr(rxn_obj, 'barrier') or model not in rxn_obj.barrier:
+                        all_completed = False
+                        break
+
+                if all_completed and len(status_tracker["reactions"]) > 0:
+                     g_meta["status"] = "terminated_normally"
+                     print(f" * Global Task '{g_task_id}' (Model: {model}) already completed for all reactions. Fast-forwarding...")
+
+    # =================================================================
     # PASS 1: Check Status of Submitted Jobs & Tally Active Jobs
     # =================================================================
     active_jobs = 0

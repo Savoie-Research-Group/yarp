@@ -18,23 +18,40 @@ class EgatMLPredict(MLPredictTask):
         self.image_name = "erm42/yarp:egat"
         
     def generate_input(self):
+        model = self.config.model
+
+        skipped_forward = 0
         forward_csv = self.scratch_dir / "forward_in.csv"
         with open(forward_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["reactions"])
 
             for rxn_hash, rxn in self.reactions.items():
+                # Skip if already evaluated by this model
+                if hasattr(rxn, 'barrier') and model in rxn.barrier:
+                    skipped_forward +=1
+                    continue
+
                 mapped_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
                 writer.writerow([mapped_smiles])
 
+        skipped_reverse = 0
         reverse_csv = self.scratch_dir / "reverse_in.csv"
         with open(reverse_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["reactions"])
 
             for rxn_hash, rxn in self.reactions.items():
+                # Skip if already evaluated by this model
+                if hasattr(rxn, 'reverse_barrier') and model in rxn.reverse_barrier:
+                    skipped_reverse += 1
+                    continue
+
                 mapped_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
                 writer.writerow([mapped_smiles])
+
+        if skipped_forward > 0 or skipped_reverse > 0:
+            print(f"   * Previously characterized reactions detected! Skipping {skipped_forward} forward and {skipped_reverse} reverse reactions!")
 
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"

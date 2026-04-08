@@ -111,27 +111,66 @@ def progress_yarp(work_dir: Path):
     # =================================================================
     print("Performing pre-flight checks to skip already characterized reactions...")
 
+    # --- PRE-COMPUTATION: Build the Reverse Dependency Graph ---
+    # Find out which downstream tasks require a given upstream task
+    required_by = {tid: [] for tid in config.pipeline_tasks.keys()}
+    for task_id, task_def in config.pipeline_tasks.items():
+        for dep_id in task_def.depends_on:
+            # dep_id (upstream) is required by task_id (downstream)
+            if dep_id in required_by: # Ensure it's a pipeline task, not global
+                required_by[dep_id].append(task_id)
+
     # 0A. Fast-Forward Pipeline Tasks (Local)
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
 
+        # --- SUB-PASS 1: Intrinsic Completion (Data-driven) ---
         for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] in ["ready", "pending"]:
                 task_def = config.pipeline_tasks[task_id]
 
-                lot = getattr(task_def.config, 'lot', None)
-                software = getattr(task_def.config, 'software', None)
+                # Smart extraction based on method type
+                lot, software = None, None
+                method = getattr(task_def, 'method', None) 
+
+                if method == "init_rxn_path" and hasattr(task_def.config, 'gsm'):
+                    lot = getattr(task_def.config.gsm, 'gsm_lot', None)
+                    software = getattr(task_def.config.gsm, 'software', None)
+                elif method == "refine_rxn_path" and hasattr(task_def.config, 'irc_val'):
+                    lot = getattr(task_def.config.irc_val, 'lot', None)
+                    software = getattr(task_def.config.irc_val, 'software', None)
+                else:
+                    lot = getattr(task_def.config, 'lot', None)
+                    software = getattr(task_def.config, 'software', None)
 
                 if lot and software:
                     barrier_key = f"{lot}_{software}"
-
                     has_outcome = hasattr(rxn_obj, 'outcome_label') and barrier_key in rxn_obj.outcome_label
                     has_barrier = hasattr(rxn_obj, 'barrier') and barrier_key in rxn_obj.barrier
 
                     if has_outcome or has_barrier:
                         meta["status"] = "terminated_normally"
                         print(f"   * [{rxn_hash}] Task '{task_id}' ({barrier_key}) already characterized. Fast-forwarding...")
+
+        # --- SUB-PASS 2: Backwards Pruning (Dependency-driven) ---
+        # Iterate in reverse order so downstream skips cascade upstream
+        for task_id in reversed(list(config.pipeline_tasks.keys())):
+            meta = rxn_meta["tasks"][task_id]
+
+            if meta["status"] in ["ready", "pending"]:
+                downstream_tasks = required_by[task_id]
+
+                # If this task HAS downstream dependents, and ALL of them are terminated/skipped
+                if len(downstream_tasks) > 0:
+                    all_downstream_skipped = all(
+                        rxn_meta["tasks"][dt]["status"] == "terminated_normally" 
+                        for dt in downstream_tasks
+                    )
+
+                    if all_downstream_skipped:
+                        meta["status"] = "terminated_normally"
+                        print(f"   * [{rxn_hash}] Task '{task_id}' skipped because all dependent downstream tasks are already completed.")
 
     # 0B. Fast-Forward Global Tasks
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():

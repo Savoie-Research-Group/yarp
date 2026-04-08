@@ -44,6 +44,8 @@ def generate_rxns(inp):
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
+            og_rxns_hash = set(og_rxns.keys())
+
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
@@ -66,6 +68,11 @@ def generate_rxns(inp):
                 for prod in clean_products:
                     prod = quick_geom_opt(prod)
                     r2p = reaction(mol, prod)
+                    p2r = reaction(mol, prod)
+
+                    # Skip reactions already discovered (forward/reverse)
+                    if r2p.hash in og_rxns_hash or p2r.hash in og_rxns_hash:
+                        continue
                     new_rxns[r2p.hash] = r2p
             
             output = og_rxns | new_rxns

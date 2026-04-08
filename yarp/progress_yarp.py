@@ -107,6 +107,27 @@ def progress_yarp(work_dir: Path):
     print(f"Max active jobs allowed: {max_active_jobs}")
 
     # =================================================================
+    # PASS 0 (Prep): Synchronize Conformers Across Identical Species
+    # =================================================================
+    print("Synchronizing conformer data across identical chemical species...")
+    species_conformer_pool = {}
+
+    # Step 1: Pool all conformers from all reactions using the unique hash
+    for rxn_obj in reactions.values():
+        for species in [rxn_obj.reactant, rxn_obj.product]:
+            if not species: continue
+            sp_hash = species.hash 
+            if sp_hash not in species_conformer_pool:
+                species_conformer_pool[sp_hash] = {}
+            species_conformer_pool[sp_hash].update(species.conformers)
+
+    # Step 2: Distribute the enriched pools back to all reactions
+    for rxn_obj in reactions.values():
+        for species in [rxn_obj.reactant, rxn_obj.product]:
+            if not species: continue
+            species.conformers.update(species_conformer_pool[species.hash])
+
+    # =================================================================
     # PASS 0: Fast-Forward Previously Characterized Reactions
     # =================================================================
     print("Performing pre-flight checks to skip already characterized reactions...")
@@ -131,27 +152,54 @@ def progress_yarp(work_dir: Path):
                 task_def = config.pipeline_tasks[task_id]
 
                 # Smart extraction based on method type
-                lot, software = None, None
                 method = getattr(task_def, 'method', None) 
+                task_type = getattr(task_def, 'task_type', '')
 
-                if method == "init_rxn_path" and hasattr(task_def.config, 'gsm'):
-                    lot = getattr(task_def.config.gsm, 'gsm_lot', None)
-                    software = getattr(task_def.config.gsm, 'software', None)
-                elif method == "refine_rxn_path" and hasattr(task_def.config, 'irc_val'):
-                    lot = getattr(task_def.config.irc_val, 'lot', None)
-                    software = getattr(task_def.config.irc_val, 'software', None)
-                else:
+                # Determine target species for the task (reactant or product)
+                target_species = rxn_obj.reactant if "reactant" in task_type else rxn_obj.product
+
+                already_done = False
+                barrier_key = ""
+
+                # 1. Check Path / Barrier Tasks
+                if method in ["init_rxn_path", "refine_rxn_path"]:
+                    if method == "init_rxn_path" and hasattr(task_def.config, 'gsm'):
+                        lot = getattr(task_def.config.gsm, 'gsm_lot', None)
+                        software = getattr(task_def.config.gsm, 'software', None)
+                    elif method == "refine_rxn_path" and hasattr(task_def.config, 'irc_val'):
+                        lot = getattr(task_def.config.irc_val, 'lot', None)
+                        software = getattr(task_def.config.irc_val, 'software', None)
+                    else:
+                        lot = getattr(task_def.config, 'lot', None)
+                        software = getattr(task_def.config, 'software', None)
+
+                    if lot and software:
+                        barrier_key = f"{lot}_{software}"
+                        has_outcome = hasattr(rxn_obj, 'outcome_label') and barrier_key in rxn_obj.outcome_label
+                        has_barrier = hasattr(rxn_obj, 'barrier') and barrier_key in rxn_obj.barrier
+                        if has_outcome or has_barrier:
+                            already_done = True
+
+                # 2. Check Conformer Generation Tasks
+                elif method == "conf_gen" or task_type in ["reactant_conformer", "product_conformer"]:
+                    if target_species and any("conf_gen" in key for key in target_species.conformers.keys()):
+                        already_done = True
+                        barrier_key = "conf_gen"
+
+                # 3. Check Minimum Optimization Tasks
+                elif method == "min_opt" or task_type in ["reactant_optimization", "product_optimization"]:
                     lot = getattr(task_def.config, 'lot', None)
                     software = getattr(task_def.config, 'software', None)
+                    if lot and software:
+                        opt_key = f"rpopt_{lot}_{software}"
+                        if target_species and any(opt_key in key for key in target_species.conformers.keys()):
+                            already_done = True
+                            barrier_key = opt_key
 
-                if lot and software:
-                    barrier_key = f"{lot}_{software}"
-                    has_outcome = hasattr(rxn_obj, 'outcome_label') and barrier_key in rxn_obj.outcome_label
-                    has_barrier = hasattr(rxn_obj, 'barrier') and barrier_key in rxn_obj.barrier
-
-                    if has_outcome or has_barrier:
-                        meta["status"] = "terminated_normally"
-                        print(f"   * [{rxn_hash}] Task '{task_id}' ({barrier_key}) already characterized. Fast-forwarding...")
+                # Execute the fast-forward!
+                if already_done:
+                    meta["status"] = "terminated_normally"
+                    print(f"   * [{rxn_hash}] Task '{task_id}' ({barrier_key}) already characterized/synced. Fast-forwarding...")
 
         # --- SUB-PASS 2: Backwards Pruning (Dependency-driven) ---
         # Iterate in reverse order so downstream skips cascade upstream
@@ -195,6 +243,25 @@ def progress_yarp(work_dir: Path):
     # =================================================================
     active_jobs = 0
     failed_rxns = {}
+
+    # NEW: Registry to prevent redundant submissions for identical species
+    active_species_tasks = set()
+
+    # Pre-populate registry with jobs that are ALREADY running from previous loops
+    for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        rxn_obj = reactions.get(rxn_hash)
+        for task_id, meta in rxn_meta["tasks"].items():
+            if meta["status"] in ["submitted", "running"]:
+                task_def = config.pipeline_tasks[task_id]
+                method = getattr(task_def, 'method', '')
+                task_type = getattr(task_def, 'task_type', '')
+
+                # Only track single-species tasks (skip reaction path tasks)
+                if method in ["conf_gen", "min_opt"] or task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
+                    is_reactant = "reactant" in task_type
+                    species = rxn_obj.reactant if is_reactant else rxn_obj.product
+                    if species:
+                        active_species_tasks.add((species.hash, task_id))
 
     # =================================================================
     # PASS 1A: Check Status of Submitted GLOBAL Jobs
@@ -398,6 +465,26 @@ def progress_yarp(work_dir: Path):
 
             if meta["status"] == "ready":
                 task_def = config.pipeline_tasks[task_id]
+                method = getattr(task_def, 'method', '')
+                task_type = getattr(task_def, 'task_type', '')
+
+                # --- Redundancy Blocker ---
+                if method in ["conf_gen", "min_opt"] or task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
+                    is_reactant = "reactant" in task_type
+                    species = rxn_obj.reactant if is_reactant else rxn_obj.product
+                    
+                    if species:
+                        registry_key = (species.hash, task_id)
+                        
+                        if registry_key in active_species_tasks:
+                            # Silently skip submission! Another identical species is doing the work.
+                            # It remains "ready" and will be fast-forwarded in PASS 0 on a future loop.
+                            print(f"   [DEBUG] ---> Blocked! Identical species calculation already active.")
+                            continue
+                        else:
+                            # We are the "leader"! Claim this species/task combo.
+                            active_species_tasks.add(registry_key)
+
                 calc = get_calculator(task_def, rxn_obj, config.job_manager)
 
                 scratch_path = work_dir / "SCRATCH" / f"{rxn_hash}_{task_id}"

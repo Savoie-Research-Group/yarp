@@ -24,8 +24,8 @@ def main(args):
     data = []
     for rxn in rxns.values():
         # access data for printing to screen via tabulate
-        egat_barrier = rxn.barrier.get('egat') if rxn.barrier else None
-        reverse_egat_barrier = rxn.reverse_barrier.get('egat') if rxn.reverse_barrier else None
+        egat_barrier = rxn.barrier.get('egat_rgd1') if rxn.barrier else None
+        reverse_egat_barrier = rxn.reverse_barrier.get('egat_rgd1') if rxn.reverse_barrier else None
         data.append([
             rxn.id,
             rxn.reactant.canon_smi,

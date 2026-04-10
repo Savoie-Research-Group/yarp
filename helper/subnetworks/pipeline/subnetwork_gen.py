@@ -15,13 +15,13 @@ import argparse
 import pickle
 from pathlib import Path
 
-from rdkit import Chem
 from yarp.network.network import network
 from tqdm.auto import tqdm as tqdm_auto
 
 import yaml
 
 from add_dummy_reverse_barriers import add_dummy_reverse_barriers, load_pickle_payload
+from smiles_utils import file_safe_label, normalize_smiles_text
 
 
 def default_config_path():
@@ -89,38 +89,6 @@ def collect_input_pickles(cfg, config_dir):
     if not pickles:
         raise RuntimeError(f"No pickle files found in {root} with pattern '{glob_pattern}'.")
     return pickles
-
-
-def _safe_label(text):
-    return "".join(ch if (ch.isalnum() or ch in "-._") else "_" for ch in str(text))
-
-
-def split_smiles(smiles):
-    return [part.strip() for part in str(smiles or "").split(".") if part.strip()]
-
-
-def normalize_smiles(smiles):
-    smi = str(smiles or "").strip()
-    if not smi:
-        return None
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        return smi
-    Chem.RemoveStereochemistry(mol)
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
-
-
-def normalize_smiles_text(smiles):
-    parts = []
-    for part in split_smiles(smiles):
-        normalized = normalize_smiles(part)
-        if normalized:
-            parts.append(normalized)
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return ".".join(sorted(parts))
 
 
 def _node_id(yp_obj, style):
@@ -281,8 +249,8 @@ def save_subnetworks(source_pickle,rxns_payload,crn,start_yp,paths,subnet_cfg,lo
     prefix_with_source_name = bool(subnet_cfg.get("prefix_with_source_name", True))
     max_saved_to_print = int(log_cfg.get("max_saved_to_print", 25))
 
-    start_dir_label = _safe_label(_node_id(start_yp, node_id_style))
-    start_file_label = _safe_label(_node_id(start_yp, node_id_style))
+    start_dir_label = file_safe_label(_node_id(start_yp, node_id_style))
+    start_file_label = file_safe_label(_node_id(start_yp, node_id_style))
 
     outdir = output_root / start_dir_label
     outdir.mkdir(parents=True, exist_ok=True)
@@ -341,7 +309,7 @@ def save_subnetworks(source_pickle,rxns_payload,crn,start_yp,paths,subnet_cfg,lo
             continue
         path_records = list(unique_path_records.values())
 
-        end_label = _safe_label(_node_id(end_yp, node_id_style))
+        end_label = file_safe_label(_node_id(end_yp, node_id_style))
         if prefix_with_source_name:
             fname = f"{source_pickle.stem}__{start_file_label}_to_{end_label}.pkl"
         else:

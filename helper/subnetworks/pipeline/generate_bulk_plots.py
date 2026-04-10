@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from smiles_utils import file_safe_label
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
@@ -242,7 +244,7 @@ def load_personal_colors(csv_path):
 
 def safe_name(text):
     """Create a compact filesystem-safe name fragment."""
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(text))[:120]
+    return file_safe_label(text, max_len=120)
 
 
 def column_first_nonempty(df, column, default=""):

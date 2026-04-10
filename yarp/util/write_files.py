@@ -5,7 +5,7 @@ Functions to generate common molecular structure files from yarpecules
 import numpy as np
 from yarp.yarpecule.lewis.be_mat import return_formals
 
-def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
+def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False, atom_info=None):
     """
     Write a MOL file to disk from a yarpecule object.
     Or rather, from attributes passed in from a yarpecule object.
@@ -82,8 +82,11 @@ def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
 
         # Write the geometry
         for count_i, i in enumerate(elements):
-            f.write(" {:> 9.4f} {:> 9.4f} {:> 9.4f} {:<3s} 0 {:>2d}  0  0  0  {:>2d}  0  0  0  0  0  0\n".format(
-                geo[count_i][0], geo[count_i][1], geo[count_i][2], i.capitalize(), mol_dict[fc[count_i]], valence[count_i]))
+            map_field = 0
+            if atom_info is not None and count_i in atom_info and atom_info[count_i].get("atom_map") is not None:
+                map_field = int(atom_info[count_i]["atom_map"])
+            f.write(" {:> 9.4f} {:> 9.4f} {:> 9.4f} {:<3s} 0 {:>2d}  0  0  0  {:>2d}  0  0  0  0 {:>3d}  0\n".format(
+                geo[count_i][0], geo[count_i][1], geo[count_i][2], i.capitalize(), mol_dict[fc[count_i]], valence[count_i], map_field))
 
         # Write the bonds
         bonds = [(count_i, count_j) for count_i, i in enumerate(adj_mat)
@@ -140,7 +143,7 @@ def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
 
     return
 
-def xyz_write(name, elements, geo, append_opt=False):
+def xyz_write(name, elements, geo, comment=None, append_opt=False):
     """
     Write cartesian coordinates of a molecule to an XYZ file
 

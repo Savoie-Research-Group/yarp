@@ -10,7 +10,6 @@ from collections import Counter
 from pathlib import Path
 
 import yaml
-from rdkit import Chem
 try:
     from tqdm import tqdm
 except Exception:
@@ -19,6 +18,8 @@ except Exception:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+from smiles_utils import normalize_smiles_text, split_smiles
 
 
 def default_config_path():
@@ -200,12 +201,6 @@ def get_smiles_for_state(state):
     return ".".join(sorted(parts))
 
 
-def split_smiles(smiles):
-    if not smiles:
-        return []
-    return [part.strip() for part in str(smiles).split(".") if part.strip()]
-
-
 def split_equation_side(side):
     return [tok.strip() for tok in str(side or "").split(" + ") if tok.strip()]
 
@@ -244,28 +239,51 @@ def equation_counters(equation):
     return left_counter, right_counter
 
 
-def normalize_smiles(smiles):
-    smi = str(smiles or "").strip()
-    if not smi:
-        return None
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        return smi
-    Chem.RemoveStereochemistry(mol)
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
-
-
-def normalize_smiles_text(smiles):
-    parts = []
-    for part in split_smiles(smiles):
-        normalized = normalize_smiles(part)
-        if normalized:
-            parts.append(normalized)
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return ".".join(sorted(parts))
+def equation_states(equation):
+    """Parse normalized full reactant/product state SMILES from equation text."""
+    text = str(equation or "")
+    if "=>" not in text:
+        return None, None
+    left, right = text.split("=>", 1)
+    left_parts = []
+    right_parts = []
+    for tok in split_equation_side(left):
+        species, coeff = parse_equation_token(tok)
+        if not species:
+            continue
+        smi = normalize_smiles_text(species)
+        if not smi:
+            continue
+        n_rep = 1
+        try:
+            c = float(coeff)
+            c_int = int(round(c))
+            if c_int >= 1 and abs(c - c_int) < 1.0e-8:
+                n_rep = c_int
+        except Exception:
+            n_rep = 1
+        left_parts.extend([smi] * n_rep)
+    for tok in split_equation_side(right):
+        species, coeff = parse_equation_token(tok)
+        if not species:
+            continue
+        smi = normalize_smiles_text(species)
+        if not smi:
+            continue
+        n_rep = 1
+        try:
+            c = float(coeff)
+            c_int = int(round(c))
+            if c_int >= 1 and abs(c - c_int) < 1.0e-8:
+                n_rep = c_int
+        except Exception:
+            n_rep = 1
+        right_parts.extend([smi] * n_rep)
+    left_parts = sorted([s for s in left_parts if s])
+    right_parts = sorted([s for s in right_parts if s])
+    left_state = ".".join(left_parts) if left_parts else None
+    right_state = ".".join(right_parts) if right_parts else None
+    return left_state, right_state
 
 
 def get_meta_smiles(primary_meta, fallback_meta, key):
@@ -977,6 +995,11 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
     total_flux_by_key = {}
     final_rate_by_key = {}
 
+    end_in_product_count = 0
+    end_in_reactant_count = 0
+    end_reverse_match_count = 0
+    rxn_lookup_miss_count = 0
+
     for reaction_name in reaction_names:
         rxn_idx = parse_reaction_index(reaction_name)
         if rxn_idx >= len(flux_to_final) or rxn_idx >= len(rxn_cum_abs_flux):
@@ -990,10 +1013,30 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
         rxn = get_reaction_by_key(payload.get("rxns", {}), orig_key)
         reactant_smiles = get_smiles_for_state(getattr(rxn, "reactant", None)) if rxn is not None else ""
         product_smiles = get_smiles_for_state(getattr(rxn, "product", None)) if rxn is not None else ""
+        if rxn is None:
+            rxn_lookup_miss_count += 1
+        eq_from_state, eq_to_state = equation_states(equation)
+        if not reactant_smiles and eq_from_state:
+            reactant_smiles = eq_from_state
+        if not product_smiles and eq_to_state:
+            product_smiles = eq_to_state
         reactant_parts = split_smiles(reactant_smiles)
         product_parts = split_smiles(product_smiles)
         ends_in_product = bool(end_smiles and end_smiles in product_parts)
-        source_type = "R" if (start_smiles and start_smiles in reactant_parts) else "I"
+        ends_in_reactant = bool(end_smiles and end_smiles in reactant_parts)
+        reverse_enabled = bool(mapping.get("reverse_enabled", False))
+        include_as_reverse_terminal = bool(ends_in_reactant and reverse_enabled and not ends_in_product)
+        if ends_in_product:
+            end_in_product_count += 1
+        if ends_in_reactant:
+            end_in_reactant_count += 1
+        if include_as_reverse_terminal:
+            end_reverse_match_count += 1
+
+        effective_from_smiles = product_smiles if include_as_reverse_terminal else reactant_smiles
+        effective_to_smiles = reactant_smiles if include_as_reverse_terminal else product_smiles
+        effective_from_parts = split_smiles(effective_from_smiles)
+        source_type = "R" if (start_smiles and start_smiles in effective_from_parts) else "I"
 
         flux_to_final_by_key[orig_key] = flux_val
         flux_to_final_std_by_key[orig_key] = float(flux_to_final_std[rxn_idx])
@@ -1036,8 +1079,28 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
                     "rxn_id": mapping.get("rxn_id"),
                     "rxn_hash": mapping.get("rxn_hash"),
                     "source_type": source_type,
-                    "from_smiles": reactant_smiles,
-                    "to_smiles": product_smiles,
+                    "from_smiles": effective_from_smiles,
+                    "to_smiles": effective_to_smiles,
+                    "flux_to_final_species": flux_val,
+                    "flux_to_final_species_std": float(flux_to_final_std[rxn_idx]),
+                    "cumulative_abs_flux": total_flux_val,
+                    "cumulative_abs_flux_std": float(rxn_cum_abs_flux_std[rxn_idx]),
+                    "final_rate_of_progress": final_rate_val,
+                    "final_rate_of_progress_std": float(rxn_final_rate_std[rxn_idx]),
+                }
+            )
+        elif include_as_reverse_terminal:
+            final_product_rows.append(
+                {
+                    "reaction_index": rxn_idx + 1,
+                    "reaction_name": reaction_name,
+                    "equation": equation,
+                    "orig_key": orig_key,
+                    "rxn_id": mapping.get("rxn_id"),
+                    "rxn_hash": mapping.get("rxn_hash"),
+                    "source_type": source_type,
+                    "from_smiles": effective_from_smiles,
+                    "to_smiles": effective_to_smiles,
                     "flux_to_final_species": flux_val,
                     "flux_to_final_species_std": float(flux_to_final_std[rxn_idx]),
                     "cumulative_abs_flux": total_flux_val,
@@ -1150,6 +1213,17 @@ def run_one_yaml(yaml_path, yaml_root, cfg, cfg_dir):
         key=lambda row: row["cumulative_abs_flux"],
         reverse=True,
     )
+    if not final_product_rows_sorted:
+        print(
+            "[to_final-debug]",
+            f"rows=0",
+            f"end_smiles={end_smiles}",
+            f"n_reactions={len(reaction_names)}",
+            f"end_in_product={end_in_product_count}",
+            f"end_in_reactant={end_in_reactant_count}",
+            f"reverse_terminal_matches={end_reverse_match_count}",
+            f"rxn_lookup_miss={rxn_lookup_miss_count}",
+        )
     max_abs_cum_flux = max((abs(float(v)) for v in rxn_cum_abs_flux), default=0.0)
     nonzero_flux_count = sum(1 for v in rxn_cum_abs_flux if abs(float(v)) > 0.0)
 

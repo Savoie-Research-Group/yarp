@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
-from rdkit import Chem
 from yarp.network.network import network
 
 from add_dummy_reverse_barriers import load_pickle_payload
 from subnetwork_gen import select_start_yarpecules
+from smiles_utils import normalize_smiles_text
 
 
 def default_config_path():
@@ -26,20 +26,9 @@ def load_config(config_path):
     return cfg if isinstance(cfg, dict) else {}
 
 
-def normalize_smiles(smiles):
-    smi = str(smiles or "").strip()
-    if not smi:
-        return None
-    mol = Chem.MolFromSmiles(smi)
-    if mol is None:
-        return smi
-    Chem.RemoveStereochemistry(mol)
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
-
-
 def _smiles(yp):
     smi = getattr(yp, "canon_smi", None)
-    return normalize_smiles(smi) if smi is not None else None
+    return normalize_smiles_text(smi) if smi is not None else None
 
 
 def write_table(df, out_path):

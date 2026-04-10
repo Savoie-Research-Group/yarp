@@ -151,6 +151,7 @@ cantera_run_subnetworks:
 
 datatable:
   retained_timeseries_downsample_seconds: 1.0
+  emit_empty_sentinel_row: true
 
 plot_export:
   enabled: true

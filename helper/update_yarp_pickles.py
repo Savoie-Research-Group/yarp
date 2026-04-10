@@ -19,6 +19,7 @@ import pickle
 from pathlib import Path
 import sys
 from types import ModuleType
+import types
 
 
 PICKLE_SUFFIXES = {".p", ".pkl", ".pickle"}
@@ -28,6 +29,18 @@ _HASH_MODULE = None
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+try:
+    import openbabel  # type: ignore
+except ModuleNotFoundError:
+    class _DummyErrorLog:
+        def SetOutputLevel(self, *_args, **_kwargs):
+            return None
+
+    openbabel_stub = types.ModuleType("openbabel")
+    openbabel_stub.pybel = types.SimpleNamespace()
+    openbabel_stub.openbabel = types.SimpleNamespace(obErrorLog=_DummyErrorLog(), obError=0)
+    sys.modules["openbabel"] = openbabel_stub
 
 # Guardrail: if core class init attrs drift, force migration script update.
 CLASS_SCHEMA_GUARDRAIL = {
@@ -63,6 +76,7 @@ CLASS_SCHEMA_GUARDRAIL = {
             "_masses",
             "_adj_mat",
             "_atom_hashes",
+            "_atom_info",
             "_mapping",
             "_lewis_struct",
             "_bond_order_dict",

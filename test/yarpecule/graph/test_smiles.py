@@ -9,7 +9,7 @@ class TestSmi2Adj:
     def test_ethene(self, ethene_smi):
         adjmat, bemat, atom_info = smiles2adjmat(ethene_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (6, 6)
@@ -60,7 +60,7 @@ class TestSmi2Adj:
     def test_haa_canon(self, haa_canon_smi):
         adjmat, bemat, atom_info = smiles2adjmat(haa_canon_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['O', 'C', 'C', 'O', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (8, 8)
@@ -141,7 +141,7 @@ class TestSmi2Adj:
     def test_haa_full_map(self, haa_full_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(haa_full_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'O', 'O', 'H', 'H', 'H', 'H']
 
         # TO-DO: test adjmat outputs in detail
@@ -150,7 +150,7 @@ class TestSmi2Adj:
     def test_haa_heavy_map(self, haa_heavy_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(haa_heavy_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'O', 'O', 'C', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (8, 8)
@@ -231,7 +231,7 @@ class TestSmi2Adj:
     def test_haa_heavy_map_explicitH(self, haa_heavy_map_explicitH_smi):
         adjmat, bemat, atom_info = smiles2adjmat(haa_heavy_map_explicitH_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'O', 'O', 'C', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (8, 8)
@@ -312,7 +312,7 @@ class TestSmi2Adj:
     def test_rad_canon(self, rad_canon_smi):
         adjmat, bemat, atom_info = smiles2adjmat(rad_canon_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -322,7 +322,7 @@ class TestSmi2Adj:
     def test_rad_canon_map(self, rad_canon_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(rad_canon_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -332,7 +332,7 @@ class TestSmi2Adj:
     def test_rad_explicitH(self, rad_explicitH_smi):
         adjmat, bemat, atom_info = smiles2adjmat(rad_explicitH_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -342,7 +342,7 @@ class TestSmi2Adj:
     def test_rad_full_map(self, rad_full_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(rad_full_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'H', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -352,7 +352,7 @@ class TestSmi2Adj:
     def test_anion_canon_smi(self, anion_canon_smi):
         adjmat, bemat, atom_info = smiles2adjmat(anion_canon_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'O', 'O', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -362,7 +362,7 @@ class TestSmi2Adj:
     def test_anion_canon_map(self, anion_canon_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(anion_canon_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['O', 'C', 'C', 'O', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -372,7 +372,7 @@ class TestSmi2Adj:
     def test_anion_explicitH(self, anion_explicitH_smi):
         adjmat, bemat, atom_info = smiles2adjmat(anion_explicitH_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -382,7 +382,7 @@ class TestSmi2Adj:
     def test_anion_full_map(self, anion_full_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(anion_full_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['O', 'C', 'O', 'C', 'H', 'H', 'H']
 
         assert adjmat.shape == (7, 7)
@@ -392,7 +392,7 @@ class TestSmi2Adj:
     def test_aromatic_canon(self, aromatic_canon_smi):
         adjmat, bemat, atom_info = smiles2adjmat(aromatic_canon_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['O', 'C', 'C', 'C', 'O', 'C', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (10, 10)
@@ -402,9 +402,17 @@ class TestSmi2Adj:
     def test_aromatic_full_map(self, aromatic_full_map_smi):
         adjmat, bemat, atom_info = smiles2adjmat(aromatic_full_map_smi)
 
-        elements = [label[0] for label in atom_info]
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
         assert elements == ['C', 'C', 'C', 'C', 'O', 'O', 'H', 'H', 'H', 'H']
 
         assert adjmat.shape == (10, 10)
         assert bemat.shape == (10, 10)
         # To-do: add explicit adjmat element checks
+
+    def test_aromatic_lactam(self):
+        adjmat, bemat, atom_info = smiles2adjmat("Oc1ncc(c(=O)[nH]1)C")
+
+        elements = [atom_info[i]["element"].capitalize() for i in atom_info]
+        assert elements == ['O', 'C', 'N', 'C', 'C', 'C', 'O', 'N', 'C', 'H', 'H', 'H', 'H', 'H', 'H']
+        assert adjmat.shape == (15, 15)
+        assert bemat.shape == (15, 15)

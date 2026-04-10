@@ -4,6 +4,7 @@ debug/*
 containers/*.sif
 containers/orca/*.tar.*
 containers/orca/example
+**/SCRATCH
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

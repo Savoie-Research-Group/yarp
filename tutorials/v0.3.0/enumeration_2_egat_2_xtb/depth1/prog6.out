@@ -1,0 +1,23 @@
+Processing YARP progress in /Users/erm/git_stuff/yarp-again/tutorials/v0.3.0/enumeration_2_egat_2_xtb/depth1...
+Jobs will be run using 'local' scheduler and 'docker' containers.
+Max active jobs allowed: 6
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2107297.9154397324] Task 'll_refine.irc_validation' finished running. Checking output...
+     * TS 1 validated: intended with barrier of 60.24139579349904 kcal/mol
+     * TS 2 validated: no_adjmat_change with barrier of 76.65391969407266 kcal/mol
+     * TS 3 validated: no_adjmat_change with barrier of 76.65391969407266 kcal/mol
+   * [2107297.9154397324] Task 'll_refine.irc_validation' completed successfully.
+   * [2409865.289214986] Task 'll_path.gsm' finished running. Checking output...
+   * [2409865.289214986] Task 'll_path.gsm' completed successfully.
+   * [2409865.289214986] Task 'll_refine.transition_state_optimization' prerequisites met. Marked as READY.
+Current active jobs: 0 / 6
+   * [2409865.289214986] Submitting task 'll_refine.transition_state_optimization'...
+YARP progress tracking complete.
+Starting YARP serial TSOPT execution...
+--- Running TSOPT 1 ---
+--- Finished TSOPT 1 ---
+--- Running TSOPT 2 ---
+--- Finished TSOPT 2 ---
+--- Running TSOPT 3 ---
+--- Finished TSOPT 3 ---

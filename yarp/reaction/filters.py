@@ -40,7 +40,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         if isinstance(dG_source, str):
             dG = rxn.barrier.get(dG_source, None)
             if dG is not None and dG > dG_cutoff:
-                print(f"  + Excluding {rxn.id} (dG = {dG}) from enumeration")
+                print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
                 continue
 
         clean_rxns[count_r] = rxn

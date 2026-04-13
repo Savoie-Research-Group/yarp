@@ -1,5 +1,7 @@
-# progress_yarp.py
-import sys
+"""
+Directed acyclic graph workflow manager for YARP jobs
+"""
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -519,9 +521,22 @@ def progress_yarp(work_dir: Path):
     save_state(work_dir, status_tracker, reactions, failed_rxns)
     print("YARP progress tracking complete.")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python progress_yarp.py /path/to/working/dir")
-        sys.exit(1)
-    absolute_work_dir = Path(sys.argv[1]).resolve()
+def main():
+    print(f"""Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    """)
+
+    parser = argparse.ArgumentParser(description="Initialize YARP with a YAML config.")
+    parser.add_argument("work_dir", type=str, help="Path to the YARP working directory")
+    args = parser.parse_args()
+
+    absolute_work_dir = Path(args.work_dir).resolve()
     progress_yarp(absolute_work_dir)
+
+if __name__ == "__main__":
+    main()

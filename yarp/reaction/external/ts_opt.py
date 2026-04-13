@@ -108,49 +108,27 @@ class PysisyphusTSOptCalculator(TSOptTask):
         return str(submit_script_path)
 
     def check_output(self) -> bool:
-        """
-        Returns True if AT LEAST ONE of the TS optimizations finished
-        """
+        """Returns True if AT LEAST ONE of the TS optimizations finished."""
         num_runs = self._get_num_runs()
         if num_runs == 0:
-            return False # No runs found at all!
+            return False 
 
         one_successful = False
-        
         for i in range(1, num_runs + 1):
-            run_dir = self.scratch_dir / f"tsopt_run{i}"
-            log_file = run_dir / f"tsopt_{i}.log"
-            xyz_file = run_dir / "ts_final_geometry.xyz"
-            hess_file = run_dir / "ts_final_hessian.h5"
-            imag_file = run_dir / "ts_imaginary_mode_000.trj"
-
-            # 1. File existence check
-            if not (log_file.exists() and xyz_file.exists()):
-                print(f"     * Run {i} failed: Missing expected output files.")
-                continue
-
-            # 2. Log file termination check
-            with open(log_file, "r") as f:
-                log_text = f.read()
-
-            if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"     * Run {i} failed: Did not find successful termination message in log.")
-                continue
-
-            # 3. Hessian file termination check
-            if not os.path.exists(hess_file) and not os.path.exists(imag_file):
-                print(f"     * Run {i} failed: Did not find final hessian or imaginary frequencies.")
-                continue
-
-            # If it passes all checks, at least one run succeeded!
-            one_successful = True
+            if self._is_run_successful(i):
+                one_successful = True
+            else:
+                print(f"     * Run {i} failed or did not finish successfully.")
         
-        # We only care if at least one succeeded
         return one_successful
 
     def scrape_data(self) -> bool:
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
+            # Skip scraping for this index if the run failed!
+            if not self._is_run_successful(i):
+                continue
+
             conf = conformer()
             conf.lot = self.config.lot
             conf.software = self.config.software
@@ -169,9 +147,6 @@ class PysisyphusTSOptCalculator(TSOptTask):
             hess, freq = self._parse_hessian_freq(hess_file)
             conf.hessian = hess
             conf.vibrational_freqs = freq
-
-            imag_file = run_dir / "ts_imaginary_mode_000.trj"
-            conf.imaginary_freq_mode = self._parse_imag_freq_mode(imag_file)
 
             self.rxn.ts_geom[conf.type] = conf
 
@@ -198,6 +173,26 @@ class PysisyphusTSOptCalculator(TSOptTask):
 
             # set opt block
             f.write(f'tsopt:\n type: rsprfo\n do_hess: True\n hessian_recalc: {self.config.hessian_recalc}\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')
+
+    def _is_run_successful(self, i: int) -> bool:
+        """Helper method to validate if a specific run completed successfully."""
+        run_dir = self.scratch_dir / f"tsopt_run{i}"
+        log_file = run_dir / f"tsopt_{i}.log"
+        xyz_file = run_dir / "ts_final_geometry.xyz"
+        hess_file = run_dir / "ts_final_hessian.h5"
+
+        # 1. File existence check
+        if not (log_file.exists() and xyz_file.exists() and hess_file.exists()):
+            return False
+
+        # 2. Log file termination check
+        with open(log_file, "r") as f:
+            log_text = f.read()
+
+        if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
+            return False
+
+        return True
 
     def _parse_opt_geo(self, xyz_file):
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)
@@ -309,43 +304,27 @@ class OrcaTSOptCalculator(TSOptTask):
         return str(submit_script_path)
 
     def check_output(self) -> bool:
-        """
-        Returns True if AT LEAST ONE of the TS optimizations finished
-        """
+        """Returns True if AT LEAST ONE of the TS optimizations finished."""
         num_runs = self._get_num_runs()
         if num_runs == 0:
-            return False # No runs found at all!
+            return False 
 
         one_successful = False
-        
         for i in range(1, num_runs + 1):
-            run_dir = self.scratch_dir / f"tsopt_run{i}"
-            log_file = run_dir / f"tsopt_{i}.out"
-            xyz_file = run_dir / f"tsopt_{i}.xyz"
-            hess_file = run_dir / f"tsopt_{i}.hess"
-
-            # 1. File existence check
-            if not (log_file.exists() and xyz_file.exists() and hess_file.exists()):
-                print(f"     * Run {i} failed: Missing expected output files.")
-                continue
-
-            # 2. Log file termination check
-            with open(log_file, "r") as f:
-                log_text = f.read()
-
-            if "THE OPTIMIZATION HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
-                print(f"     * Run {i} failed: Did not find successful termination message in log.")
-                continue
-
-            # If it passes all checks, at least one run succeeded!
-            one_successful = True
+            if self._is_run_successful(i):
+                one_successful = True
+            else:
+                print(f"     * Run {i} failed or did not finish successfully.")
         
-        # We only care if at least one succeeded
         return one_successful
 
     def scrape_data(self) -> bool:
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
+            # Skip scraping for this index if the run failed!
+            if not self._is_run_successful(i):
+                continue
+
             conf = conformer()
             conf.lot = self.config.lot
             conf.software = self.config.software
@@ -353,6 +332,7 @@ class OrcaTSOptCalculator(TSOptTask):
 
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             log_file = run_dir / f"tsopt_{i}.out"
+            
             conf.properties['internal_energy_Eh'] = self._parse_energy(log_file)
 
             enthalpy, entropy, gibbs = self._parse_orca_thermo(log_file)
@@ -404,6 +384,24 @@ class OrcaTSOptCalculator(TSOptTask):
             # set XYZ input file
             f.write(f'*xyzfile {self.config.charge} {self.config.multiplicity} {input_geo_xyz}\n')
             f.write('\n# Never forget your bonus lines!!!\n')
+
+    def _is_run_successful(self, i: int) -> bool:
+        """Helper method to validate if a specific ORCA run completed successfully."""
+        run_dir = self.scratch_dir / f"tsopt_run{i}"
+        log_file = run_dir / f"tsopt_{i}.out"
+        xyz_file = run_dir / f"tsopt_{i}.xyz"
+        hess_file = run_dir / f"tsopt_{i}.hess"
+
+        if not (log_file.exists() and xyz_file.exists() and hess_file.exists()):
+            return False
+
+        with open(log_file, "r") as f:
+            log_text = f.read()
+
+        if "THE OPTIMIZATION HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
+            return False
+
+        return True
 
     def _parse_opt_geo(self, xyz_file):
         opt_elements, opt_geo = xyz_parse(xyz_file, multiple=False)

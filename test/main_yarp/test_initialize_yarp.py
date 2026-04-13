@@ -1,7 +1,7 @@
 import yaml
 import pickle
 from pathlib import Path
-from yarp.initialize_yarp import initialize_from_dict, main
+from yarp.initialize_yarp import initialize_from_dict, initialize_yarp
 
 def test_happy_path_initialization(enum_egat_llpath_llrefine):
     """
@@ -61,7 +61,7 @@ def test_happy_path_initialization(enum_egat_llpath_llrefine):
 
 def test_enum_minimal(enum_min_options):
     input_dict = enum_min_options
-    main(input_dict)
+    initialize_yarp(input_dict)
 
     output_str = input_dict['initialize']['output']
     output = Path(output_str)
@@ -74,7 +74,7 @@ def test_enum_minimal(enum_min_options):
 
 def test_enum_full(enum_full_options):
     input_dict = enum_full_options
-    main(input_dict)
+    initialize_yarp(input_dict)
 
     output_str = input_dict['initialize']['output']
     output = Path(output_str)

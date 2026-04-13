@@ -20,19 +20,37 @@ def main(args):
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
-    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Reverse EGAT barrier']
+    # 1. First pass: Find all unique barrier keys across all reactions
+    unique_barrier_keys = set()
+    for rxn in rxns.values():
+        if rxn.barrier:
+            unique_barrier_keys.update(rxn.barrier.keys())
+            
+    # Sort the keys alphabetically so the columns are always in a consistent order
+    unique_barrier_keys = sorted(list(unique_barrier_keys))
+
+    # 2. Dynamically build the headers
+    headers = ['Reaction Hash', 'Reactant', 'Product']
+    for key in unique_barrier_keys:
+        headers.append(f"{key} dG_activation")
+
+    # 3. Second pass: Extract the data for the table
     data = []
     for rxn in rxns.values():
-        # access data for printing to screen via tabulate
-        egat_barrier = rxn.barrier.get('egat_rgd1') if rxn.barrier else None
-        reverse_egat_barrier = rxn.reverse_barrier.get('egat_rgd1') if rxn.reverse_barrier else None
-        data.append([
-            rxn.id,
+        # Start the row with the standard identifiers
+        row = [
+            rxn.hash,
             rxn.reactant.canon_smi,
-            rxn.product.canon_smi,
-            _format_optional_barrier(egat_barrier),
-            _format_optional_barrier(reverse_egat_barrier),
-        ])
+            rxn.product.canon_smi
+        ]
+        
+        # Dynamically pull the barriers for each unique key we found
+        for key in unique_barrier_keys:
+            fwd_barrier = rxn.barrier.get(key) if rxn.barrier else None
+            
+            row.append(_format_optional_barrier(fwd_barrier))
+            
+        data.append(row)
         
         # optionally, generate PDFs for each reactant/product pair
         if args.visualize:

@@ -1,4 +1,7 @@
-import sys
+"""
+Initialization and task scheduler for YARP jobs
+"""
+import argparse
 import yaml
 import pickle
 import json
@@ -72,21 +75,12 @@ def save_state(work_dir, reactions, status_tracker):
         
     print(f"Initialized {len(reactions)} reactions and saved to disk!")
 
-def main(file_dict):
-    # Figure out a way to print the current version/commit hash
-    print("First off, here's the input file you provided:")
-    print("=====================================")
-    print(yaml.dump(file_dict))
-    print("=====================================")
-        
+def initialize_yarp(file_dict):
     work_dir = Path.cwd()
     reactions, status_tracker = initialize_from_dict(file_dict)
     save_state(work_dir, reactions, status_tracker)
 
-    print("If you want to characterize these reactions, you'll need to go run 'progress_yarp' next.")
-    print("See ya, bye!")
-
-if __name__ == "__main__":
+def main():
     print(f"""Welcome to
                __   __ _    ____  ____  
                \ \ / // \  |  _ \|  _ \ 
@@ -95,7 +89,23 @@ if __name__ == "__main__":
                  |_/_/   \_\_| \_\_|
                         // Yet Another Reaction Program
     """)
-    with open(sys.argv[1], 'r') as f:
+    parser = argparse.ArgumentParser(description="Initialize YARP with a YAML config.")
+    parser.add_argument("config_file", type=str, help="Path to the YAML input file")
+    args = parser.parse_args()
+
+    with open(args.config_file, 'r') as f:
         file_dict = yaml.safe_load(f)
 
-    main(file_dict)
+    # Figure out a way to print the current version/commit hash
+    print("First off, here's the input file you provided:")
+    print("=====================================")
+    print(yaml.dump(file_dict))
+    print("=====================================")
+        
+    initialize_yarp(file_dict)
+
+    print("If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.")
+    print("See ya, bye!")
+
+if __name__ == "__main__":
+    main()

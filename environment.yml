@@ -1,4 +1,4 @@
-name: yarp-again
+name: yarp
 channels:
   - conda-forge
   - pytorch

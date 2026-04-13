@@ -218,36 +218,38 @@ class PysisyphusIRCValCalculator(IRCValTask):
         # Return the outer script for the Job Manager to execute
         return str(submit_script_path)
 
+    def _is_run_successful(self, i: int) -> bool:
+        """Helper method to validate if a specific Pysisyphus IRC run completed successfully."""
+        run_dir = self.scratch_dir / f"irc_run{i}"
+        log_file = run_dir / f"irc_{i}.log"
+        backward_xyz_file = run_dir / "backward_end_opt.xyz"
+        forward_xyz_file = run_dir / "forward_end_opt.xyz"
+
+        # 1. File existence check
+        if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
+            return False
+
+        # 2. Log file termination check
+        with open(log_file, "r") as f:
+            log_text = f.read()
+
+        if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
+            return False
+
+        return True
+
     def check_output(self) -> bool:
         num_runs = self._get_num_runs()
         if num_runs == 0:
             return False # No runs found at all!
 
         one_successful = False
-        
         for i in range(1, num_runs + 1):
-            run_dir = self.scratch_dir / f"irc_run{i}"
-            log_file = run_dir / f"irc_{i}.log"
-            backward_xyz_file = run_dir / "backward_end_opt.xyz"
-            forward_xyz_file = run_dir / "forward_end_opt.xyz"
-
-            # 1. File existence check
-            if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
-                print(f"     * Run {i} failed: Missing expected output files.")
-                continue
-
-            # 2. Log file termination check
-            with open(log_file, "r") as f:
-                log_text = f.read()
-
-            if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"     * Run {i} failed: Did not find successful termination message in log.")
-                continue
-
-            # If it passes all checks, at least one run succeeded!
-            one_successful = True
+            if self._is_run_successful(i):
+                one_successful = True
+            else:
+                print(f"     * Run {i} failed or did not finish successfully.")
         
-        # We only care if at least one succeeded
         return one_successful
 
     def scrape_data(self) -> bool:
@@ -255,6 +257,10 @@ class PysisyphusIRCValCalculator(IRCValTask):
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
+            # Skip scraping for this index if the run failed!
+            if not self._is_run_successful(i):
+                continue
+
             run_dir = self.scratch_dir / f"irc_run{i}"
 
             log_file = run_dir / f"irc_{i}.log"
@@ -281,7 +287,6 @@ class PysisyphusIRCValCalculator(IRCValTask):
             target_ts = self.rxn.ts_geom.get(target_ts_key, None)
             irc_runs[i] = {
                 "outcome": irc_outcome,
-                # ERM: this *should* be safe because we always optimize TS before IRC...
                 "ts_geom": target_ts,
                 "lhs_barrier": lhs,
                 "rhs_barrier": rhs
@@ -428,36 +433,38 @@ class OrcaIRCValCalculator(IRCValTask):
         # Return the outer script for the Job Manager to execute
         return str(submit_script_path)
 
+    def _is_run_successful(self, i: int) -> bool:
+        """Helper method to validate if a specific ORCA IRC run completed successfully."""
+        run_dir = self.scratch_dir / f"irc_run{i}"
+        log_file = run_dir / f"irc_{i}.out"
+        backward_xyz_file = run_dir / f"irc_{i}_IRC_B.xyz"
+        forward_xyz_file = run_dir / f"irc_{i}_IRC_F.xyz"
+
+        # 1. File existence check
+        if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
+            return False
+
+        # 2. Log file termination check
+        with open(log_file, "r") as f:
+            log_text = f.read()
+
+        if "THE IRC HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
+            return False
+
+        return True
+
     def check_output(self) -> bool:
         num_runs = self._get_num_runs()
         if num_runs == 0:
             return False # No runs found at all!
 
         one_successful = False
-        
         for i in range(1, num_runs + 1):
-            run_dir = self.scratch_dir / f"irc_run{i}"
-            log_file = run_dir / f"irc_{i}.out"
-            backward_xyz_file = run_dir / f"irc_{i}_IRC_B.xyz"
-            forward_xyz_file = run_dir / f"irc_{i}_IRC_F.xyz"
-
-            # 1. File existence check
-            if not (log_file.exists() and backward_xyz_file.exists() and forward_xyz_file.exists()):
-                print(f"     * Run {i} failed: Missing expected output files.")
-                continue
-
-            # 2. Log file termination check
-            with open(log_file, "r") as f:
-                log_text = f.read()
-
-            if "THE IRC HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
-                print(f"     * Run {i} failed: Did not find successful termination message in log.")
-                continue
-
-            # If it passes all checks, at least one run succeeded!
-            one_successful = True
+            if self._is_run_successful(i):
+                one_successful = True
+            else:
+                print(f"     * Run {i} failed or did not finish successfully.")
         
-        # We only care if at least one succeeded
         return one_successful
 
     def scrape_data(self) -> bool:
@@ -469,6 +476,10 @@ class OrcaIRCValCalculator(IRCValTask):
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
+            # Skip scraping for this index if the run failed!
+            if not self._is_run_successful(i):
+                continue
+
             run_dir = self.scratch_dir / f"irc_run{i}"
 
             target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
@@ -496,7 +507,6 @@ class OrcaIRCValCalculator(IRCValTask):
 
             irc_runs[i] = {
                 "outcome": irc_outcome,
-                # ERM: this *should* be safe because we always optimize TS before IRC...
                 "ts_geom": target_ts,
                 "lhs_barrier": lhs,
                 "rhs_barrier": rhs

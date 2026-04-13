@@ -7,7 +7,7 @@
     ```
 2. Activate YARP loop script to progress individual tasks forward in the pipeline:
     ```
-    nohup yarp-loop -w . -i 1 -d 2 > loop.out &
+    nohup yarp-loop -w . -i 1 -d 15 > loop.out &
     ```
 3. After the analysis of `depth1` has fully completed, move to the `depth2` directory, and repeat steps 1 and 2
 4. You can quickly check the contents of a YARP reactions pickle file using the `helper/read_pkl.py` script!

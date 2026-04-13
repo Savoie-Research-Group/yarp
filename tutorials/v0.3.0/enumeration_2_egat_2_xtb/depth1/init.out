@@ -111,5 +111,5 @@ Product enumeration routine selected
    + Applying formal charge cutoff of 2.0
    + Returning 2 products after filtering
 Initialized 2 reactions and saved to disk!
-If you want to characterize these reactions, you'll need to go run 'progress_yarp' next.
+If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.
 See ya, bye!

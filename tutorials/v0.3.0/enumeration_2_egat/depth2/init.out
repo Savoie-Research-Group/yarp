@@ -46,7 +46,7 @@ Product enumeration routine selected
  - Reading in 2 total reactions
  - Barrier filtering selected!
    Reactions with egat_rgd1 dG above 90.0 kcal/mol will be excluded from enumeration.
-  + Excluding 2107297.9154397324 (dG = 97.13385772705078) from enumeration
+  + Excluding 2107297.9154397324 (dG = 95.71311950683594) from enumeration
  - No product separation will be performed prior to enumeration
  - 1 unique products identified for enumeration
  - Enumerating from DOAMZWOPDPPKJS (OC1CO1) node
@@ -57,5 +57,5 @@ Product enumeration routine selected
    + Applying formal charge cutoff of 2.0
    + Returning 2 products after filtering
 Initialized 4 reactions and saved to disk!
-If you want to characterize these reactions, you'll need to go run 'progress_yarp' next.
+If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.
 See ya, bye!

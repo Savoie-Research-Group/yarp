@@ -1,0 +1,126 @@
+initialize:
+  initial species: OCC=O # can also be a path to an XYZ or MOL file
+  output: depth1.pkl
+  job manager:
+     scheduler: local
+     container: docker
+     max_active_jobs: 4
+  enumeration:
+     enumerate: True
+     mode: concerted
+     bonds to break: 2
+     bonds to form: 2
+     reactive atoms: [0, 1, 2, 3] # only enumerate between heavy atoms
+     enumeration filters:
+       lewis score: 0.0
+       formal charge: 2.0
+       discard strained rings: False
+
+stages:
+ - egat
+ - ll_path
+ - ll_refine
+ - hl_refine
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 1
+  mem_per_cpu: 1000 # in MB
+
+ll_path:
+  method: init_rxn_path
+  pre_process_filtering: # optional: this whole block can be absent
+    property: barrier
+    source: egat_rgd1
+    threshold: 100.00 # kcal/mol
+  conformers:
+     n_cpus: 2
+     mem_per_cpu: 1000 # in MB
+     max_runtime: 01:00:00
+     software: crest
+     lot: gfn # other options: gfn1, gfnff
+     energy_window: 6.0 # units: kcal/mol
+     charge: 0
+     n_unpaired_electrons: 0
+  gsm:
+     n_cpus: 2
+     mem_per_cpu: 1000 # in MB
+     max_runtime: 01:00:00
+     n_conf: 3
+     software: pysisyphus
+     joint_opt: dual # other options: r_only, p_only, off
+     bias_lot: uff
+     gsm_lot: xtb
+     max_gsm_nodes: 30
+     charge: 0
+     multiplicity: 1
+
+ll_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 300
+  ts_opt:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 300
+    conv_thresh: gau
+  irc_val:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 2
+    conv_thresh: gau
+    max_cycles: 300
+
+hl_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    product:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    transition_state:
+      label: ts_opt
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 300
+  ts_opt:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 300
+  irc_val:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 4
+    max_cycles: 50
+

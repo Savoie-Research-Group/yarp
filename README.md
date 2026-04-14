@@ -73,7 +73,7 @@ egat:
 ### Installation Notes
 
 First, get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
-from the root directory. Then do a good old `conda activate yarp-again`
+from the root directory. Then do a good old `conda activate yarp`
 
 Also from the root directory of this git repository, run `pip install -e .`
 - This will give you access to the `yarp-init`, `yarp-progress`, and `yarp-loop` executables

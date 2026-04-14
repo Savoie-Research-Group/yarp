@@ -3,7 +3,7 @@
 1. Perform product enumeration and initialize reaction objects/status tracker:
     ```
     cd /path/to/depth1
-    yarp-init input.yaml > init.out
+    yarp-init depth1.yaml > init.out
     ```
 2. Activate YARP loop script to progress individual tasks forward in the pipeline:
     ```

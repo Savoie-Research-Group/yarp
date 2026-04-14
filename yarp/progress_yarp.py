@@ -11,6 +11,9 @@ from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calc_factory import get_calculator
 
 def load_state(work_dir: Path):
+    """
+    Load in status tracker and reaction objects from working directory
+    """
     # Grab all JSONs, but explicitly ignore the failure log!
     json_files = [f for f in work_dir.glob("*.json") if f.name != "failed_status.json"]
 
@@ -33,6 +36,11 @@ def load_state(work_dir: Path):
     return status_tracker, reactions
 
 def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxns: dict):
+    """
+    Save tasks status and reactions to the working directory.
+    If any reactions have failed in the pipeline, they are removed from
+    the status tracker and output reaction files and collected elsewhere.
+    """
     # ====================================================================
     # 1. PROCESS FAILURES (Extract Data & Save to Failed Logs)
     # ====================================================================
@@ -90,15 +98,18 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
         pickle.dump(reactions, f)
 
 def progress_yarp(work_dir: Path):
+    """
+    Primary logic flow for managing
+    """
     print(f"Processing YARP progress in {work_dir}...")
 
-    # 1. Load the state
+    # Load the state
     status_tracker, reactions = load_state(work_dir)
 
-    # 2. Parse the configuration
+    # Parse the configuration derived from OG user input file
     config = InputParser(status_tracker["input_config"])
 
-    # Notice these are direct attributes of `config` based on your InputParser!
+    # Set up job manager
     scheduler = config.job_manager.scheduler
     container_runner = config.job_manager.container
     max_active_jobs = config.job_manager.max_active_jobs
@@ -109,12 +120,12 @@ def progress_yarp(work_dir: Path):
     print(f"Max active jobs allowed: {max_active_jobs}")
 
     # =================================================================
-    # PASS 0 (Prep): Synchronize Conformers Across Identical Species
+    # PASS 0.1: Synchronize Conformers Across Identical Species
     # =================================================================
     print("Synchronizing conformer data across identical chemical species...")
     species_conformer_pool = {}
 
-    # Step 1: Pool all conformers from all reactions using the unique hash
+    # 0.1.A Pool all conformers from all reactions using the unique hash
     for rxn_obj in reactions.values():
         for species in [rxn_obj.reactant, rxn_obj.product]:
             if not species: continue
@@ -123,14 +134,14 @@ def progress_yarp(work_dir: Path):
                 species_conformer_pool[sp_hash] = {}
             species_conformer_pool[sp_hash].update(species.conformers)
 
-    # Step 2: Distribute the enriched pools back to all reactions
+    # 0.1.B Distribute the enriched pools back to all reactions
     for rxn_obj in reactions.values():
         for species in [rxn_obj.reactant, rxn_obj.product]:
             if not species: continue
             species.conformers.update(species_conformer_pool[species.hash])
 
     # =================================================================
-    # PASS 0: Fast-Forward Previously Characterized Reactions
+    # PASS 0.2: Fast-Forward Previously Characterized Reactions
     # =================================================================
     print("Performing pre-flight checks to skip already characterized reactions...")
 
@@ -143,86 +154,72 @@ def progress_yarp(work_dir: Path):
             if dep_id in required_by: # Ensure it's a pipeline task, not global
                 required_by[dep_id].append(task_id)
 
-    # 0A. Fast-Forward Pipeline Tasks (Local)
+    # 0.2.A. Fast-Forward Pipeline Tasks (Local)
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
 
-        # --- SUB-PASS 1: Intrinsic Completion (Data-driven) ---
         for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] in ["ready", "pending"]:
                 task_def = config.pipeline_tasks[task_id]
-
-                # Smart extraction based on method type
-                method = getattr(task_def, 'method', None) 
                 task_type = getattr(task_def, 'task_type', '')
 
                 # Determine target species for the task (reactant or product)
                 target_species = rxn_obj.reactant if "reactant" in task_type else rxn_obj.product
 
                 already_done = False
-                barrier_key = ""
+                desired_key = ""
 
-                # 1. Check Path / Barrier Tasks
-                if method in ["init_rxn_path", "refine_rxn_path"]:
-                    if method == "init_rxn_path" and hasattr(task_def.config, 'gsm'):
-                        lot = getattr(task_def.config.gsm, 'gsm_lot', None)
-                        software = getattr(task_def.config.gsm, 'software', None)
-                    elif method == "refine_rxn_path" and hasattr(task_def.config, 'irc_val'):
-                        lot = getattr(task_def.config.irc_val, 'lot', None)
-                        software = getattr(task_def.config.irc_val, 'software', None)
-                    else:
-                        lot = getattr(task_def.config, 'lot', None)
-                        software = getattr(task_def.config, 'software', None)
-
-                    if lot and software:
-                        barrier_key = f"{lot}_{software}"
-                        has_outcome = hasattr(rxn_obj, 'outcome_label') and barrier_key in rxn_obj.outcome_label
-                        has_barrier = hasattr(rxn_obj, 'barrier') and barrier_key in rxn_obj.barrier
-                        if has_outcome or has_barrier:
-                            already_done = True
-
-                # 2. Check Conformer Generation Tasks
-                elif method == "conf_gen" or task_type in ["reactant_conformer", "product_conformer"]:
-                    if target_species and any("conf_gen" in key for key in target_species.conformers.keys()):
-                        already_done = True
-                        barrier_key = "conf_gen"
-
-                # 3. Check Minimum Optimization Tasks
-                elif method == "min_opt" or task_type in ["reactant_optimization", "product_optimization"]:
+                # Make sure to pull out the right level of theory for GSM input block                     
+                if task_type == "gsm":
+                    lot = getattr(task_def.config, 'gsm_lot', None)
+                    software = getattr(task_def.config, 'software', None)
+                else:
                     lot = getattr(task_def.config, 'lot', None)
                     software = getattr(task_def.config, 'software', None)
-                    if lot and software:
-                        opt_key = f"rpopt_{lot}_{software}"
-                        if target_species and any(opt_key in key for key in target_species.conformers.keys()):
-                            already_done = True
-                            barrier_key = opt_key
+                
+                # Generate the desired data key
+                desired_key = f"{lot}_{software}"
+                
+                # Check if reactant/product conformers have been generated
+                if task_type in ["reactant_conformer", "product_conformer"]:
+                    conf_gen_keys = [key for key in target_species.conformers.keys() if "conf_gen" in key]
+                    if target_species and any(desired_key in key for key in conf_gen_keys):
+                        already_done = True
+
+                # Check if transition state initial guess conformers have been generated
+                elif task_type == "gsm":
+                    ts_guess_keys = [key for key in rxn_obj.ts_geom.keys() if "ts_guess" in key]
+                    if any(desired_key in key for key in ts_guess_keys):
+                        already_done = True
+
+                # Check if reactant/product conformers have been optimized
+                elif task_type in ["reactant_optimization", "product_optimization"]:
+                    rpopt_keys = [key for key in target_species.conformers.keys() if "rpopt" in key]
+                    if target_species and any(desired_key in key for key in rpopt_keys):
+                        already_done = True
+
+                # Check if transition state conformers have been optimized
+                elif task_type == "transition_state_optimization":
+                    tsopt_keys = [key for key in rxn_obj.ts_geom.keys() if "tsopt" in key]
+                    if any(desired_key in key for key in tsopt_keys):
+                        already_done = True
+
+                # Check if IRC validation has been performed
+                elif task_type == "irc_validation":
+                    val_keys = [key for key in rxn_obj.ts_geom.keys() if "validated_ts" in key]
+                    val_check = any(desired_key in key for key in val_keys)
+                    fbar_check = any(desired_key in key for key in rxn_obj.barrier.keys())
+                    rbar_check = any(desired_key in key for key in rxn_obj.reverse_barrier.keys())
+                    if val_check and fbar_check and rbar_check:
+                        already_done = True
 
                 # Execute the fast-forward!
                 if already_done:
                     meta["status"] = "terminated_normally"
-                    print(f"   * [{rxn_hash}] Task '{task_id}' ({barrier_key}) already characterized/synced. Fast-forwarding...")
+                    print(f"   * [{rxn_hash}] Task '{task_id}' ({desired_key}) already characterized/synced. Fast-forwarding...")
 
-        # --- SUB-PASS 2: Backwards Pruning (Dependency-driven) ---
-        # Iterate in reverse order so downstream skips cascade upstream
-        for task_id in reversed(list(config.pipeline_tasks.keys())):
-            meta = rxn_meta["tasks"][task_id]
-
-            if meta["status"] in ["ready", "pending"]:
-                downstream_tasks = required_by[task_id]
-
-                # If this task HAS downstream dependents, and ALL of them are terminated/skipped
-                if len(downstream_tasks) > 0:
-                    all_downstream_skipped = all(
-                        rxn_meta["tasks"][dt]["status"] == "terminated_normally" 
-                        for dt in downstream_tasks
-                    )
-
-                    if all_downstream_skipped:
-                        meta["status"] = "terminated_normally"
-                        print(f"   * [{rxn_hash}] Task '{task_id}' skipped because all dependent downstream tasks are already completed.")
-
-    # 0B. Fast-Forward Global Tasks
+    # 0.2.B. Fast-Forward Global Tasks
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
         if g_meta["status"] in ["ready", "pending"]:
             task_def = config.global_tasks[g_task_id]
@@ -246,7 +243,7 @@ def progress_yarp(work_dir: Path):
     active_jobs = 0
     failed_rxns = {}
 
-    # NEW: Registry to prevent redundant submissions for identical species
+    # Registry to prevent redundant submissions for identical species
     active_species_tasks = set()
 
     # Pre-populate registry with jobs that are ALREADY running from previous loops
@@ -255,18 +252,17 @@ def progress_yarp(work_dir: Path):
         for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] in ["submitted", "running"]:
                 task_def = config.pipeline_tasks[task_id]
-                method = getattr(task_def, 'method', '')
                 task_type = getattr(task_def, 'task_type', '')
 
                 # Only track single-species tasks (skip reaction path tasks)
-                if method in ["conf_gen", "min_opt"] or task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
+                if task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
                     is_reactant = "reactant" in task_type
                     species = rxn_obj.reactant if is_reactant else rxn_obj.product
                     if species:
                         active_species_tasks.add((species.hash, task_id))
 
     # =================================================================
-    # PASS 1A: Check Status of Submitted GLOBAL Jobs
+    # PASS 1.1: Check Status of Submitted GLOBAL Jobs
     # =================================================================
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
         if g_meta["status"] == "submitted":
@@ -290,7 +286,7 @@ def progress_yarp(work_dir: Path):
                 active_jobs += 1
 
     # =================================================================
-    # PASS 1B: Check Status of Submitted PIPELINE Jobs
+    # PASS 1.2: Check Status of Submitted PIPELINE Jobs
     # =================================================================
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         rxn_obj = reactions.get(rxn_hash)
@@ -353,7 +349,7 @@ def progress_yarp(work_dir: Path):
         for task_id, meta in tasks_status.items():
             if meta["status"] == "pending":
                 task_def = config.pipeline_tasks[task_id]
-                
+
                 deps_met = True
                 for dep_id in task_def.depends_on:
                     # Check if the dependency is a global task
@@ -366,7 +362,7 @@ def progress_yarp(work_dir: Path):
                         if tasks_status[dep_id]["status"] != "terminated_normally":
                             deps_met = False
                             break
-                
+
                 if deps_met:
                     # --- Evaluate Pre-Process Filters ---
                     stage_filter = config.stage_filters.get(task_def.parent_stage)
@@ -412,7 +408,7 @@ def progress_yarp(work_dir: Path):
     print(f"Current active jobs: {active_jobs} / {max_active_jobs}")
 
     # =================================================================
-    # PASS 3A: Submit New GLOBAL Jobs
+    # PASS 3.1: Submit New GLOBAL Jobs
     # =================================================================
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
         # Global limit check
@@ -421,10 +417,10 @@ def progress_yarp(work_dir: Path):
             break
 
         if g_meta["status"] == "ready":
-                
+
             task_def = config.global_tasks[g_task_id]
             calc = get_calculator(task_def, reactions, config.job_manager)
-            
+
             scratch_path = work_dir / "SCRATCH" / f"GLOBAL_{g_task_id}"
             calc.set_scratch_dir(scratch_path)
 
@@ -449,7 +445,7 @@ def progress_yarp(work_dir: Path):
 
 
     # =================================================================
-    # PASS 3B: Submit New PIPELINE Jobs
+    # PASS 3.2: Submit New PIPELINE Jobs
     # =================================================================
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         # Global limit check
@@ -467,17 +463,16 @@ def progress_yarp(work_dir: Path):
 
             if meta["status"] == "ready":
                 task_def = config.pipeline_tasks[task_id]
-                method = getattr(task_def, 'method', '')
                 task_type = getattr(task_def, 'task_type', '')
 
                 # --- Redundancy Blocker ---
-                if method in ["conf_gen", "min_opt"] or task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
+                if task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
                     is_reactant = "reactant" in task_type
                     species = rxn_obj.reactant if is_reactant else rxn_obj.product
-                    
+
                     if species:
                         registry_key = (species.hash, task_id)
-                        
+
                         if registry_key in active_species_tasks:
                             # Silently skip submission! Another identical species is doing the work.
                             # It remains "ready" and will be fast-forwarded in PASS 0 on a future loop.
@@ -516,6 +511,10 @@ def progress_yarp(work_dir: Path):
                     meta["status"] = "finished_with_error"
                     meta["error_log"] = "Job manager failed to submit job."
                     failed_rxns[rxn_hash] = rxn_obj
+
+    # =================================================================
+    # Congrats! You made it through!
+    # =================================================================
 
     # Write all updates back to disk
     save_state(work_dir, status_tracker, reactions, failed_rxns)

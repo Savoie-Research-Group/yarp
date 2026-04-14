@@ -76,7 +76,7 @@ class conformer:
 
             rank = calc_data.get('conf_rank')
 
-            self.type = f'conf_gen_rank{rank}_{self.software}_{self.lot}'
+            self.type = f'conf_gen_rank{rank}_{self.lot}_{self.software}'
         else:
             pass
 

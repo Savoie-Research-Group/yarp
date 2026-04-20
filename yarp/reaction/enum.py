@@ -593,6 +593,66 @@ def unique_set_partition_generator(seq: Iterable, group_size: int):
     the same partition. This function is used to generate all possible partitions of atoms that can form 
     bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
     [(3,4),(1,2)] pair of bonds, etc.
+
+    When len(seq) is not divisible by group_size, all possible subsets of size
+    (groups_needed * group_size) are partitioned, so no valid grouping is missed.
+    """
+    seq = tuple(seq)                     # tuple => O(1) index lookup
+    n = len(seq)                         # O(1) lookup
+
+    # Needs to be at least 1 and not larger than seq, otherwise no partition is possible
+    if group_size <= 0 or group_size > n:
+        return
+
+    groups_needed = n // group_size      # number of complete groups we can form
+
+    def helper(available: tuple, accum: tuple):
+        """
+        Recursively build up `accum`, a tuple of grouped index-tuples.
+        Canonical order is enforced by always anchoring the next group on
+        the first element of `available` — there is no choice here, which
+        is what prevents duplicate partitions from being generated.
+        """
+        if len(accum) == groups_needed:   # base case: complete partition
+            # Map indices back to original elements exactly once:
+            yield tuple(frozenset(seq[i] for i in grp) for grp in accum)
+            return
+
+        # Canonical anchor: first available index MUST start the next group
+        first, *rest = available
+        for combo in combinations(rest, group_size - 1):
+            # Build the remaining available indices by excluding the chosen combo
+            remaining = tuple(i for i in rest if i not in combo)
+            yield from helper(remaining, accum + ((first,) + combo,))
+
+    # When n is not divisible by group_size, we iterate over all subsets of
+    # exactly (groups_needed * group_size) elements and partition each one.
+    # This ensures every valid grouping is considered regardless of which
+    # elements are left over.
+    elements_needed = groups_needed * group_size
+    seen = set()                          # tracks yielded partitions to avoid duplicates
+    for subset in combinations(range(n), elements_needed):
+        for partition in helper(subset, ()):
+            # Different subsets can produce identical frozenset partitions,
+            # so we deduplicate before yielding
+            key = frozenset(partition)
+            if key not in seen:
+                seen.add(key)
+                yield partition
+
+'''
+def unique_set_partition_generator(seq: Iterable, group_size: int):
+    """
+    Yield all unique partitions of `seq` into groups of `group_size`.
+    Generates each partition exactly once, in canonical order,
+    without holding all previous results in memory.
+
+    This function returns the unique partitionings of group_size of the elements of seq. The returned partitions
+    are not distinguishable by ordering within partitions or the ordering between partitions. For example, 
+    if seq = [1,2,3,4] and group_size=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
+    the same partition. This function is used to generate all possible partitions of atoms that can form 
+    bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
+    [(3,4),(1,2)] pair of bonds, etc.
     """
     seq = tuple(seq)                     # tuple => O(1) index lookup
     n = len(seq)                        # O(1) lookup
@@ -637,7 +697,7 @@ def unique_set_partition_generator(seq: Iterable, group_size: int):
             #break   # keep canonical: only first unused i is allowed
 
     yield from helper(0, ())
-
+'''
 
 def return_bondtypes(yarpecules, b_inds=[]):
     """

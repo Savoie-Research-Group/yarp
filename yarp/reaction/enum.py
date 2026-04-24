@@ -640,64 +640,6 @@ def unique_set_partition_generator(seq: Iterable, group_size: int):
                 seen.add(key)
                 yield partition
 
-'''
-def unique_set_partition_generator(seq: Iterable, group_size: int):
-    """
-    Yield all unique partitions of `seq` into groups of `group_size`.
-    Generates each partition exactly once, in canonical order,
-    without holding all previous results in memory.
-
-    This function returns the unique partitionings of group_size of the elements of seq. The returned partitions
-    are not distinguishable by ordering within partitions or the ordering between partitions. For example, 
-    if seq = [1,2,3,4] and group_size=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
-    the same partition. This function is used to generate all possible partitions of atoms that can form 
-    bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
-    [(3,4),(1,2)] pair of bonds, etc.
-    """
-    seq = tuple(seq)                     # tuple => O(1) index lookup
-    n = len(seq)                        # O(1) lookup
-
-    # Needs to be at least 1 otherwise the partition will be empty
-    if group_size <= 0:
-        return
-
-    groups_needed = n // group_size
-    used = [False] * n                    # bitmap of positions already grouped
-
-    # It's useful to define the recursive helper function here because it allows us to
-    # separate the passthrough variables from the parent function call.
-    def helper(start_idx: int, accum: Tuple[Tuple[int, ...], ...]):
-        """
-        Recursively build up `accum`, a tuple of grouped index-tuples.
-        The `start_idx` ensures canonical order: we only look *forward*
-        in the sequence for the next unused element, so each partition
-        appears once and only once.
-        """
-        if len(accum) == groups_needed:   # base case: complete partition
-            # Map indices back to original elements exactly once:
-            yield tuple(frozenset(seq[i] for i in grp) for grp in accum)
-            return
-
-        # Pick the smallest unused element to start the next group
-        for i in range(start_idx, n):
-            if used[i]:
-                continue
-            used[i] = True
-
-            # Choose the remaining (group_size - 1) members *after* i
-            available = [j for j in range(i + 1, n) if not used[j]]
-            for combo in combinations(available, group_size - 1):
-                for j in combo:
-                    used[j] = True
-                yield from helper(i + 1, accum + ((i,) + combo,))
-                for j in combo:
-                    used[j] = False
-
-            used[i] = False
-            #break   # keep canonical: only first unused i is allowed
-
-    yield from helper(0, ())
-'''
 
 def return_bondtypes(yarpecules, b_inds=[]):
     """

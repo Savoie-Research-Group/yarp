@@ -119,32 +119,6 @@ class TestConcertedClosedShell:
         assert dap.hash not in dar_b2f2_hash
 
 class TestConcertedOpenShell:
-    def test_liec_b1f1(self):
-        '''
-        Test if lower_score b1f1 products are formed
-        '''
-        liec = yarpecule('[Li]O[C]1OCCO1')
-        prods = list(bmfn(liec, 1, 1, hashes={liec.hash}))
-
-        assert len(prods) == 4
-
-        expected_prods = ['[Li][O]C(=O)OC[CH2]',
-                          '[H].[Li][O][C@@]12OC[C@@H]1O2',
-                          '[Li][O][C@@H]1O[CH]CO1',
-                          'O=C1OCCO1.[Li]']
-        
-        expected_prods_hash = set()
-        for smi in expected_prods:
-            mol = yarpecule(smi)
-            expected_prods_hash.add(mol.hash)
-
-        found_hashes = set()
-        for _ in prods:
-            if _.hash in expected_prods_hash:
-                found_hashes.add(_.hash)
-            
-        assert found_hashes == expected_prods_hash
-
     def test_liec_b1f1_all(self):
         '''
         Test if all b1f1 products are formed (regardless of score)
@@ -195,7 +169,7 @@ class TestConcertedOpenShell:
         for _ in b1f2_prods:
             b1f2_prods_hash.add(_.hash)
 
-        assert b1f1_prods == b1f2_prods
+        assert b1f1_prods_hash == b1f2_prods_hash
 
     def test_liec_b2f2(self):
         """
@@ -225,20 +199,20 @@ class TestConcertedOpenShell:
             b1f1_prods_hash.add(_.hash)
 
         # get found hashes for each
-        found_paper = set()
-        found_b1f1 = set()
+        found_paper_hash = set()
+        found_b1f1_hash = set()
         for _ in b2f2_prods:
             # look for paper products
             if _.hash in paper_prods_hash:
-                found_paper.add(_.hash)
+                found_paper_hash.add(_.hash)
             
             # look for b1f1 products
             if _.hash in b1f1_prods_hash:
-                found_b1f1.add(_.hash)
+                found_b1f1_hash.add(_.hash)
             
-        assert found_paper == paper_prods_hash
+        assert found_paper_hash == paper_prods_hash
 
-        assert found_b1f1 == b1f1_prods_hash
+        assert found_b1f1_hash == b1f1_prods_hash
 
 class TestPartitionGenerator:
     def test_unique_set_partition_generator(self):

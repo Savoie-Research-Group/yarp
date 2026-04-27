@@ -12,7 +12,7 @@ from yarp.yarpecule.lewis.be_mat import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
-def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted"):
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False):
     """
     Master wrapper function for all enumeration routines
 
@@ -69,7 +69,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted"):
               f"{len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react))
+        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react, verbose=verbose))
         print(f"   + Enumerated {len(products)} products")
 
     else:
@@ -652,6 +652,11 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                         print(f"Yielding new product with hash: "
                               f"{product._yarpecule_hash}")
                     yield product
+                # KMH: Added error message to let user know why some products were skipped
+                else:
+                    if verbose:
+                        print(f"Skipping - product hash already in set: "
+                              f"{product._yarpecule_hash}")
 
 
 def unique_set_partition_generator(seq: Iterable, group_size: int):
@@ -666,50 +671,52 @@ def unique_set_partition_generator(seq: Iterable, group_size: int):
     the same partition. This function is used to generate all possible partitions of atoms that can form 
     bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
     [(3,4),(1,2)] pair of bonds, etc.
+
+    When len(seq) is not divisible by group_size, all possible subsets of size
+    (groups_needed * group_size) are partitioned, so no valid grouping is missed.
     """
     seq = tuple(seq)                     # tuple => O(1) index lookup
-    n = len(seq)                        # O(1) lookup
+    n = len(seq)                         # O(1) lookup
 
-    # Needs to be at least 1 otherwise the partition will be empty
-    if group_size <= 0:
+    # Needs to be at least 1 and not larger than seq, otherwise no partition is possible
+    if group_size <= 0 or group_size > n:
         return
 
-    groups_needed = n // group_size
-    used = [False] * n                    # bitmap of positions already grouped
+    groups_needed = n // group_size      # number of complete groups we can form
 
-    # It's useful to define the recursive helper function here because it allows us to
-    # separate the passthrough variables from the parent function call.
-    def helper(start_idx: int, accum: Tuple[Tuple[int, ...], ...]):
+    def helper(available: tuple, accum: tuple):
         """
         Recursively build up `accum`, a tuple of grouped index-tuples.
-        The `start_idx` ensures canonical order: we only look *forward*
-        in the sequence for the next unused element, so each partition
-        appears once and only once.
+        Canonical order is enforced by always anchoring the next group on
+        the first element of `available` — there is no choice here, which
+        is what prevents duplicate partitions from being generated.
         """
         if len(accum) == groups_needed:   # base case: complete partition
             # Map indices back to original elements exactly once:
             yield tuple(frozenset(seq[i] for i in grp) for grp in accum)
             return
 
-        # Pick the smallest unused element to start the next group
-        for i in range(start_idx, n):
-            if used[i]:
-                continue
-            used[i] = True
+        # Canonical anchor: first available index MUST start the next group
+        first, *rest = available
+        for combo in combinations(rest, group_size - 1):
+            # Build the remaining available indices by excluding the chosen combo
+            remaining = tuple(i for i in rest if i not in combo)
+            yield from helper(remaining, accum + ((first,) + combo,))
 
-            # Choose the remaining (group_size - 1) members *after* i
-            available = [j for j in range(i + 1, n) if not used[j]]
-            for combo in combinations(available, group_size - 1):
-                for j in combo:
-                    used[j] = True
-                yield from helper(i + 1, accum + ((i,) + combo,))
-                for j in combo:
-                    used[j] = False
-
-            used[i] = False
-            break   # keep canonical: only first unused i is allowed
-
-    yield from helper(0, ())
+    # When n is not divisible by group_size, we iterate over all subsets of
+    # exactly (groups_needed * group_size) elements and partition each one.
+    # This ensures every valid grouping is considered regardless of which
+    # elements are left over.
+    elements_needed = groups_needed * group_size
+    seen = set()                          # tracks yielded partitions to avoid duplicates
+    for subset in combinations(range(n), elements_needed):
+        for partition in helper(subset, ()):
+            # Different subsets can produce identical frozenset partitions,
+            # so we deduplicate before yielding
+            key = frozenset(partition)
+            if key not in seen:
+                seen.add(key)
+                yield partition
 
 
 def return_bondtypes(yarpecules, b_inds=[]):

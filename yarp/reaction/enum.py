@@ -147,7 +147,21 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                         adj_mat[donor,acceptor] = 1
                         adj_mat[acceptor,donor] = 1
                         bonds.update([(donor,acceptor),(acceptor,donor)])
-                        product = yarpecule((adj_mat,y.geo,y.elements,y.q),canon=False)
+                        product = yarpecule((
+                            adj_mat,
+                            y.geo,
+                            y.elements,
+                            y.q,
+                            {
+                                i: {
+                                    **dict(y._atom_info[i]),
+                                    "atom_index": i,
+                                    "formal_charge": None,
+                                    "stereo": {"atom": None, "bonds": {}},
+                                }
+                                for i in y._atom_info
+                            },
+                        ), canon=False)
                         if product.hash not in hashes:
                             yield product
                         if hash_filter:
@@ -162,7 +176,21 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                         adj_mat[donor,acceptor] = 1
                         adj_mat[acceptor,donor] = 1
                         bonds.update([(donor,acceptor),(acceptor,donor)])
-                        product = yarpecule((adj_mat,y.geo,y.elements,y.q),canon=False)                        
+                        product = yarpecule((
+                            adj_mat,
+                            y.geo,
+                            y.elements,
+                            y.q,
+                            {
+                                i: {
+                                    **dict(y._atom_info[i]),
+                                    "atom_index": i,
+                                    "formal_charge": None,
+                                    "stereo": {"atom": None, "bonds": {}},
+                                }
+                                for i in y._atom_info
+                            },
+                        ), canon=False)
                         if product.hash not in hashes:
                             yield product
                         if hash_filter:
@@ -190,7 +218,18 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     adj_mat[donor,acceptor+len(c[0][1])] = 1
                                     adj_mat[acceptor+len(c[0][1]),donor] = 1
                                     bonds.update([((c[0][0],donor),(c[1][0],acceptor)),((c[1][0],acceptor),(c[0][0],donor))])                                                                        
-                                    product = yarpecule((adj_mat,vstack([c[0][1].geo,c[1][1].geo]),c[0][1].elements+c[1][1].elements,c[0][1].q+c[1][1].q),canon=False)
+                                    atom_info = {}
+                                    offset = 0
+                                    for _, yp in [c[0], c[1]]:
+                                        for i in range(len(yp.elements)):
+                                            atom_info[offset + i] = {
+                                                **dict(yp._atom_info[i]),
+                                                "atom_index": offset + i,
+                                                "formal_charge": None,
+                                                "stereo": {"atom": None, "bonds": {}},
+                                            }
+                                        offset += len(yp.elements)
+                                    product = yarpecule((adj_mat, vstack([c[0][1].geo, c[1][1].geo]), c[0][1].elements + c[1][1].elements, c[0][1].q + c[1][1].q, atom_info), canon=False)
                                     if product.hash not in hashes:
                                         yield product
                                     if hash_filter:
@@ -204,7 +243,18 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     adj_mat[donor,acceptor+len(c[0][1])] = 1
                                     adj_mat[acceptor+len(c[0][1]),donor] = 1
                                     bonds.update([((c[0][0],donor),(c[1][0],acceptor)),((c[1][0],acceptor),(c[0][0],donor))])                                                                        
-                                    product = yarpecule((adj_mat,vstack([c[0][1].geo,c[1][1].geo]),c[0][1].elements+c[1][1].elements,c[0][1].q+c[1][1].q),canon=False)
+                                    atom_info = {}
+                                    offset = 0
+                                    for _, yp in [c[0], c[1]]:
+                                        for i in range(len(yp.elements)):
+                                            atom_info[offset + i] = {
+                                                **dict(yp._atom_info[i]),
+                                                "atom_index": offset + i,
+                                                "formal_charge": None,
+                                                "stereo": {"atom": None, "bonds": {}},
+                                            }
+                                        offset += len(yp.elements)
+                                    product = yarpecule((adj_mat, vstack([c[0][1].geo, c[1][1].geo]), c[0][1].elements + c[1][1].elements, c[0][1].q + c[1][1].q, atom_info), canon=False)
                                     if product.hash not in hashes:
                                         yield product
                                     if hash_filter:
@@ -385,7 +435,21 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
             for b in combos:                            
                 adj_mat[b[0],b[1]] = 0
                 adj_mat[b[1],b[0]] = 0
-                tmp = yarpecule((adj_mat,y.geo,y.elements,y.q),canon=False)
+                tmp = yarpecule((
+                    adj_mat,
+                    y.geo,
+                    y.elements,
+                    y.q,
+                    {
+                        i: {
+                            **dict(y._atom_info[i]),
+                            "atom_index": i,
+                            "formal_charge": None,
+                            "stereo": {"atom": None, "bonds": {}},
+                        }
+                        for i in y._atom_info
+                    },
+                ), canon=False)
                 # Catch redundancies
                 if remove_redundant:
                     if tmp.hash not in hashes:
@@ -545,7 +609,21 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                 adj_mat = add_bonds(adj_mat, [list(_) for _ in g], val=1)
 
                 # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
-                product = yarpecule((np.where(adj_mat > 0, 1, 0).astype(int), y.geo, y.elements, y.q), canon=False)
+                product = yarpecule((
+                    np.where(adj_mat > 0, 1, 0).astype(int),
+                    y.geo,
+                    y.elements,
+                    y.q,
+                    {
+                        i: {
+                            **dict(y._atom_info[i]),
+                            "atom_index": i,
+                            "formal_charge": None,
+                            "stereo": {"atom": None, "bonds": {}},
+                        }
+                        for i in y._atom_info
+                    },
+                ), canon=False)
 
                 # Debug: show the transformation
                 if verbose:

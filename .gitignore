@@ -1,6 +1,10 @@
 .DS_Store
 debug/*
 .vscode
+containers/*.sif
+containers/orca/*.tar.*
+containers/orca/example
+**/SCRATCH
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -74,7 +78,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-docs/Source/
+docs/source/
 
 # PyBuilder
 .pybuilder/

@@ -1,0 +1,177 @@
+yarp_path: /Users/tburton2/Desktop/Repos/yarp-again/
+network_manifest: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/networks/manifest.txt
+array_env_var: SGE_TASK_ID
+output_dir: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+output_mode: production
+save_flux_for_every_subnetwork: true
+plot_all_network_flux_outputs: true
+merged_all_table_name: network_all_rows_merged.parquet
+run_steps:
+- subnetwork
+- cantera_yaml
+- cantera_run
+failure_mode: fail_network
+parallelize_subnetworks: true
+parallel_subnetwork_workers: auto
+parallel_worker_env_var: NSLOTS
+subprocess_single_core: true
+subprocess_thread_env_vars:
+- OMP_NUM_THREADS
+- MKL_NUM_THREADS
+- OPENBLAS_NUM_THREADS
+- NUMEXPR_NUM_THREADS
+- VECLIB_MAXIMUM_THREADS
+- BLIS_NUM_THREADS
+verbose: true
+table_preview_rows: 20
+max_products_per_network: 5
+only_product_hash: null
+dummy_barriers_required: true
+overwrite_source_with_dummy_barriers: true
+# Derived by output_mode at runtime (shown explicitly for visibility):
+cleanup_mode: clean
+merge_all_tables_per_network: true
+remove_source_tables_after_full_merge: false
+clear_previous_outputs: true
+save_terminal_list: true
+
+subnetwork_gen:
+  input:
+    pickle: null
+    directory: ../../networks
+    glob: '*.pkl'
+    recursive: false
+  dummy_reverse_barriers:
+    enabled: true
+    seed: 42
+    save_reverse: true
+    suffix: _full_network
+    output_dir: generated_networks
+    verbose: true
+  network:
+    dG_lot: egat
+    terminal_verbose: true
+  start:
+    reaction_id: null
+    smiles: null
+    auto_detect: true
+    index: 0
+    fallback_first_reactant: true
+  paths:
+    cutoff: 4
+    show_progress: true
+    verbose: true
+  subnetworks:
+    min_paths_to_save: 1
+    output_root: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+    node_id_style: inchi
+    prefix_with_source_name: true
+    only_end_hash: null
+    only_end_smiles: null
+  logging:
+    max_saved_to_print: 5
+
+cantera_from_subnetworks:
+  dedupe_after_normalization: true
+  runtime:
+    module_paths: []
+  input:
+    root: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+    glob: '*.pkl'
+    recursive: true
+  output:
+    root: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+    preserve_tree: true
+  rate:
+    forward_barrier_label: egat
+    reverse_barrier_label: egat
+    energy_units: kJ/mol
+    reverse_fallback_factor: null
+  write_yaml:
+    kinetics: gas
+    reactions: all
+    model: constant-cp
+    EOS: ideal-gas
+    T: 500.0
+    P: 1.0
+  logging:
+    max_print: 50
+
+cantera_run_subnetworks:
+  runtime:
+    module_paths: []
+  input:
+    cantera_yaml_root: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+    subnetwork_pickle_root: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/outputs
+    glob: '*.yaml'
+    recursive: true
+  batch:
+    start: 0
+    max_files: null
+  reactor:
+    time_sim: 25.0
+    time_step: 0.01
+    rule: css
+    curr_depth: 1
+    uncertainty: true
+    uncertainty_cycles: 10
+    scale: 2.0
+    write_excel: false
+    terminal_species: auto
+    terminal_completion_mode: auto
+    fraction_basis: X
+    completion_tol: 0.02
+    completion_target_scale_mode: min
+    completion_hold_steps: 20
+    completion_dxdt_tol: 1.0e-4
+    min_completion_time: 25.0
+    extend_if_not_complete: true
+    extend_seconds: 25.0
+    max_time_multiplier: 20.0
+    debug_fraction: true
+    debug_flux_direction: true
+    debug_flux_threshold: 0.0
+  output:
+    write_run_yaml: true
+    run_yaml_suffix: .run.yaml
+    write_reaction_flux_table: true
+    reaction_flux_table_suffix: .flux.csv
+    write_final_product_flux_table: true
+    final_product_flux_table_suffix: .to_final.csv
+    write_flux_timeseries_table: true
+    flux_timeseries_table_suffix: .flux_timeseries.csv
+    write_reactor_debug_yaml: true
+    reactor_debug_yaml_suffix: .reactor_debug.yaml
+    reactor_debug_top_n: 50
+    update_subnetwork_pickle_metadata: true
+    table_preview_rows: 20
+  logging:
+    progress_bar: true
+    max_print: 50
+
+datatable:
+  retained_timeseries_downsample_seconds: 1.0
+  emit_empty_sentinel_row: true
+
+plot_export:
+  enabled: true
+  palette_csv: /Users/tburton2/Desktop/Projects/dblYAKS/subnetwork_kinetics/color_palettes/color_wheel.csv
+  output_subdir: bulk_profile_plots
+  summary_csv_name: bulk_profile_summary.csv
+  profile_pattern: flux_timeseries*.parquet
+  product_pattern: product_*.parquet
+  profile_source_mode: saved_flux_tables
+  tmp_profile_subdir: _debug_profiles_from_tmp
+  rebuild_tmp_profiles: true
+  tmp_profile_verbose: true
+  max_conc_species: 12
+  max_flux_species: 10
+  max_reaction_lines: 12
+  fig_dpi: 170
+  time_axis_log: false
+  reaction_cumulative_log_y: true
+  reaction_current_log_y: true
+  reaction_log_floor: 1.0e-30
+  reaction_time_round_decimals: 9
+  reaction_dt_fraction_floor: 1.0e-3
+  reaction_abs_dt_floor_s: 1.0e-9

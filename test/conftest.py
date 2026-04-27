@@ -5,10 +5,30 @@ import yaml
 import pytest
 from pathlib import Path
 import pickle
-import omegaconf
-from yarp.reaction.egat.predict_from_smiles import load_model
 
 # YAML input files
+@pytest.fixture
+def enum_egat_llpath_llrefine(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "enum_egat_llpath_llrefine.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_enum_egat_llpath_llrefine_output.pkl"
+    safe_status = tmp_path / "test_enum_egat_llpath_llrefine_STATUS.json"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+
 @pytest.fixture
 def enum_min_options(tmp_path):
     # 1. Load the real YAML
@@ -18,10 +38,12 @@ def enum_min_options(tmp_path):
 
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_enum_min_options_output.pkl"
+    safe_status = tmp_path / "test_enum_min_options_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:
         data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
     else:
         # Fallback if the YAML structure changes in the future
         pytest.fail("The input YAML does not contain an 'initialize' block.")
@@ -37,29 +59,12 @@ def enum_full_options(tmp_path):
 
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_enum_full_options_output.pkl"
+    safe_status = tmp_path / "test_enum_full_options_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:
         data['initialize']['output'] = str(safe_output)
-    else:
-        # Fallback if the YAML structure changes in the future
-        pytest.fail("The input YAML does not contain an 'initialize' block.")
-
-    return data
-
-@pytest.fixture
-def egat_min_options(tmp_path):
-    # 1. Load the real YAML
-    yaml_path = Path(__file__).parent / "main_inputs" / "egat_min_options.yaml"
-    with open(yaml_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    # 2. Define the safe temporary output path
-    safe_output = tmp_path / "test_egat_min_options_output.pkl"
-
-    # 3. Overwrite the nested key
-    if 'initialize' in data:
-        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
     else:
         # Fallback if the YAML structure changes in the future
         pytest.fail("The input YAML does not contain an 'initialize' block.")
@@ -75,10 +80,12 @@ def d2_default_enum(tmp_path):
 
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_d2_default_enum_output.pkl"
+    safe_status = tmp_path / "test_d2_default_enum_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:
         data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
     else:
         # Fallback if the YAML structure changes in the future
         pytest.fail("The input YAML does not contain an 'initialize' block.")
@@ -94,10 +101,12 @@ def d2_sep_prods_enum(tmp_path):
 
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_d2_sep_prods_enum_output.pkl"
+    safe_status = tmp_path / "test_d2_sep_prods_enum_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:
         data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
     else:
         # Fallback if the YAML structure changes in the future
         pytest.fail("The input YAML does not contain an 'initialize' block.")
@@ -113,26 +122,17 @@ def d2_dg_filter_enum(tmp_path):
 
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_d2_dg_filter_enum_output.pkl"
+    safe_status = tmp_path / "test_d2_dg_filter_enum_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:
         data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
     else:
         # Fallback if the YAML structure changes in the future
         pytest.fail("The input YAML does not contain an 'initialize' block.")
 
     return data
-
-# Pytorch models
-@pytest.fixture
-def egat_csv():
-    return str(Path(__file__).parent / "reaction" / "yarp_predictions.csv")
-
-@pytest.fixture
-def egat_pretrain():
-    """Return pytorch model"""
-    model, args = load_model('test/models/v1.pth', omegaconf.OmegaConf.load('test/models/auto0.yaml'))
-    return model, args
 
 # Pickle files
 @pytest.fixture

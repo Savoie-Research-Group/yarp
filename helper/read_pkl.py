@@ -10,19 +10,47 @@ import argparse
 import pickle
 from tabulate import tabulate
 
+def _format_optional_barrier(value):
+    if value is None:
+        return "none"
+    return f"{value:.5}"
+
 def main(args):
     file = args.filename
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
-    headers = ['Reaction ID', 'Reactant', 'Product', 'EGAT barrier', 'Max Flux']
+    # 1. First pass: Find all unique barrier keys across all reactions
+    unique_barrier_keys = set()
+    for rxn in rxns.values():
+        if rxn.barrier:
+            unique_barrier_keys.update(rxn.barrier.keys())
+            
+    # Sort the keys alphabetically so the columns are always in a consistent order
+    unique_barrier_keys = sorted(list(unique_barrier_keys))
+
+    # 2. Dynamically build the headers
+    headers = ['Reaction Hash', 'Reactant', 'Product']
+    for key in unique_barrier_keys:
+        headers.append(f"{key} dG_activation")
+
+    # 3. Second pass: Extract the data for the table
     data = []
     for rxn in rxns.values():
-        # access data for printing to screen via tabulate
-        if 'egat' in rxn.barrier:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, f"{rxn.barrier['egat']:.5}", f"{rxn.max_flux:.5g}"])
-        else:
-            data.append([rxn.id, rxn.reactant.canon_smi, rxn.product.canon_smi, 'none'])
+        # Start the row with the standard identifiers
+        row = [
+            rxn.hash,
+            rxn.reactant.canon_smi,
+            rxn.product.canon_smi
+        ]
+        
+        # Dynamically pull the barriers for each unique key we found
+        for key in unique_barrier_keys:
+            fwd_barrier = rxn.barrier.get(key) if rxn.barrier else None
+            
+            row.append(_format_optional_barrier(fwd_barrier))
+            
+        data.append(row)
         
         # optionally, generate PDFs for each reactant/product pair
         if args.visualize:

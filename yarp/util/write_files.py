@@ -5,7 +5,7 @@ Functions to generate common molecular structure files from yarpecules
 import numpy as np
 from yarp.yarpecule.lewis.be_mat import return_formals
 
-def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
+def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False, atom_info=None):
     """
     Write a MOL file to disk from a yarpecule object.
     Or rather, from attributes passed in from a yarpecule object.
@@ -82,8 +82,11 @@ def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
 
         # Write the geometry
         for count_i, i in enumerate(elements):
-            f.write(" {:> 9.4f} {:> 9.4f} {:> 9.4f} {:<3s} 0 {:>2d}  0  0  0  {:>2d}  0  0  0  0  0  0\n".format(
-                geo[count_i][0], geo[count_i][1], geo[count_i][2], i.capitalize(), mol_dict[fc[count_i]], valence[count_i]))
+            map_field = 0
+            if atom_info is not None and count_i in atom_info and atom_info[count_i].get("atom_map") is not None:
+                map_field = int(atom_info[count_i]["atom_map"])
+            f.write(" {:> 9.4f} {:> 9.4f} {:> 9.4f} {:<3s} 0 {:>2d}  0  0  0  {:>2d}  0  0  0  0 {:>3d}  0\n".format(
+                geo[count_i][0], geo[count_i][1], geo[count_i][2], i.capitalize(), mol_dict[fc[count_i]], valence[count_i], map_field))
 
         # Write the bonds
         bonds = [(count_i, count_j) for count_i, i in enumerate(adj_mat)
@@ -140,7 +143,7 @@ def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False):
 
     return
 
-def xyz_write(name, elements, geo, append_opt=False):
+def xyz_write(name, elements, geo, comment=None, append_opt=False):
     """
     Write cartesian coordinates of a molecule to an XYZ file
 
@@ -161,12 +164,41 @@ def xyz_write(name, elements, geo, append_opt=False):
         out=open(name, 'w+')
     else: 
         out=open(name, 'a+')
+
+    file_str = xyz_generate_string(elements=elements, geo=geo)
     
     elements = [el.upper() for el in elements]
     
-    out.write('{}\n\n'.format(len(elements)))
-    for count_i, i in enumerate(elements):
-        out.write('{} {} {} {}\n'.format(i, geo[count_i][0], geo[count_i][1], geo[count_i][2]))
+    out.write(file_str)
     out.close()
 
     return
+
+def xyz_generate_string(elements, geo):
+    """
+    Generates a string in XYZ format from cartesian coordinates.
+
+    elements : list of str
+        Elements of molecule.
+    geo : numpy array or list of lists
+        Cartesian coordinates (N x 3).
+
+    Returns:
+        str: The formatted XYZ data as a single string.
+    """
+    lines = []
+    
+    # 1. Number of atoms
+    lines.append(str(len(elements)))
+    
+    # 2. Comment line (standard XYZ format requires a blank or comment line here)
+    lines.append("")
+    
+    # 3. Element and coordinates
+    for i, element in enumerate(elements):
+        symbol = element.upper()
+        x, y, z = geo[i]
+        lines.append(f"{symbol} {x:>12.8f} {y:>12.8f} {z:>12.8f}")
+    
+    # Join everything with newlines and add a trailing newline
+    return "\n".join(lines) + "\n"

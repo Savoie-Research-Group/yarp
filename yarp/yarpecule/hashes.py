@@ -131,6 +131,8 @@ def yarpecule_hash(y):
     Notes
     -----            
     Any method affecting the `bond_mats` or `masses` attributes of the yarpecule instance should also recalculate this hash.  
+    Future work: this path still needs to be updated to source isotope-aware mass information from `atom_info`
+    so that isotopomers are actually distinguished when that behavior is enabled in yarpecule construction.
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
     bem = np.zeros_like(y.bond_mats[0])

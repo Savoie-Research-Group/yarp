@@ -3,6 +3,7 @@ Definition of the state object class.
 """
 from copy import deepcopy
 
+from yarp.reaction.conformer import conformer
 
 class state:
     """
@@ -13,8 +14,16 @@ class state:
         Yarpecule object that contains the molecular graph of all molecules in state.
         This is provided upon initialization, and is typically not modified.
 
-    conformers : list of conformer objects
-        Conformers correspond to all molecules contained in state?
+    conformers : dict of conformer objects
+        Conformers correspond to all molecules contained in state (for now...)
+        Keys indicate where in the process a given conformer was generated.
+        Doesn't need to indicate the specific level-of-theory used,
+        as that should be stored within the conformer object itself.
+        The conformer stored under the key "final" will be used in downstream
+        reaction characterization processes
+
+    paired_bem : 2D numpy array
+        Bond electron matrix to be used in the generation of joint optimized conformers
 
     species : list of yarpecule objects
         Separated molecular graphs of each species contained in state.
@@ -32,9 +41,16 @@ class state:
         self._graph.get_smiles()
         self._graph.get_inchi()
 
-        self.conformers = []
+        # This duplication of data seems worth it for the downstream clarity
+        self.conformers = {
+            "initial_geom": conformer(calc_type="yarpecule", calc_data=self._graph)
+        }
+        self.paired_bem = None
 
         self._species = self._graph.separate(canon=canon)
+
+        # ERM: We probably want to rethink this...
+        # Can this be integrated with rxn.network_meta somehow?
         self.conc = dict()
         for _ in self.species:
             _.get_smiles()
@@ -51,11 +67,11 @@ class state:
     @property
     def inchi(self):
         return self._graph.inchi
-    
+
     @property
     def canon_smi(self):
         return self._graph.canon_smi
-    
+
     @property
     def map_smi(self):
         return self._graph.map_smi
@@ -72,13 +88,3 @@ class state:
     def species(self):
         return self._species
 
-    def gen_conformers(self, input):
-
-        # Initialize a calculator object to make a call out to CREST or RDKit
-        # Placeholder for actual conformer generation
-        self.conformers = ["conf1", "conf2", "conf3"]
-
-    def refine(self, input):
-        # Initialize a calculator object to perform a geometry optimization (local minima)
-        # This will probably just be a light wrapper to do this in the conformer class, actually
-        pass

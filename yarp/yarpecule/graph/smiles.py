@@ -5,19 +5,19 @@ import re
 import numpy as np
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist
 from yarp.yarpecule.graph.fragment import return_rings
-from yarp.util.properties import el_valence, el_metals, el_expand_octet
+from yarp.util.properties import el_valence, el_metals, el_expand_octet, el_mass, el_to_an
 from yarp.yarpecule.atom_mapping import canon_order
 
 
 def smiles2adjmat(smiles, verbose=False):
     """
     In-house Savoie group SMILES parser. Written in python and transparent to debug. The main motivation
-    was to consistently handle protonation of radicals and atoms with formal charges. The usual SMILES 
-    syntax rules apply, except that square brace annotations are handled specially. Square braces are 
+    was to consistently handle protonation of radicals and atoms with formal charges. The usual SMILES
+    syntax rules apply, except that square brace annotations are handled specially. Square braces are
     reserved to annotate the isotope, formal charge, or number of hydrogens that should be added to an
     atom. The isotope number must preceed the element label. The charge and number of hydrogens must be
     after the element label. The formal charge can be specified as +d, ++++, -d, ---, where d is an integer.
-    The number of hydrogens to be added can be specified as Hd or HHH, where d is an integer.      
+    The number of hydrogens to be added can be specified as Hd or HHH, where d is an integer.
 
     Parameters
     ----------
@@ -29,36 +29,20 @@ def smiles2adjmat(smiles, verbose=False):
     adjmat: array
             This is numpy array holding the graph defined by the smiles string.
 
-    atom_info: list of tuples
-            This list is indexed to the adjacency matrix and contains a tuple for each atom. Each tuple has
-            the element token, formal charge, explicit hydrogens, isotope, atom_mapping, and should_infer_hydrogens
-            as its respective elements. 
+    atom_info: dict
+            This dict is indexed to the adjacency matrix and contains metadata for each atom.
     """
 
-    # When we are ready for production, move all definitions here
     if not hasattr(smiles2adjmat, 'aromatics'):
         smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s"}
-
-        # Define the regex patterns for tokenization
-        # any token pattern
-        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|[A-Z](?:[a-z]+)?|[a-z]|\d{1}|[=#+\-\\\/.()])'
-        # used to find the tokens corresponding to atoms
+        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z](?:[a-z]+)?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
         smiles2adjmat.atom_pattern = r'([A-Z](?:[a-z]+)?|[a-z])'
-
-        smiles2adjmat.isotope_pattern = re.compile(
-            r'^\[(\d+)')  # used to find isotopic information
-        # used to find explicit partial charge information
-        smiles2adjmat.charge_pattern = re.compile(
-            r'(\+\d+|-\d+|\++(?!\d)|-+(?!\d))')
-        # used to find the explicit specification of hydrogens
+        smiles2adjmat.ring_pattern = re.compile(r'^(%\d{2}|\d)$')
+        smiles2adjmat.isotope_pattern = re.compile(r'^\[(\d+)')
+        smiles2adjmat.charge_pattern = re.compile(r'(\+\d+|-\d+|\++(?!\d)|-+(?!\d))')
         smiles2adjmat.hydrogen_pattern = re.compile(r'(H\d+|H+)')
-        # matches labels inside square braces
-        smiles2adjmat.element_label_pattern = re.compile(
-            r'([A-Z](?:[a-z]+)?|[a-z])')
-        # matches atom mapping numbers after a colon
+        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z](?:[a-z]+)?|[a-z])')
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
-        
-        # Valid element symbols for tokenization validation
         smiles2adjmat.valid_elements = {
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
             'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
@@ -67,123 +51,104 @@ def smiles2adjmat(smiles, verbose=False):
             'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
             'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Hf', 'Ta', 'W',
             'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po',
-            'At', 'Rn', 'b', 'c', 'n', 'o', 'p', 's'  # Include aromatic lowercase
+            'At', 'Rn', 'b', 'c', 'n', 'o', 'p', 's'
         }
 
-    # Find all matches of the pattern in the SMILES string for tokenization
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
-    
-    # Secondary tokenization: split invalid multi-character element tokens
     final_tokens = []
     for token in preliminary_tokens:
-        # Check if this is a 2-character token that might be an invalid element
-        if len(token) == 2 and token not in smiles2adjmat.valid_elements:
-            # Split into individual characters if not a valid element
+        if len(token) == 2 and token not in smiles2adjmat.valid_elements and not token.startswith("%"):
             final_tokens.extend(list(token))
         else:
             final_tokens.append(token)
-    
-    # Use the corrected tokens for the rest of the processing
     preliminary_tokens = final_tokens
 
-    # Initialize the atom_info, tokens lists
-    atom_info = []  # holds element label, formal charge, isotope, explicit h information
-    tokens = []  # holds the tokens with the [] information removed.
+    atom_info = {}
+    atom_parse_meta = {}
+    tokens = []
+    atom_counter = 0
 
-    # Regular expressions for parsing atom information
-
-    # This loop handles [] annotations and initialization of atom_info list
     for token in preliminary_tokens:
-
         if token.startswith('['):
-            # Default values
             formal_charge = 0
             explicit_hydrogens = 0
             isotope = None
             atom_mapping = None
-            should_infer_hydrogens = False  # Square brackets always disable hydrogen inference
+            should_infer_hydrogens = False
 
-            # Track what information was found in the brackets
-            found_isotope = False
-            found_mapping = False
-            found_charge = False
-            found_explicit_h = False
-
-            # Check for isotope
             isotope_match = smiles2adjmat.isotope_pattern.search(token)
             if isotope_match:
                 isotope = int(isotope_match.group(1))
-                found_isotope = True
 
-            # Check for formal charge
             charge_match = smiles2adjmat.charge_pattern.search(token)
             if charge_match:
-                found_charge = True
                 charge_str = charge_match.group(1)
                 if charge_str[-1].isdigit():
-                    # Case: +2, -3, etc.
                     formal_charge = int(charge_str)
                 else:
-                    # Case: +, -, ++, ---
-                    formal_charge = charge_str.count(
-                        '+') - charge_str.count('-')
+                    formal_charge = charge_str.count('+') - charge_str.count('-')
 
-            # Check for explicit hydrogens
             hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token)
             if verbose:
                 print(f"{token=} {hydrogen_match=}")
             if hydrogen_match:
-                found_explicit_h = True
                 h_str = hydrogen_match.group(1)
-                # Only set explicit_hydrogens if this is a hydrogen count specification
-                # (i.e., not just a hydrogen atom with other annotations)
                 element_label = smiles2adjmat.element_label_pattern.search(token).group(1)
-                if element_label.lower() != 'h':  # Only set explicit_hydrogens for non-hydrogen atoms
+                if element_label.lower() != 'h':
                     if h_str[-1].isdigit():
-                        # Case: H2, H3, etc.
                         explicit_hydrogens = int(h_str[1:])
                     else:
-                        # Case: HH, HHH, etc.
                         explicit_hydrogens = len(h_str)
 
-            # Check for atom mapping
             mapping_match = smiles2adjmat.mapping_pattern.search(token)
             if mapping_match:
                 atom_mapping = int(mapping_match.group(1))
-                found_mapping = True
 
-            # Append the atom information with the new flag
-            element_label_match = smiles2adjmat.element_label_pattern.search(
-                token)
+            element_label_match = smiles2adjmat.element_label_pattern.search(token)
             if element_label_match:
-                atom_info.append([element_label_match.group(1), formal_charge,
-                                  explicit_hydrogens, isotope, atom_mapping,
-                                  should_infer_hydrogens])
-                # Append the clean token information
-                tokens.append(element_label_match.group(1))
+                element_label = element_label_match.group(1)
+                stereo_atom = '@@' if '@@' in token else '@' if '@' in token else None
+                atom_info[atom_counter] = {
+                    "atom_index": atom_counter,
+                    "atom_map": atom_mapping,
+                    "element": element_label.lower(),
+                    "formal_charge": int(formal_charge),
+                    "mass": float(isotope) if isotope is not None else None,
+                    "stereo": {"atom": stereo_atom, "bonds": {}},
+                    "aromatic_input": element_label.islower(),
+                }
+                atom_parse_meta[atom_counter] = {
+                    "explicit_hydrogens": explicit_hydrogens,
+                    "should_infer_hydrogens": should_infer_hydrogens,
+                    "isotope": isotope,
+                }
+                tokens.append(element_label)
+                atom_counter += 1
             else:
-                print(
-                    f"Error: Could not detect element label at token {token}.")
+                print(f"Error: Could not detect element label at token {token}.")
                 return None, None
 
-        # Default values
         elif re.match(smiles2adjmat.atom_pattern, token):
-            formal_charge = 0
-            explicit_hydrogens = None  # None will trigger hydrogen inference in add_hydrogens
-            isotope = None
-            atom_mapping = None
-            should_infer_hydrogens = True  # Always True for atoms without square brackets
-            atom_info.append([token, formal_charge, explicit_hydrogens,
-                             isotope, atom_mapping, should_infer_hydrogens])
+            atom_info[atom_counter] = {
+                "atom_index": atom_counter,
+                "atom_map": None,
+                "element": token.lower(),
+                "formal_charge": 0,
+                "mass": None,
+                "stereo": {"atom": None, "bonds": {}},
+                "aromatic_input": token.islower(),
+            }
+            atom_parse_meta[atom_counter] = {
+                "explicit_hydrogens": None,
+                "should_infer_hydrogens": True,
+                "isotope": None,
+            }
             tokens.append(token)
+            atom_counter += 1
         else:
             tokens.append(token)
 
-    # Initialize adjmat as a square matrix with a row and column for each atom
-    # Use len(atom_info) instead of regex-based counting
     adjmat = np.zeros([len(atom_info), len(atom_info)])
-
-    # Track the indices of atoms in the token list and their branch levels
     atom_indices = []
     branch_levels = []
     current_level = 0
@@ -191,11 +156,11 @@ def smiles2adjmat(smiles, verbose=False):
     branch_close_atom_indices = []
     open_flag = False
     close_flag = False
-    ring_numbers = {}  # Dictionary to track the atoms preceding each ring number
+    ring_numbers = {}
+    pending_bond_stereo = None
+    pending_atom_stereo_owner = None
+    sequential_atom_counter = 0
 
-    # Iterate through the tokens and collect the atom indices and branch levels
-    # while we are at it we will also add the bonds associated with rings.
-    atom_counter = 0  # Counter for sequential atom numbering
     for i, token in enumerate(tokens):
         if token == '(':
             current_level += 1
@@ -203,364 +168,402 @@ def smiles2adjmat(smiles, verbose=False):
         elif token == ')':
             current_level -= 1
             close_flag = True
+        elif token in ['/', '\\']:
+            pending_bond_stereo = token
+        elif token in ['@', '@@']:
+            pending_atom_stereo_owner = sequential_atom_counter - 1
         elif re.match(smiles2adjmat.atom_pattern, token):
             atom_indices.append(i)
             branch_levels.append(current_level)
             if close_flag and not open_flag:
                 close_flag = False
-                branch_close_atom_indices.append(atom_counter)
+                branch_close_atom_indices.append(sequential_atom_counter)
             if open_flag:
                 open_flag = False
-                branch_open_atom_indices.append(atom_counter)
-            atom_counter += 1
-        elif token.isdigit():
-            # The index of the atom preceding the number (using sequential atom numbering)
-            atom_index = atom_counter - 1
+                branch_open_atom_indices.append(sequential_atom_counter)
 
-            # If the number has been seen before, form a bond between the current atom and the one previously noted
+            if pending_atom_stereo_owner is not None and pending_atom_stereo_owner in atom_info:
+                atom_info[pending_atom_stereo_owner]["stereo"]["atom"] = '@'
+                pending_atom_stereo_owner = None
+
+            if pending_bond_stereo is not None and sequential_atom_counter > 0:
+                atom_info[sequential_atom_counter]["stereo"]["bonds"][sequential_atom_counter - 1] = pending_bond_stereo
+                pending_bond_stereo = None
+
+            sequential_atom_counter += 1
+        elif smiles2adjmat.ring_pattern.match(token):
+            atom_index = sequential_atom_counter - 1
             if token in ring_numbers:
-
-                # Note the current atom's index and bond type
-                if tokens[i-1] == '-':
+                if tokens[i - 1] == '-':
                     last_bond_type = 1
-                elif tokens[i-1] == '=':
+                elif tokens[i - 1] == '=':
                     last_bond_type = 2
-                elif tokens[i-1] == '#':
+                elif tokens[i - 1] == '#':
                     last_bond_type = 3
                 else:
                     last_bond_type = None
 
-                prev_atom_index, prev_bond_type = ring_numbers[token]
+                prev_atom_index, prev_bond_type, prev_bond_stereo = ring_numbers[token]
                 bond_type = last_bond_type if last_bond_type else prev_bond_type
                 if prev_bond_type and last_bond_type and prev_bond_type != last_bond_type:
-                    print(
-                        f"Error: Inconsistent bond order specified for ring closure at token {token}.")
+                    print(f"Error: Inconsistent bond order specified for ring closure at token {token}.")
                     return None, None
-
-                # If neither closure specified a bond_type then it will be none here and should to default to 1.
                 if bond_type is None:
                     bond_type = 1
+                adjmat[atom_index, prev_atom_index] = adjmat[prev_atom_index, atom_index] = bond_type
 
-                # Sanity check: ensure indices are within bounds
-                if atom_index >= len(atom_info) or prev_atom_index >= len(atom_info):
-                    print(f"Error: Atom index out of bounds. atom_index={atom_index}, prev_atom_index={prev_atom_index}, num_atoms={len(atom_info)}")
-                    return None, None
-
-                adjmat[atom_index, prev_atom_index] = adjmat[prev_atom_index,
-                                                             atom_index] = bond_type
-                del ring_numbers[token]  # Allow ring tokens to be reused
+                if pending_bond_stereo is not None:
+                    atom_info[atom_index]["stereo"]["bonds"][prev_atom_index] = pending_bond_stereo
+                elif prev_bond_stereo is not None:
+                    atom_info[atom_index]["stereo"]["bonds"][prev_atom_index] = prev_bond_stereo
+                pending_bond_stereo = None
+                del ring_numbers[token]
             else:
-                # Note the current atom's index and bond type
-                if tokens[i-1] == '-':
+                if tokens[i - 1] == '-':
                     last_bond_type = 1
-                elif tokens[i-1] == '=':
+                elif tokens[i - 1] == '=':
                     last_bond_type = 2
-                elif tokens[i-1] == '#':
+                elif tokens[i - 1] == '#':
                     last_bond_type = 3
                 else:
                     last_bond_type = None
-                ring_numbers[token] = (atom_index, last_bond_type)
+                ring_numbers[token] = (atom_index, last_bond_type, pending_bond_stereo)
+                pending_bond_stereo = None
 
-    # Iterate through the atom indices and set bonding information for sequential atoms
-    for i in range(len(atom_indices)-1):
-
-        # Current and next atom indices in the tokens list
+    for i in range(len(atom_indices) - 1):
         current_atom_index = atom_indices[i]
         next_atom_index = atom_indices[i + 1]
-
-        # Extract intervening tokens between current and next atom
         intervening_tokens = tokens[current_atom_index + 1: next_atom_index]
 
-        # Check if intervening tokens contain any special characters that prohibit bond formation
         if not any(re.match(r'[\[\].()]', token) for token in intervening_tokens):
-
             after_digits = []
-            for j in intervening_tokens[::-1]:
-                if j.isdigit():
+            for token in intervening_tokens[::-1]:
+                if smiles2adjmat.ring_pattern.match(token):
                     break
-                else:
-                    after_digits.append(j)
+                after_digits.append(token)
 
-            # Check for double bond (=)
             if '=' in after_digits:
                 adjmat[i, i + 1] = adjmat[i + 1, i] = 2
-            # Check for triple bond (#)
             elif '#' in after_digits:
                 adjmat[i, i + 1] = adjmat[i + 1, i] = 3
-            # Update the adjacency matrix for a single bond
             else:
                 adjmat[i, i + 1] = adjmat[i + 1, i] = 1
 
-    # Iterate through the branch starting points and add bonds.
     for i in branch_open_atom_indices:
-
-        # Current and next atom indices in the tokens list
         current_atom_index = atom_indices[i]
         current_branch_level = branch_levels[i]
 
-        # If the user puts an opening parentheses then no bond is required
         if current_atom_index == 0:
             continue
-        else:
+        for j in range(i - 1, -1, -1):
+            if branch_levels[j] == current_branch_level - 1:
+                intervening_tokens = []
+                for k in range(current_atom_index, 0, -1):
+                    if tokens[k] == "(":
+                        break
+                    intervening_tokens.append(tokens[k])
 
-            # Look backwards until finding an atom at lower branch level
-            for j in range(i-1, -1, -1):
+                if '=' in intervening_tokens:
+                    adjmat[i, j] = adjmat[j, i] = 2
+                elif '#' in intervening_tokens:
+                    adjmat[i, j] = adjmat[j, i] = 3
+                else:
+                    adjmat[i, j] = adjmat[j, i] = 1
+                break
 
-                if branch_levels[j] == current_branch_level - 1:
-
-                    # Extract intervening tokens between the branch start and the current atom
-                    intervening_tokens = []
-                    for k in range(current_atom_index, 0, -1):
-                        if tokens[k] == "(":
-                            break
-                        intervening_tokens.append(tokens[k])
-
-                    # Check for double bond (=)
-                    if '=' in intervening_tokens:
-                        adjmat[i, j] = adjmat[j, i] = 2
-                    # Check for triple bond (#)
-                    elif '#' in intervening_tokens:
-                        adjmat[i, j] = adjmat[j, i] = 3
-                    # Update the adjacency matrix for a single bond
-                    else:
-                        adjmat[i, j] = adjmat[j, i] = 1
-
-                    # break out of the search for branch closures
-                    break
-
-    # Iterate through the branch ending points and add bonds.
     for i in branch_close_atom_indices:
-
-        # Current and next atom indices in the tokens list
         current_atom_index = atom_indices[i]
         current_branch_level = branch_levels[i]
-
-        # Look backwards until finding an atom at the same branch level
-        for j in range(i-1, -1, -1):
-
+        for j in range(i - 1, -1, -1):
             if branch_levels[j] == current_branch_level:
-
-                # Extract intervening tokens between the branch end token and the current atom
                 intervening_tokens = []
                 for k in range(current_atom_index, 0, -1):
                     if tokens[k] == ")":
                         break
                     intervening_tokens.append(tokens[k])
 
-                # Check for double bond (=)
                 if '=' in intervening_tokens:
                     adjmat[i, j] = adjmat[j, i] = 2
-                # Check for triple bond (#)
                 elif '#' in intervening_tokens:
                     adjmat[i, j] = adjmat[j, i] = 3
-                # Update the adjacency matrix for a single bond
                 else:
                     adjmat[i, j] = adjmat[j, i] = 1
-
-                # break out of the search for branch closures
                 break
 
-    # Handle aromatics (BMS: aromatic symbols should be discontinued, they are fragile and poorly defined)
-    if any([_ in smiles2adjmat.aromatics for _ in tokens]):
+    ambiguous_aromatic_assignment = False
+    if any(atom_info[i]["aromatic_input"] for i in atom_info):
+        aromatic_rings = []
+        try:
+            aromatic_atoms = []
+            for idx, info in atom_info.items():
+                if info["aromatic_input"] and info["element"] in smiles2adjmat.aromatics:
+                    aromatic_atoms.append(idx)
+            aromatic_atoms = set(aromatic_atoms)
 
-        # Loop over all rings
-        for r in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=True):
+            for ring in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=False):
+                if all(idx in aromatic_atoms for idx in ring):
+                    aromatic_rings.append(ring)
 
-            # If all the atoms in the ring have aromatic labels then the alternating double bonds are placed
-            if all([atom_info[_][0] in smiles2adjmat.aromatics for _ in r]):
+            fused_components = []
+            for ring in aromatic_rings:
+                ring = set(ring)
+                merged = True
+                while merged:
+                    merged = False
+                    next_components = []
+                    for comp in fused_components:
+                        if comp & ring:
+                            ring |= comp
+                            merged = True
+                        else:
+                            next_components.append(comp)
+                    fused_components = next_components
+                fused_components.append(ring)
 
-                # Place all double-bonds less the final connection
-                for ind in range(1, len(r)):
-                    if (ind-1) % 2 == 0:
-                        adjmat[r[ind], r[ind-1]] = 2
-                        adjmat[r[ind-1], r[ind]] = 2
+            for component in fused_components:
+                component = sorted(component)
+                component_set = set(component)
+                component_edges = []
+                for count_i, i in enumerate(component):
+                    for j in component[count_i + 1:]:
+                        if adjmat[i, j] == 1 and can_promote_aromatic_edge(i, j, component_set, adjmat):
+                            component_edges.append((i, j))
 
-    # Add hydrogens
-    adjmat, atom_info = add_hydrogens(adjmat, atom_info)
+                target_size = len(component) // 2
+                promoted_edges, best_partial = choose_aromatic_matching(component_edges, target_size)
+                if promoted_edges is None:
+                    ambiguous_aromatic_assignment = True
+                    promoted_edges = best_partial
 
-    # Reorder by mappings if present
+                for i, j in promoted_edges:
+                    adjmat[i, j] = 2
+                    adjmat[j, i] = 2
+
+        except Exception as err:
+            print(f"WARNING: kekulization/aromatic assignment fallback used: {err}")
+            for ring in return_rings(adjmat_to_adjlist(adjmat), max_size=10, remove_fused=True):
+                if not all(atom_info[idx]["element"] in smiles2adjmat.aromatics for idx in ring):
+                    continue
+                if any(sum(idx in other for other in aromatic_rings) > 1 for idx in ring):
+                    continue
+                for ind in range(1, len(ring)):
+                    if (ind - 1) % 2 == 0:
+                        adjmat[ring[ind], ring[ind - 1]] = 2
+                        adjmat[ring[ind - 1], ring[ind]] = 2
+
+    adjmat, atom_info = add_hydrogens(adjmat, atom_info, atom_parse_meta)
+
+    for idx in atom_parse_meta:
+        if idx in atom_info:
+            isotope = atom_parse_meta[idx]["isotope"]
+            if atom_info[idx]["mass"] is None:
+                atom_info[idx]["mass"] = float(isotope) if isotope is not None else el_mass[atom_info[idx]["element"]]
+
+    provided_maps = [atom_info[i]["atom_map"] for i in atom_info if atom_info[i]["atom_map"] is not None]
+    if len(provided_maps) != len(set(provided_maps)):
+        dupes = sorted({m for m in provided_maps if provided_maps.count(m) > 1})
+        raise ValueError(f"Duplicate atom-map indices in input SMILES: {dupes}")
+
     adjmat, atom_info = reorder_by_mappings(adjmat, atom_info)
 
-    # Standardize element formatting before returning (capitalize first letter)
-    for info in atom_info:
-        info[0] = info[0].capitalize()
-
-    # Create bond electron matrix (copy of original adjmat for off-diagonals)
     bond_electron_mat = adjmat.copy()
-    
-    # Calculate electrons for each atom and place on diagonal
-    for i, info in enumerate(atom_info):     # Place on diagonal
-        bond_electron_mat[i, i] = el_valence[info[0].lower()] - info[1] - sum(adjmat[i])
+    for i in atom_info:
+        bond_electron_mat[i, i] = el_valence[atom_info[i]["element"]] - atom_info[i]["formal_charge"] - sum(adjmat[i])
+
+    heavy_radicals = [
+        i for i in atom_info
+        if atom_info[i]["element"] != "h" and int(bond_electron_mat[i, i]) % 2 == 1
+    ]
+    if ambiguous_aromatic_assignment or (any(atom_info[i]["aromatic_input"] for i in atom_info) and heavy_radicals):
+        interpreted_smiles = bemat_to_smiles(bond_electron_mat, atom_info)
+        if heavy_radicals:
+            print(f"WARNING: ambiguous SMILES provided; interpreted as radical structure: {interpreted_smiles}")
+        else:
+            print(f"WARNING: ambiguous SMILES provided; interpreted as: {interpreted_smiles}")
 
     return np.where(adjmat > 0, 1, 0), bond_electron_mat, atom_info
 
 
-def add_hydrogens(adjmat, atom_info):
+def choose_aromatic_matching(component_edges, target_size):
     """
-    This is a helper function for the smiles2adjmat() function that adds hydrogens to atoms based on either
-    the explicit number of hydrogens designation or the using an inference algorithm based on the formal charge
-    and number of bonds. If an explicit number of hydrogens is supplied it will overrule the hydrogen inference
-    routine based on formal charge. Formal charge inference is based on the neutral full octet protonation state
-    with protons/hydrides removed or added to meet the formal charge requirements.
-
-    Parameters
-    ----------
-    adjmat: array
-            This is numpy array holding the graph defined by the smiles string.
-
-    atom_info: list of tuples
-            This list is indexed to the adjacency matrix and contains a tuple for each atom. Each tuple has
-            the element token, formal charge, explicit hydrogens, isotope, atom_mapping, and should_infer_hydrogens
-            as its respective elements. 
-
-    Returns
-    -------
-    adjmat: array
-            This is numpy array holding the graph defined by the smiles string. This array is expanded relative
-            to the inputted array to accomodate the additional hydrogens. 
-
-    atom_info: list of tuples
-            This list is indexed to the adjacency matrix and contains a tuple for each atom. Each tuple has
-            the element token, formal charge, explicit hydrogens, isotope, atom_mapping, and should_infer_hydrogens
-            as its respective elements. This list is expanded relative to the inputted list to reflect the additional hydrogens.
+    Return the first valid deterministic matching of `target_size` edges and
+    also track the best partial matching if a full one is unavailable.
     """
+    best_partial = []
+    stack = [(0, set(), [])]
 
-    # Number of hydrogens to add for each atom
+    while stack:
+        edge_index, used_atoms, chosen_edges = stack.pop()
+
+        if len(chosen_edges) > len(best_partial):
+            best_partial = chosen_edges.copy()
+        if len(chosen_edges) == target_size:
+            return chosen_edges.copy(), best_partial
+        if edge_index >= len(component_edges):
+            continue
+
+        i, j = component_edges[edge_index]
+        stack.append((edge_index + 1, used_atoms.copy(), chosen_edges.copy()))
+        if i not in used_atoms and j not in used_atoms:
+            next_used = used_atoms.copy()
+            next_used.update((i, j))
+            next_edges = chosen_edges.copy()
+            next_edges.append((i, j))
+            stack.append((edge_index + 1, next_used, next_edges))
+
+    return None, best_partial
+
+
+def bemat_to_smiles(bond_electron_mat, atom_info):
+    """
+    Render the current interpreted graph as a kekulized SMILES string for
+    diagnostics.
+    """
+    from rdkit import Chem
+
+    bond_to_type = {
+        1: Chem.BondType.SINGLE,
+        2: Chem.BondType.DOUBLE,
+        3: Chem.BondType.TRIPLE,
+        4: Chem.BondType.QUADRUPLE,
+    }
+
+    mol = Chem.RWMol()
+    for idx in range(len(atom_info)):
+        info = atom_info[idx]
+        atom = Chem.Atom(el_to_an[info["element"]])
+        atom.SetFormalCharge(int(info["formal_charge"]))
+        if info.get("mass", None) not in (None, el_mass[info["element"]]):
+            atom.SetIsotope(int(round(info["mass"])))
+        atom.SetNumRadicalElectrons(int(bond_electron_mat[idx, idx] % 2))
+        mol.AddAtom(atom)
+
+    for i in range(len(atom_info)):
+        for j in range(i + 1, len(atom_info)):
+            bond_order = int(bond_electron_mat[i, j])
+            if bond_order > 0:
+                mol.AddBond(i, j, bond_to_type.get(bond_order, Chem.BondType.SINGLE))
+
+    mol = mol.GetMol()
+    mol.UpdatePropertyCache(strict=False)
+    Chem.SanitizeMol(
+        mol,
+        sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_KEKULIZE,
+        catchErrors=True,
+    )
+    try:
+        return Chem.MolToSmiles(Chem.RemoveHs(mol), canonical=True, kekuleSmiles=True)
+    except Exception:
+        return Chem.MolToSmiles(mol, canonical=True, kekuleSmiles=True)
+
+
+def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
+    """
+    Guard aromatic promotion against ring atoms that already carry an exocyclic
+    multiple bond outside the aromatic component.
+
+    This prevents cases like `Oc1ncc(c(=O)[nH]1)C` from promoting an additional
+    double bond onto the carbonyl-bearing ring carbon.
+    """
+    for atom in (i, j):
+        for neighbor, bond_order in enumerate(adjmat[atom]):
+            if neighbor not in component_atoms and bond_order > 1:
+                return False
+    return True
+
+
+def add_hydrogens(adjmat, atom_info, atom_parse_meta):
+    """
+    Add hydrogens to atoms based on either the explicit number of hydrogens designation or
+    an inference algorithm based on formal charge and number of bonds.
+    """
     hydrogens_to_add = []
-
-    # Calculate bonded hydrogens for each atom. This will override the inference value if non-zero
     bonded_hydrogens = []
-    
-    for atom in range(len(atom_info)):
-        # Count the number of hydrogen atoms already bonded to this atom
-        h_count = sum(1 for i in range(len(atom_info))
-                      if atom_info[i][0].lower() == 'h' and adjmat[atom, i] != 0)
-        bonded_hydrogens.append(h_count)
-    
-    # Loop over the atoms and determine how many hydrogens to add
-    for atom, info in enumerate(atom_info):
-        # Determine the element of the current atom
-        element = info[0].lower()
-        formal_charge = info[1]
-        explicit_hydrogens = info[2]  # hydrogens designated via [] annotation
-        should_infer_hydrogens = info[5]  # flag for whether to infer hydrogens
 
-        # Calculate the number of valence electrons
+    for atom in range(len(atom_info)):
+        h_count = sum(1 for i in range(len(atom_info)) if atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0)
+        bonded_hydrogens.append(h_count)
+
+    for atom in range(len(atom_info)):
+        info = atom_info[atom]
+        element = info["element"]
+        formal_charge = info["formal_charge"]
+        explicit_hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
+        should_infer_hydrogens = atom_parse_meta[atom]["should_infer_hydrogens"]
         valence_electrons = el_valence.get(element, None)
 
-        # If the atomic valence is undefined then assume no hydrogens need to be added.
         if valence_electrons is None:
             print(f"Warning: Element '{element}' is not recognized or has an undefined valence.")
             hydrogens_to_add.append(0)
             continue
-        # If the atom is a metal then it isn't hydrogenated
-        elif element in el_metals:
+        if element in el_metals:
             hydrogens_to_add.append(0)
             continue
 
-        # Calculate the number of bonds (each bond contributes 1 electron)
         bonds = sum(adjmat[atom])
-        
-        # First check for square bracket annotations
+
         if explicit_hydrogens is not None:
-            # If there are also bonded hydrogens, just don't add any more
-            # (suppress the consistency check that was causing errors)
             if bonded_hydrogens[atom] > 0:
-                # if explicit_hydrogens != bonded_hydrogens[atom]:
-                #     raise ValueError(
-                #         f"Inconsistent hydrogen specification for atom {atom} ({element}): "
-                #         f"Square bracket annotation specifies {explicit_hydrogens} hydrogens, "
-                #         f"but {bonded_hydrogens[atom]} hydrogens are already bonded in the SMILES string"
-                #     )
                 needed_hydrogens = 0
             else:
                 needed_hydrogens = explicit_hydrogens
-            
-        # If we should infer hydrogens, calculate based on formal charge
         elif should_infer_hydrogens:
-            
-            # Special handling for aromatic atoms
-            if info[0] in smiles2adjmat.aromatics:  # Check original case-sensitive element symbol
-                # Count the number of bonded neighbors (not bond order)
+            if info["aromatic_input"]:
                 bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
-                
-                # Aromatic atoms have specific coordination numbers
-                if element in ['c', 'b', 'p']:  # 3-coordinate aromatic atoms
+                if element in ['c', 'b', 'p']:
                     target_neighbors = 3
-                elif element in ['n', 'o', 's']:  # 2-coordinate aromatic atoms  
+                elif element in ['n', 'o', 's']:
                     target_neighbors = 2
                 else:
-                    # Fallback for unknown aromatic atoms
                     target_neighbors = 3
-                
-                # Calculate needed hydrogens based on current coordination
                 needed_hydrogens = max(0, target_neighbors - bonded_neighbors)
-            
-            else:  # <-- This else should be for non-aromatic atoms within the should_infer_hydrogens block
-                # Original logic for non-aromatic atoms
-                # Determine the desired number of electrons for a full octet (8 for most elements)
-                # Special cases like hydrogen (which wants 2) can be handled here
+            else:
                 desired_electrons = 8 if element not in ['h', 'he'] else 2
-
-                # Calculate the current electrons: valence electrons + bonds - charge
                 current_electrons = int(valence_electrons + bonds)
-         
-                # Add hydrogen radicals to reach the desired number of electrons
                 needed_hydrogens = max(0, desired_electrons - current_electrons)
-                
-                # Cation case
-                if formal_charge > 0:
-                    e = desired_electrons - 2*needed_hydrogens - 2*bonds  # number of unbound electrons
 
-                    # Case where the formal charge can be satisfied entirely by adding protons to lone-pairs
-                    if (formal_charge - int(e/2)) <= 0:
+                if formal_charge > 0:
+                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
+                    if (formal_charge - int(e / 2)) <= 0:
                         needed_hydrogens += formal_charge
-                    # Case where the formal charge requires the loss of hydride
                     else:
                         needed_hydrogens -= formal_charge
-
-                # Anion case
                 elif formal_charge < 0:
-                    e = desired_electrons - 2*needed_hydrogens - 2*bonds  # number of unbound electrons
-
-                    # Case where the formal charge can be satisfied entirely by loss of protons (leaving behind lone pairs)
+                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
                     if (needed_hydrogens + formal_charge) >= 0:
                         needed_hydrogens += formal_charge
-                    # Case where the formal charge requires the addition of hydride
                     else:
                         needed_hydrogens -= formal_charge
-        
-        # If we shouldn't infer hydrogens and no explicit count is given, don't add any hydrogens
         else:
             needed_hydrogens = 0
 
-        # Check that not all electrons have been removed
         if needed_hydrogens < 0:
-            print(
-                f"Warning: add_hydrogens() was unable to satisfy formal charge specification with hydrogens.")
-        # Check that the octet has not been violated
-        if (2*bonds + 2*needed_hydrogens) > 8 and not el_expand_octet[element]:
+            print("Warning: add_hydrogens() was unable to satisfy formal charge specification with hydrogens.")
+        if (2 * bonds + 2 * needed_hydrogens) > 8 and not el_expand_octet[element]:
             raise OctetError(atom)
 
-        # Update list of hydrogens to add
         hydrogens_to_add.append(needed_hydrogens)
 
-    # Create a new adjacency matrix including hydrogens
     total_atoms = len(hydrogens_to_add) + int(sum(hydrogens_to_add))
     new_adjmat = np.zeros((total_atoms, total_atoms))
-
-    # Fill in the original adjmat values
     new_adjmat[:len(adjmat), :len(adjmat)] = adjmat
 
-    # Add hydrogens to the adjacency matrix
     current_index = len(adjmat)
     for i, num_hydrogens in enumerate(hydrogens_to_add):
         for _ in range(num_hydrogens):
             new_adjmat[i, current_index] = new_adjmat[current_index, i] = 1
+            atom_info[current_index] = {
+                "atom_index": current_index,
+                "atom_map": None,
+                "element": "h",
+                "formal_charge": 0,
+                "mass": el_mass["h"],
+                "stereo": {"atom": None, "bonds": {}},
+                "aromatic_input": False,
+            }
             current_index += 1
 
-    # Add hydrogens to atom_info in the return statement
-    return new_adjmat, atom_info+[['H', 0, None, None, None, True] for _ in range(int(sum(hydrogens_to_add)))]
+    return new_adjmat, atom_info
 
 
 class OctetError(ValueError):
@@ -575,40 +578,24 @@ def reorder_by_mappings(adjmat, atom_info):
     """
     Reorder atoms in the graph based on their atom mappings if present.
     If no mappings are present, returns the original ordering.
-
-    Parameters
-    ----------
-    adjmat : array
-        The adjacency matrix of the molecular graph
-    atom_info : list
-        List of tuples containing (element, charge, hydrogens, isotope, mapping)
-
-    Returns
-    -------
-    tuple
-        (reordered_adjmat, reordered_atom_info) if mappings present
-        (original_adjmat, original_atom_info) if no mappings
     """
-    # Extract elements and mappings
-    elements = [info[0].lower() for info in atom_info]
-    mappings = [info[4] for info in atom_info]
+    elements = [atom_info[i]["element"] for i in atom_info]
+    mappings = [atom_info[i]["atom_map"] for i in atom_info]
 
-    # Check if any mappings are present
     if all(m is None for m in mappings):
         return adjmat, atom_info
 
-    # Convert None mappings to a large number to ensure they go to the end
     hash_list = [m if m is not None else float('inf') for m in mappings]
-
-    # Convert hash_list to numpy array and invert values (so lower numbers come first)
     hash_list = -np.array(hash_list)
 
-    # Use canon_order to reorder based on mappings
     ordered_elements, ordered_adjmat, ordered_hash, idx = canon_order(
         elements, adjmat, hash_list=hash_list, return_index=True
     )
 
-    # Reorder atom_info using the same index
-    ordered_atom_info = [atom_info[i] for i in idx]
+    ordered_atom_info = {}
+    for new_idx, old_idx in enumerate(idx):
+        record = dict(atom_info[old_idx])
+        record["atom_index"] = new_idx
+        ordered_atom_info[new_idx] = record
 
     return ordered_adjmat, ordered_atom_info

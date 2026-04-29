@@ -19,6 +19,7 @@ class JobManagerConfig:
     max_active_jobs: int = 100
     queue: Optional[str] = None
     job_name: str = "yarp"
+    account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
 
     def __post_init__(self):
         # Normalize inputs for easier checking

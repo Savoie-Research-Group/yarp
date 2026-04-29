@@ -22,11 +22,14 @@ class AsyncYarpCalculator:
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_container_prefix(self, image_name: str, work_dir: str) -> str:
+    def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False) -> str:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
         Automatically checks for and pulls missing images.
+
+        apptainer_run: If True, use ``apptainer run`` (OCI ENTRYPOINT/CMD, like ``docker run``).
+        If False, use ``apptainer exec`` (requires an explicit executable before flags).
         """
         if self.job_manager.container == "docker":
             # 1. Check if the image exists locally
@@ -45,23 +48,37 @@ class AsyncYarpCalculator:
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
             # e.g., "erm42/yarp:crest" -> "erm42_yarp_crest.sif"
-            safe_filename = image_name.replace("/", "_").replace(":", "_") + ".sif"
-            sif_path = Path(self.job_manager.sif_location) / safe_filename
+            sanitized = image_name.replace("/", "_").replace(":", "_")
+            if sanitized.endswith(".sif"):
+                safe_filename = sanitized
+                local_sif_only = True
+            else:
+                safe_filename = f"{sanitized}.sif"
+                local_sif_only = False
 
+            sif_path = Path(self.job_manager.sif_location) / safe_filename
             # 1. Check if the .sif file exists on disk
             if not sif_path.exists():
+                if local_sif_only:
+                    raise FileNotFoundError(
+                        f"Local Apptainer image not found: {sif_path}\n"
+                        f"(image_name={image_name!r}). This name is treated as a filename under "
+                        f"`job_manager.sif_location`, not a Docker Hub image.\n"
+                        "Build the .sif from your definition file, for example:\n"
+                        f"  apptainer build {sif_path} /path/to/orca_6.0.1.def\n"
+                        "Place the ORCA installer tarball next to the .def as documented in that file."
+                    )
                 print(f"Apptainer image not found at {sif_path}. Pulling from Docker Hub...")
-                
                 # Ensure the target directory actually exists before pulling
                 sif_path.parent.mkdir(parents=True, exist_ok=True)
-                
                 # 2. Pull the docker image and convert it to a .sif file
                 subprocess.run(
-                    ["apptainer", "pull", str(sif_path), f"docker://{image_name}"], 
-                    check=True
+                    ["apptainer", "pull", str(sif_path), f"docker://{image_name}"],
+                    check=True,
                 )
 
-            return f"apptainer exec --bind {work_dir}:/work --pwd /work {sif_path}"
+            verb = "run" if apptainer_run else "exec"
+            return f"apptainer {verb} --bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")
@@ -76,6 +93,8 @@ class AsyncYarpCalculator:
         time = self.config.max_runtime
 
         if scheduler == "slurm":
+            if self.job_manager.account:
+                f.write(f"#SBATCH -A {self.job_manager.account}\n")
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={queue}\n")
             f.write("#SBATCH -N 1\n") # nodes

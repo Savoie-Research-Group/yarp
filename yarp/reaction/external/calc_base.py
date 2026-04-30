@@ -38,9 +38,9 @@ class AsyncYarpCalculator:
             # 2. If returncode is non-zero, it doesn't exist. Pull it!
             if inspect_cmd.returncode != 0:
                 print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
-                subprocess.run(["docker", "pull", image_name], check=True)
+                subprocess.run(["docker", "pull", "--platform linux/amd64", image_name], check=True)
 
-            return f"docker run --rm -v {work_dir}:/work -w /work {image_name}"
+            return f"docker run --platform linux/amd64 --rm -v {work_dir}:/work -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename

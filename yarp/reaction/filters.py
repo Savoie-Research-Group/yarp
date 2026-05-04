@@ -229,13 +229,13 @@ def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=
 
     # Filter out garbage potential products according to formal charge
     print(f"   + Applying formal charge cutoff of {fc_cutoff}")
-    clean = [_ for _ in raw_products if sum(np.abs(_.fc)) < fc_cutoff]
+    clean = [_ for _ in clean if sum(np.abs(_.fc)) < fc_cutoff]
 
     # Filter out 3 and 4 member rings from potential products
     if ring_filter:
         print(f"   + Removing 3 and 4 member rings")
         product = []
-        for _ in raw_products:
+        for _ in clean:
             if _.rings != []:
                 if len(_.rings[0]) > 4:
                     product.append(_)

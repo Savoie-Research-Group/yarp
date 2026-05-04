@@ -75,7 +75,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react, verbose=verbose))
+        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=react, verbose=verbose))
         print(f"   + Enumerated {len(products)} products")
 
     else:
@@ -465,9 +465,9 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     yield tmp
 
 
-def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_only=False, hash_filter=True, lower_score=True, keep_symmetric=True, verbose=False):
+def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=True, keep_symmetric=True, verbose=False):
     """
-    This function provides a shortcut for enumerating "break m form n" products without generating intermediate 
+    This function provides a shortcut for enumerating "break n form n" products without generating intermediate 
     zwitterionic/dangling bond species
 
     Still need to implement the keep_symmetric option.
@@ -488,17 +488,6 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
             don't want this function to waste time with. For example, if you are performing multiple sequential `form_bonds()` 
             calls, then it is useful to pass the hashes of the genereated products from each call forward to the next to avoid 
             redundant calls. 
-
-    inter: bool, default=False
-           Controls whether intermolecular bond-formations should be returned. Here, intermolecular is defined as bond-formation
-           steps between distinct yarpecule objects.
-
-    intra: bool, default=True
-           Controls whether intramolecular bond-formations should be returned. Here, intramolecular is defined as bond-formation
-           reactions between atoms within a given yarpecule object.
-
-    def_only: bool, default=False
-              Controls whether only bond formations are performed that involve electron deficient atoms.
 
     hash_filter: bool, default=True
                  Controls whether the returned products are filtered by uniqueness. Due to symmetry, the same product may be obtained
@@ -536,9 +525,6 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
     # Perform all bond breaks over relevant atoms
     for count_y, y in enumerate(yarpecules):
 
-        # keep bonds involving reactive atoms ( return_bondtypes(y)[0] returns all bonds the comprehension is the filter)
-        #        bonds = [ i if count_i in react[count_y] else [ j for j in i if j[0] in react[count_y] ] for count_i,i in enumerate(return_bondtypes(y)[0]) ]
-
         # Find the bond mat that minimizes the formal charges (this may be conservative but I'm trying to avoid spurious zwitterions)
         fc_ind = [sum(abs(x) for x in return_formals(_, y.elements))
                   for _ in y.lewis.bond_mats]
@@ -553,7 +539,7 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
         radicals = list(return_radicals(y))
 
         # Loop over combinations of bonds to break (m bonds at a time)
-        for b in combinations(list(range(len(bonds))), m):
+        for b in combinations(list(range(len(bonds))), n):
 
             # Create set to avoid reforming the exact same bonds we just broke
             # You read this as set(frozenset(bonds we just broke)). We use frozensets so that they are
@@ -573,7 +559,7 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                 print(f"Breaking bonds at indices: {b}")
                 print(f"Reactive atom set: {formset}")
                 print(f"Bonds to avoid reforming: {avoid}")
-                print(f"Number of reactive atoms: {n}")
+                print(f"Number of reactive atoms: {n * 2}")
                 print(f"Actual bonds being broken: {[bonds[_] for _ in b]}")
 
             # Start with copy of original bond matrix
@@ -604,6 +590,8 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
                 # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
                 if any([len(_) < 2 for _ in g]):
                     avoid.update(frozenset(g))
+                    if verbose:
+                        print(f"Skipping - would form dangling bond: {g}")
                     continue
 
                 if verbose:
@@ -649,7 +637,6 @@ def bmfn(yarpecules, m, n, react=[], hashes=None, inter=False, intra=True, def_o
 
                 # This will avoid duplicates that are symmetrically equivalent (so distinct mappings will get collapsed, which isn't usually what we want)
                 if product._yarpecule_hash not in hashes:
-                    # Add to hash filter to prevent duplicates (if enabled)
                     if hash_filter:
                         hashes.add(product._yarpecule_hash)
 
@@ -749,7 +736,7 @@ def return_bondtypes(yarpecules, b_inds=[]):
     if len(b_inds) != len(yarpecules):
         b_inds = [0 for _ in range(len(yarpecules))]
 
-    #    tuple holds: bond between atoms i and j, with their hashes, and the bond order taken from the bond_mat at the index supplied by b_inds. This list of bonds is returned for each yarpecule.
+    # tuple holds: bond between atoms i and j, with their hashes, and the bond order taken from the bond_mat at the index supplied by b_inds. This list of bonds is returned for each yarpecule.
     return [[(count_i, j, y._atom_hashes[count_i], y._atom_hashes[j], y.lewis.bond_mats[b_inds[count_y]][count_i][j]) for count_i, i in enumerate(return_adjlist(y)) for j in i if count_i <= j] for count_y, y in enumerate(yarpecules)]
 
 
@@ -836,7 +823,7 @@ def return_radicals(y, all_bmats=False):
 
 def add_bonds(bond_mat, bonds, val=1):
     """
-    Helper function for bmfn. Modifies the bond_mat in place.
+    Helper function for bnfn. Modifies the bond_mat in place.
 
     Parameters
     ----------

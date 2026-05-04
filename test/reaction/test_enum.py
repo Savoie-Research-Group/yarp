@@ -3,7 +3,7 @@ Testing suite for functions contained in yarp/reaction/enum.py
 """
 import pytest
 import numpy as np
-from yarp.reaction.enum import bmfn, enumerate_products
+from yarp.reaction.enum import bnfn, enumerate_products
 from yarp.reaction.filters import filter_enum_products
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
@@ -15,7 +15,7 @@ class TestConcertedClosedShell:
         Test if all concerted b2f2 products are recovered
         """
         haa = yarpecule('CC=O')
-        prods = list(bmfn(haa, 2, 2, hashes={haa.hash}))
+        prods = list(bnfn(haa, 2, hashes={haa.hash}))
 
         assert len(prods) == 3
 
@@ -40,8 +40,8 @@ class TestConcertedClosedShell:
         """
         haa = yarpecule('CC=O')
 
-        b2f2_prods = list(bmfn(haa, 2, 2, hashes={haa.hash}))
-        b3f3_prods = list(bmfn(haa, 2, 2, hashes={haa.hash}))
+        b2f2_prods = list(bnfn(haa, 2, hashes={haa.hash}))
+        b3f3_prods = list(bnfn(haa, 3, hashes={haa.hash}))
 
         assert len(b2f2_prods) == len(b3f3_prods)
 
@@ -59,7 +59,7 @@ class TestConcertedClosedShell:
         """
         khp = yarpecule('O=CCCOO')
 
-        khp_b2f2 = list(bmfn(khp, 2, 2, hashes={khp.hash}))
+        khp_b2f2 = list(bnfn(khp, 2, hashes={khp.hash}))
 
         khp_b2f2_hash = set()
         for _ in khp_b2f2:
@@ -88,12 +88,12 @@ class TestConcertedClosedShell:
 
         khp = yarpecule('O=CCCOO')
 
-        khp_b2f2 = list(bmfn(khp, 2, 2, hashes={khp.hash}))
+        khp_b2f2 = list(bnfn(khp, 2, hashes={khp.hash}))
         khp_b2f2_hash = set()
         for _ in khp_b2f2:
             khp_b2f2_hash.add(_.hash)
 
-        khp_b3f3 = list(bmfn(khp, 3, 3, hashes={khp.hash}))
+        khp_b3f3 = list(bnfn(khp, 3, hashes={khp.hash}))
         khp_b3f3_hash = set()
         for _ in khp_b3f3:
             khp_b3f3_hash.add(_.hash)
@@ -111,7 +111,7 @@ class TestConcertedClosedShell:
         dar = yarpecule('C=CC=C.C=C') # Diels-Alder reactants
         dap = yarpecule('C1C=CCCC1') # Diels-Alder product (from b3f3)
 
-        dar_b2f2 = list(bmfn(dar, 2, 2, hashes={dar.hash}, lower_score=True))
+        dar_b2f2 = list(bnfn(dar, 2, hashes={dar.hash}, lower_score=True))
 
         dar_b2f2_hash = set()
         for _ in dar_b2f2:
@@ -125,7 +125,7 @@ class TestConcertedOpenShell:
         Test if all b1f1 products are formed (regardless of score)
         '''
         liec = yarpecule('[Li]O[C]1OCCO1')
-        prods = list(bmfn(liec, 1, 1, hashes={liec.hash}, lower_score=False))
+        prods = list(bnfn(liec, 1, hashes={liec.hash}, lower_score=False))
 
 
         assert len(prods) == 7
@@ -150,28 +150,6 @@ class TestConcertedOpenShell:
             
         assert found_hashes == expected_prods_hash
 
-    def test_liec_b1f2(self):
-        '''
-        Test if all b1f2 products are formed
-        --> All should be same as b1f1
-        '''
-
-        liec = yarpecule('[Li]O[C]1OCCO1')
-        b1f1_prods = list(bmfn(liec, 1, 1, hashes={liec.hash}, lower_score=True))
-        b1f2_prods = list(bmfn(liec, 1, 2, hashes={liec.hash}, lower_score=True))
-
-        assert len(b1f1_prods) == len(b1f2_prods)
-
-        b1f1_prods_hash = set()
-        for _ in b1f1_prods:
-            b1f1_prods_hash.add(_.hash)
-
-        b1f2_prods_hash = set()
-        for _ in b1f2_prods:
-            b1f2_prods_hash.add(_.hash)
-
-        assert b1f1_prods_hash == b1f2_prods_hash
-
     def test_liec_b2f2(self):
         """
         Test if all b2f2 products from doi: 10.1021/acs.jpclett.5c01123n are formed
@@ -179,8 +157,8 @@ class TestConcertedOpenShell:
         """
         
         liec = yarpecule('[Li]O[C]1OCCO1')
-        b1f1_prods = list(bmfn(liec, 1, 1, hashes={liec.hash}, lower_score=False))
-        b2f2_prods = list(bmfn(liec, 2, 2, hashes={liec.hash}, lower_score=False))
+        b1f1_prods = list(bnfn(liec, 1, hashes={liec.hash}, lower_score=False))
+        b2f2_prods = list(bnfn(liec, 2, hashes={liec.hash}, lower_score=False))
 
         paper_prods = ['[Li][O][C@@H]1O[CH]CO1',    # product R2-2 (also b1f1 product)
                        '[Li][O]C(=O)OC[CH2]',       # product R2-1 (also b1f1 product)

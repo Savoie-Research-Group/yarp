@@ -64,9 +64,15 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
               f"{len(break_mol)} intermediates")
 
         # Form bonds
-        products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash})
-        print(f"   + Forming {n_form} bonds formed "
-              f"{len(products)} potential products")
+        if n_form > 0:
+            products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash})
+            print(f"   + Forming {n_form} bonds formed "
+                f"{len(products)} potential products")
+            products += break_mol
+        else:
+            products = break_mol
+
+        print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
         products = list(bmfn(r_yp, n_break, n_form, hashes={r_yp.hash}, react=react, verbose=verbose))

@@ -3,7 +3,8 @@ Testing suite for functions contained in yarp/reaction/enum.py
 """
 import pytest
 import numpy as np
-from yarp.reaction.enum import bmfn
+from yarp.reaction.enum import bmfn, enumerate_products
+from yarp.reaction.filters import filter_enum_products
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
 import math
@@ -239,4 +240,44 @@ class TestPartitionGenerator:
         assert uspg_length_set == confirmation_set
 
 
+class TestSequentialPhoto:
+    def test_cb_b2f0(self):
+        cb = yarpecule('C1(=O)CCC1')
+        c2 = yarpecule('C=C.C=C=O')
+        c3 = yarpecule('[C-]#[O+].C1CC1')
 
+        b2f0 = enumerate_products(cb, n_break=2, n_form=0, mode="sequential")
+
+        b2f0_hash = set()
+        for _ in b2f0:
+            b2f0_hash.add(_.hash)
+
+        assert c2.hash in b2f0_hash
+        assert c3.hash not in b2f0_hash
+
+        b2f0_filtered = filter_enum_products(b2f0, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False)
+
+        assert len(b2f0_filtered) == 1
+        assert b2f0_filtered[0].hash == c2.hash
+
+    def test_cb_b2f1(self):
+        cb = yarpecule('C1(=O)CCC1')
+        c2 = yarpecule('C=C.C=C=O')
+        c3 = yarpecule('[C-]#[O+].C1CC1')
+
+        b2f1 = enumerate_products(cb, n_break=2, n_form=1, mode="sequential")
+
+        b2f1_hash = set()
+        for _ in b2f1:
+            b2f1_hash.add(_.hash)
+
+        assert c2.hash in b2f1_hash
+        assert c3.hash in b2f1_hash
+
+        b2f1_filtered = filter_enum_products(b2f1, l_cutoff=1.0, fc_cutoff=2.5, ring_filter=False)
+        b2f1_filt_hash = set()
+        for _ in b2f1_filtered:
+            b2f1_filt_hash.add(_.hash)
+
+        assert c2.hash in b2f1_filt_hash
+        assert c3.hash in b2f1_filt_hash

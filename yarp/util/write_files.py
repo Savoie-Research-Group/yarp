@@ -3,7 +3,7 @@ Functions to generate common molecular structure files from yarpecules
 """
 
 import numpy as np
-from yarp.yarpecule.lewis.be_mat import return_formals
+from yarp.yarpecule.lewis.bem_score import return_formals
 
 def mol_write_yp(file, elements, geo, bond_mat, adj_mat, append_opt=False, atom_info=None):
     """

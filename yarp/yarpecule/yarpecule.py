@@ -8,7 +8,7 @@ from rdkit import Chem
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
-from yarp.yarpecule.lewis.be_mat import return_bo_dict, return_formals
+from yarp.yarpecule.lewis.bem_score import return_bo_dict, return_formals
 from yarp.yarpecule.atom_mapping import canon_order
 from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass

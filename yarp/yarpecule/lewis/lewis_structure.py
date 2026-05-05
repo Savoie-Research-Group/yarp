@@ -10,8 +10,8 @@ from IPython.display import display
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
 from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
-from yarp.yarpecule.lewis.be_mat import *
-from yarp.yarpecule.lewis.support_dump import *
+from yarp.yarpecule.lewis.bem_score import bmat_score, bmat_unique, adjust_metals, return_n_e_accept, return_n_e_donate, return_formals
+from yarp.yarpecule.lewis.find_lewis import gen_init, gen_all_lstructs
 from yarp.yarpecule.hashes import bmat_hash
 
 

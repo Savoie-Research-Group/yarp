@@ -1,31 +1,9 @@
 """
-Helper functions for bond-electron matrices.
+Helper functions for processing and characterizing bond-electron matrices (Lewis structures)
 """
 import numpy as np
 from copy import copy
 from yarp.util.properties import el_n_deficient, el_expand_octet, el_valence, el_metals
-
-
-def bmat_unique(new_bond_mat, old_bond_mats):
-    """
-    Helper function for `gen_all_lstructs()` that checks whether an array already exists in a set of arrays. 
-    Deprecated because it was expensive. Now a hash is used in place of this in the comparison routine.
-    """
-    for i in old_bond_mats:
-        if all_zeros(i-new_bond_mat):
-            return False
-    return True
-
-
-def all_zeros(m):
-    """
-    Helper function for `bmat_unique()` that checks is a numpy array is all zeroes
-    (uses short-circuit logic to speed things up in contrast to np.any) 
-    """
-    for _ in m.flat:
-        if _:
-            return False  # short-circuit logic at first non-zero
-    return True
 
 
 def bmat_score(bond_mat, elements, rings, en,
@@ -112,6 +90,64 @@ def bmat_score(bond_mat, elements, rings, en,
         w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2)
                   for _ in range(len(bond_mat))]) + factor
 
+#####################
+# BEM Score Support #
+#####################
+
+def return_def(bond_mat, e_def):
+    """
+    Returns returns the electron deficiencies of each atom (based on octet goal supplied via `e_tet`).
+
+    Parameters
+    ----------
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list. 
+
+    e_def: array
+           Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
+           2 for hydrogen).
+
+    Returns
+    -------
+    deficiencies: array
+                  Contains the electron deficiencies of each atom. This array is indexed to the bond-electron matrix.
+
+    Notes
+    -----            
+    Atoms with expanded octets return 0 not a negative value.
+    """
+    tmp = np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)-e_def
+    return np.where(tmp < 0, tmp, 0)
+
+
+def return_expanded(bond_mat, e_exp):
+    """
+    Returns returns the number of surplus electrons beyond the target for each atom (based on octet goal 
+    supplied via `e_tet`).
+
+    Parameters
+    ----------
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list. 
+
+    e_exp: array
+           Holds the number of electrons each atom can have until incurring an expanded octect penalty (e.g., 8 for most organics, 
+           2 for hydrogen).
+
+    Returns
+    -------
+    surplus: array
+             Contains the excess electrons for each atom. This array is indexed to the bond-electron matrix.
+
+    Notes
+    -----            
+    Atoms with electron deficiencies return 0 not a negative value.
+    """
+    tmp = np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)-e_exp
+    return np.where(tmp > 0, tmp, 0)
+
 
 def is_aromatic(bond_mat, ring):
     """
@@ -188,79 +224,6 @@ def is_aromatic(bond_mat, ring):
         return 1
 
 
-def return_e(bond_mat):
-    """
-    Returns the valence electrons possessed by each atom (half of each bond) 
-
-    Parameters
-    ----------
-    bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    Returns
-    -------
-    valencies: array
-               Contains the valence electrons possessed by each atom. This array is indexed to the bond-electron matrix.
-    """
-    return np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)
-
-
-def return_def(bond_mat, e_def):
-    """
-    Returns returns the electron deficiencies of each atom (based on octet goal supplied via `e_tet`).
-
-    Parameters
-    ----------
-    bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    e_def: array
-           Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
-           2 for hydrogen).
-
-    Returns
-    -------
-    deficiencies: array
-                  Contains the electron deficiencies of each atom. This array is indexed to the bond-electron matrix.
-
-    Notes
-    -----            
-    Atoms with expanded octets return 0 not a negative value.
-    """
-    tmp = np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)-e_def
-    return np.where(tmp < 0, tmp, 0)
-
-
-def return_expanded(bond_mat, e_exp):
-    """
-    Returns returns the number of surplus electrons beyond the target for each atom (based on octet goal 
-    supplied via `e_tet`).
-
-    Parameters
-    ----------
-    bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    e_exp: array
-           Holds the number of electrons each atom can have until incurring an expanded octect penalty (e.g., 8 for most organics, 
-           2 for hydrogen).
-
-    Returns
-    -------
-    surplus: array
-             Contains the excess electrons for each atom. This array is indexed to the bond-electron matrix.
-
-    Notes
-    -----            
-    Atoms with electron deficiencies return 0 not a negative value.
-    """
-    tmp = np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)-e_exp
-    return np.where(tmp > 0, tmp, 0)
-
-
 def return_formals(bond_mat, elements):
     """
     Returns returns the formal charge on each atom.
@@ -282,6 +245,28 @@ def return_formals(bond_mat, elements):
 
     """
     return np.array([el_valence[_] for _ in elements]) - np.sum(bond_mat, axis=1)
+
+
+#######################
+# Lewis Class Support #
+#######################
+
+def return_e(bond_mat):
+    """
+    Returns the valence electrons possessed by each atom (half of each bond) 
+
+    Parameters
+    ----------
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list. 
+
+    Returns
+    -------
+    valencies: array
+               Contains the valence electrons possessed by each atom. This array is indexed to the bond-electron matrix.
+    """
+    return np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)
 
 
 def return_n_e_accept(bond_mat, elements):
@@ -348,75 +333,26 @@ def return_n_e_donate(bond_mat):
     return np.sum(2*tmp, axis=1)-np.diag(tmp)
 
 
-def return_connections(ind, bond_mat, inds=None, min_order=1):
+def bmat_unique(new_bond_mat, old_bond_mats):
     """
-    Returns indices of atoms bonded to the atom at `ind` according to the bond-electron matrix. 
-
-    Parameters
-    ----------
-    ind : int
-          The index of the bond-electron matrix that the connections are being returned for. 
-
-    bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    inds : list, default=None 
-           Optional list of indices of atoms that the user wants to restrict the return to. Useful for avoiding the return
-           some trivial atoms that aren't relevant to resolving the Lewis structure. 
-
-    min_order : int, default=1
-                Optional argument that sets the threshold for determining a connection. If the user wishes to only find
-                doubly-bonded connections, then this would be set to 2 (default: 1).
-
-    Returns
-    -------
-    connections: list
-                 Contains the indices of the bonded atoms subject to the `inds` and `min_order` arguments.
+    Helper function for `gen_all_lstructs()` that checks whether an array already exists in a set of arrays. 
+    Deprecated because it was expensive. Now a hash is used in place of this in the comparison routine.
     """
-    if inds:
-        return [_ for _ in inds if bond_mat[ind, _] >= min_order and _ != ind]
-    else:
-        return [count for count, _ in enumerate(bond_mat[ind]) if _ >= min_order and count != ind]
+    for i in old_bond_mats:
+        if all_zeros(i-new_bond_mat):
+            return False
+    return True
 
 
-def return_bo_dict(y, score_thresh=0.0):
+def all_zeros(m):
     """
-    Returns a dictionary of dictionaries containing the set of bond orders observed across all bond-electron matrices
-    available to the yarpecule. For example, if atoms 1 and 2 have a double bond in one resonance structure but a single
-    bond in another, this dictionary will hold set({1,2}) in the bo_dict[1][2] and bo_dict[2][1] positions. 
-
-    Parameters
-    ----------
-    y: yarpecule
-               Contains the bond_mats and bond_mat_scores needed for evaluation as attributesset.
-
-    score_thresh: float
-                  Only bond_mats with a score below this threshold are used for determining bond orders. If none of the 
-                  bond_mats satisfy this threshold, then only the lowest scoring bond-electron matrix is used. 
-
-    Returns
-    -------
-    bo_dict : dictionary of dictionaries
-              Contains the set of observable bond-orders across all bond-electron matrices between atoms i and j at 
-              each element. The keys of the dictionary are the atom indices. For example, to query the bond-order of
-              the bond between atoms 4 and 6 you can use bo_dict[4][6] or bo_dict[6][4]. By default, unbonded atoms
-              have `None` as their bond-order. 
+    Helper function for `bmat_unique()` that checks is a numpy array is all zeroes
+    (uses short-circuit logic to speed things up in contrast to np.any) 
     """
-    inds = [count for count, _ in enumerate(
-        y.bond_mat_scores) if _ <= score_thresh]
-    if len(inds) == 0:
-        inds = [0]  # handle the case where no matrices satisfy the threshold.
-    bonds = [(count_i, count_j) for count_i, i in enumerate(y.bond_mats[0])
-             for count_j, j in enumerate(i) if (count_j > count_i and j > 0)]
-    bo_dict = {i: {j: None for j in range(
-        len(y.bond_mats[0]))} for i in range(len(y.bond_mats[0]))}
-    for i in bonds:
-        bo_dict[i[0]][i[1]] = set(
-            [int(y.bond_mats[_][i[0], i[1]]) for _ in inds])
-        bo_dict[i[1]][i[0]] = bo_dict[i[0]][i[1]]
-
-    return bo_dict
+    for _ in m.flat:
+        if _:
+            return False  # short-circuit logic at first non-zero
+    return True
 
 
 def adjust_metals(bond_mats, adj_mat, elements):
@@ -488,3 +424,80 @@ def adjust_metals(bond_mats, adj_mat, elements):
                     if count == 4:
                         break
     return bond_mats
+
+
+###########################
+# Miscellaneous Functions #
+###########################
+
+def return_bo_dict(y, score_thresh=0.0):
+    """
+    Returns a dictionary of dictionaries containing the set of bond orders observed across all bond-electron matrices
+    available to the yarpecule. For example, if atoms 1 and 2 have a double bond in one resonance structure but a single
+    bond in another, this dictionary will hold set({1,2}) in the bo_dict[1][2] and bo_dict[2][1] positions. 
+
+    Parameters
+    ----------
+    y: yarpecule
+               Contains the bond_mats and bond_mat_scores needed for evaluation as attributesset.
+
+    score_thresh: float
+                  Only bond_mats with a score below this threshold are used for determining bond orders. If none of the 
+                  bond_mats satisfy this threshold, then only the lowest scoring bond-electron matrix is used. 
+
+    Returns
+    -------
+    bo_dict : dictionary of dictionaries
+              Contains the set of observable bond-orders across all bond-electron matrices between atoms i and j at 
+              each element. The keys of the dictionary are the atom indices. For example, to query the bond-order of
+              the bond between atoms 4 and 6 you can use bo_dict[4][6] or bo_dict[6][4]. By default, unbonded atoms
+              have `None` as their bond-order. 
+    """
+    inds = [count for count, _ in enumerate(
+        y.bond_mat_scores) if _ <= score_thresh]
+    if len(inds) == 0:
+        inds = [0]  # handle the case where no matrices satisfy the threshold.
+    bonds = [(count_i, count_j) for count_i, i in enumerate(y.bond_mats[0])
+             for count_j, j in enumerate(i) if (count_j > count_i and j > 0)]
+    bo_dict = {i: {j: None for j in range(
+        len(y.bond_mats[0]))} for i in range(len(y.bond_mats[0]))}
+    for i in bonds:
+        bo_dict[i[0]][i[1]] = set(
+            [int(y.bond_mats[_][i[0], i[1]]) for _ in inds])
+        bo_dict[i[1]][i[0]] = bo_dict[i[0]][i[1]]
+
+    return bo_dict
+
+
+def return_connections(ind, bond_mat, inds=None, min_order=1):
+    """
+    Returns indices of atoms bonded to the atom at `ind` according to the bond-electron matrix. 
+
+    Parameters
+    ----------
+    ind : int
+          The index of the bond-electron matrix that the connections are being returned for. 
+
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list. 
+
+    inds : list, default=None 
+           Optional list of indices of atoms that the user wants to restrict the return to. Useful for avoiding the return
+           some trivial atoms that aren't relevant to resolving the Lewis structure. 
+
+    min_order : int, default=1
+                Optional argument that sets the threshold for determining a connection. If the user wishes to only find
+                doubly-bonded connections, then this would be set to 2 (default: 1).
+
+    Returns
+    -------
+    connections: list
+                 Contains the indices of the bonded atoms subject to the `inds` and `min_order` arguments.
+    """
+    if inds:
+        return [_ for _ in inds if bond_mat[ind, _] >= min_order and _ != ind]
+    else:
+        return [count for count, _ in enumerate(bond_mat[ind]) if _ >= min_order and count != ind]
+
+

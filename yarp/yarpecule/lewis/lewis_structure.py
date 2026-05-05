@@ -247,7 +247,7 @@ class lewis_struct:
         #    factor = -min(en)*q*w_formal if q>=0 else -max(en)*q*w_formal
         factor = 0.0
 
-        def obj_fun(x): return bmat_score(x, elements, self._rings, cat_en=en, an_en=en,
+        def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
                                           e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           # aro term is turned off initially since it traps greedy optimization
@@ -272,7 +272,7 @@ class lewis_struct:
                                                               N_max=10000, min_win=100.0, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations and update scores of the current bmats
-        def obj_fun(x): return bmat_score(x, elements, self._rings, cat_en=en, an_en=en,
+        def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
                                           e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False)
@@ -345,7 +345,7 @@ class lewis_struct:
         # an_en = en + np.sum(adj_mat*(0.1*en/(100+en)),axis=1) + 0.05*s_char
         # scores = [ bmat_score(_,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)
-        scores = [bmat_score(_, elements, self._rings, en, en, rad_env, e_def, e_exp, w_def=w_def, w_exp=w_exp,
+        scores = [bmat_score(_, elements, self._rings, en=en, rad_env=rad_env, e_def=e_def, e_exp=e_exp, w_def=w_def, w_exp=w_exp,
                              w_formal=w_formal, w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
 
         # # Sort by hashes

@@ -28,7 +28,7 @@ def all_zeros(m):
     return True
 
 
-def bmat_score(bond_mat, elements, rings, cat_en, an_en,
+def bmat_score(bond_mat, elements, rings, en,
                rad_env, e_def, e_exp, w_def=-1, w_exp=0.1,
                w_formal=0.1, w_aro=-24, w_rad=0.1, factor=0.0, verbose=False):
     """
@@ -55,12 +55,8 @@ def bmat_score(bond_mat, elements, rings, cat_en, an_en,
     rings: list, default=None
            List of lists holding the atom indices in each ring. If none, then the rings are calculated.
 
-    cat_en: array 
-            Holds the cation electronegativity for each atom to determine the penalty for formal charges.
-
-    an_en: array
-           Holds the anion electronegativity for each atom to determine the penalty for formal charges.
-           This is currently not used! - ERM
+    en: array
+            Holds the Allen scale electronegativity for each atom to determine the penalty for formal charges.
 
     rad_env: array
              Holds the radical environment term for each atom to determine the relative stability of hosting a radical. 
@@ -95,7 +91,6 @@ def bmat_score(bond_mat, elements, rings, cat_en, an_en,
     score: float
            The score for the supplied bond-electron matrix.
     """
-    en = cat_en
 
     if verbose:
         print("deficiency: {}".format(

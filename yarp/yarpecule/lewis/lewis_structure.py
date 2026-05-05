@@ -127,7 +127,7 @@ class lewis_struct:
     def _gen_bond_el_mat(self, adj_mat, elements, q=0,
                          mats_max=10, mats_thresh=10.0,
                          w_def=-1, w_exp=0.1, w_formal=0.1,
-                         w_aro=-24, w_rad=0.1, local_opt=True):
+                         w_aro=-24, w_rad=-0.01, factor=0.0, local_opt=True):
         """
         Accesses self._rings, but shouldn't modify it at all...
 
@@ -172,8 +172,11 @@ class lewis_struct:
         w_aro: float, default=-24
                 The weight of the aromatic term in the objective function for scoring bond-electron matrices.
 
-        w_rad: float, default=0.1
+        w_rad: float, default=-0.01
                 The weight of the radical term in the objective function for scoring bond-electron matrices.
+
+        factor: float, default=0
+            An optional value that can be added to the score. Useful for normalizing with respect to something (e.g., the ionization potential of the molecule).
 
         local_opt: boolean, default=True
                 This controls whether non-local charge transfers are allowed (False). This can be expensive.
@@ -188,19 +191,30 @@ class lewis_struct:
                 A list of scores for each bond-electon matrix within bond_mats.
         """
 
-        # This makes me nervous, do we really need to do this? Or should we adjust internally our own recursion limits?
-        # Is there a concrete example of "we miss important chemistry if we don't do this"? -ERM
+        # Perhaps one day, we will be able to avoid doing this
+        # But today, is not that day - ERM
         old_rec_limit = sys.getrecursionlimit()
         sys.setrecursionlimit(5000)
-
-        # Array of atom-wise electroneutral electron expectations for convenience.
-        eneutral = np.array([el_valence[_] for _ in elements])
 
         # Array of atom-wise octet requirements for determining electron deficiencies
         e_def = np.array([el_n_deficient[_] for _ in elements])
 
         # Array of atom-wise octet requirements for determining expanded octects
         e_exp = np.array([el_n_expand_octet[_] for _ in elements])
+
+        # Array of base electronegativities of each atom
+        en = np.array([el_en[_] for _ in elements])
+
+        # Array of polarizability of each atom
+        pol = np.array([el_pol[_] for _ in elements])
+
+        # Array of radical environment viability scores for each atom
+        rad_env = np.sum(adj_mat*(pol/(100+pol)), axis=1)
+
+        # Initialize score function for ranking bond_mats
+        # subtracts off trivial formal charge penalty from cations and anions
+        # so that they have a baseline score of 0 all else being equal.
+        # factor = -min(en)*q*w_formal if q>=0 else -max(en)*q*w_formal
 
         # Check that there are enough electrons to at least form all sigma bonds consistent with the adjacency
         # This check needs to be updated to account for metals and be justified against the added cost.
@@ -238,16 +252,8 @@ class lewis_struct:
         scores = []
         hashes = set([])
 
-        # Initialize score function for ranking bond_mats
-        # base electronegativities of each atom
-        en = np.array([el_en[_] for _ in elements])
-        # base electronegativities of each atom
-        rad_env = np.array([el_en[_] for _ in elements])
-        # subtracts off trivial formal charge penalty from cations and anions so that they have a baseline score of 0 all else being equal.
-        #    factor = -min(en)*q*w_formal if q>=0 else -max(en)*q*w_formal
-        factor = 0.0
-
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
+                                          # radical term is turned off initially
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
                                           e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           # aro term is turned off initially since it traps greedy optimization
@@ -273,6 +279,7 @@ class lewis_struct:
 
         # Update objective function to include (anti)aromaticity considerations and update scores of the current bmats
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
+                                          # radical term is still turned off
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
                                           e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False)
@@ -282,14 +289,10 @@ class lewis_struct:
         bond_mats = [_[1]
                      for _ in sorted(zip(scores, bond_mats), key=lambda x: x[0])]
         scores = sorted(scores)
-        # print(hashes)
 
-        # Generate resonance structures: Run starting from the minimum structure and allow moves that are within s_window of the min_enegy score
+        # Generate resonance structures:
+        # Run starting from the minimum structure and allow moves that are within s_window of the min_enegy score
         bond_mats = [bond_mats[0]]
-        # bond_mats = [bond_mats[0]]
-        # for j in range(0, len(bond_mats)):
-        #    for count_i, i in enumerate(elements):
-        #        if i=='o': print(bond_mats[j][count_i])
         scores = [scores[0]]
         hashes = set([bmat_hash(bond_mats[0])])
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
@@ -297,11 +300,7 @@ class lewis_struct:
                                                            self._rings, ring_atoms, bridgeheads, seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
                                                            N_score=1000, N_max=10000, min_opt=True)
-        # for j in range(0, len(bond_mats)):
-        #    for count_i, i in enumerate(elements):
-        #        if i=='o': print(bond_mats[j][count_i])
         # Sort by initial scores
-
         inds = np.argsort(scores)
         bond_mats = [bond_mats[_] for _ in inds]
         scores = [scores[_] for _ in inds]
@@ -319,44 +318,25 @@ class lewis_struct:
                 break
         if flag:
             count += 1
+
         # Shed the excess b_mats
         bond_mats = bond_mats[:count]
         scores = scores[:count]
 
-        # Calculate the number of charge centers bonded to each atom (determines hybridization)
-        # calculated as: number of bonded_atoms + number of unbound electron orbitals (pairs or radicals).
-        # The latter is calculated as the minimum value over all relevant bond_mats
-        # (e.g., ester oxygen, R-O(C=O)-R will only have one lone pair not two in this calculation)
-        # finds the number of charge centers bonded to each atom (determines hybridization)
-        centers = [i+np.ceil(min([b[count, count] for b in bond_mats])*0.5)
-                   for count, i in enumerate(sum(adj_mat))]
-        # need s-character to assign positions of anions for precisely
-        s_char = np.array([1/(_+0.0001) for _ in centers])
-        # polarizability of each atom
-        pol = np.array([el_pol[_] for _ in elements])
-
-        # Calculate final scores. For finding the preferred position of formal charges,
-        # some small corrections are made to the electronegativities of anion and cations
-        # based on neighboring atoms and hybridization.
-        # The scores of ions are also adjusted by their ionization/reduction energy
-        # to provide a 0-baseline for all species regardless of charge state.
-        rad_env = -np.sum(adj_mat*(0.1*pol/(100+pol)), axis=1)
-        # cat_en = en + rad_env
-        # an_en = en + np.sum(adj_mat*(0.1*en/(100+en)),axis=1) + 0.05*s_char
-        # scores = [ bmat_score(_,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
+        # Calculate final scores
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)
-        scores = [bmat_score(_, elements, self._rings, en=en, rad_env=rad_env, e_def=e_def, e_exp=e_exp, w_def=w_def, w_exp=w_exp,
-                             w_formal=w_formal, w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
-
-        # # Sort by hashes
-        # inds = np.argsort([ bmat_hash(_) for _ in bond_mats ])
-        # bond_mats = [ bond_mats[_] for _ in inds ]
-        # scores = [ scores[_] for _ in inds ]
+        scores = [bmat_score(_, elements, self._rings, en=en,
+                             # radical term is now turned on!
+                             rad_env=rad_env, e_def=e_def,
+                             e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
+                             w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
 
         # Sort by final scores
         inds = np.argsort(scores)
         bond_mats = [bond_mats[_] for _ in inds]
         scores = [scores[_] for _ in inds]
+
+        # ERM: SUPER IMPORTANT LINE OF CODE!!!!!
         sys.setrecursionlimit(old_rec_limit)
 
         # Dump the final products into class attributes!
@@ -371,7 +351,7 @@ class lewis_struct:
         self._e_acceptors = self._return_n_e_accept(
             self._bond_mats[0], elements)
         self._e_donors = self._return_n_e_donate(
-            self._bond_mats[0], elements)
+            self._bond_mats[0])
         self._formal_charge = self._return_formals(
             self._bond_mats[0], elements)
 
@@ -380,10 +360,6 @@ class lewis_struct:
         self._atom_neighbors = [set(
             [ind] + [count for count, _ in enumerate(adj_mat[ind]) if _ == 1]) for ind in range(len(self))]
 
-    #########################################################
-    # Class functions that aren't really class functions... #
-    # We'll fix this later. - ERM                           #
-    #########################################################
     def _return_n_e_accept(self, bond_mat, elements):
         """
         Returns the number of electrons each atom can accept without violating orbital constraints or breaking sigma bonds.
@@ -420,7 +396,7 @@ class lewis_struct:
 
         return np.where(tmp < 0, -tmp, 0)
 
-    def _return_n_e_donate(self, bond_mat, elements):
+    def _return_n_e_donate(self, bond_mat):
         """
         Returns the number of electrons each atom can donate without breaking sigma bonds. This total basically comes to the 
         sum of non-sigma-bonded electrons associated with each atom. Atoms participating in a double bonds are assumed to be able to
@@ -431,11 +407,6 @@ class lewis_struct:
         bond_mat : array
                 A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
                 This array is indexed to the elements list. 
-
-        elements : list 
-                `   Contains elemental information indexed to the supplied adjacency matrix. 
-                Expects a list of lower-case elemental symbols.
-                Not used!!! - ERM
 
         Returns
         -------

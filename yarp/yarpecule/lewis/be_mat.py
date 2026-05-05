@@ -30,7 +30,7 @@ def all_zeros(m):
 
 def bmat_score(bond_mat, elements, rings, en,
                rad_env, e_def, e_exp, w_def=-1, w_exp=0.1,
-               w_formal=0.1, w_aro=-24, w_rad=0.1, factor=0.0, verbose=False):
+               w_formal=0.1, w_aro=-24, w_rad=-0.01, factor=0.0, verbose=False):
     """
     Score function used to rank candidate Lewis Structures during and after the exploration. The `find_lewis()` algorithm uses a few 
     different sets of weights at the start vs later parts of the algortihm by defining different versions via anonymous functions.
@@ -59,9 +59,9 @@ def bmat_score(bond_mat, elements, rings, en,
             Holds the Allen scale electronegativity for each atom to determine the penalty for formal charges.
 
     rad_env: array
-             Holds the radical environment term for each atom to determine the relative stability of hosting a radical. 
+           Holds the radical environment term for each atom to determine the relative stability of hosting a radical. 
 
-    e_tet: array
+    e_def: array
            Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
            2 for hydrogen).
 
@@ -77,7 +77,7 @@ def bmat_score(bond_mat, elements, rings, en,
     w_aro: float, default=-24
            The weight of the aromatic term in the objective function for scoring bond-electron matrices.
 
-    w_rad: float, default=0.1
+    w_rad: float, default=-0.01
            The weight of the radical term in the objective function for scoring bond-electron matrices.
 
     factor: float, default=0
@@ -104,7 +104,7 @@ def bmat_score(bond_mat, elements, rings, en,
         print("radicals: {}".format(
             w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2) for _ in range(len(bond_mat))])))
 
-    # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + factor
+    # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + sum ( radical environment viability ) + factor
     return w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, elements, e_def))]) + \
         w_exp*sum(return_expanded(bond_mat, elements, e_exp)) + \
         w_formal*sum([_ * en[count]*np.exp(0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))]) + \

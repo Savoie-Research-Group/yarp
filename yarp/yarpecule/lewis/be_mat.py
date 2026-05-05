@@ -94,9 +94,9 @@ def bmat_score(bond_mat, elements, rings, en,
 
     if verbose:
         print("deficiency: {}".format(
-            w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, elements, e_def))])))
+            w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, e_def))])))
         print("expanded: {}".format(
-            w_exp*sum(return_expanded(bond_mat, elements, e_exp))))
+            w_exp*sum(return_expanded(bond_mat, e_exp))))
         print("formals: {}".format(w_formal*sum([_ * en[count]*np.exp(
             0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))])))
         print("aromatic: {}".format(
@@ -105,8 +105,8 @@ def bmat_score(bond_mat, elements, rings, en,
             w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2) for _ in range(len(bond_mat))])))
 
     # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + sum ( radical environment viability ) + factor
-    return w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, elements, e_def))]) + \
-        w_exp*sum(return_expanded(bond_mat, elements, e_exp)) + \
+    return w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, e_def))]) + \
+        w_exp*sum(return_expanded(bond_mat, e_exp)) + \
         w_formal*sum([_ * en[count]*np.exp(0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))]) + \
         w_aro*sum([is_aromatic(bond_mat, _)/len(_) for _ in rings]) + \
         w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2)
@@ -206,7 +206,7 @@ def return_e(bond_mat):
     return np.sum(2*bond_mat, axis=1)-np.diag(bond_mat)
 
 
-def return_def(bond_mat, elements, e_def):
+def return_def(bond_mat, e_def):
     """
     Returns returns the electron deficiencies of each atom (based on octet goal supplied via `e_tet`).
 
@@ -215,10 +215,6 @@ def return_def(bond_mat, elements, e_def):
     bond_mat : array
                A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
                This array is indexed to the elements list. 
-
-    elements : list 
-               Contains elemental information indexed to the supplied adjacency matrix. 
-               Expects a list of lower-case elemental symbols.
 
     e_def: array
            Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
@@ -237,7 +233,7 @@ def return_def(bond_mat, elements, e_def):
     return np.where(tmp < 0, tmp, 0)
 
 
-def return_expanded(bond_mat, elements, e_exp):
+def return_expanded(bond_mat, e_exp):
     """
     Returns returns the number of surplus electrons beyond the target for each atom (based on octet goal 
     supplied via `e_tet`).
@@ -247,10 +243,6 @@ def return_expanded(bond_mat, elements, e_exp):
     bond_mat : array
                A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
                This array is indexed to the elements list. 
-
-    elements : list 
-               Contains elemental information indexed to the supplied adjacency matrix. 
-               Expects a list of lower-case elemental symbols.
 
     e_exp: array
            Holds the number of electrons each atom can have until incurring an expanded octect penalty (e.g., 8 for most organics, 
@@ -294,7 +286,7 @@ def return_formals(bond_mat, elements):
 
 def return_n_e_accept(bond_mat, elements):
     """
-    Returns returns the number of electrons each atom can accept without violating orbital constraints or breaking sigma bonds.
+    Returns the number of electrons each atom can accept without violating orbital constraints or breaking sigma bonds.
     Atoms that can expand their octets are treated as permitting two additional electrons beyond their orbital constraint (e.g.,
     sulfur can accept up to 10 electrons). Atoms participating in a double bonds are assumed to be able to accept at least two
     electrons since the double-bond can in principle be converted into a lone pair on the neighboring atom. 
@@ -302,12 +294,12 @@ def return_n_e_accept(bond_mat, elements):
     Parameters
     ----------
     bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
+            A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+            This array is indexed to the elements list. 
 
     elements : list 
-               Contains elemental information indexed to the supplied adjacency matrix. 
-               Expects a list of lower-case elemental symbols.
+            Contains elemental information indexed to the supplied adjacency matrix. 
+            Expects a list of lower-case elemental symbols.
 
     Returns
     -------
@@ -317,41 +309,41 @@ def return_n_e_accept(bond_mat, elements):
     tmp = copy(bond_mat)  # don't modify the supplied bond_mat
     # -1 from off-diagonal elements>1
     tmp[~np.eye(tmp.shape[0], dtype=bool)] -= (tmp >
-                                               1)[~np.eye(tmp.shape[0], dtype=bool)]
+                                                1)[~np.eye(tmp.shape[0], dtype=bool)]
     # -2 from diagonal for atoms that can expand octets.
-    tmp = tmp + np.diag([-2 if el_expand_octet[_] else 0 for _ in elements])
+    tmp = tmp + np.diag([-2 if el_expand_octet[_]
+                        else 0 for _ in elements])
     # atom-wise octet requirements for determining electron deficiencies
     e_tet = np.array([el_n_deficient[_] for _ in elements])
     tmp = np.sum(2*tmp, axis=1)-np.diag(tmp) - \
         e_tet  # electron deficiency calculation
+
     return np.where(tmp < 0, -tmp, 0)
 
-
-def return_n_e_donate(bond_mat, elements):
+def return_n_e_donate(bond_mat):
     """
-    Returns returns the number of electrons each atom can donate without breaking sigma bonds. This total basically comes to the 
+    Returns the number of electrons each atom can donate without breaking sigma bonds. This total basically comes to the 
     sum of non-sigma-bonded electrons associated with each atom. Atoms participating in a double bonds are assumed to be able to
     donote at least two electrons since the double-bond can in principle be converted into a lone pair on the atom. 
 
     Parameters
     ----------
     bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    elements : list 
-            `   Contains elemental information indexed to the supplied adjacency matrix. 
-               Expects a list of lower-case elemental symbols.
+            A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+            This array is indexed to the elements list. 
 
     Returns
     -------
     na: array
-        contains the number of electrons that each atom can accept.
+        contains the number of electrons that each atom can donate.
     """
-    tmp = copy(bond_mat)  # don't modify the supplied bond_mat
+    # don't modify the supplied bond_mat
+    tmp = copy(bond_mat)
+
     # -1 from off-diagonal elements>0
     tmp[~np.eye(tmp.shape[0], dtype=bool)] -= (tmp >
-                                               0)[~np.eye(tmp.shape[0], dtype=bool)]
+                                                0)[~np.eye(tmp.shape[0], dtype=bool)]
+
     # number of electrons associated with the atom after removing sigma-bonds.
     return np.sum(2*tmp, axis=1)-np.diag(tmp)
 
@@ -459,7 +451,7 @@ def adjust_metals(bond_mats, adj_mat, elements):
     e_def = np.array([el_n_deficient[_] for _ in elements])
     m_inds = [count for count, _ in enumerate(elements) if _ in el_metals]
     for b in bond_mats:
-        defs = return_def(b, elements, e_def)
+        defs = return_def(b, e_def)
         for m_ind in m_inds:
             for con in return_connections(m_ind, adj_mat):
 

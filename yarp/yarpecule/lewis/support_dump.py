@@ -103,9 +103,9 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
     # Correct expanded octets if possible (while performs CT from atoms with expanded octets
     # to deficient atoms until there are no more expanded octets or no more deficient atoms)
     e_ind = [count for count, _ in enumerate(return_expanded(
-        bond_mat, elements, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
+        bond_mat, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
     d_ind = [count for count, _ in enumerate(
-        return_def(bond_mat, elements, e_def)) if _ < 0]
+        return_def(bond_mat, e_def)) if _ < 0]
     while (len(e_ind) > 0 and len(d_ind) > 0):
         for i in e_ind:
             try:
@@ -115,9 +115,9 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
             except:
                 continue
         e_ind = [count for count, _ in enumerate(return_expanded(
-            bond_mat, elements, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
+            bond_mat, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
         d_ind = [count for count, _ in enumerate(
-            return_def(bond_mat, elements, e_def)) if _ < 0]
+            return_def(bond_mat, e_def)) if _ < 0]
 
     # Get the indices of atoms in rings < 10 (used to determine if multiple double bonds and alkynes are allowed on an atom)
     ring_atoms = {j for i in [_ for _ in rings if len(_) < 10] for j in i}

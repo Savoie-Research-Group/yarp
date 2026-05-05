@@ -9,7 +9,7 @@ from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
-from yarp.util.properties import el_valence, el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
+from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
 from yarp.yarpecule.lewis.be_mat import *
 from yarp.yarpecule.lewis.support_dump import *
 from yarp.yarpecule.hashes import bmat_hash
@@ -348,105 +348,25 @@ class lewis_struct:
         Throw all these functions together?
         """
         # Do we want to modify this to make it so we compute these properties for each bond-electron matrix? - ERM
-        self._e_acceptors = self._return_n_e_accept(
-            self._bond_mats[0], elements)
-        self._e_donors = self._return_n_e_donate(
-            self._bond_mats[0])
-        self._formal_charge = self._return_formals(
-            self._bond_mats[0], elements)
+        self._e_acceptors = return_n_e_accept(self._bond_mats[0], elements)
+        self._e_donors = return_n_e_donate(self._bond_mats[0])
+        self._formal_charge = return_formals(self._bond_mats[0], elements)
 
         # Maybe this should just be a thing in the yarpecule, not here... - ERM
         # return set of neighbors for each atom (adj_list can replace this if we store it permanently)
         self._atom_neighbors = [set(
             [ind] + [count for count, _ in enumerate(adj_mat[ind]) if _ == 1]) for ind in range(len(self))]
 
-    def _return_n_e_accept(self, bond_mat, elements):
-        """
-        Returns the number of electrons each atom can accept without violating orbital constraints or breaking sigma bonds.
-        Atoms that can expand their octets are treated as permitting two additional electrons beyond their orbital constraint (e.g.,
-        sulfur can accept up to 10 electrons). Atoms participating in a double bonds are assumed to be able to accept at least two
-        electrons since the double-bond can in principle be converted into a lone pair on the neighboring atom. 
-
-        Parameters
-        ----------
-        bond_mat : array
-                A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-                This array is indexed to the elements list. 
-
-        elements : list 
-                Contains elemental information indexed to the supplied adjacency matrix. 
-                Expects a list of lower-case elemental symbols.
-
-        Returns
-        -------
-        na: array
-            contains the number of electrons that each atom can accept.
-        """
-        tmp = copy(bond_mat)  # don't modify the supplied bond_mat
-        # -1 from off-diagonal elements>1
-        tmp[~np.eye(tmp.shape[0], dtype=bool)] -= (tmp >
-                                                   1)[~np.eye(tmp.shape[0], dtype=bool)]
-        # -2 from diagonal for atoms that can expand octets.
-        tmp = tmp + np.diag([-2 if el_expand_octet[_]
-                            else 0 for _ in elements])
-        # atom-wise octet requirements for determining electron deficiencies
-        e_tet = np.array([el_n_deficient[_] for _ in elements])
-        tmp = np.sum(2*tmp, axis=1)-np.diag(tmp) - \
-            e_tet  # electron deficiency calculation
-
-        return np.where(tmp < 0, -tmp, 0)
-
-    def _return_n_e_donate(self, bond_mat):
-        """
-        Returns the number of electrons each atom can donate without breaking sigma bonds. This total basically comes to the 
-        sum of non-sigma-bonded electrons associated with each atom. Atoms participating in a double bonds are assumed to be able to
-        donote at least two electrons since the double-bond can in principle be converted into a lone pair on the atom. 
-
-        Parameters
-        ----------
-        bond_mat : array
-                A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-                This array is indexed to the elements list. 
-
-        Returns
-        -------
-        na: array
-            contains the number of electrons that each atom can donate.
-        """
-        # don't modify the supplied bond_mat
-        tmp = copy(bond_mat)
-
-        # -1 from off-diagonal elements>0
-        tmp[~np.eye(tmp.shape[0], dtype=bool)] -= (tmp >
-                                                   0)[~np.eye(tmp.shape[0], dtype=bool)]
-
-        # number of electrons associated with the atom after removing sigma-bonds.
-        return np.sum(2*tmp, axis=1)-np.diag(tmp)
-
-    def _return_formals(self, bond_mat, elements):
-        """
-        Returns returns the formal charge on each atom.
-
-        Parameters
-        ----------
-        bond_mat : array
-                A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-                This array is indexed to the elements list. 
-
-        elements : list 
-                Contains elemental information indexed to the supplied adjacency matrix. 
-                Expects a list of lower-case elemental symbols.
-
-        Returns
-        -------
-        formals: array
-                Contains the formal charge for each atom. This array is indexed to the bond-electron matrix.
-
-        """
-        return np.array([el_valence[_] for _ in elements]) - np.sum(bond_mat, axis=1)
+    ####################
+    # Dunder Functions #
+    ####################
 
     def __len__(self):
         return len(self._elements)
+
+    ######################
+    # External Functions #
+    ######################
 
     def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
         """

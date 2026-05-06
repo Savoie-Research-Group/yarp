@@ -248,11 +248,7 @@ class lewis_struct:
         else:
             seps = np.zeros([len(elements), len(elements)])
 
-        # Initialize lists to hold bond_mats and scores
-        bond_mats = []
-        scores = []
-        hashes = set([])
-
+        # Set up initial scoring function
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
                                           # radical term is turned off initially
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
@@ -264,19 +260,23 @@ class lewis_struct:
         # gen_init() generates a series of initial guesses.
         # For neutral molecules, this guess is singular.
         # For charged molecules, it will yield all possible charge placements (expensive but safe).
+        seed_bond_mats = []
+        seed_scores = []
+        seed_hashes = set([])
+
         count = 0
         for score, bond_mat, reactive in gen_init(obj_fun, adj_mat, elements, self._rings, q):
             count += 1
-            if bmat_unique(bond_mat, bond_mats):
-                scores += [score]
-                bond_mats += [bond_mat]
-                hashes.add(bmat_hash(bond_mat))
-                bond_mats, scores, _, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores, hashes,
-                                                              elements, reactive, self._rings, ring_atoms, bridgeheads,
-                                                              # allow all charge transfers in first pass
-                                                              seps=np.zeros([len(elements), len(elements)]),
-                                                              min_score=scores[0], ind=len(bond_mats)-1,
-                                                              N_score=1000, N_max=10000, min_opt=True)
+            if bmat_unique(bond_mat, seed_bond_mats):
+                seed_scores += [score]
+                seed_bond_mats += [bond_mat]
+                seed_hashes.add(bmat_hash(bond_mat))
+                seed_bond_mats, seed_scores, _, _, _ = gen_all_lstructs(obj_fun, seed_bond_mats, seed_scores, seed_hashes,
+                                                                        elements, reactive, self._rings, ring_atoms, bridgeheads,
+                                                                        # allow all charge transfers in first pass
+                                                                        seps=np.zeros([len(elements), len(elements)]),
+                                                                        min_score=seed_scores[0], ind=len(seed_bond_mats)-1,
+                                                                        N_score=1000, N_max=10000, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
@@ -284,17 +284,18 @@ class lewis_struct:
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
                                           e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False)
-        scores = [obj_fun(_) for _ in bond_mats]
+        seed_scores = [obj_fun(_) for _ in seed_bond_mats]
 
         # Sort by updated scores
-        bond_mats = [_[1] for _ in sorted(zip(scores, bond_mats), key=lambda x: x[0])]
-        scores = sorted(scores)
+        seed_bond_mats = [_[1] for _ in sorted(zip(seed_scores, seed_bond_mats), key=lambda x: x[0])]
+        seed_scores = sorted(seed_scores)
 
-        # Generate resonance structures:
-        # Run starting from the minimum initial guess BEM structure
-        bond_mats = [bond_mats[0]]
-        scores = [scores[0]]
-        hashes = set([bmat_hash(bond_mats[0])])
+        # Initialize holders from best seed BEM
+        bond_mats = [seed_bond_mats[0]]
+        scores = [seed_scores[0]]
+        hashes = set([bmat_hash(seed_bond_mats[0])])
+
+        # Next round of BEM searching
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
                                                            hashes, elements, reactive,
                                                            self._rings, ring_atoms, bridgeheads,
@@ -302,6 +303,12 @@ class lewis_struct:
                                                            seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
                                                            N_score=1000, N_max=10000, min_opt=True)
+
+        # Collect all discovered BEMs
+        for i, bem in enumerate(seed_bond_mats):
+            if bmat_hash(bem) not in hashes:
+                bond_mats.append(bem)
+                scores.append(seed_scores[i])
 
         # Calculate final scores
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)

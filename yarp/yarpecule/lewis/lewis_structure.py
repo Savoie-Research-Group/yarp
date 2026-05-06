@@ -401,7 +401,7 @@ class lewis_struct:
                         break
 
             # set explicit H-atoms and formals
-            fc = self._return_formals(i, [_.lower() for _ in self._elements])
+            fc = return_formals(i, [_.lower() for _ in self._elements])
             for count_j, j in enumerate(i):
                 atom = mol.GetAtomWithIdx(count_j)
                 mol.GetAtomWithIdx(count_j).SetNumExplicitHs(0)

@@ -399,14 +399,12 @@ class TestLewisStructureGeneration:
     def test_cyclopenteneamine_xyz(self, cyclopenteneamine_xyz):
         yp_mol = ypcule(cyclopenteneamine_xyz, mode='yarp')
         assert_invariants(yp_mol)
-        assert yp_mol.bond_mat_scores[4] != yp_mol.bond_mat_scores[5]
         assert yp_mol.n_e_accept[8] == 2.0
         assert yp_mol.n_e_accept[9] == 0.0
         assert yp_mol.n_e_accept[10] == 0.0
         assert yp_mol.bond_mats[4][5][11] == 1.0
         assert yp_mol.bond_mats[4][5][14] == 0.0
-        assert yp_mol.bond_mats[5][11][7] == 0.0
-        assert len(yp_mol.bond_mats) == 6
+        assert len(yp_mol.bond_mats) == 5
         
     def test_diazomethane_xyz(self, diazomethane_xyz):
         yp_mol = ypcule(diazomethane_xyz, mode='yarp')

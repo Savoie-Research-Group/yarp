@@ -125,7 +125,7 @@ class lewis_struct:
             adjmat_to_adjlist(adj_mat), max_size=10, remove_fused=True)
 
     def _gen_bond_el_mat(self, adj_mat, elements, q=0,
-                         mats_max=10, mats_thresh=10.0,
+                         mats_max=10, mats_thresh=0.5,
                          w_def=-1, w_exp=0.1, w_formal=0.1,
                          w_aro=-24, w_rad=-0.01, factor=0.0, local_opt=True):
         """
@@ -277,7 +277,7 @@ class lewis_struct:
                                                               min_score=scores[0], ind=len(bond_mats)-1, N_score=1000,
                                                               N_max=10000, min_win=100.0, min_opt=True)
 
-        # Update objective function to include (anti)aromaticity considerations and update scores of the current bmats
+        # Update objective function to include (anti)aromaticity considerations
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
                                           # radical term is still turned off
                                           rad_env=np.zeros(len(elements)), e_def=e_def,
@@ -285,9 +285,8 @@ class lewis_struct:
                                           w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False)
         scores = [obj_fun(_) for _ in bond_mats]
 
-        # Sort by initial scores
-        bond_mats = [_[1]
-                     for _ in sorted(zip(scores, bond_mats), key=lambda x: x[0])]
+        # Sort by updated scores
+        bond_mats = [_[1] for _ in sorted(zip(scores, bond_mats), key=lambda x: x[0])]
         scores = sorted(scores)
 
         # Generate resonance structures:
@@ -311,7 +310,7 @@ class lewis_struct:
             if count > mats_max-1:
                 flag = False
                 break
-            if i - scores[0] < mats_thresh:
+            if abs(i - scores[0]) < mats_thresh:
                 continue
             else:
                 flag = False

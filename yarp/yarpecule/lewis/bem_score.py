@@ -70,25 +70,35 @@ def bmat_score(bond_mat, elements, rings, en,
            The score for the supplied bond-electron matrix.
     """
 
-    if verbose:
-        print("deficiency: {}".format(
-            w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, e_def))])))
-        print("expanded: {}".format(
-            w_exp*sum(return_expanded(bond_mat, e_exp))))
-        print("formals: {}".format(w_formal*sum([_ * en[count]*np.exp(
-            0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))])))
-        print("aromatic: {}".format(
-            w_aro*sum([is_aromatic(bond_mat, _)/len(_) for _ in rings])))
-        print("radicals: {}".format(
-            w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2) for _ in range(len(bond_mat))])))
+    # Electron deficiency score
+    # sum ( electron_deficiency * electronegativity_of_atom )
+    s_def = sum([_ * en[count] for count, _ in enumerate(return_def(bond_mat, e_def))])
 
-    # objective function (lower is better): sum ( electron_deficiency * electronegativity_of_atom ) + sum ( expanded_octets ) + sum ( formal charge * electronegativity_of_atom ) + sum ( aromaticity of rings ) + sum ( radical environment viability ) + factor
-    return w_def*sum([_*en[count] for count, _ in enumerate(return_def(bond_mat, e_def))]) + \
-        w_exp*sum(return_expanded(bond_mat, e_exp)) + \
-        w_formal*sum([_ * en[count]*np.exp(0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))]) + \
-        w_aro*sum([is_aromatic(bond_mat, _)/len(_) for _ in rings]) + \
-        w_rad*sum([rad_env[_]*(bond_mat[_, _] % 2)
-                  for _ in range(len(bond_mat))]) + factor
+    # Octet expansion score
+    # sum ( expanded_octets )
+    s_exp = sum(return_expanded(bond_mat, e_exp))
+
+    # Formal charge score
+    # sum ( formal charge * electronegativity_of_atom )
+    s_formal = sum([_ * en[count] * np.exp(0.05*(_-1)) for count, _ in enumerate(return_formals(bond_mat, elements))])
+
+    # Aromatic score
+    # sum ( aromaticity of rings )
+    s_aro = sum([is_aromatic(bond_mat, _)/len(_) for _ in rings])
+
+    # Radical score
+    # sum ( radical environment viability )
+    s_rad = sum([rad_env[_] * (bond_mat[_, _] % 2) for _ in range(len(bond_mat))])
+
+    if verbose:
+        print(f"deficiency: {w_def} * {s_def} = {w_def * s_def}")
+        print(f"octet: {w_exp} * {s_exp} = {w_exp * s_exp}")
+        print(f"formal: {w_formal} * {s_formal} = {w_formal * s_formal}")
+        print(f"aromatic: {w_aro} * {s_aro} = {w_aro * s_aro}")
+        print(f"radical: {w_rad} * {s_rad} = {w_rad * s_rad}")
+
+    # objective function (lower is better):
+    return w_def * s_def + w_exp * s_exp + w_formal * s_formal + w_aro * s_aro + w_rad * s_rad + factor
 
 #####################
 # BEM Score Support #

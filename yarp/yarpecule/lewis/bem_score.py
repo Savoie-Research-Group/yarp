@@ -3,12 +3,12 @@ Helper functions for processing and characterizing bond-electron matrices (Lewis
 """
 import numpy as np
 from copy import copy
-from yarp.util.properties import el_n_deficient, el_expand_octet, el_valence, el_metals
+from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_expand_octet, el_en, el_pol, el_valence, el_metals
 
 
-def bmat_score(bond_mat, elements, rings, en,
-               rad_env, e_def, e_exp, w_def=-1, w_exp=0.1,
-               w_formal=0.1, w_aro=-24, w_rad=-0.01, factor=0.0, verbose=False):
+def bmat_score(bond_mat, elements, rings,
+               w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=-0.01,
+               factor=0.0, verbose=False):
     """
     Score function used to rank candidate Lewis Structures during and after the exploration. The `find_lewis()` algorithm uses a few 
     different sets of weights at the start vs later parts of the algortihm by defining different versions via anonymous functions.
@@ -18,7 +18,8 @@ def bmat_score(bond_mat, elements, rings, en,
            Electron deficiencies on more electronegative atoms are penalized more strongly.
         2. Expanded octets are penalized at 0.1 per violation by default     
         3. Formal charges are penalized based on their sign and the electronegativity of the atom they occur on
-        4. (anti)aromaticity is incentivized (penalized) depending on the size of the ring.  
+        4. (anti)aromaticity is incentivized (penalized) depending on the size of the ring.
+        5. Radicals placed in favorable environments (more polarizable atom, more bonding connections) is weakly incentivized
 
     Parameters
     ----------
@@ -32,16 +33,6 @@ def bmat_score(bond_mat, elements, rings, en,
 
     rings: list, default=None
            List of lists holding the atom indices in each ring. If none, then the rings are calculated.
-
-    en: array
-            Holds the Allen scale electronegativity for each atom to determine the penalty for formal charges.
-
-    rad_env: array
-           Holds the radical environment term for each atom to determine the relative stability of hosting a radical. 
-
-    e_def: array
-           Holds the number of electrons each atom needs to avoid a deficiency penalty (e.g., 8 for most organics, 
-           2 for hydrogen).
 
     w_def: float, default=-1
            The weight of the electron deficiency term in the objective function for scoring bond-electron matrices.
@@ -69,6 +60,24 @@ def bmat_score(bond_mat, elements, rings, en,
     score: float
            The score for the supplied bond-electron matrix.
     """
+
+    # number of electrons each atom needs to avoid a deficiency penalty
+    # (e.g., 8 for most organics, 2 for hydrogen).
+    e_def = np.array([el_n_deficient[_] for _ in elements])
+
+    # number of electrons in a full octet for each atom
+    e_exp = np.array([el_n_expand_octet[_] for _ in elements])
+
+    # Allen scale electronegativity for each atom to determine the penalty for formal charges.
+    en = np.array([el_en[_] for _ in elements])
+
+    # polarizability of each atom
+    pol = np.array([el_pol[_] for _ in elements])
+
+    # radical environment term for each atom to determine the relative stability of hosting a radical. 
+    adj_mat = np.where(bond_mat != 0, 1, 0)
+    np.fill_diagonal(adj_mat, 0.0)
+    rad_env = np.sum(adj_mat * (pol/(100+pol)), axis=1)
 
     # Electron deficiency score
     # sum ( electron_deficiency * electronegativity_of_atom )

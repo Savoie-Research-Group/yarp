@@ -196,21 +196,6 @@ class lewis_struct:
         old_rec_limit = sys.getrecursionlimit()
         sys.setrecursionlimit(5000)
 
-        # Array of atom-wise octet requirements for determining electron deficiencies
-        e_def = np.array([el_n_deficient[_] for _ in elements])
-
-        # Array of atom-wise octet requirements for determining expanded octects
-        e_exp = np.array([el_n_expand_octet[_] for _ in elements])
-
-        # Array of base electronegativities of each atom
-        en = np.array([el_en[_] for _ in elements])
-
-        # Array of polarizability of each atom
-        pol = np.array([el_pol[_] for _ in elements])
-
-        # Array of radical environment viability scores for each atom
-        rad_env = np.sum(adj_mat*(pol/(100+pol)), axis=1)
-
         # Initialize score function for ranking bond_mats
         # subtracts off trivial formal charge penalty from cations and anions
         # so that they have a baseline score of 0 all else being equal.
@@ -249,12 +234,11 @@ class lewis_struct:
             seps = np.zeros([len(elements), len(elements)])
 
         # Set up initial scoring function
-        def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
-                                          # radical term is turned off initially
-                                          rad_env=np.zeros(len(elements)), e_def=e_def,
-                                          e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
+        def obj_fun(x): return bmat_score(x, elements, self._rings,
+                                          w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           # aro term is turned off initially since it traps greedy optimization
-                                          w_aro=0, w_rad=w_rad, factor=factor, verbose=False)
+                                          # radical term is also turned off initially
+                                          w_aro=0, w_rad=0, factor=factor, verbose=False)
 
         # Find the minimum bmat structure
         # gen_init() generates a series of initial guesses.
@@ -279,11 +263,10 @@ class lewis_struct:
                                                                         N_score=1000, N_max=10000, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations
-        def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
+        def obj_fun(x): return bmat_score(x, elements, self._rings,
+                                          w_def=w_def, w_exp=w_exp, w_formal=w_formal,
                                           # radical term is still turned off
-                                          rad_env=np.zeros(len(elements)), e_def=e_def,
-                                          e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
-                                          w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False)
+                                          w_aro=w_aro, w_rad=0, factor=factor, verbose=False)
         seed_scores = [obj_fun(_) for _ in seed_bond_mats]
 
         # Sort by updated scores
@@ -310,13 +293,11 @@ class lewis_struct:
                 bond_mats.append(bem)
                 scores.append(seed_scores[i])
 
-        # Calculate final scores
+        # Calculate final scores (radical term is now turned on!)
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)
-        scores = [bmat_score(_, elements, self._rings, en=en,
-                             # radical term is now turned on!
-                             rad_env=rad_env, e_def=e_def,
-                             e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
-                             w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
+        scores = [bmat_score(_, elements, self._rings,
+                             w_def=w_def, w_exp=w_exp, w_formal=w_formal, w_aro=w_aro, w_rad=w_rad,
+                             factor=factor, verbose=False) for _ in bond_mats]
 
         # Sort by final scores
         inds = np.argsort(scores)

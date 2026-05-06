@@ -31,8 +31,8 @@ def bmat_score(bond_mat, elements, rings,
                Contains elemental information indexed to the supplied adjacency matrix. 
                Expects a list of lower-case elemental symbols.
 
-    rings: list, default=None
-           List of lists holding the atom indices in each ring. If none, then the rings are calculated.
+    rings: list
+           List of lists holding the atom indices in each ring.
 
     w_def: float, default=-1
            The weight of the electron deficiency term in the objective function for scoring bond-electron matrices.
@@ -142,8 +142,8 @@ def return_def(bond_mat, e_def):
 
 def return_expanded(bond_mat, e_exp):
     """
-    Returns returns the number of surplus electrons beyond the target for each atom (based on octet goal 
-    supplied via `e_tet`).
+    Returns returns the number of surplus electrons beyond the target for each atom
+    (based on octet goal supplied via `e_exp`).
 
     Parameters
     ----------
@@ -152,8 +152,8 @@ def return_expanded(bond_mat, e_exp):
                This array is indexed to the elements list. 
 
     e_exp: array
-           Holds the number of electrons each atom can have until incurring an expanded octect penalty (e.g., 8 for most organics, 
-           2 for hydrogen).
+           Holds the number of electrons each atom can have until incurring an expanded octect penalty
+           (e.g., 8 for most organics, 2 for hydrogen).
 
     Returns
     -------

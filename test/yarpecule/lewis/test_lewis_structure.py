@@ -438,7 +438,24 @@ class TestLewisStructureGeneration:
         assert yp_mol.n_e_accept[1] == 0.0
         assert yp_mol.n_e_donate[4] == 6.0
         assert yp_mol.n_e_donate[5] == 0.0
-        
+
+    def test_amide_smi(self):
+        yp_mol = ypcule('CC(N)=O')
+        assert_invariants(yp_mol)
+        assert len(yp_mol.bond_mats) == 2
+        assert yp_mol.fc[0] == 0.0
+        assert yp_mol.fc[1] == 0.0
+        assert yp_mol.fc[2] == 1.0
+        assert yp_mol.fc[3] == -1.0
+        assert yp_mol.n_e_accept[0] == 0.0
+        assert yp_mol.n_e_accept[1] == 2.0
+        assert yp_mol.n_e_accept[2] == 2.0
+        assert yp_mol.n_e_accept[3] == 0.0
+        assert yp_mol.n_e_donate[0] == 0.0
+        assert yp_mol.n_e_donate[1] == 2.0
+        assert yp_mol.n_e_donate[2] == 2.0
+        assert yp_mol.n_e_donate[3] == 6.0
+
     """=========== Find Lewis Structures Tests for Neutral Structures ==========="""
     def test_chloroform_xyz(self, chloroform_xyz):
         yp_mol = ypcule(chloroform_xyz, mode='yarp')

@@ -226,9 +226,9 @@ class lewis_struct:
             self._rings = return_rings(
                 adjmat_to_adjlist(adj_mat), max_size=10, remove_fused=True)
 
-        # Get the indices of atoms in rings < 10 (used to determine if multiple double bonds and alkynes are allowed on an atom)
-        ring_atoms = {j for i in [
-            _ for _ in self._rings if len(_) < 10] for j in i}
+        # Get the indices of atoms in rings < 10
+        # (used to determine if multiple double bonds and alkynes are allowed on an atom)
+        ring_atoms = {j for i in [_ for _ in self._rings if len(_) < 10] for j in i}
 
         # Get the indices of bridgehead atoms whose largest parent ring is smaller than 8
         # (i.e., Bredt's rule says no double-bond can form at such bridgeheads)
@@ -243,7 +243,8 @@ class lewis_struct:
         # Get the graph separations if local_opt = True
         if local_opt:
             seps = graph_seps(adj_mat)
-        # using seps=0 is equivalent to allowing all charge transfers (i.e., all atoms are treated as nearby)
+        # using seps=0 is equivalent to allowing all charge transfers
+        # (i.e., all atoms are treated as nearby)
         else:
             seps = np.zeros([len(elements), len(elements)])
 
@@ -272,10 +273,10 @@ class lewis_struct:
                 hashes.add(bmat_hash(bond_mat))
                 bond_mats, scores, _, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores, hashes,
                                                               elements, reactive, self._rings, ring_atoms, bridgeheads,
-                                                              seps=np.zeros(
-                                                                  [len(elements), len(elements)]),
-                                                              min_score=scores[0], ind=len(bond_mats)-1, N_score=1000,
-                                                              N_max=10000, min_win=100.0, min_opt=True)
+                                                              # allow all charge transfers in first pass
+                                                              seps=np.zeros([len(elements), len(elements)]),
+                                                              min_score=scores[0], ind=len(bond_mats)-1,
+                                                              N_score=1000, N_max=10000, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations
         def obj_fun(x): return bmat_score(x, elements, self._rings, en=en,
@@ -290,16 +291,27 @@ class lewis_struct:
         scores = sorted(scores)
 
         # Generate resonance structures:
-        # Run starting from the minimum structure and allow moves that are within s_window of the min_enegy score
+        # Run starting from the minimum initial guess BEM structure
         bond_mats = [bond_mats[0]]
         scores = [scores[0]]
         hashes = set([bmat_hash(bond_mats[0])])
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
                                                            hashes, elements, reactive,
-                                                           self._rings, ring_atoms, bridgeheads, seps,
+                                                           self._rings, ring_atoms, bridgeheads,
+                                                           # set according to local_opt flag
+                                                           seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
                                                            N_score=1000, N_max=10000, min_opt=True)
-        # Sort by initial scores
+
+        # Calculate final scores
+        bond_mats = adjust_metals(bond_mats, adj_mat, elements)
+        scores = [bmat_score(_, elements, self._rings, en=en,
+                             # radical term is now turned on!
+                             rad_env=rad_env, e_def=e_def,
+                             e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
+                             w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
+
+        # Sort by final scores
         inds = np.argsort(scores)
         bond_mats = [bond_mats[_] for _ in inds]
         scores = [scores[_] for _ in inds]
@@ -322,25 +334,13 @@ class lewis_struct:
         bond_mats = bond_mats[:count]
         scores = scores[:count]
 
-        # Calculate final scores
-        bond_mats = adjust_metals(bond_mats, adj_mat, elements)
-        scores = [bmat_score(_, elements, self._rings, en=en,
-                             # radical term is now turned on!
-                             rad_env=rad_env, e_def=e_def,
-                             e_exp=e_exp, w_def=w_def, w_exp=w_exp, w_formal=w_formal,
-                             w_aro=w_aro, w_rad=w_rad, factor=factor, verbose=False) for _ in bond_mats]
-
-        # Sort by final scores
-        inds = np.argsort(scores)
-        bond_mats = [bond_mats[_] for _ in inds]
-        scores = [scores[_] for _ in inds]
+        # Dump the final products into class attributes!
+        self._bond_mats = bond_mats
+        self._scores = scores
 
         # ERM: SUPER IMPORTANT LINE OF CODE!!!!!
         sys.setrecursionlimit(old_rec_limit)
 
-        # Dump the final products into class attributes!
-        self._bond_mats = bond_mats
-        self._scores = scores
 
     def _get_properties(self, adj_mat, elements):
         """

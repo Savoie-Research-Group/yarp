@@ -1,19 +1,18 @@
 """
-Functions that are needed for finding Lewis structures.
-But I don't know where they should live.
-So they are here for now! -ERM
+Functions controlling the recursive searching for Lewis structures
 """
 import itertools
 from copy import deepcopy, copy
+import numpy as np
 
-from yarp.util.properties import el_valence, el_n_deficient, el_n_expand_octet, el_en, el_metals
+from yarp.util.properties import el_valence, el_n_deficient, el_n_expand_octet, el_en, el_metals, el_expand_octet
 from yarp.yarpecule.hashes import bmat_hash
-from yarp.yarpecule.lewis.be_mat import *
+from yarp.yarpecule.lewis.bem_score import return_expanded, return_def, return_e, return_formals, return_connections, is_aromatic
 
 
 def gen_init(obj_fun, adj_mat, elements, rings, q):
     """ 
-    A helper-generator for initial guesses for the final_lewis algorithm.
+    A helper-generator for initial guesses for the Lewis structure search algorithm.
 
     Parameters
     ----------
@@ -44,9 +43,6 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
 
     # Array of atom-wise electroneutral electron expectations for convenience.
     eneutral = np.array([el_valence[_] for _ in elements])
-
-    # Array of atom-wise octet requirements for determining electron deficiencies
-    e_tet = np.array([el_n_deficient[_] for _ in elements])
 
     # Array of atom-wise octet requirements for determining electron deficiencies
     e_def = np.array([el_n_deficient[_] for _ in elements])
@@ -103,9 +99,9 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
     # Correct expanded octets if possible (while performs CT from atoms with expanded octets
     # to deficient atoms until there are no more expanded octets or no more deficient atoms)
     e_ind = [count for count, _ in enumerate(return_expanded(
-        bond_mat, elements, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
+        bond_mat, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
     d_ind = [count for count, _ in enumerate(
-        return_def(bond_mat, elements, e_def)) if _ < 0]
+        return_def(bond_mat, e_def)) if _ < 0]
     while (len(e_ind) > 0 and len(d_ind) > 0):
         for i in e_ind:
             try:
@@ -115,9 +111,9 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
             except:
                 continue
         e_ind = [count for count, _ in enumerate(return_expanded(
-            bond_mat, elements, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
+            bond_mat, e_exp)) if _ > 0 and bond_mat[count, count] > 0]
         d_ind = [count for count, _ in enumerate(
-            return_def(bond_mat, elements, e_def)) if _ < 0]
+            return_def(bond_mat, e_def)) if _ < 0]
 
     # Get the indices of atoms in rings < 10 (used to determine if multiple double bonds and alkynes are allowed on an atom)
     ring_atoms = {j for i in [_ for _ in rings if len(_) < 10] for j in i}
@@ -208,7 +204,7 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
                      reactive, rings, ring_atoms, bridgeheads, seps, min_score,
                      ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
     """ 
-    A generator for find_lewis() that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
+    A generator for Lewis search algorithm that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
 
     Parameters
     ----------
@@ -411,12 +407,12 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
     (7) transfer an electron to i from its neighbor j, if i is electron deficient and has a greater electronegativity.
     (8) transfer a charge from i to another atom if i has an expanded octet and unbound electrons. 
     (9) shuffle aromatic and anti-aromatic bonds (i.e., change bond alteration along the cycle). 
-    (10) forming a pi-bond between two radicals
+    (10) forming a pi-bond between two radicals <-- ERM: Seems like this is no longer present!
     All of these moves are contingent on the ability of atoms to expand octet, whether they are electron deficient, and whether the move would lead to unphysical ring-strain. 
 
     """
-    e = return_e(
-        bond_mat)  # current number of electrons associated with each atom
+    # current number of electrons associated with each atom
+    e = return_e(bond_mat)
 
     # Loop over the individual atoms and determine the moves that apply
     for i in reactive:
@@ -640,6 +636,7 @@ def delta_aromatic(bond_mat, rings, move):
         if (is_aromatic(tmp, r) - is_aromatic(bond_mat, r) > 0):
             return True
     return False
+
 
 
 class LewisStructureError(Exception):

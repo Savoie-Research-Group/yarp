@@ -8,7 +8,7 @@ from copy import copy
 from itertools import combinations
 from numpy import vstack
 from typing import Iterable, Tuple
-from yarp.yarpecule.lewis.be_mat import return_formals
+from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 

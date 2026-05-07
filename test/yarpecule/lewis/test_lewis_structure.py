@@ -168,7 +168,13 @@ class TestLewisStructureGeneration:
         assert yp_mol.bond_mat_scores[0] > 0.0
         assert yp_mol.n_e_accept[6] == 2.0
         assert yp_mol.n_e_accept[7] == 0.0
-    
+
+    def test_quinolizinium_smi(self):
+        yp_mol = ypcule('C1=CC=[N+]2C=CC=CC2=C1')
+        assert_invariants(yp_mol)
+        assert len(yp_mol.bond_mats) == 3
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
+
     """=========== Find Lewis Structures Tests for Radicals ==========="""
     def test_methyl_3_butene_radical_xyz(self, methyl_3_butene_radical_xyz):
         yp_mol = ypcule(methyl_3_butene_radical_xyz, mode='yarp')
@@ -256,8 +262,9 @@ class TestLewisStructureGeneration:
         assert yp_mol.rings[2][3] == 13
         assert yp_mol.rings[2][4] == 12
         assert yp_mol.rings[2][5] == 8
-        assert len(yp_mol.bond_mats) == 2
+        assert len(yp_mol.bond_mats) == 4
         assert yp_mol.bond_mat_scores[0] == yp_mol.bond_mat_scores[1]
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
         assert len(yp_mol.rings) == 3
         
     def test_azulene_xyz(self, azulene_xyz):
@@ -287,6 +294,7 @@ class TestLewisStructureGeneration:
         assert yp_mol.fc[9] == 0.0
         assert yp_mol.fc[10] == 0.0
         assert yp_mol.bond_mat_scores[0] == yp_mol.bond_mat_scores[1]
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
         assert len(yp_mol.bond_mats) == 2
         assert yp_mol.bond_mats[0][1][7] == 1.0
         assert yp_mol.bond_mats[1][5][1] == 2.0
@@ -346,7 +354,8 @@ class TestLewisStructureGeneration:
         assert yp_mol.fc[7] == 0.0
         assert yp_mol.fc[8] == 0.0
         assert yp_mol.fc[9] == 0.0
-        assert yp_mol.bond_mat_scores[0] < 0.0
+        assert len(yp_mol.bond_mats) == 3
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
         assert len(yp_mol.rings) == 2
         
     def test_o_xylene_xyz(self, o_xylene_xyz):
@@ -399,14 +408,12 @@ class TestLewisStructureGeneration:
     def test_cyclopenteneamine_xyz(self, cyclopenteneamine_xyz):
         yp_mol = ypcule(cyclopenteneamine_xyz, mode='yarp')
         assert_invariants(yp_mol)
-        assert yp_mol.bond_mat_scores[4] != yp_mol.bond_mat_scores[5]
         assert yp_mol.n_e_accept[8] == 2.0
         assert yp_mol.n_e_accept[9] == 0.0
         assert yp_mol.n_e_accept[10] == 0.0
         assert yp_mol.bond_mats[4][5][11] == 1.0
         assert yp_mol.bond_mats[4][5][14] == 0.0
-        assert yp_mol.bond_mats[5][11][7] == 0.0
-        assert len(yp_mol.bond_mats) == 6
+        assert len(yp_mol.bond_mats) == 5
         
     def test_diazomethane_xyz(self, diazomethane_xyz):
         yp_mol = ypcule(diazomethane_xyz, mode='yarp')
@@ -440,7 +447,36 @@ class TestLewisStructureGeneration:
         assert yp_mol.n_e_accept[1] == 0.0
         assert yp_mol.n_e_donate[4] == 6.0
         assert yp_mol.n_e_donate[5] == 0.0
-        
+
+    def test_amide_smi(self):
+        yp_mol = ypcule('CC(N)=O')
+        assert_invariants(yp_mol)
+        assert len(yp_mol.bond_mats) == 2
+        assert yp_mol.fc[0] == 0.0
+        assert yp_mol.fc[1] == 0.0
+        assert yp_mol.fc[2] == 1.0
+        assert yp_mol.fc[3] == -1.0
+        assert yp_mol.n_e_accept[0] == 0.0
+        assert yp_mol.n_e_accept[1] == 2.0
+        assert yp_mol.n_e_accept[2] == 2.0
+        assert yp_mol.n_e_accept[3] == 0.0
+        assert yp_mol.n_e_donate[0] == 0.0
+        assert yp_mol.n_e_donate[1] == 2.0
+        assert yp_mol.n_e_donate[2] == 2.0
+        assert yp_mol.n_e_donate[3] == 6.0
+    
+    def test_benzopyrilium_salt_smi(self):
+        yp_mol = ypcule('C1=CC=C(C=C1)C2=[O+]C3=CC=CC=C3C=C2.[Cl-]')
+        assert_invariants(yp_mol)
+        assert len(yp_mol.bond_mats) == 6
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
+    
+    def test_benzothiazole_smi(self):
+        yp_mol = ypcule('C1=C2C(=CC3=C1SC(=N3)N)SC(=N2)N')
+        assert_invariants(yp_mol)
+        assert len(yp_mol.bond_mats) == 2
+        assert all(score < 0.0 for score in yp_mol.bond_mat_scores)
+
     """=========== Find Lewis Structures Tests for Neutral Structures ==========="""
     def test_chloroform_xyz(self, chloroform_xyz):
         yp_mol = ypcule(chloroform_xyz, mode='yarp')

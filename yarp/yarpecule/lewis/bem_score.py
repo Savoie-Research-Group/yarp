@@ -93,7 +93,10 @@ def bmat_score(bond_mat, elements, rings,
 
     # Aromatic score
     # sum ( aromaticity of rings )
-    s_aro = sum([is_aromatic(bond_mat, _)/len(_) for _ in rings])
+    clusters = get_ring_clusters(rings)
+    s_aro = sum([is_aromatic_cluster(bond_mat, _) / len(set(at for r in _ for at in r)) for _ in clusters])
+    # small additional score to favor fused ring BEMs with more individually aromatic sub-rings
+    s_aro += 0.01 * sum([is_aromatic(bond_mat, _)/len(_) for _ in rings])
 
     # Radical score
     # sum ( radical environment viability )
@@ -242,6 +245,132 @@ def is_aromatic(bond_mat, ring):
     else:
         return 1
 
+def is_aromatic_cluster(bond_mat, ring_cluster):
+    """
+    Check aromaticity of a fused ring cluster using Hückel's rule.
+    Evaluates the cluster as a unified conjugated system.
+    Defaults to is_aromatic() for single-ring clusters.
+    
+    Parameters
+    ----------
+    bond_mat : array
+               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
+               This array is indexed to the elements list.
+    
+    ring_cluster : list of lists
+                   Each sublist contains atom indices for one ring in the cluster.
+                   Rings in the cluster share one or more atoms (fused rings).
+    
+    Returns
+    -------
+    aromaticity : int
+                  1 for aromatic (4n+2 pi electrons), -1 for antiaromatic (4n pi electrons), 
+                  0 for nonaromatic or disconnected system.
+                  (anti)aromaticity scores are scaled by the number of subrings in the
+                  fused ring cluster
+    """
+    if len(ring_cluster) == 1:
+        return is_aromatic(bond_mat, ring_cluster[0])
+
+    # Get all unique atoms in the cluster
+    cluster_atoms = set()
+    for ring in ring_cluster:
+        cluster_atoms.update(ring)
+    cluster_atoms = sorted(list(cluster_atoms))
+
+    # Check for conjugation (must have at least one double/triple bond)
+    has_conjugation = False
+    for i in range(len(cluster_atoms)):
+        for j in range(i + 1, len(cluster_atoms)):
+            atom = cluster_atoms[i]
+            other = cluster_atoms[j]
+            if bond_mat[atom, other] >= 2:
+                has_conjugation = True
+                break
+        if has_conjugation:
+            break
+    if not has_conjugation:
+        return 0
+
+    # Count pi electrons based on bond count and unbound electrons
+    total_pi = 0
+    for atom in cluster_atoms:
+        num_bonds = sum(bond_mat[atom]) - bond_mat[atom, atom]
+        if num_bonds == 2:
+            total_pi += bond_mat[atom, atom]
+        elif 3 <= num_bonds <= 4:
+            total_pi += 1
+
+    # If there are no pi electrons, it's not aromatic or antiaromatic
+    if total_pi == 0:
+        return 0
+
+    # Apply Hückel's rule to the entire cluster
+    # If there isn't an even number of pi electrons, it can't be aromatic/antiaromatic
+    if total_pi % 2 != 0:
+        return 0
+
+    pi_pairs = total_pi // 2
+    cluster_size = len(cluster_atoms)
+
+    # The number of pi electron pairs needs to be less than the cluster size
+    if pi_pairs >= cluster_size:
+        return 0
+
+    # Hückel's rule: 4n (antiaromatic) vs 4n+2 (aromatic)
+    if pi_pairs % 2 == 0:
+        return -1 * len(ring_cluster)  # Antiaromatic (4n pi electrons)
+    else:
+        return 1 * len(ring_cluster)   # Aromatic (4n+2 pi electrons)
+
+def get_ring_clusters(rings):
+    """
+    Groups rings into clusters where each cluster contains rings that share atoms.
+    
+    Parameters
+    ----------
+    rings : list of lists
+            Each sublist contains atom indices forming a ring.
+    
+    Returns
+    -------
+    clusters : list of lists
+               Each sublist is a cluster containing one or more rings.
+    """
+    if not rings:
+        return []
+
+    # Track which rings have been assigned to a cluster
+    assigned = [False] * len(rings)
+    clusters = []
+
+    for i, ring in enumerate(rings):
+        if assigned[i]:
+            continue
+
+        # Start a new cluster with this ring
+        current_cluster = [ring]
+        assigned[i] = True
+        ring_set = set(ring)
+
+        # Keep adding rings that share atoms until no new rings are found
+        changed = True
+        while changed:
+            changed = False
+            for j, other_ring in enumerate(rings):
+                if assigned[j]:
+                    continue
+
+                # Check if this ring shares atoms with ANY ring in the current cluster
+                if ring_set.intersection(set(other_ring)):
+                    current_cluster.append(other_ring)
+                    assigned[j] = True
+                    ring_set.update(other_ring)  # Add these atoms to the pool
+                    changed = True
+
+        clusters.append(current_cluster)
+
+    return clusters
 
 def return_formals(bond_mat, elements):
     """

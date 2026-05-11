@@ -1,4 +1,5 @@
 import os
+import shutil
 import h5py
 import re
 from pathlib import Path
@@ -143,8 +144,14 @@ class PysisyphusMinOptCalculator(MinOptTask):
         return True
 
     def cleanup(self):
-        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
-        pass
+        # Keep input, log, and final geometry; delete Hessian (scraped) and xTB calc dirs
+        keep = {"min_opt.yaml", "min_opt.log", "final_geometry.xyz", "initial_geom.xyz", "run_pysis_rpopt.sh"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
 
     def _write_pysis_rp_opt_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
@@ -303,8 +310,14 @@ class OrcaMinOptCalculator(MinOptTask):
         return True
 
     def cleanup(self):
-        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
-        pass
+        # Keep input, log, and final geometry; delete Hessian (scraped), .gbw, .densities, etc.
+        keep = {"min_opt.inp", "min_opt.out", "min_opt.xyz", "initial_geom.xyz", "run_orca_rpopt.sh"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
 
     def _write_orca_rp_opt_input(self, input_path, input_geo_xyz):
 

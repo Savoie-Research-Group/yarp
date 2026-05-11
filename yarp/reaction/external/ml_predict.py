@@ -121,6 +121,6 @@ class EgatMLPredict(MLPredictTask):
                     rxn.reverse_barrier[self.config.model] = barrier
 
     def cleanup(self):
-        # # EGAT is lightweight, maybe just delete the folder
-        # shutil.rmtree(self.scratch_dir)
-        pass
+        # EGAT output is fully scraped into memory; the scratch dir is tiny and disposable
+        if self.scratch_dir and self.scratch_dir.exists():
+            shutil.rmtree(self.scratch_dir)

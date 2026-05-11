@@ -220,7 +220,7 @@ class InputParser:
 
         # Enumeration configs
         enum_node = initnode.get("enumeration", {})
-        self.enum = self._parse_enum_config(enum_node)
+        self.enum = self._parse_enum_config(initnode, enum_node)
         self.enum_filters = self._parse_enum_filters(enum_node)
         self.net_explore = self._parse_network_config(enum_node)
 
@@ -299,7 +299,7 @@ class InputParser:
 
         raise RuntimeError(f"Invalid value for separate products: {raw_value}")
 
-    def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
+    def _parse_enum_config(self, init_node: dict, enum_node: dict) -> EnumerationConfig:
         """Extracts enumeration settings and returns a clean EnumerationConfig object."""
 
         # Handle the reactive atoms list-to-set conversion
@@ -308,8 +308,10 @@ class InputParser:
         if raw_react:
             react_atoms_processed = [set(raw_react)]
 
+        enumerate_value = enum_node.get("enumerate", init_node.get("enumerate", False))
+
         return EnumerationConfig(
-            enumerate=enum_node.get("enumerate", False),
+            enumerate=enumerate_value,
             mode=enum_node.get("mode", "concerted"),
             n_break=enum_node.get("bonds to break", 2),
             n_form=enum_node.get("bonds to form", 2),

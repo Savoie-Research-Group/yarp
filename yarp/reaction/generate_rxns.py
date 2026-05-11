@@ -5,13 +5,131 @@ import os
 import fnmatch
 import pickle
 import numpy as np
+from pathlib import Path
 from openbabel import pybel
+from rdkit import Chem
 
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.write_files import mol_write_yp
+
+
+def _resolve_xyz_pair(directory):
+    xyz_files = sorted(
+        [
+            path for path in Path(directory).iterdir()
+            if path.is_file() and path.suffix.lower() == ".xyz"
+        ]
+    )
+    reactant_matches = [path for path in xyz_files if "reactant" in path.name.lower()]
+    product_matches = [path for path in xyz_files if "product" in path.name.lower()]
+
+    if (
+        len(reactant_matches) == 1
+        and len(product_matches) == 1
+        and reactant_matches[0] != product_matches[0]
+    ):
+        return reactant_matches[0], product_matches[0]
+
+    if len(xyz_files) == 2:
+        return xyz_files[0], xyz_files[1]
+
+    raise RuntimeError(
+        "Could not uniquely identify a reactant/product XYZ pair in "
+        f"'{directory}'. Provide exactly one file containing 'reactant' and one containing "
+        "'product' (case-insensitive), or provide exactly two .xyz files total."
+    )
+
+
+def _build_direct_reaction(reactant_source, product_source, source_label):
+    reactant = yarpecule(str(reactant_source), mode="yarp", canon=False)
+    product = yarpecule(str(product_source), mode="yarp", canon=False)
+
+    if len(reactant.elements) != len(product.elements):
+        raise RuntimeError(
+            "Direct reaction initialization requires reactant and product to have the same atom count. "
+            f"Got {len(reactant.elements)} atoms for reactant '{reactant_source}' and "
+            f"{len(product.elements)} atoms for product '{product_source}' from {source_label}. "
+            "For XYZ inputs, YARP assumes the user has already ensured matching atom ordering."
+        )
+
+    return reaction(reactant, product)
+
+
+def _load_reaction_from_xyz_directory(directory):
+    reactant_path, product_path = _resolve_xyz_pair(directory)
+    rxn = _build_direct_reaction(reactant_path, product_path, f"directory '{directory}'")
+    return {rxn.hash: rxn}
+
+
+def _parse_mapped_smiles(smiles, role, line_number, source_path):
+    mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    if mol is None:
+        raise RuntimeError(
+            f"Could not parse {role} SMILES on line {line_number} of '{source_path}': {smiles}"
+        )
+
+    if any(not atom.HasProp("molAtomMapNumber") for atom in mol.GetAtoms()):
+        raise RuntimeError(
+            f"{role.capitalize()} SMILES on line {line_number} of '{source_path}' must be fully atom-mapped."
+        )
+
+    maps = [int(atom.GetProp("molAtomMapNumber")) for atom in mol.GetAtoms()]
+    if len(maps) != len(set(maps)):
+        dupes = sorted({atom_map for atom_map in maps if maps.count(atom_map) > 1})
+        raise RuntimeError(
+            f"{role.capitalize()} SMILES on line {line_number} of '{source_path}' contains duplicate atom maps: {dupes}"
+        )
+
+    return set(maps)
+
+
+def _load_reactions_from_smiles_file(source_path):
+    output = {}
+
+    with open(source_path, "r") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            if line.count(">>") != 1:
+                raise RuntimeError(
+                    f"Reaction SMILES line {line_number} of '{source_path}' must contain exactly one '>>': {line}"
+                )
+
+            reactant_smiles, product_smiles = [part.strip() for part in line.split(">>")]
+            if not reactant_smiles or not product_smiles:
+                raise RuntimeError(
+                    f"Reaction SMILES line {line_number} of '{source_path}' must include both reactant and product."
+                )
+
+            reactant_maps = _parse_mapped_smiles(reactant_smiles, "reactant", line_number, source_path)
+            product_maps = _parse_mapped_smiles(product_smiles, "product", line_number, source_path)
+            if reactant_maps != product_maps:
+                raise RuntimeError(
+                    f"Reaction SMILES line {line_number} of '{source_path}' has mismatched atom-map sets. "
+                    f"Reactant maps: {sorted(reactant_maps)}; Product maps: {sorted(product_maps)}"
+                )
+
+            rxn = _build_direct_reaction(
+                reactant_smiles, product_smiles, f"line {line_number} of '{source_path}'"
+            )
+            if rxn.hash in output:
+                print(
+                    f" - Skipping duplicate direct reaction on line {line_number} of '{source_path}' "
+                    f"(hash {rxn.hash})"
+                )
+                continue
+
+            output[rxn.hash] = rxn
+
+    if not output:
+        raise RuntimeError(f"No direct reactions were found in '{source_path}'.")
+
+    return output
 
 
 def generate_rxns(inp):
@@ -107,7 +225,18 @@ def generate_rxns(inp):
 
             output = og_rxns
         else:
-            raise RuntimeError("We can only start from a YARP pickle file currently, sorry friend!")
+            source_path = Path(inp.d0_node)
+            if source_path.is_dir():
+                print(f" - Loading direct reaction from XYZ directory {source_path}")
+                output = _load_reaction_from_xyz_directory(source_path)
+            elif source_path.is_file():
+                print(f" - Loading direct reaction(s) from mapped SMILES file {source_path}")
+                output = _load_reactions_from_smiles_file(source_path)
+            else:
+                raise RuntimeError(
+                    "When enumeration is disabled, 'initial species' must point to a YARP pickle file, "
+                    "an XYZ directory, or a mapped reaction-SMILES text file."
+                )
 
     return output
 

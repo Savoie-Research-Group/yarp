@@ -1,0 +1,13 @@
+initialize:
+  initial species: SMILES_test/failure_modes.txt
+  output: direct_init_smiles_failure_no_double_arrow.pkl
+  status: direct_init_smiles_failure_no_double_arrow_STATUS.json
+  enumeration:
+    enumerate: false
+
+test_case:
+  expect: fail
+  source_type: smiles_file
+  scenario: malformed_separator
+  source_line: 1
+  expected_failure: No >> or more than 1 >>

@@ -1,0 +1,11 @@
+initialize:
+  initial species: xyz_test/xyz_unnamed
+  output: direct_init_xyz_unnamed.pkl
+  status: direct_init_xyz_unnamed_STATUS.json
+  enumeration:
+    enumerate: false
+
+test_case:
+  expect: pass
+  source_type: xyz_folder
+  scenario: two_file_lexicographic_fallback

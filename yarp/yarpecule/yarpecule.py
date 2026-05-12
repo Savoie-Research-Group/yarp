@@ -434,7 +434,7 @@ class yarpecule:
         # Remove temporary file
         os.remove(tmp_file)
 
-    def get_inchi(self):
+    def get_inchi(self, verbose=False):
         """
         Generate the InChIKey for a given yarpecule using RDKit.
         Requires the yarpecule to already have SMILES
@@ -486,8 +486,9 @@ class yarpecule:
             try:
                 inchi = mol.write(format='inchikey').strip().split()[0]
             except:
-                print("WARNING: ERROR in INCHI key generation!")
-                print(f"  --> {mol.write(format='inchikey')}")
+                if verbose:
+                    print("WARNING: ERROR in INCHI key generation!")
+                    print(f"  --> {mol.write(format='inchikey')}")
                 continue
             
             inchikey += [inchi]

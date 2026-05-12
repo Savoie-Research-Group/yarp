@@ -25,7 +25,8 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     candidates : list of yarpecule objects
 
     """
-    print(f" - Reading in {len(rxns)} total reactions")
+    if verbose:
+        print(f" - Reading in {len(rxns)} total reactions")
 
     if isinstance(dG_source, str) and verbose:
         print(f" - Barrier filtering selected!")
@@ -40,7 +41,8 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         if isinstance(dG_source, str):
             dG = rxn.barrier.get(dG_source, None)
             if dG is not None and dG > dG_cutoff:
-                print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
+                if verbose:
+                    print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
                 continue
 
         clean_rxns[count_r] = rxn
@@ -204,8 +206,8 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
                 raise RuntimeError(f"Cutoff {cap} for capped exploration is not recognized/implemented!")
     else:
         raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
-
-    print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
+    if verbose:
+        print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
     return candidates
 
 

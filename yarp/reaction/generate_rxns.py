@@ -14,7 +14,7 @@ from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.write_files import mol_write_yp
 
 
-def generate_rxns(inp):
+def generate_rxns(inp,verbose=False):
     """
     Wrapper function to manage the generation of reaction objects during main_yarp routine
 
@@ -35,10 +35,10 @@ def generate_rxns(inp):
 
     # Initialize reactions for product enumeration
     if inp.enum.enumerate:
-
-        print("Product enumeration routine selected")
+        print("Product enumeration enabled. Enumerating products.")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
@@ -54,7 +54,8 @@ def generate_rxns(inp):
 
             new_rxns = dict()
             for mol in candidates:
-                print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+                if verbose:
+                    print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
                     react=inp.enum.react_atoms, mode=inp.enum.mode
@@ -78,7 +79,8 @@ def generate_rxns(inp):
             output = og_rxns | new_rxns
             
         else:
-            print(f" - Initializing starting reactant node from {inp.d0_node}")
+            if verbose:
+                print(f" - Initializing starting reactant node from {inp.d0_node}")
             output = dict()
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
@@ -97,9 +99,10 @@ def generate_rxns(inp):
                 output[r2p.hash] = r2p
 
     else:
-        print("Loading reactions")
+        print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"

@@ -43,40 +43,46 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         Enumerated products! No duplicate products should be included,
         as duplicates are filtered out based on the yarpecule hash.
     """
-
-    print(f"  * Product enumeration with break {n_break}, form {n_form} "
-          f"will be performed in {mode} mode.")
+    if verbose:
+        print(f"  * Product enumeration with break {n_break}, form {n_form} "
+            f"will be performed in {mode} mode.")
 
     if react != []:
         react_list = list(react[0])
         element_list = []
         for i in react_list:
             element_list.append(r_yp.elements[i])
-        print(f"   + Reactive atoms defined as: index {react_list} --> element {element_list}")
+        if verbose:
+            print(f"   + Reactive atoms defined as: index {react_list} --> element {element_list}")
 
     if mode == "sequential":
-        print(f"   WARNING: Sequential mode is expensive and "
-              "may cause memory blow-up issues!")
+        if verbose:
+            print(f"   WARNING: Sequential mode is expensive and "
+                "may cause memory blow-up issues!")
 
         # Break bonds
         break_mol = list(break_bonds(r_yp, n=n_break, react=react))
-        print(f"   + Breaking {n_break} bonds formed "
-              f"{len(break_mol)} intermediates")
+        if verbose:
+            print(f"   + Breaking {n_break} bonds formed "
+                f"{len(break_mol)} intermediates")
 
         # Form bonds
         if n_form > 0:
             products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash})
-            print(f"   + Forming {n_form} bonds formed "
-                f"{len(products)} potential products")
+            if verbose:
+                print(f"   + Forming {n_form} bonds formed "
+                    f"{len(products)} potential products")
             products += break_mol
         else:
             products = break_mol
 
-        print(f"   + Returning total {len(products)} potential products")
+        if verbose:
+            print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
         products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=react, verbose=verbose))
-        print(f"   + Enumerated {len(products)} products")
+        if verbose:
+            print(f"   + Enumerated {len(products)} products")
 
     else:
         raise RuntimeError("Please select either concerted or sequential as the product enumeration mode!")
@@ -296,7 +302,7 @@ def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True,
     return new
 
 
-def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_only=False,hash_filter=True):
+def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_only=False,hash_filter=True,verbose=False):
     """
     This function yields all products that result from valid bond formations amongst the supplied yarpecules.
 
@@ -345,6 +351,10 @@ def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_onl
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules) 
+    
+    if verbose:
+        print(f"Enumerating all bond formations for {len(yarpecules)} yarpecules.")
+        print(f"Reactive atoms defined as: {react}")
 
     # Prepare react list if it isn't the same length as the number of yarpecules
     if len(react) != len(yarpecules):
@@ -368,7 +378,7 @@ def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_onl
     return new
 
 
-def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,remove_redundant=True):
+def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,remove_redundant=True,verbose=False):
     """
     This function yields all products that result from breaking bonds amongst the supplied yarpecules.
 
@@ -409,13 +419,12 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules) 
-    #print(react)
-    # Prepare react list if it isn't the same length as the number of yarpecules
-    #print(len(react))
-    #print(len(yarpecules))
+    if verbose:
+        print(f"Breaking {n} bonds in {len(yarpecules)} yarpecules.")
+        print(f"Reactive atoms defined as: {react}")
+        
     if len(react) != len(yarpecules):
         react = [ set(range(len(y))) for y in yarpecules ]
-    #print(react)
     # Prepare hash set if it isn't already supplied
     if hashes is None:
         hashes = set([])
@@ -513,6 +522,10 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules)
+    
+    if verbose:
+        print(f"Enumerating break {n} form {n} products for {len(yarpecules)} yarpecules.")
+        print(f"Reactive atoms defined as: {react}")
 
     # Prepare react list if it isn't the same length as the number of yarpecules
     if len(react) != len(yarpecules):

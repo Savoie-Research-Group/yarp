@@ -105,7 +105,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
         # 1. File existence check
         if not (log_file.exists() and xyz_file.exists() and hess_file.exists()):
             print(f"     * Run failed: Missing expected output files.")
-            success = False
+            return False
 
         # 2. Log file termination check
         with open(log_file, "r") as f:
@@ -257,7 +257,7 @@ class OrcaMinOptCalculator(MinOptTask):
         # 1. File existence check
         if not (out_file.exists() and xyz_file.exists()):
             print(f"     * Run failed: Missing expected output files.")
-            success = False
+            return False
 
         # 2. Log file termination check
         with open(out_file, "r") as f:

@@ -519,6 +519,7 @@ def progress_yarp(work_dir: Path):
     # Write all updates back to disk
     save_state(work_dir, status_tracker, reactions, failed_rxns)
     print("YARP progress tracking complete.")
+    print(f"======================\n")
 
 def main():
     print(f"""Welcome to

@@ -22,13 +22,13 @@ def main():
     script_location = Path(__file__).parent.resolve()
     target_script = script_location / "progress_yarp.py"
 
-    print(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}")
+    print(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}", flush=True)
 
     # Background periodic execution loop
     execute_counter = 0
     while datetime.now() < end_time:
         execute_counter += 1
-        print(f"[{datetime.now()}] Executing progress_yarp.py (Run {execute_counter})...")
+        print(f"[{datetime.now()}] Executing progress_yarp.py (Run {execute_counter})...", flush=True)
 
         # Open the output file, and route stdout AND stderr to it
         output_file = work_dir / f"prog{execute_counter}.out"
@@ -42,7 +42,7 @@ def main():
         # Calculate next run time and sleep
         time.sleep(args.interval * 60)
 
-    print("YARP total runtime reached. Shutting down.")
+    print("YARP total runtime reached. Shutting down.", flush=True)
 
 if __name__ == "__main__":
     main()

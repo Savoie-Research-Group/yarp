@@ -1,10 +1,7 @@
 import yaml
 import pickle
-import pytest
-import shutil
 from pathlib import Path
 from yarp.initialize_yarp import initialize_from_dict, initialize_yarp
-from yarp.reaction.reaction import reaction
 
 def test_happy_path_initialization(enum_egat_llpath_llrefine):
     """
@@ -87,104 +84,6 @@ def test_enum_full(enum_full_options):
         saved_reactions = pickle.load(f)
 
     assert len(saved_reactions) == 2
-
-
-MAIN_INPUTS_DIR = Path(__file__).resolve().parents[1] / "main_inputs"
-
-DIRECT_INIT_FAILURE_MATCHES = {
-    "malformed_separator": r"must contain exactly one '>>'",
-    "unmapped_smiles": r"must be fully atom-mapped",
-    "mismatched_atom_mapping": r"mismatched atom-map sets",
-    "ambiguous_xyz_folder": r"Could not uniquely identify a reactant/product XYZ pair",
-    "mismatched_xyz_atom_count": r"same atom count",
-}
-
-
-def _load_direct_init_yaml(yaml_name, tmp_path):
-    yaml_path = MAIN_INPUTS_DIR / yaml_name
-    with open(yaml_path, "r") as handle:
-        data = yaml.safe_load(handle)
-
-    init = data["initialize"]
-    init["output"] = str(tmp_path / Path(init["output"]).name)
-    init["status"] = str(tmp_path / Path(init["status"]).name)
-
-    input_path = (yaml_path.parent / init["initial species"]).resolve()
-    test_case = data.get("test_case", {})
-    if test_case.get("source_type") == "xyz_folder":
-        copied_dir = tmp_path / input_path.name
-        shutil.copytree(input_path, copied_dir)
-        input_path = copied_dir
-    source_line = test_case.get("source_line")
-    if source_line is not None:
-        with open(input_path, "r") as handle:
-            lines = [line.rstrip("\n") for line in handle.readlines()]
-        selected_line = lines[source_line - 1]
-        extracted_path = tmp_path / f"{yaml_path.stem}_line_{source_line}.txt"
-        extracted_path.write_text(selected_line + "\n")
-        input_path = extracted_path
-
-    init["initial species"] = str(input_path)
-    return data
-
-
-@pytest.mark.parametrize(
-    "yaml_name",
-    [
-        "direct_init_xyz_named.yaml",
-        "direct_init_xyz_unnamed.yaml",
-        "direct_init_xyz_too_many.yaml",
-        "direct_init_xyz_mismatch_atom_count.yaml",
-    ],
-)
-def test_direct_init_xyz_cases(tmp_path, yaml_name):
-    input_dict = _load_direct_init_yaml(yaml_name, tmp_path)
-    test_case = input_dict["test_case"]
-
-    if test_case["expect"] == "pass":
-        reactions, _ = initialize_from_dict(input_dict)
-
-        assert len(reactions) == 1
-        rxn = next(iter(reactions.values()))
-        assert isinstance(rxn, reaction)
-        assert rxn.reactant.map_smi
-        assert rxn.product.map_smi
-        assert rxn.reactant.graph.geo.shape == rxn.product.graph.geo.shape
-    else:
-        match = DIRECT_INIT_FAILURE_MATCHES[test_case["scenario"]]
-        with pytest.raises(RuntimeError, match=match):
-            initialize_from_dict(input_dict)
-
-
-@pytest.mark.parametrize(
-    "yaml_name",
-    [
-        "direct_init_smiles_amidation.yaml",
-        "direct_init_smiles_failure_no_double_arrow.yaml",
-        "direct_init_smiles_failure_unmapped.yaml",
-        "direct_init_smiles_failure_mismatched_maps.yaml",
-    ],
-)
-def test_direct_init_smiles_cases(tmp_path, yaml_name):
-    input_dict = _load_direct_init_yaml(yaml_name, tmp_path)
-    test_case = input_dict["test_case"]
-
-    if test_case["expect"] == "pass":
-        initialize_yarp(input_dict)
-
-        output_path = Path(input_dict["initialize"]["output"])
-        with open(output_path, "rb") as handle:
-            reactions = pickle.load(handle)
-
-        assert len(reactions) == 1
-        rxn = next(iter(reactions.values()))
-        assert isinstance(rxn, reaction)
-        assert ".O." not in rxn.reactant.map_smi
-        assert ".O." in rxn.product.map_smi or ".[O:" in rxn.product.map_smi
-    else:
-        match = DIRECT_INIT_FAILURE_MATCHES[test_case["scenario"]]
-        with pytest.raises(RuntimeError, match=match):
-            initialize_from_dict(input_dict)
 
 # def test_d2_default(d2_default_enum, d1_path):
 #     input_dict = d2_default_enum

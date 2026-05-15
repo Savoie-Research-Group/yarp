@@ -571,9 +571,9 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
             if verbose:
                 print(f"Breaking bonds at indices: {b}")
                 print(f"Reactive atom set: {formset}")
-                print(f"Bonds to avoid reforming: {avoid}")
+                print(f"Bonds to avoid reforming: {[y.describe_bond_pattern(_) for _ in avoid]}")
                 print(f"Number of reactive atoms: {n * 2}")
-                print(f"Actual bonds being broken: {[bonds[_] for _ in b]}")
+                print(f"Breaking bonds: {[y.describe_bond_tuple(bonds[_]) for _ in b]}")
 
             # Start with copy of original bond matrix
             base_bmat = copy(y.lewis.bond_mats[fc_ind])
@@ -608,7 +608,7 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
                     continue
 
                 if verbose:
-                    print(f"Forming new bonds: {g}")
+                    print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
 
                 # Create new adjacency matrix by adding the new bonds
                 adj_mat = copy(base_bmat)

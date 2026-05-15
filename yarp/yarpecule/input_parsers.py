@@ -182,6 +182,135 @@ def xyz_q_parse(xyz):
     return q
 
 
+def _comment_q_parse(comment_line):
+    fields = comment_line.split()
+    if "q" in fields:
+        try:
+            q = int(float(fields[fields.index("q")+1]))
+        except:
+            q = 0
+    else:
+        q = 0
+
+    return q
+
+
+def reaction_xyz_parse(xyz):
+    """
+    Parse a reaction xyz file containing exactly two xyz coordinate sets:
+    the reactant first and the product second.
+
+    Parameters
+    ----------
+    xyz : filename
+          This is the reaction xyz file being parsed.
+
+    Returns
+    -------
+    reactant_elements : list
+                        A list with the reactant element labels indexed to the geometry.
+
+    reactant_geo : array
+                   An nx3 numpy array holding the reactant cartesian coordinates.
+
+    reactant_q : int
+                 The reactant charge parsed from the reactant comment line.
+
+    product_elements : list
+                       A list with the product element labels indexed to the geometry.
+
+    product_geo : array
+                  An nx3 numpy array holding the product cartesian coordinates.
+
+    product_q : int
+                The product charge parsed from the product comment line.
+    """
+
+    with open(xyz, 'r') as f:
+        lines = f.readlines()
+
+    if len(lines) == 0:
+        raise RuntimeError(f"ERROR in reaction_xyz_parse: {xyz} is empty.")
+
+    def _is_coordinate_line(fields):
+        if len(fields) != 4:
+            return False
+        try:
+            float(fields[1])
+            float(fields[2])
+            float(fields[3])
+            return True
+        except:
+            return False
+
+    frames = []
+    line_idx = 0
+
+    while line_idx < len(lines):
+        while line_idx < len(lines) and len(lines[line_idx].split()) == 0:
+            line_idx += 1
+
+        if line_idx >= len(lines):
+            break
+
+        fields = lines[line_idx].split()
+        if len(fields) != 1 or fields[0].isdigit() is False:
+            raise RuntimeError(
+                f"ERROR in reaction_xyz_parse: {xyz} must start each coordinate set with an atom-count line.")
+
+        n_atoms = int(fields[0])
+        line_idx += 1
+
+        if line_idx >= len(lines):
+            raise RuntimeError(
+                f"ERROR in reaction_xyz_parse: {xyz} is missing the required comment line after atom count {n_atoms}.")
+
+        comment_line = lines[line_idx].rstrip("\n")
+        comment_fields = comment_line.split()
+        if len(comment_fields) == 0 or _is_coordinate_line(comment_fields):
+            raise RuntimeError(
+                f"ERROR in reaction_xyz_parse: {xyz} is missing the required comment line after atom count {n_atoms}.")
+
+        line_idx += 1
+
+        elements = ["X"] * n_atoms
+        geometry = np.zeros([n_atoms, 3])
+
+        for atom_idx in range(n_atoms):
+            if line_idx >= len(lines):
+                raise RuntimeError(
+                    f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
+
+            fields = lines[line_idx].split()
+            if _is_coordinate_line(fields) is False:
+                raise RuntimeError(
+                    f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
+
+            elements[atom_idx] = fields[0]
+            geometry[atom_idx, :] = np.array(
+                [float(fields[1]), float(fields[2]), float(fields[3])])
+            line_idx += 1
+
+        frames.append((elements, geometry, _comment_q_parse(comment_line)))
+
+    if len(frames) != 2:
+        raise RuntimeError(
+            f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets (reactant first, product second).")
+
+    reactant_elements, reactant_geo, reactant_q = frames[0]
+    product_elements, product_geo, product_q = frames[1]
+
+    if len(reactant_elements) != len(product_elements):
+        raise RuntimeError(
+            f"ERROR in reaction_xyz_parse: {xyz} has mismatched reactant/product atom counts.")
+
+    if reactant_elements != product_elements:
+        raise RuntimeError(
+            f"ERROR in reaction_xyz_parse: {xyz} requires identical atom ordering between reactant and product.")
+
+    return reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q
+
+
 def mol_parse(mol):
     """
     A simple wrapper for rdkit function to read a mol file.

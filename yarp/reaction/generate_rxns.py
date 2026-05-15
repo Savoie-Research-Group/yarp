@@ -5,129 +5,100 @@ import os
 import fnmatch
 import pickle
 import numpy as np
-from pathlib import Path
 from openbabel import pybel
+from pathlib import Path
 from rdkit import Chem
 
 from yarp.yarpecule.yarpecule import yarpecule
+from yarp.yarpecule.input_parsers import reaction_xyz_parse
+from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.write_files import mol_write_yp
 
 
-def _resolve_xyz_pair(directory):
-    xyz_files = sorted(
-        [
-            path for path in Path(directory).iterdir()
-            if path.is_file() and path.suffix.lower() == ".xyz"
-        ]
-    )
-    reactant_matches = [path for path in xyz_files if "reactant" in path.name.lower()]
-    product_matches = [path for path in xyz_files if "product" in path.name.lower()]
+def _load_reaction_from_xyz_file(xyz_file):
+    reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-    if (
-        len(reactant_matches) == 1
-        and len(product_matches) == 1
-        and reactant_matches[0] != product_matches[0]
-    ):
-        return reactant_matches[0], product_matches[0]
+    reactant_adj = table_generator(reactant_elements, reactant_geo)
+    product_adj = table_generator(product_elements, product_geo)
 
-    if len(xyz_files) == 2:
-        return xyz_files[0], xyz_files[1]
-
-    raise RuntimeError(
-        "Could not uniquely identify a reactant/product XYZ pair in "
-        f"'{directory}'. Provide exactly one file containing 'reactant' and one containing "
-        "'product' (case-insensitive), or provide exactly two .xyz files total."
-    )
-
-
-def _build_direct_reaction(reactant_source, product_source, source_label):
-    reactant = yarpecule(str(reactant_source), mode="yarp", canon=False)
-    product = yarpecule(str(product_source), mode="yarp", canon=False)
-
-    if len(reactant.elements) != len(product.elements):
-        raise RuntimeError(
-            "Direct reaction initialization requires reactant and product to have the same atom count. "
-            f"Got {len(reactant.elements)} atoms for reactant '{reactant_source}' and "
-            f"{len(product.elements)} atoms for product '{product_source}' from {source_label}. "
-            "For XYZ inputs, YARP assumes the user has already ensured matching atom ordering."
-        )
+    reactant = yarpecule((reactant_adj, reactant_geo, reactant_elements, reactant_q), canon=False)
+    product = yarpecule((product_adj, product_geo, product_elements, product_q), canon=False)
 
     return reaction(reactant, product)
 
 
-def _load_reaction_from_xyz_directory(directory):
-    reactant_path, product_path = _resolve_xyz_pair(directory)
-    rxn = _build_direct_reaction(reactant_path, product_path, f"directory '{directory}'")
-    return {rxn.hash: rxn}
+def _load_reactions_from_xyz_directory(xyz_dir):
+    xyz_files = sorted([_ for _ in xyz_dir.iterdir() if _.is_file() and _.suffix.lower() == ".xyz"])
+
+    if len(xyz_files) == 0:
+        raise RuntimeError(f"No xyz reaction files were found in {xyz_dir}.")
+
+    output = dict()
+    for xyz_file in xyz_files:
+        rxn = _load_reaction_from_xyz_file(xyz_file)
+        output[rxn.hash] = rxn
+
+    return output
 
 
-def _parse_mapped_smiles(smiles, role, line_number, source_path):
+def _parse_mapped_reaction_smiles(smiles, line_number, source_path):
     mol = Chem.MolFromSmiles(smiles, sanitize=False)
+
     if mol is None:
         raise RuntimeError(
-            f"Could not parse {role} SMILES on line {line_number} of '{source_path}': {smiles}"
+            f"Line {line_number} in {source_path}: could not parse reaction SMILES."
         )
 
-    if any(not atom.HasProp("molAtomMapNumber") for atom in mol.GetAtoms()):
+    atom_maps = []
+    for atom in mol.GetAtoms():
+        atom_props = atom.GetPropsAsDict()
+        if "molAtomMapNumber" not in atom_props:
+            raise RuntimeError(
+                f"Line {line_number} in {source_path}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization"
+            )
+        atom_map = int(atom_props["molAtomMapNumber"])
+        atom_maps.append(atom_map)
+
+    if len(atom_maps) != len(set(atom_maps)):
         raise RuntimeError(
-            f"{role.capitalize()} SMILES on line {line_number} of '{source_path}' must be fully atom-mapped."
+            f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
         )
 
-    maps = [int(atom.GetProp("molAtomMapNumber")) for atom in mol.GetAtoms()]
-    if len(maps) != len(set(maps)):
-        dupes = sorted({atom_map for atom_map in maps if maps.count(atom_map) > 1})
-        raise RuntimeError(
-            f"{role.capitalize()} SMILES on line {line_number} of '{source_path}' contains duplicate atom maps: {dupes}"
-        )
-
-    return set(maps)
+    return atom_maps
 
 
 def _load_reactions_from_smiles_file(source_path):
-    output = {}
+    output = dict()
 
-    with open(source_path, "r") as handle:
-        for line_number, raw_line in enumerate(handle, start=1):
+    with open(source_path, 'r') as f:
+        for line_number, raw_line in enumerate(f, start=1):
             line = raw_line.strip()
-            if not line or line.startswith("#"):
+
+            if len(line) == 0 or line.startswith("#"):
                 continue
 
             if line.count(">>") != 1:
                 raise RuntimeError(
-                    f"Reaction SMILES line {line_number} of '{source_path}' must contain exactly one '>>': {line}"
+                    f"Line {line_number} in {source_path}: No >> or more than 1 >>"
                 )
 
-            reactant_smiles, product_smiles = [part.strip() for part in line.split(">>")]
-            if not reactant_smiles or not product_smiles:
+            reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
+            reactant_maps = _parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
+            product_maps = _parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
+
+            if set(reactant_maps) != set(product_maps):
                 raise RuntimeError(
-                    f"Reaction SMILES line {line_number} of '{source_path}' must include both reactant and product."
+                    f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
                 )
 
-            reactant_maps = _parse_mapped_smiles(reactant_smiles, "reactant", line_number, source_path)
-            product_maps = _parse_mapped_smiles(product_smiles, "product", line_number, source_path)
-            if reactant_maps != product_maps:
-                raise RuntimeError(
-                    f"Reaction SMILES line {line_number} of '{source_path}' has mismatched atom-map sets. "
-                    f"Reactant maps: {sorted(reactant_maps)}; Product maps: {sorted(product_maps)}"
-                )
+            reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+            product = yarpecule(product_smiles, mode="yarp", canon=False)
 
-            rxn = _build_direct_reaction(
-                reactant_smiles, product_smiles, f"line {line_number} of '{source_path}'"
-            )
-            if rxn.hash in output:
-                print(
-                    f" - Skipping duplicate direct reaction on line {line_number} of '{source_path}' "
-                    f"(hash {rxn.hash})"
-                )
-                continue
-
+            rxn = reaction(reactant, product)
             output[rxn.hash] = rxn
-
-    if not output:
-        raise RuntimeError(f"No direct reactions were found in '{source_path}'.")
 
     return output
 
@@ -224,19 +195,14 @@ def generate_rxns(inp):
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
             output = og_rxns
+        elif Path(inp.d0_node).is_dir():
+            print(f" - Processing starting node(s) as reaction xyz files in {inp.d0_node}")
+            output = _load_reactions_from_xyz_directory(Path(inp.d0_node))
+        elif Path(inp.d0_node).is_file():
+            print(f" - Processing starting node(s) as mapped reaction SMILES in {inp.d0_node}")
+            output = _load_reactions_from_smiles_file(inp.d0_node)
         else:
-            source_path = Path(inp.d0_node)
-            if source_path.is_dir():
-                print(f" - Loading direct reaction from XYZ directory {source_path}")
-                output = _load_reaction_from_xyz_directory(source_path)
-            elif source_path.is_file():
-                print(f" - Loading direct reaction(s) from mapped SMILES file {source_path}")
-                output = _load_reactions_from_smiles_file(source_path)
-            else:
-                raise RuntimeError(
-                    "When enumeration is disabled, 'initial species' must point to a YARP pickle file, "
-                    "an XYZ directory, or a mapped reaction-SMILES text file."
-                )
+            raise RuntimeError("We can only start from a YARP pickle file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
     return output
 

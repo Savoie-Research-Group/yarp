@@ -12,7 +12,7 @@ from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
-def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False):
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
     """
     Master wrapper function for all enumeration routines
 
@@ -61,14 +61,14 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
                 "may cause memory blow-up issues!")
 
         # Break bonds
-        break_mol = list(break_bonds(r_yp, n=n_break, react=react))
+        break_mol = list(break_bonds(r_yp, n=n_break, react=react, debug=debug))
         if verbose:
             print(f"   + Breaking {n_break} bonds formed "
                 f"{len(break_mol)} intermediates")
 
         # Form bonds
         if n_form > 0:
-            products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash})
+            products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash}, debug=debug)
             if verbose:
                 print(f"   + Forming {n_form} bonds formed "
                     f"{len(products)} potential products")
@@ -80,7 +80,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
             print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=react, verbose=verbose))
+        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=react, verbose=verbose, debug=debug))
         if verbose:
             print(f"   + Enumerated {len(products)} products")
 
@@ -474,7 +474,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     yield tmp
 
 
-def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=True, keep_symmetric=True, verbose=False):
+def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=True, keep_symmetric=True, verbose=True, debug=False):
     """
     This function provides a shortcut for enumerating "break n form n" products without generating intermediate 
     zwitterionic/dangling bond species
@@ -568,7 +568,7 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
             formset += radicals
 
             # Debug output
-            if verbose:
+            if debug:
                 print(f"Breaking bonds at indices: {b}")
                 print(f"Reactive atom set: {formset}")
                 print(f"Bonds to avoid reforming: {[y.describe_bond_pattern(_) for _ in avoid]}")
@@ -577,18 +577,18 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
 
             # Start with copy of original bond matrix
             base_bmat = copy(y.lewis.bond_mats[fc_ind])
-            if verbose:
+            if debug:
                 print("Original bond matrix:")
                 print(base_bmat)
 
             # Break the selected bonds (subtract 1 from bond order)
             base_bmat = add_bonds(base_bmat, [bonds[_] for _ in b], val=-1)
-            if verbose:
+            if debug:
                 print("Bond matrix after breaking bonds:")
                 print(base_bmat)
 
             # Loop over all unique ways to pair reactive atoms into new bonds
-            if verbose:
+            if debug:
                 print(f"this is the formset: {formset}")
                 print(f"these are the bond formations we will test: "
                       f"{list(unique_set_partition_generator(formset, 2))}")
@@ -596,18 +596,18 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
 
                 # Skip if we would just reform a bond we broke
                 if frozenset(g) in avoid:
-                    if verbose:
+                    if debug:
                         print(f"Skipping - would reform broken bond: {g}")
                     continue
 
                 # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
                 if any([len(_) < 2 for _ in g]):
                     avoid.update(frozenset(g))
-                    if verbose:
+                    if debug:
                         print(f"Skipping - would form dangling bond: {g}")
                     continue
 
-                if verbose:
+                if debug:
                     print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
 
                 # Create new adjacency matrix by adding the new bonds
@@ -633,14 +633,14 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
                 ), canon=False)
 
                 # Debug: show the transformation
-                if verbose:
+                if debug:
                     print(f"Original adjacency matrix:\n{y._adj_mat}")
                     print(f"New adjacency matrix:\n{product._adj_mat}")
 
                 # Optional: skip products with higher bond matrix scores (worse quality)
                 if lower_score:
                     if product.lewis._scores[0] > y.lewis._scores[0]:
-                        if verbose:
+                        if debug:
                             print(f"Skipping - higher score: "
                                   f"{product.lewis._scores[0]} > {y.lewis._scores[0]}")
                         continue
@@ -654,13 +654,13 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
                         hashes.add(product._yarpecule_hash)
 
                     # Yield new product
-                    if verbose:
+                    if debug:
                         print(f"Yielding new product with hash: "
                               f"{product._yarpecule_hash}")
                     yield product
                 # KMH: Added error message to let user know why some products were skipped
                 else:
-                    if verbose:
+                    if debug:
                         print(f"Skipping - product hash already in set: "
                               f"{product._yarpecule_hash}")
 

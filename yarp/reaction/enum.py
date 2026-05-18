@@ -272,7 +272,7 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     if hash_filter:
                                         hashes.add(product.hash)
 
-def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True, def_only=False, hash_filter=True):
+def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True, def_only=False, hash_filter=True, debug=False):
     
     yarpecules = prepare_list(yarpecules) 
 
@@ -378,7 +378,7 @@ def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_onl
     return new
 
 
-def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,remove_redundant=True,verbose=False):
+def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,remove_redundant=True,verbose=False,debug=False):
     """
     This function yields all products that result from breaking bonds amongst the supplied yarpecules.
 

@@ -213,6 +213,7 @@ class InputParser:
             raise RuntimeError("Please provide an initial species for enumeration.")
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
         self.status_file = initnode.get("status", "STATUS.json")
+        self.verbose = initnode.get("verbose", False) # bool, initialize_yarp only
 
         # Job manager configuration
         jm_node = initnode.get("job manager", {})

@@ -36,13 +36,12 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         self.n_pairs = self.config.n_conf
         self.pairs_to_run = []
 
-    def generate_input(self,verbose=False):
+    def generate_input(self):
         """
         Runs the Joint Opt + ML Selection, then writes the files 
         required for the Pysisyphus GSM run.
         """
-        if verbose:
-            print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
+        print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
         self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
         
         # Write inputs for each pair

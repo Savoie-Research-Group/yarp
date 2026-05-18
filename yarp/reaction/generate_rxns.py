@@ -14,7 +14,7 @@ from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.write_files import mol_write_yp
 
 
-def generate_rxns(inp,verbose=False):
+def generate_rxns(inp):
     """
     Wrapper function to manage the generation of reaction objects during main_yarp routine
 
@@ -32,6 +32,7 @@ def generate_rxns(inp,verbose=False):
         Reactant-product pairs contained in a reaction object and ready for further processing!
     """
     output = None
+    verbose = inp.verbose
 
     # Initialize reactions for product enumeration
     if inp.enum.enumerate:
@@ -49,7 +50,7 @@ def generate_rxns(inp,verbose=False):
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore
+                netconfig=inp.net_explore, verbose=verbose
             )
 
             new_rxns = dict()
@@ -58,12 +59,12 @@ def generate_rxns(inp,verbose=False):
                     print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
                 )
 
                 clean_products = filter_enum_products(
                     raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
                 )
 
                 for prod in clean_products:
@@ -86,12 +87,12 @@ def generate_rxns(inp,verbose=False):
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
                 )
 
             clean_products = filter_enum_products(
                 raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
             )
 
             for prod in clean_products:

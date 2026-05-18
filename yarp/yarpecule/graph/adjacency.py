@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 from yarp.util.properties import el_radii, el_max_bonds
 
 
-def table_generator(elements, geometry, scale_factor=1.2, filename=None):
+def table_generator(elements, geometry, scale_factor=1.2, filename=None,verbose=False):
     """ 
     Algorithm for finding the adjacency matrix of a geometry based on atomic separations. 
 
@@ -80,7 +80,7 @@ def table_generator(elements, geometry, scale_factor=1.2, filename=None):
                 adj_mat[idx, count_i] = 0
 
     # Print warning messages for obviously suspicious bonding motifs.
-    if sum([problem_dict[i] for i in problem_dict.keys()]) > 0:
+    if sum([problem_dict[i] for i in problem_dict.keys()]) > 0 and verbose:
         print("Table Generation Warnings:")
         for i in sorted(problem_dict.keys()):
             if problem_dict[i] > 0:

@@ -29,14 +29,16 @@ class AsyncYarpCalculator:
         Automatically checks for and pulls missing images.
         """
         if self.job_manager.container == "docker":
-            # 1. Check if the image exists locally
-            inspect_cmd = subprocess.run(
-                ["docker", "image", "inspect", image_name], 
-                capture_output=True
+            # 1. Check if the image exists locally.
+            # Use `docker images -q` rather than `docker image inspect` because
+            # the latter fails silently with the containerd image store in Docker Desktop.
+            check_cmd = subprocess.run(
+                ["docker", "images", "-q", image_name],
+                capture_output=True, text=True
             )
-            
-            # 2. If returncode is non-zero, it doesn't exist. Pull it!
-            if inspect_cmd.returncode != 0:
+
+            # 2. If output is empty, the image isn't local. Pull it!
+            if not check_cmd.stdout.strip():
                 print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
                 subprocess.run(["docker", "pull", "--platform", "linux/amd64", image_name], check=True)
 

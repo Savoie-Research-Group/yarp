@@ -30,6 +30,15 @@ def _load_reaction_from_xyz_file(xyz_file):
     return reaction(reactant, product)
 
 
+def _print_reaction_load_failures(source, failures):
+    if len(failures) == 0:
+        return
+
+    print(f" - Failed to initialize {len(failures)} reaction(s) from {source}:")
+    for label, error in failures:
+        print(f"   * {label}: {error}")
+
+
 def _load_reactions_from_xyz_directory(xyz_dir):
     xyz_files = sorted([_ for _ in xyz_dir.iterdir() if _.is_file() and _.suffix.lower() == ".xyz"])
 
@@ -37,9 +46,17 @@ def _load_reactions_from_xyz_directory(xyz_dir):
         raise RuntimeError(f"No xyz reaction files were found in {xyz_dir}.")
 
     output = dict()
+    failures = []
     for xyz_file in xyz_files:
-        rxn = _load_reaction_from_xyz_file(xyz_file)
+        try:
+            rxn = _load_reaction_from_xyz_file(xyz_file)
+        except Exception as exc:
+            failures.append((str(xyz_file), str(exc)))
+            continue
+
         output[rxn.hash] = rxn
+
+    _print_reaction_load_failures(xyz_dir, failures)
 
     return output
 
@@ -72,6 +89,7 @@ def _parse_mapped_reaction_smiles(smiles, line_number, source_path):
 
 def _load_reactions_from_smiles_file(source_path):
     output = dict()
+    failures = []
 
     with open(source_path, 'r') as f:
         for line_number, raw_line in enumerate(f, start=1):
@@ -81,24 +99,29 @@ def _load_reactions_from_smiles_file(source_path):
                 continue
 
             if line.count(">>") != 1:
-                raise RuntimeError(
-                    f"Line {line_number} in {source_path}: No >> or more than 1 >>"
-                )
+                failures.append((f"Line {line_number}", "No >> or more than 1 >>"))
+                continue
 
-            reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
-            reactant_maps = _parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
-            product_maps = _parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
+            try:
+                reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
+                reactant_maps = _parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
+                product_maps = _parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
 
-            if set(reactant_maps) != set(product_maps):
-                raise RuntimeError(
-                    f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
-                )
+                if set(reactant_maps) != set(product_maps):
+                    raise RuntimeError(
+                        f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
+                    )
 
-            reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
-            product = yarpecule(product_smiles, mode="yarp", canon=False)
+                reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+                product = yarpecule(product_smiles, mode="yarp", canon=False)
+            except Exception as exc:
+                failures.append((f"Line {line_number}", str(exc)))
+                continue
 
             rxn = reaction(reactant, product)
             output[rxn.hash] = rxn
+
+    _print_reaction_load_failures(source_path, failures)
 
     return output
 

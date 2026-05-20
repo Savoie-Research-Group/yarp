@@ -225,11 +225,15 @@ def generate_rxns(inp):
         elif Path(inp.d0_node).is_dir():
             print(f" - Processing starting node(s) as reaction xyz files in {inp.d0_node}")
             output = _load_reactions_from_xyz_directory(Path(inp.d0_node))
+        elif Path(inp.d0_node).is_file() and Path(inp.d0_node).suffix.lower() == ".xyz":
+            print(f" - Processing starting node(s) as reaction xyz file {inp.d0_node}")
+            rxn = _load_reaction_from_xyz_file(Path(inp.d0_node))
+            output = {rxn.hash: rxn}
         elif Path(inp.d0_node).is_file():
             print(f" - Processing starting node(s) as mapped reaction SMILES in {inp.d0_node}")
             output = _load_reactions_from_smiles_file(inp.d0_node)
         else:
-            raise RuntimeError("We can only start from a YARP pickle file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
+            raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
     return output
 

@@ -121,13 +121,14 @@ def generate_rxns(inp):
         Reactant-product pairs contained in a reaction object and ready for further processing!
     """
     output = None
+    verbose = inp.verbose
 
     # Initialize reactions for product enumeration
     if inp.enum.enumerate:
-
-        print("Product enumeration routine selected")
+        print("Product enumeration enabled. Enumerating products.")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
@@ -138,20 +139,21 @@ def generate_rxns(inp):
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore
+                netconfig=inp.net_explore, verbose=verbose
             )
 
             new_rxns = dict()
             for mol in candidates:
-                print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+                if verbose:
+                    print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
                 )
 
                 clean_products = filter_enum_products(
                     raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
                 )
 
                 for prod in clean_products:
@@ -167,18 +169,19 @@ def generate_rxns(inp):
             output = og_rxns | new_rxns
             
         else:
-            print(f" - Initializing starting reactant node from {inp.d0_node}")
+            if verbose:
+                print(f" - Initializing starting reactant node from {inp.d0_node}")
             output = dict()
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
                 )
 
             clean_products = filter_enum_products(
                 raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
             )
 
             for prod in clean_products:
@@ -186,9 +189,10 @@ def generate_rxns(inp):
                 output[r2p.hash] = r2p
 
     else:
-        print("Loading reactions")
+        print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"

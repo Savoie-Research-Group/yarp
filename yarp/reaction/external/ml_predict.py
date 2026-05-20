@@ -56,8 +56,8 @@ class EgatMLPredict(MLPredictTask):
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"
 
-        # Grab the container execution command from the base class
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
+        # EGAT flags (--input/--output) follow Docker ENTRYPOINT; use `apptainer run`, not `exec`.
+        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir), apptainer_run=True)
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n\n")

@@ -434,7 +434,7 @@ class yarpecule:
         # Remove temporary file
         os.remove(tmp_file)
 
-    def get_inchi(self):
+    def get_inchi(self, verbose=False):
         """
         Generate the InChIKey for a given yarpecule using RDKit.
         Requires the yarpecule to already have SMILES
@@ -486,8 +486,9 @@ class yarpecule:
             try:
                 inchi = mol.write(format='inchikey').strip().split()[0]
             except:
-                print("WARNING: ERROR in INCHI key generation!")
-                print(f"  --> {mol.write(format='inchikey')}")
+                if verbose:
+                    print("WARNING: ERROR in INCHI key generation!")
+                    print(f"  --> {mol.write(format='inchikey')}")
                 continue
             
             inchikey += [inchi]
@@ -668,6 +669,38 @@ class yarpecule:
     def draw_bmats(self, outfile="be_mats.pdf", show_inline=False):
         self._lewis_struct.draw_bmats(outfile, show_inline)
         return
+
+    def describe_atom_pair(self, pair):
+        """
+        Given a pair of atom indices, 
+        return a human-readable description of the pair 
+        using the atom mapping information and element types.
+        """
+        i, j = sorted(tuple(pair))
+        i_map = self._atom_info[i]["atom_map"]
+        j_map = self._atom_info[j]["atom_map"]
+        i_el = self.elements[i].upper()
+        j_el = self.elements[j].upper()
+
+        return f"atom {i_map} ({i_el}) and atom {j_map} ({j_el})"
+
+    def describe_bond_tuple(self, bond):
+        """
+        Given a bond tuple, 
+        return a human-readable description of the bond 
+        using the atom mapping information and element types.
+        """
+        i, j = bond[:2]
+        return self.describe_atom_pair((i, j))
+
+    def describe_bond_pattern(self, pattern):
+        """
+        Given a bond pattern, 
+        return a human-readable description of the pattern 
+        using the atom mapping information and element types.
+        """
+
+        return [self.describe_atom_pair(pair) for pair in pattern]
 
     def __len__(self):
         return len(self._elements)

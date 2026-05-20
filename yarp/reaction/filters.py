@@ -1,7 +1,7 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None):
+def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None,verbose=False):
     """
     Parameters:
     -----------
@@ -25,12 +25,13 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     candidates : list of yarpecule objects
 
     """
-    print(f" - Reading in {len(rxns)} total reactions")
+    if verbose:
+        print(f" - Reading in {len(rxns)} total reactions")
 
-    if isinstance(dG_source, str):
+    if isinstance(dG_source, str) and verbose:
         print(f" - Barrier filtering selected!")
         print(f"   Reactions with {dG_source} dG above {dG_cutoff} kcal/mol will be excluded from enumeration.")
-    else:
+    elif verbose:
         print(" - No barrier filtering will be performed prior to enumeration")
 
     r_set = set()
@@ -40,7 +41,8 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         if isinstance(dG_source, str):
             dG = rxn.barrier.get(dG_source, None)
             if dG is not None and dG > dG_cutoff:
-                print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
+                if verbose:
+                    print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
                 continue
 
         clean_rxns[count_r] = rxn
@@ -50,7 +52,8 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
     candidates = []
     if netconfig.target_product is not None:
-        print(f" - Constrained network exploration mode selected!")
+        if verbose:
+            print(f" - Constrained network exploration mode selected!")
         candidates = apply_target_blinders(
             raw_rxns=clean_rxns, target_yp=netconfig.target_product,
             dist=netconfig.distance, mode=netconfig.mode,
@@ -61,9 +64,9 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         for rxn in clean_rxns.values():
             candidates.append(rxn.product.graph)
 
-    if separate_prods == 'all':
+    if separate_prods == 'all' and verbose:
         print(f" - Performing product separation on all reactions prior to enumeration")
-    else:
+    elif verbose:
         print(" - No product separation will be performed prior to enumeration")
 
     p_set = set()
@@ -80,7 +83,8 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         for p in prod:
             if p.hash in r_set:
                 p.get_smiles()
-                print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
+                if verbose:
+                    print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
                 continue
             if p.hash in p_set: continue # Throw away all duplicate candidates
 
@@ -88,10 +92,12 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
             p.get_inchi()
             unique_candidates.append(p)
 
-    print(f" - {len(unique_candidates)} unique products identified for enumeration")
+    if verbose:
+        print(f" - {len(unique_candidates)} unique products identified for enumeration")
+        
     return unique_candidates
         
-def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.0, cap='moderate'):
+def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.0, cap='moderate',verbose=False):
     """
     Parameters:
     -----------
@@ -129,9 +135,10 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
 
     candidates = []
     if mode == 'beam':
-        print(f"  + Selecting {k_nodes} enumeration candidates via beam search (with {tolerance} window)")
-        print(f"    Target species: {target_yp.canon_smi}")
-        print(f"    Distance metric: {dist}")
+        if verbose:
+            print(f"  + Selecting {k_nodes} enumeration candidates via beam search (with {tolerance} window)")
+            print(f"    Target species: {target_yp.canon_smi}")
+            print(f"    Distance metric: {dist}")
 
         # Compute distances for each reaction product
         mol2dist = dict()
@@ -163,43 +170,48 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
             else:
                 # Since the list is sorted, we can stop early once we exceed the cutoff
                 break
-
-        print(f"  + Identified {len(top_k_mol_hashes)} candidates within window {tolerance} of top {k_nodes}")
+        if verbose:
+            print(f"  + Identified {len(top_k_mol_hashes)} candidates within window {tolerance} of top {k_nodes}")
 
         for rxn in raw_rxns.values():
             mol = rxn.product.graph
             if mol.hash in top_k_mol_hashes:
-                print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
+                if verbose:
+                    print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
                 candidates.append(mol)
             else:
-                print(f"  + SKIPPED! {rxn.id} == {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
+                if verbose:
+                    print(f"  + SKIPPED! {rxn.id} == {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
 
     elif mode == 'capped':
-        print(f"  + Selecting enumeration candidates via distance capping strategy")
-        print(f"    Target species: {target_yp.canon_smi}")
-        print(f"    Distance metric: {dist}")
+        if verbose:
+            print(f"  + Selecting enumeration candidates via distance capping strategy")
+            print(f"    Target species: {target_yp.canon_smi}")
+            print(f"    Distance metric: {dist}")
         for rxn in raw_rxns.values():
             r_dist = compute_min_distance(rxn.reactant.graph, target_dist_smi, metric=dist)
             p_dist = compute_min_distance(rxn.product.graph, target_dist_smi, metric=dist)
             diff = r_dist - p_dist
             if cap == 'moderate':
                 if diff >= 0.0:
-                    print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
+                    if verbose:
+                        print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
                     candidates.append(rxn.product.graph)
             elif cap == 'aggressive':
                 if diff > 0.0:
-                    print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
+                    if verbose:
+                        print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
                     candidates.append(rxn.product.graph)
             else:
                 raise RuntimeError(f"Cutoff {cap} for capped exploration is not recognized/implemented!")
     else:
         raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
-
-    print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
+    if verbose:
+        print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
     return candidates
 
 
-def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False):
+def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False,verbose=False):
     """
     Parameters:
     -----------
@@ -224,16 +236,19 @@ def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=
     """
 
     # Filter out the garbage potential products according to Lewis threshold
-    print(f"   + Applying Lewis score cutoff of {l_cutoff}")
+    if verbose:
+        print(f"   + Applying Lewis score cutoff of {l_cutoff}")
     clean = [_ for _ in raw_products if _.bond_mat_scores[0] <= l_cutoff]
 
     # Filter out garbage potential products according to formal charge
-    print(f"   + Applying formal charge cutoff of {fc_cutoff}")
+    if verbose:
+        print(f"   + Applying formal charge cutoff of {fc_cutoff}")
     clean = [_ for _ in clean if sum(np.abs(_.fc)) < fc_cutoff]
 
     # Filter out 3 and 4 member rings from potential products
     if ring_filter:
-        print(f"   + Removing 3 and 4 member rings")
+        if verbose:
+            print(f"   + Removing 3 and 4 member rings")
         product = []
         for _ in clean:
             if _.rings != []:
@@ -243,12 +258,13 @@ def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=
                 product.append(_)
         clean = product
 
-    print(f"   + Returning {len(clean)} products after filtering")
+    if verbose:
+        print(f"   + Returning {len(clean)} products after filtering")
     return clean
 
 
 
-def separate_molecules(node):
+def separate_molecules(node, verbose=False):
     """
     Parameters:
     -----------
@@ -263,7 +279,8 @@ def separate_molecules(node):
 
     sep_mols = node.separate()
     if len(sep_mols) > 1:
-        print(f"  + Separating {node.inchi} into {len(sep_mols)} nodes")
+        if verbose:
+            print(f"  + Separating {node.inchi} into {len(sep_mols)} nodes")
 
         for mol in sep_mols:
             mol.get_inchi() # need to generate these for a newly initialized yarpecule object!

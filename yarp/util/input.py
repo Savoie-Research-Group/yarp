@@ -19,6 +19,7 @@ class JobManagerConfig:
     max_active_jobs: int = 100
     queue: Optional[str] = None
     job_name: str = "yarp"
+    account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
 
     def __post_init__(self):
         # Normalize inputs for easier checking
@@ -213,6 +214,7 @@ class InputParser:
             raise RuntimeError("Please provide an initial species for enumeration.")
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
         self.status_file = initnode.get("status", "STATUS.json")
+        self.verbose = initnode.get("verbose", False) # bool, initialize_yarp only
 
         # Job manager configuration
         jm_node = initnode.get("job manager", {})

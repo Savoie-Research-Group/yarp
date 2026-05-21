@@ -152,5 +152,5 @@ for _ in list(el_max_valence.keys()):
     el_max_valence[_.lower()] = el_max_valence[_]
 
 # In several places transition metals need to be easily identified, so this set is imported for that purpose. 
-el_metals = {'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'Au'}
+el_metals = {'Sc','Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'La', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'}
 el_metals.update({ _.lower() for _ in el_metals })

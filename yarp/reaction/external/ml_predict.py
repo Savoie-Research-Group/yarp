@@ -121,8 +121,8 @@ class EgatMLPredict(MLPredictTask):
                     rxn.reverse_barrier[self.config.model] = barrier
 
     def cleanup(self):
-        # remove .csv files, keep logs
-        keep = {"forward.err", "forward.log", "reverse.err", "reverse.log", "run_egat.sh"}
+        # remove everything except output csv files
+        keep = {"forward_out.csv", "reverse_out.csv"}
         for item in self.scratch_dir.iterdir():
             if item.name not in keep:
                 if item.is_file():

@@ -27,6 +27,11 @@ class InitalStructConfig:
         if self.type == 'yarp_pickle' and self.mode != 'reaction':
             raise ValueError(f"Only 'mode = reaction' is valid for 'type = yarp_pickle'")
 
+        if self.type == 'yarp_pickle':
+            if os.path.splitext(self.source)[1].lower() != '.pkl':
+                raise ValueError(f"'source' must be a .pkl file, got: '{self.source}'")
+        # TO-DO: Put in checks for XYZ and SMILES, which are compatible with Tanveer's changes
+
 @dataclass
 class JobManagerConfig:
     """Holds settings for job scheduling and container execution."""

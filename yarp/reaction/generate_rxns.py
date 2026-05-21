@@ -37,11 +37,11 @@ def generate_rxns(inp):
     # Initialize reactions for product enumeration
     if inp.enum.enumerate:
         print("Product enumeration enabled. Enumerating products.")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+        if inp.init_struct.type == 'yarp_pickle':
             if verbose:
                 print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
@@ -81,9 +81,9 @@ def generate_rxns(inp):
             
         else:
             if verbose:
-                print(f" - Initializing starting reactant node from {inp.d0_node}")
+                print(f" - Initializing starting reactant node from {inp.init_struct.source}")
             output = dict()
-            reactant = yarpecule(inp.d0_node, mode="yarp")
+            reactant = yarpecule(inp.init_struct.source, mode="yarp")
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
@@ -101,11 +101,11 @@ def generate_rxns(inp):
 
     else:
         print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+        if inp.init_struct.type == 'yarp_pickle':
             if verbose:
                 print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 

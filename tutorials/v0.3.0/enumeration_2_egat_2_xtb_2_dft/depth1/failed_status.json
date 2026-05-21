@@ -1,8 +1,0 @@
-{
-    "2409865.289214986": {
-        "ll_refine.irc_validation": {
-            "error_log": "IRC validation failed: Outcome was 'unintended'.",
-            "scratch_dir": "/Users/khubler/Documents/notre_dame/research/dev/yarp-again/tutorials/v0.3.0/enumeration_2_egat_2_xtb_2_dft/depth1/SCRATCH/2409865.289214986_ll_refine.irc_validation"
-        }
-    }
-}

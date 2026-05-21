@@ -4,7 +4,7 @@ Tests for EGAT atom-map normalization helpers.
 
 import pytest
 
-from yarp.reaction.egat_mapping import normalize_reaction_smiles_for_egat
+from yarp.reaction.ml_barrier import normalize_reaction_smiles_for_egat
 
 
 def test_sparse_maps_are_densified_zero_based():

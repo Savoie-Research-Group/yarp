@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
-from yarp.reaction.egat_mapping import dense_reaction_smiles_for_egat
+from yarp.reaction.ml_barrier import dense_reaction_smiles_for_egat
 
 class MLPredictTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:

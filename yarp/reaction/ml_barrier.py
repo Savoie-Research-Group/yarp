@@ -1,12 +1,9 @@
 """
 Placeholder for code allowing for ML predicted reaction barriers (and other reaction properties?)
 """
-import omegaconf
 import os
 import pandas as pd
-
-from yarp.reaction.egat.predict_from_smiles import load_model, predict_activation_energy
-from yarp.reaction.egat.dataset import FastDataset
+from rdkit import Chem
 
 
 def _normalize_reaction_smiles_for_egat(rsmiles, psmiles):
@@ -28,6 +25,8 @@ def get_egat_barriers(yp_rxns, model, args, verbose=False):
     model : ???
         Loaded pytorch model
     """
+    from yarp.reaction.egat.predict_from_smiles import predict_activation_energy
+    from yarp.reaction.egat.dataset import FastDataset
 
     rxn_list = list(yp_rxns.values())
     dataframe = []
@@ -90,6 +89,9 @@ def get_egat_barries_from_csv(csv_path, model, args, verbose=False):
     model : ???
         Loaded pytorch model
     """
+    from yarp.reaction.egat.predict_from_smiles import predict_activation_energy
+    from yarp.reaction.egat.dataset import FastDataset
+
     df = pd.read_csv(csv_path)
     test_dataset = FastDataset(args, dataset=csv_path)
     for idx in range(len(test_dataset)):

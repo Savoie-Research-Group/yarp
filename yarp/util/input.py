@@ -51,11 +51,7 @@ class JobManagerConfig:
         if self.container is not None:
             self.container = self.container.lower()
 
-        # Sanity Check 1: Schedulers that require a queue
-        if self.scheduler in ["sge", "slurm"] and not self.queue:
-            raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
-
-        # Sanity Check 2: Apptainer/Singularity environments
+        # Get the proper location of apptainer containers
         if self.container == "apptainer" and not self.sif_location:
             # Dynamically resolve the path relative to this file
             # __file__       == base_git_repo/yarp/util/input.py
@@ -66,6 +62,21 @@ class JobManagerConfig:
             base_repo_path = Path(__file__).resolve().parents[2]
             
             self.sif_location = str(base_repo_path / "containers")
+
+        # Sanity Checks
+        if self.scheduler not in ["local", "sge", "slurm"]:
+            raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', and 'slurm'")
+        if self.container not in ["apptainer", "docker"]:
+            raise ValueError(f"Invalid 'container' entered: '{self.container}'. Valid options are 'apptainer' and 'docker'")
+        if self.scheduler in ["sge", "slurm"] and not self.queue:
+            raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
+
+        if not isinstance(self.max_active_jobs, int):
+            raise ValueError("Please provide an integer value to 'max_active_jobs'")
+        if self.sif_location and not isinstance(self.sif_location, str):
+            raise ValueError("Please provide a valid string value to 'sif_location'")
+        if self.module_container and not isinstance(self.sif_location, str):
+            raise ValueError("Please provide a valid string value to 'module_container'")
 
 @dataclass
 class EnumerationConfig:

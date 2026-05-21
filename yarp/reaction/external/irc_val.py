@@ -1,4 +1,5 @@
 import os
+import shutil
 import re
 import numpy as np
 
@@ -304,7 +305,19 @@ class PysisyphusIRCValCalculator(IRCValTask):
         return True
 
     def cleanup(self):
-        pass
+        """Per run dir: keep yaml input, log, and IRC endpoint geometries; delete input TS xyz and xTB calc dirs."""
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"irc_run{i}"
+            if not run_dir.exists():
+                continue
+            keep = {f"irc_{i}_input.yaml", f"irc_{i}.log", "forward_end_opt.xyz", "backward_end_opt.xyz"}
+            for item in run_dir.iterdir():
+                if item.name not in keep:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
 
     def _write_pysis_irc_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
@@ -524,7 +537,19 @@ class OrcaIRCValCalculator(IRCValTask):
         return True
 
     def cleanup(self):
-        pass
+        """Per run dir: keep inp, output log, and IRC endpoint geometries; delete input TS xyz, .gbw, .densities, etc."""
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"irc_run{i}"
+            if not run_dir.exists():
+                continue
+            keep = {f"irc_{i}.inp", f"irc_{i}.out", f"irc_{i}_IRC_F.xyz", f"irc_{i}_IRC_B.xyz"}
+            for item in run_dir.iterdir():
+                if item.name not in keep:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
 
     def _write_orca_irc_input(self, input_path, input_geo_xyz):
 

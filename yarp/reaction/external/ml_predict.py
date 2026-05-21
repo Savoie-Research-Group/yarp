@@ -121,6 +121,12 @@ class EgatMLPredict(MLPredictTask):
                     rxn.reverse_barrier[self.config.model] = barrier
 
     def cleanup(self):
-        # # EGAT is lightweight, maybe just delete the folder
-        # shutil.rmtree(self.scratch_dir)
-        pass
+        # remove everything except output csv files
+        keep = {"forward_out.csv", "reverse_out.csv"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        return

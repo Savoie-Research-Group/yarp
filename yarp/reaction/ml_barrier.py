@@ -7,7 +7,6 @@ import pandas as pd
 
 from yarp.reaction.egat.predict_from_smiles import load_model, predict_activation_energy
 from yarp.reaction.egat.dataset import FastDataset
-from yarp.reaction.egat_mapping import normalize_reaction_smiles_for_egat
 
 
 def _normalize_reaction_smiles_for_egat(rsmiles, psmiles):
@@ -109,3 +108,64 @@ def get_egat_barries_from_csv(csv_path, model, args, verbose=False):
                 print(f"Error predicting barrier for {strings}: {e}")
                 df.loc[idx, 'egat_barrier'] = None
     return df
+
+
+
+def _explicit_atom_maps(mol):
+    maps = []
+    missing = []
+    for atom in mol.GetAtoms():
+        if not atom.HasProp("molAtomMapNumber"):
+            missing.append(atom.GetIdx())
+            continue
+        maps.append(int(atom.GetProp("molAtomMapNumber")))
+    if missing:
+        raise ValueError(f"Atoms missing explicit atom maps: {missing}")
+    return maps
+
+
+def normalize_reaction_smiles_for_egat(rsmiles, psmiles):
+    """
+    Return temporary EGAT-only mapped SMILES with dense 0..N-1 atom-map labels.
+
+    The original YARP reaction objects remain untouched. This exists because
+    EGAT feature generation assumes dense positional map labels on both sides
+    of the reaction.
+    """
+    rmol = Chem.MolFromSmiles(rsmiles, sanitize=False)
+    pmol = Chem.MolFromSmiles(psmiles, sanitize=False)
+    if rmol is None or pmol is None:
+        raise ValueError("Could not parse mapped reaction smiles for EGAT normalization.")
+
+    r_maps = _explicit_atom_maps(rmol)
+    p_maps = _explicit_atom_maps(pmol)
+
+    if len(set(r_maps)) != len(r_maps):
+        dupes = sorted({m for m in r_maps if r_maps.count(m) > 1})
+        raise ValueError(f"Duplicate reactant atom maps encountered during EGAT normalization: {dupes}")
+    if len(set(p_maps)) != len(p_maps):
+        dupes = sorted({m for m in p_maps if p_maps.count(m) > 1})
+        raise ValueError(f"Duplicate product atom maps encountered during EGAT normalization: {dupes}")
+
+    if set(r_maps) != set(p_maps):
+        raise ValueError(
+            "Reactant/product atom-map sets differ during EGAT normalization. "
+            f"Reactant-only: {sorted(set(r_maps) - set(p_maps))}; "
+            f"Product-only: {sorted(set(p_maps) - set(r_maps))}"
+        )
+
+    old_to_new = {
+        old_map: new_map
+        for new_map, old_map in enumerate(sorted(set(r_maps)))
+    }
+
+    for mol in (rmol, pmol):
+        for atom in mol.GetAtoms():
+            atom.SetProp("molAtomMapNumber", str(old_to_new[int(atom.GetProp("molAtomMapNumber"))]))
+
+    return Chem.MolToSmiles(rmol), Chem.MolToSmiles(pmol)
+
+
+def dense_reaction_smiles_for_egat(rsmiles, psmiles):
+    rsmiles, psmiles = normalize_reaction_smiles_for_egat(rsmiles, psmiles)
+    return f"{rsmiles}>>{psmiles}"

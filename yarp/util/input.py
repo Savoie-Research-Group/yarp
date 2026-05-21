@@ -12,6 +12,22 @@ from yarp.yarpecule.yarpecule import yarpecule
 # --- CONFIGURATION OBJECTS ---
 # These classes act as simple containers for user provided settings.
 @dataclass
+class InitalStructConfig:
+    """Holds settings for reading in initial species/reactions data."""
+    source: str = None
+    type: str = None
+    mode: str = None
+
+    def __post_init__(self):
+        if self.type not in ["smiles", "xyz", "yarp_pickle"]:
+            raise ValueError(f"Invalid 'type' provided in 'initial_species': {self.type}. Valid options are 'smiles', 'xyz', or 'yarp_pickle'")
+        if self.mode not in ["species", "reaction"]:
+            raise ValueError(f"Invalid 'mode' provided in 'initial_species': {self.mode}. Valid options are 'species' or 'reaction'")
+
+        if self.type == 'yarp_pickle' and self.mode != 'reaction':
+            raise ValueError(f"Only 'mode = reaction' is valid for 'type = yarp_pickle'")
+
+@dataclass
 class JobManagerConfig:
     """Holds settings for job scheduling and container execution."""
     scheduler: str = "local"
@@ -210,11 +226,6 @@ class InputParser:
             raise RuntimeError("Hey bro beans, I need some molecules or reactions to work with. "
                                "Missing `initialize` node in YAML file.")
 
-        # Core level inputs
-        self.d0_node = initnode.get("initial species", None)
-        if not self.d0_node:
-            raise RuntimeError("Please provide an initial species for enumeration.")
-
         # Control of output generation
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
         if os.path.splitext(self.out_file)[1].lower() != '.pkl':
@@ -228,17 +239,27 @@ class InputParser:
         if self.verbose not in [True, False]:
             raise ValueError(f"Acceptable inputs for 'verbose' are 'True' or 'False', got: '{self.verbose}'")
 
+        # Reading in intial structure controls
+        init_struct_node = initnode.get("initial_structure", {})
+        if init_struct_node == {}:
+            raise RuntimeError("Missing required block! 'initial_structure' must be provided!")
+        self.init_struct = self._parse_init_struct(init_struct_node)
+
         # Job manager configuration
-        jm_node = initnode.get("job manager", {})
+        jm_node = initnode.get("job_manager", {})
         self.job_manager = self._parse_job_manager(jm_node)
 
         # Enumeration configs
         enum_node = initnode.get("enumeration", {})
+        if self.init_struct.mode == 'species' and enum_node == {}:
+            raise RuntimeError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
         self.enum = self._parse_enum_config(enum_node)
         self.enum_filters = self._parse_enum_filters(enum_node)
         self.net_explore = self._parse_network_config(enum_node)
 
-        # Process stages node
+        # ---------------------------------------------------------
+        # 2. Process Stages Node(s)
+        # ---------------------------------------------------------
         self.stage_names = file_dict.get('stages', [])
         self.stage_configs: Dict[str, StageConfig] = {}
 
@@ -277,6 +298,23 @@ class InputParser:
         # Dynamically link inter-stage dependencies for path refinement
         self._link_refine_dependencies()
 
+    def _parse_init_struct(self, init_struct: dict) -> InitalStructConfig:
+         # 1. Normalize keys (spaces to underscores) and drop None values.
+        # Dropping None ensures we don't accidentally overwrite a dataclass default.
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in init_struct.items()
+            if value is not None
+        }
+        # 2. Unpack the clean dictionary into the dataclass
+        try:
+            return InitalStructConfig(**kwargs)
+        except TypeError as e:
+            # Python's dataclass automatically raises a TypeError for two reasons:
+            # A) A required field (one without a default) is missing.
+            # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
+            raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
+
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
         # If the user omitted the block entirely, use all dataclass defaults
@@ -286,8 +324,8 @@ class InputParser:
         # 1. Normalize keys (spaces to underscores) and drop None values.
         # Dropping None ensures we don't accidentally overwrite a dataclass default.
         kwargs = {
-            key.replace(" ", "_"): value 
-            for key, value in jm_node.items() 
+            key.replace(" ", "_"): value
+            for key, value in jm_node.items()
             if value is not None
         }
 

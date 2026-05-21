@@ -1,6 +1,8 @@
 """
 Definition of input object class
 """
+import os
+
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Dict, Any
 from pathlib import Path
@@ -212,9 +214,19 @@ class InputParser:
         self.d0_node = initnode.get("initial species", None)
         if not self.d0_node:
             raise RuntimeError("Please provide an initial species for enumeration.")
+
+        # Control of output generation
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
+        if os.path.splitext(self.out_file)[1].lower() != '.pkl':
+            raise ValueError(f"'output' must be a .pkl file, got: '{self.out_file}'")
+
         self.status_file = initnode.get("status", "STATUS.json")
+        if os.path.splitext(self.status_file)[1].lower() != '.json':
+            raise ValueError(f"'status' must be a .json file, got: '{self.status_file}'")
+
         self.verbose = initnode.get("verbose", False) # bool, initialize_yarp only
+        if self.verbose not in [True, False]:
+            raise ValueError(f"Acceptable inputs for 'verbose' are 'True' or 'False', got: '{self.verbose}'")
 
         # Job manager configuration
         jm_node = initnode.get("job manager", {})

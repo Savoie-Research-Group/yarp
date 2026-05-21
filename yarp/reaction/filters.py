@@ -1,7 +1,8 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
+from yarp.reaction.enum import validate_reactive_maps_against_starting_species
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None,verbose=False):
+def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, react_atoms=[], verbose=False):
     """
     Parameters:
     -----------
@@ -19,6 +20,11 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
     netconfig : NetworkConfig object
         Dataclass that holds settings for network exploration mode from input file
+
+    react_atoms : list
+        Reactive atom-map ids from the input file. When product separation is
+        enabled, these are validated against the unseparated product before
+        fragments are generated.
 
     Returns:
     --------
@@ -75,6 +81,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
         # Apply separate product routine to each/select products (optionally)
         if separate_prods == 'all':
+            validate_reactive_maps_against_starting_species(mol, react_atoms)
             prod = separate_molecules(mol)
         else:
             prod = [mol]

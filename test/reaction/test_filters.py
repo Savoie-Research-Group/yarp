@@ -1,5 +1,8 @@
 import pytest
+from types import SimpleNamespace
 from yarp.reaction.filters import apply_target_blinders
+from yarp.reaction.filters import filter_enum_candidates
+from yarp.reaction.reaction import reaction
 from yarp.yarpecule.yarpecule import yarpecule
 
 @pytest.fixture
@@ -27,3 +30,16 @@ def target_yp():
     #     assert len(candidates) == 3
 
 
+def test_separated_candidate_reactive_maps_validate_before_separation():
+    reactant = yarpecule('CC')
+    product = yarpecule('[CH3].[CH3]')
+    rxn = reaction(reactant, product)
+
+    with pytest.raises(ValueError, match="Reactive atom maps missing"):
+        filter_enum_candidates(
+            {rxn.hash: rxn},
+            separate_prods='all',
+            netconfig=SimpleNamespace(target_product=None),
+            react_atoms=[set([999])],
+            verbose=False,
+        )

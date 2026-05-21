@@ -4,6 +4,7 @@ Testing suite for functions contained in yarp/reaction/enum.py
 import pytest
 import numpy as np
 from yarp.reaction.enum import bnfn, enumerate_products
+from yarp.reaction.enum import _resolve_reactive_atoms_for_candidate
 from yarp.reaction.filters import filter_enum_products
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
@@ -259,3 +260,45 @@ class TestSequentialPhoto:
 
         assert c2.hash in b2f1_filt_hash
         assert c3.hash in b2f1_filt_hash
+
+
+class TestReactiveAtomMaps:
+    def test_invalid_reactive_map_raises(self):
+        mol = yarpecule('O=CCCOO')
+
+        with pytest.raises(ValueError, match="Reactive atom maps missing"):
+            enumerate_products(
+                mol,
+                n_break=1,
+                n_form=1,
+                react=[set([999])],
+                mode="concerted",
+                verbose=False,
+            )
+
+    def test_fragment_policy_skips_empty_intersection(self):
+        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
+            fragment_policy=True,
+        )
+
+        assert products == []
+
+    def test_nonprefix_reactive_maps_resolve_to_local_indices(self):
+        mol = yarpecule('O=CCCOO')
+        local_react, present, missing = _resolve_reactive_atoms_for_candidate(
+            mol,
+            react=[set([0, 4, 5])],
+        )
+
+        assert present == [0, 4, 5]
+        assert missing == []
+        assert len(local_react) == 1
+        assert len(local_react[0]) == 3

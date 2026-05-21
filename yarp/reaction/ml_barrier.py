@@ -4,52 +4,21 @@ Placeholder for code allowing for ML predicted reaction barriers (and other reac
 import omegaconf
 import os
 import pandas as pd
-from rdkit import Chem
 
 from yarp.reaction.egat.predict_from_smiles import load_model, predict_activation_energy
 from yarp.reaction.egat.dataset import FastDataset
+from yarp.reaction.egat_mapping import normalize_reaction_smiles_for_egat
 
 
 def _normalize_reaction_smiles_for_egat(rsmiles, psmiles):
     """
-    Return temporary EGAT-only mapped smiles with dense 1..N atom-map labels.
+    Return temporary EGAT-only mapped smiles with dense 0..N-1 atom-map labels.
 
     The original YARP reaction objects remain untouched. This exists because
     EGAT feature generation assumes dense positional map labels on both sides
     of the reaction.
     """
-    rmol = Chem.MolFromSmiles(rsmiles, sanitize=False)
-    pmol = Chem.MolFromSmiles(psmiles, sanitize=False)
-    if rmol is None or pmol is None:
-        raise ValueError("Could not parse mapped reaction smiles for EGAT normalization.")
-
-    r_maps = [atom.GetAtomMapNum() for atom in rmol.GetAtoms()]
-    p_maps = [atom.GetAtomMapNum() for atom in pmol.GetAtoms()]
-
-    if len(set(r_maps)) != len(r_maps):
-        dupes = sorted({m for m in r_maps if r_maps.count(m) > 1})
-        raise ValueError(f"Duplicate reactant atom maps encountered during EGAT normalization: {dupes}")
-    if len(set(p_maps)) != len(p_maps):
-        dupes = sorted({m for m in p_maps if p_maps.count(m) > 1})
-        raise ValueError(f"Duplicate product atom maps encountered during EGAT normalization: {dupes}")
-
-    if set(r_maps) != set(p_maps):
-        raise ValueError(
-            "Reactant/product atom-map sets differ during EGAT normalization. "
-            f"Reactant-only: {sorted(set(r_maps) - set(p_maps))}; "
-            f"Product-only: {sorted(set(p_maps) - set(r_maps))}"
-        )
-
-    old_to_new = {
-        old_map: new_map
-        for new_map, old_map in enumerate(sorted(set(r_maps)), start=1)
-    }
-
-    for mol in (rmol, pmol):
-        for atom in mol.GetAtoms():
-            atom.SetAtomMapNum(old_to_new[atom.GetAtomMapNum()])
-
-    return Chem.MolToSmiles(rmol), Chem.MolToSmiles(pmol)
+    return normalize_reaction_smiles_for_egat(rsmiles, psmiles)
 
 
 def get_egat_barriers(yp_rxns, model, args, verbose=False):

@@ -5,7 +5,7 @@ initialize:
   mode: concerted
   bonds to break: 2
   bonds to form: 2
-  reactive atoms: [0, 1, 2, 3, 4, 5] # incompatible with separate products!!!
+  reactive atoms: [0, 1, 2, 3, 4, 5] # atom-map IDs; compatible with separated-product restarts after validation
   # separate products: all
   enumeration filters:
     lewis score: 0.0

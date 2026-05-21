@@ -50,7 +50,7 @@ def generate_rxns(inp):
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore, verbose=verbose
+                netconfig=inp.net_explore, react_atoms=inp.enum.react_atoms, verbose=verbose
             )
 
             new_rxns = dict()
@@ -59,7 +59,8 @@ def generate_rxns(inp):
                     print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose,
+                    fragment_policy=inp.enum_filters.separate_prods == 'all'
                 )
 
                 clean_products = filter_enum_products(

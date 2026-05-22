@@ -131,8 +131,8 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         if local_react is None:
             return []
 
-        print(f"   + Reactive atoms: {r_yp.reactive_map_smi(react)}")
         if verbose:
+            print(f"   + Reactive atoms: {r_yp.reactive_map_smi(react)}")
             react_list = sorted(local_react[0])
             element_list = [r_yp.elements[i] for i in react_list]
             msg = f"   + Reactive atoms defined as: map {present_maps} --> element {element_list}"

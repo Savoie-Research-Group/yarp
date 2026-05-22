@@ -291,6 +291,52 @@ class TestReactiveAtomMaps:
 
         assert products == []
 
+    def test_fragment_policy_skip_logs_only_when_verbose(self, capsys):
+        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
+            fragment_policy=True,
+        )
+
+        assert products == []
+        assert "Molecule contains no atoms in reactive set" not in capsys.readouterr().out
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=True,
+            fragment_policy=True,
+        )
+
+        assert products == []
+        assert "Molecule contains no atoms in reactive set" in capsys.readouterr().out
+
+    def test_fragment_policy_allows_partial_map_intersection(self, capsys):
+        mol = yarpecule('[C:0][O:1]', canon=False)
+
+        enumerate_products(
+            mol,
+            n_break=1,
+            n_form=0,
+            react=[set([0, 999])],
+            mode="concerted",
+            verbose=True,
+            fragment_policy=True,
+        )
+
+        output = capsys.readouterr().out
+        assert "Reactive atoms defined as: map [0]" in output
+        assert "candidate missing maps [999]" in output
+
     def test_nonprefix_reactive_maps_resolve_to_local_indices(self):
         mol = yarpecule('O=CCCOO')
         local_react, present, missing = _resolve_reactive_atoms_for_candidate(

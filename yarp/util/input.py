@@ -79,43 +79,76 @@ class JobManagerConfig:
             raise ValueError("Please provide a valid string value to 'module_container'")
 
 @dataclass
-class EnumerationConfig:
-    """Holds settings specific to the generation of products via enumeration."""
-    enumerate: bool = False
-    mode: str = "concerted"
-    n_break: int = 2
-    n_form: int = 2
-    react_atoms: List[set] = field(default_factory=list)
+class PropertyFilterConfig:
+    type: str
+    source: str
+    threshold: float
+
+    def __post_init__(self):
+        if self.type not in ['barrier', 'reverse_barrier']:
+            raise ValueError(f"Invalid property selected: '{self.type}'. Valid options are 'barrier', 'reverse_barrier'")
 
 @dataclass
-class EnumFilterConfig:
-    """Holds settings specific to cleaning up enumeration outputs"""
-    # Pre-enumeration filters
-    dG_cutoff: float = 1000.0
-    dG_source: Optional[str] = None
-    separate_prods: Union[str, List[int]] = field(default_factory=list)
+class ProductBlindersConfig:
+    target_product: str = None
+    distance_metric: str = "soergel"
+    mode: str = "beam"
+    n_nodes: int = 1
 
-    # Post-enumeration filters
-    l_cutoff: float = 0.0
-    fc_cutoff: float = 2.0
+    def __post_init__(self):
+        if not self.target_product:
+            raise ValueError("If using product blinders, you must provide a 'target_product'!!!")
+        
+        try:
+            target = yarpecule(self.target_product)
+            target.get_inchi()
+            target.get_smiles()
+            self.target_product = target
+        except TypeError as e:
+            raise ValueError(f"Invalid entry for 'target_product': {e}")
+
+@dataclass
+class PreEnumFilters:
+    separate_prods: bool = False
+    property_filter: Optional[PropertyFilterConfig] = None
+    product_blinders: Optional[ProductBlindersConfig] = None
+
+@dataclass
+class PostEnumFilters:
+    lewis_score: float = 0.0
+    formal_charge: float = 2.0
     ring_filter: bool = False
 
 @dataclass
-class NetworkConfig:
-    """Holds settings specific to generating a multi-layered reaction network"""
-    target_product: Optional[yarpecule] = None
-    distance: str = 'sorgel'
-    mode: str = 'capped'
-    n_nodes: Optional[int] = 1
-    tolerance: float = 0.0
-    cap: str = 'moderate'
+class EnumerationConfig:
+    ON: bool = False
+    mode: str = "concerted"
+    n_break: int = 2
+    n_form: int = 2
+    pre_enum_filters: PreEnumFilters = field(default_factory=PreEnumFilters)
+    post_enum_filters: PostEnumFilters = field(default_factory=PostEnumFilters)
+    react_atoms: List[set] = field(default_factory=list)
 
-@dataclass
-class PreProcessFilterConfig:
-    """Holds settings for filtering out reactions before downstream reaction characterization steps."""
-    property: str
-    source: str
-    threshold: float
+    def __post_init__(self):
+        # Clean up reactive atoms input for uniqueness
+        react_atoms_processed = []
+        if self.react_atoms:
+            react_atoms_processed = [set(self.react_atoms)]
+            self.react_atoms = react_atoms_processed
+
+        # Sanity checks
+        if self.mode not in ["concerted", "sequential"]:
+            raise ValueError(f"Invalid enumeration 'mode' entered: '{self.mode}'. Valid options are 'concerted' and 'sequential'")
+        if not isinstance(self.n_break, int):
+            raise ValueError("Please provide an integer value to 'n_break'")
+        if not isinstance(self.n_form, int):
+            raise ValueError("Please provide an integer value to 'n_form'")
+        # TO-DO: Put in sanity checks related to reactive atoms!
+
+        # User warnings
+        if self.mode == 'concerted' and self.n_break != self.n_form:
+            print(f"WARNING! Concerted enumeration requires n_break = n_form! Setting n_break = n_form = {self.n_break}")
+            self.n_form = self.n_break
 
 @dataclass
 class GeomSourceConfig:
@@ -257,8 +290,6 @@ class InputParser:
 
         # Reading in intial structure controls
         init_struct_node = initnode.get("initial_structure", {})
-        if init_struct_node == {}:
-            raise RuntimeError("Missing required block! 'initial_structure' must be provided!")
         self.init_struct = self._parse_init_struct(init_struct_node)
 
         # Job manager configuration
@@ -267,11 +298,14 @@ class InputParser:
 
         # Enumeration configs
         enum_node = initnode.get("enumeration", {})
-        if self.init_struct.mode == 'species' and enum_node == {}:
-            raise RuntimeError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
+        if enum_node != {}:
+            enum_node['ON'] = True
         self.enum = self._parse_enum_config(enum_node)
-        self.enum_filters = self._parse_enum_filters(enum_node)
-        self.net_explore = self._parse_network_config(enum_node)
+
+        if self.init_struct.mode == 'species' and not self.enum.ON:
+            raise ValueError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
+        if self.init_struct.mode == 'species' and self.enum.pre_enum_filters:
+            print(f"WARNING: When starting from single species, all 'pre_enum_filters' are non-applicable!")
 
         # ---------------------------------------------------------
         # 2. Process Stages Node(s)
@@ -315,6 +349,9 @@ class InputParser:
         self._link_refine_dependencies()
 
     def _parse_init_struct(self, init_struct: dict) -> InitalStructConfig:
+        if not init_struct or init_struct == {}:
+            raise ValueError("Missing required block! 'initial_structure' must be provided!")
+
          # 1. Normalize keys (spaces to underscores) and drop None values.
         # Dropping None ensures we don't accidentally overwrite a dataclass default.
         kwargs = {
@@ -329,7 +366,7 @@ class InputParser:
             # Python's dataclass automatically raises a TypeError for two reasons:
             # A) A required field (one without a default) is missing.
             # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
-            raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
+            raise ValueError(f"Invalid 'initial_structure' configuration in YAML: {e}")
 
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
@@ -347,89 +384,65 @@ class InputParser:
 
         # 2. Unpack the clean dictionary into the dataclass
         try:
-            return JobManagerConfig(**kwargs)
+            return JobManagerConfig(**{k: v for k, v in kwargs.items() if k in JobManagerConfig.__dataclass_fields__})
         except TypeError as e:
             # Python's dataclass automatically raises a TypeError for two reasons:
             # A) A required field (one without a default) is missing.
             # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
             raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
 
-    def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:
-        """Handles the logic for the 'separate products' input."""
-        if raw_value is None:
-            return []
-        if isinstance(raw_value, str) and raw_value.lower() == 'all':
-            return 'all'
-        if isinstance(raw_value, int):
-            return [raw_value]
-        if isinstance(raw_value, list):
-            return raw_value
-
-        raise RuntimeError(f"Invalid value for separate products: {raw_value}")
-
     def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
-        """Extracts enumeration settings and returns a clean EnumerationConfig object."""
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in enum_node.items()
+            if value is not None
+        }
 
-        # Handle the reactive atoms list-to-set conversion
-        raw_react = enum_node.get("reactive atoms", None)
-        react_atoms_processed = []
-        if raw_react:
-            react_atoms_processed = [set(raw_react)]
+        pre_node = kwargs.pop("pre_enum_filters", {}) or {}
+        post_node = kwargs.pop("post_enum_filters", {}) or {}
 
-        return EnumerationConfig(
-            enumerate=enum_node.get("enumerate", False),
-            mode=enum_node.get("mode", "concerted"),
-            n_break=enum_node.get("bonds to break", 2),
-            n_form=enum_node.get("bonds to form", 2),
-            react_atoms=react_atoms_processed,
+        pre_filters = self._parse_pre_enum_filters(pre_node)
+        post_filters = self._parse_post_enum_filters(post_node)
+
+        try:
+            return EnumerationConfig(
+                pre_enum_filters=pre_filters,
+                post_enum_filters=post_filters,
+                **{k: v for k, v in kwargs.items() if k in EnumerationConfig.__dataclass_fields__}
+            )
+        except TypeError as e:
+            raise ValueError(f"Invalid 'enumeration' configuration in YAML: {e}")
+
+    def _parse_pre_enum_filters(self, pre_node: dict) -> PreEnumFilters:
+        if pre_node is None:
+            pre_node = {}
+
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in pre_node.items()
+            if value is not None
+        }
+
+        property_data = kwargs.pop("property", {}) or {}
+        product_blinders_data = kwargs.pop("product_blinders", {}) or {}
+
+        return PreEnumFilters(
+            property_filter=PropertyFilterConfig(**property_data) if property_data else None,
+            product_blinders=ProductBlindersConfig(**product_blinders_data) if product_blinders_data else None,
+            **{k: v for k, v in kwargs.items() if k in PreEnumFilters.__dataclass_fields__}
         )
 
-    def _parse_enum_filters(self, enum_node: dict) -> EnumFilterConfig:
-        """Extracts enumeration filtering settings and returns a clean EnumFilterConfig object."""
+    def _parse_post_enum_filters(self, post_node: dict) -> PostEnumFilters:
+        if post_node is None:
+            post_node = {}
 
-        # Handle complex "separate products" logic using a helper method
-        separate_prods = self._parse_separate_prods(enum_node.get("separate products"))
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in post_node.items()
+            if value is not None
+        }
 
-        # Handle nested filters
-        filters = enum_node.get('enumeration filters', {})
-        # If filters is None (yaml key exists but is empty), treat as empty dict
-        if filters is None: 
-            filters = {}
-
-        return EnumFilterConfig(
-            l_cutoff=filters.get('lewis score', 0.0),
-            fc_cutoff=filters.get('formal charge', 2.0),
-            ring_filter=filters.get('discard strained rings', False),
-            dG_cutoff=filters.get('barrier cutoff', -100.00),
-            dG_source=filters.get('barrier source', None),
-            separate_prods=separate_prods
-        )
-
-    def _parse_network_config(self, enum_node: dict) -> NetworkConfig:
-        """Extracts network exploration settings and returns a clean NetworkConfig object."""
-
-        # Handle nested filters
-        netconfig = enum_node.get('network exploration', {})
-        # If netconfig is None (yaml key exists but is empty), treat as empty dict
-        if netconfig is None: 
-            netconfig = {}
-
-        target = netconfig.get("target product", None)
-        if target is not None:
-            target_yp = yarpecule(target)
-            target_yp.get_inchi()
-            target_yp.get_smiles()
-        else:
-            target_yp = None
-
-        return NetworkConfig(
-            target_product=target_yp,
-            distance=netconfig.get("distance metric", 'soergel'),
-            mode=netconfig.get("mode", 'capped'),
-            n_nodes=netconfig.get("n_nodes", 1),
-            tolerance=netconfig.get("tie window", 0.0),
-            cap=netconfig.get("cutoff", "moderate")
-        )
+        return PostEnumFilters(**{k: v for k, v in kwargs.items() if k in PostEnumFilters.__dataclass_fields__})
 
     def _parse_stage(self, name: str, data: dict) -> StageConfig:
         method = data.get('method')
@@ -461,13 +474,8 @@ class InputParser:
 
         elif method == 'init_rxn_path':
             pre_filter_node = data.get("pre_process_filtering")
-            pre_filter_node = data.get("pre_process_filtering")
             if pre_filter_node:
-                self.stage_filters[name] = PreProcessFilterConfig(
-                    property=pre_filter_node.get("property"),
-                    source=pre_filter_node.get("source"),
-                    threshold=float(pre_filter_node.get("threshold"))
-                )
+                self.stage_filters[name] = PropertyFilterConfig(**{k: v for k, v in pre_filter_node.items() if k in PropertyFilterConfig.__dataclass_fields__})
 
             conf_data = data.get('conformers', {})
             conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})

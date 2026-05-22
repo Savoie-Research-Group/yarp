@@ -35,7 +35,7 @@ def generate_rxns(inp):
     verbose = inp.verbose
 
     # Initialize reactions for product enumeration
-    if inp.enum.enumerate:
+    if inp.enum.ON:
         print("Product enumeration enabled. Enumerating products.")
         if inp.init_struct.type == 'yarp_pickle':
             if verbose:
@@ -63,8 +63,9 @@ def generate_rxns(inp):
                 )
 
                 clean_products = filter_enum_products(
-                    raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                    raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                    fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                    verbose=verbose
                 )
 
                 for prod in clean_products:
@@ -91,8 +92,9 @@ def generate_rxns(inp):
                 )
 
             clean_products = filter_enum_products(
-                raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                verbose=verbose
             )
 
             for prod in clean_products:

@@ -1,12 +1,10 @@
 initialize:
-  initial species: ../pickles/haa_heavy_b2f2_d1.pkl
   output: tmp.pkl
+  initial_structure:
+    source: ../pickles/haa_heavy_b2f2_d1.pkl
+    type: yarp_pickle
+    mode: reaction
   enumeration:
-    enumerate: True
     mode: concerted
-    bonds to break: 2
-    bonds to form: 2
-    enumeration filters:
-      lewis score: 0.0
-      formal charge: 2.0
-      discard strained rings: False
+    n_break: 2
+    n_form: 2

@@ -4,7 +4,3 @@ initialize:
     source: OCC=O
     type: smiles
     mode: species
-  enumeration:
-    mode: concerted
-    n_break: 2
-    n_form: 2

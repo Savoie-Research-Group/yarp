@@ -173,14 +173,16 @@ class InitialGeomConfig:
 @dataclass
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
-    model: str = 'egat_rgd1'
+    model: str
     n_cpus: int = 8
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
+        if not self.model:
+            raise ValueError("Missing required key! Please provide 'model' when using ml_rxn_prop method!")
         if self.model not in ['egat_rgd1']:
-            raise ValueError(f"Invalid 'model' provided: '{self.model}' Currently, only option is 'egat_rdg1'")
+            raise ValueError(f"Invalid 'model' provided: '{self.model}' Currently, only valid option is 'egat_rdg1'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
@@ -191,15 +193,41 @@ class MLPropConfig:
 @dataclass
 class ConformerConfig:
     """Holds settings specific to generating a reactant/product conformers"""
-    software: str = "crest"
-    lot: str = "gfn2"
+    software: str = None
+    lot: str = None
+    charge: int = None
+    n_unpaired_electrons: int = None
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
-    charge: int = 0
-    n_unpaired_electrons: int = 0
+
+    def __post_init__(self):
+        if self.charge == None:
+            raise ValueError("Missing required key! Please provide 'charge' in conf_gen block!")
+        if not self.software:
+            raise ValueError("Missing required key! Please provide 'software' in conf_gen block!")
+        if self.software not in ['crest']:
+            raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'crest'")
+        if self.software == 'crest' and self.lot not in ['gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff']:
+            raise ValueError(f"Invalid 'lot' for CREST software! Valid options: 'gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff'")
+        if self.software == 'crest' and self.n_unpaired_electrons == None:
+            raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
+
+        if not isinstance(self.charge, int):
+            raise ValueError("Please provide an integer value to 'charge'")
+        if self.n_unpaired_electrons != None and not isinstance(self.n_unpaired_electrons, int):
+            raise ValueError("Please provide an integer value to 'n_unpaired_electrons'")
+        if not isinstance(self.energy_window, float):
+            raise ValueError("Please provide a float value to 'energy_window'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide 'max_runtime' time in HH:MM:SS!")
+
 
 @dataclass
 class GSMConfig:
@@ -497,7 +525,7 @@ class InputParser:
             if pre_filter_node:
                 self.stage_filters[name] = PropertyFilterConfig(**{k: v for k, v in pre_filter_node.items() if k in PropertyFilterConfig.__dataclass_fields__})
 
-            conf_data = data.get('conformers', {})
+            conf_data = data.get('conf_gen', {})
             conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})
 
             gsm_data = data.get('gsm', {})

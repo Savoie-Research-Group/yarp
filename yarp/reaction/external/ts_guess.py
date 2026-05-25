@@ -214,7 +214,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
         lot = self.config.gsm_lot.lower()
-        assert (self.config.gsm_lot.lower() == 'xtb'), "GSM with Pysisyphus is xTB or bust right now, friend..."
 
         # Write the file! Yay, YAML friend!
         with open(input_path, 'a') as f:

@@ -25,7 +25,7 @@ def get_calculator(task_def, rxn_data, job_config) -> AsyncYarpCalculator:
             return CrestConfCalculator(task_def, rxn_data, job_config)
 
     # Task 3: TS Guess
-    elif t_type == "gsm":
+    elif t_type == "ts_guess":
         if software == "pysisyphus":
             return PysisyphusTSGuessCalculator(task_def, rxn_data, job_config)
 

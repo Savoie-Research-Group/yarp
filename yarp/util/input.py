@@ -174,6 +174,7 @@ class InitialGeomConfig:
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
     model: str
+
     n_cpus: int = 8
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
@@ -184,11 +185,11 @@ class MLPropConfig:
         if self.model not in ['egat_rgd1']:
             raise ValueError(f"Invalid 'model' provided: '{self.model}' Currently, only valid option is 'egat_rdg1'")
         if not isinstance(self.n_cpus, int):
-            raise ValueError("Please provide an integer value to 'n_cpus'")
+            raise ValueError("Please provide an integer value to ml_rxn_prop -> 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
-            raise ValueError("Please provide an integer value (in MB) to 'mem_per_cpu'")
+            raise ValueError("Please provide an integer value (in MB) to ml_rxn_prop -> 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
-            raise ValueError("Please provide 'max_runtime' time in HH:MM:SS!")
+            raise ValueError("Please provide ml_rxn_prop -> 'max_runtime' time in HH:MM:SS!")
 
 @dataclass
 class ConformerConfig:
@@ -197,11 +198,13 @@ class ConformerConfig:
     lot: str = None
     charge: int = None
     n_unpaired_electrons: int = None
+    energy_window: float = 6.0
+    solvent: Optional[Dict[str, str]] = None
+
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
-    energy_window: float = 6.0
-    solvent: Optional[Dict[str, str]] = None
+
 
     def __post_init__(self):
         if self.charge == None:
@@ -216,57 +219,85 @@ class ConformerConfig:
             raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
 
         if not isinstance(self.charge, int):
-            raise ValueError("Please provide an integer value to 'charge'")
+            raise ValueError("Please provide an integer value to conf_gen: 'charge'")
         if self.n_unpaired_electrons != None and not isinstance(self.n_unpaired_electrons, int):
-            raise ValueError("Please provide an integer value to 'n_unpaired_electrons'")
+            raise ValueError("Please provide an integer value to conf_gen: 'n_unpaired_electrons'")
         if not isinstance(self.energy_window, float):
-            raise ValueError("Please provide a float value to 'energy_window'")
+            raise ValueError("Please provide a float value to conf_gen: 'energy_window'")
         if not isinstance(self.n_cpus, int):
-            raise ValueError("Please provide an integer value to 'n_cpus'")
+            raise ValueError("Please provide an integer value to conf_gen: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
-            raise ValueError("Please provide an integer value (in MB) to 'mem_per_cpu'")
+            raise ValueError("Please provide an integer value (in MB) to conf_gen: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
-            raise ValueError("Please provide 'max_runtime' time in HH:MM:SS!")
+            raise ValueError("Please provide conf_gen: 'max_runtime' time in HH:MM:SS!")
 
 
 @dataclass
-class GSMConfig:
+class TSGuessConfig:
     """Holds settings specific to generating transition state guesses via GSM"""
-    software: str = "pysisyphus"
-    selector: str = "rich"
-    joint_opt: str = "dual"
+    software: str = None
+    gsm_lot: str = None
+    charge: int = None
+    multiplicity: int = None
     n_conf: int = 1
+    max_gsm_nodes: int = 30
+    bias_lot: str = "uff"
+    joint_opt: str = "dual"
+
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
-    bias_lot: str = "uff"
-    gsm_lot: str = "xtb"
-    max_gsm_nodes: int = 30
-    charge: int = 0
-    multiplicity: int = 1
+
+    def __post_init__(self):
+        if self.charge == None:
+            raise ValueError("Missing required key! Please provide 'charge' in ts_guess block!")
+        if self.multiplicity == None:
+            raise ValueError("Missing required key! Please provide 'multiplicity' in ts_guess block!")
+        if not self.software:
+            raise ValueError("Missing required key! Please provide 'software' in ts_guess block!")
+        if self.software not in ['pysisyphus']:
+            raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'pysisyphus'")
+        if self.software == 'pysisyphus' and self.gsm_lot not in ['xtb']:
+            raise ValueError(f"Invalid 'lot' for Pysisyphus software! Valid options: 'xtb'")
+
+        if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
+            raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
+        if self.joint_opt not in ['dual', 'r_only', 'p_only', 'off']:
+            raise ValueError(f"Invalid 'joint_opt' entry: '{self.joint_opt}' Valid options are: 'dual', 'r_only', 'p_only', 'off'")
+
+        if not isinstance(self.n_conf, int):
+            raise ValueError("Please provide an integer value to ts_guess: 'n_conf'")
+        if not isinstance(self.max_gsm_nodes, int):
+            raise ValueError("Please provide an integer value to ts_guess: 'max_gsm_nodes'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to ts_guess: 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to ts_guess: 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
+
 
 @dataclass
 class RPOptConfig:
     """Holds settings specific to optimizing reactant/product conformers"""
     software: str = "pysisyphus"
     lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
     hessian_recalc: int = 3
     max_cycles: int = 300
     charge: int = 0
     multiplicity: int = 1
     initial_geom: Optional[InitialGeomConfig] = None
+
+    n_cpus: int = 1
+    mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
+
 
 @dataclass
 class TSOptConfig:
     """Holds settings specific to optimizing transition state conformers"""
     software: str = "pysisyphus"
     lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau'
@@ -274,24 +305,31 @@ class TSOptConfig:
     multiplicity: int = 1
     initial_geom: Optional[InitialGeomConfig] = None
 
+    n_cpus: int = 1
+    mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
+
+
 @dataclass
 class IRCValConfig:
     """Holds settings specific to validating transition states with IRC"""
     software: str = "pysisyphus"
     lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
     max_cycles: int = 300
     conv_thresh: str = 'gau'
     charge: int = 0
     multiplicity: int = 1
 
+    n_cpus: int = 1
+    mem_per_cpu: int = 1000
+    max_runtime: str = "01:00:00"
+
+
 @dataclass
 class TaskDef:
     """A specific executable step within a stage and its execution prerequisites."""
-    task_id: str             # Unique identifier (e.g., 'll_path.gsm')
-    task_type: str           # The YARP functional type (e.g., 'gsm', 'reactant_conformer')
+    task_id: str             # Unique identifier (e.g., 'll_path.ts_guess')
+    task_type: str           # The YARP functional type (e.g., 'ts_guess', 'reactant_conformer')
     parent_stage: str        # The arbitrary user-defined stage name (e.g., 'll_path')
     depends_on: List[str]    # List of prerequisite task_ids that must complete first
     config: Any              # The specific dataclass configuration for this task
@@ -528,13 +566,13 @@ class InputParser:
             conf_data = data.get('conf_gen', {})
             conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})
 
-            gsm_data = data.get('gsm', {})
-            gsm_cfg = GSMConfig(**{k: v for k, v in gsm_data.items() if k in GSMConfig.__dataclass_fields__})
+            tsg_data = data.get('ts_guess', {})
+            tsg_cfg = TSGuessConfig(**{k: v for k, v in tsg_data.items() if k in TSGuessConfig.__dataclass_fields__})
 
             # Define Unique Task IDs
             r_conf_id = f"{name}.reactant_conformer"
             p_conf_id = f"{name}.product_conformer"
-            gsm_id = f"{name}.gsm"
+            tsg_id = f"{name}.ts_guess"
 
             # Determine initial dependencies: Wait for ML if it exists!
             initial_deps = [self.ml_task_id] if self.ml_task_id else []
@@ -558,12 +596,12 @@ class InputParser:
                 provides_data=["product_conf"]
             )
 
-            config.tasks[gsm_id] = TaskDef(
-                task_id=gsm_id, 
-                task_type="gsm", 
+            config.tasks[tsg_id] = TaskDef(
+                task_id=tsg_id, 
+                task_type="ts_guess", 
                 parent_stage=name, 
                 depends_on=[r_conf_id, p_conf_id],
-                config=gsm_cfg,
+                config=tsg_cfg,
                 requires_data=["reactant_conf", "product_conf"], # Needs 2 starting nodes to run!
                 provides_data=["ts_guess"]
             )
@@ -664,7 +702,7 @@ class InputParser:
                 source = ig.transition_state
                 # CRITICAL: If the user requests 'ts_opt', we must wait for the IRC task 
                 # of that refinement layer, because IRC produces the validated_ts dict!
-                target_type = "gsm" if source.label == "ts_guess" else "irc_validation"
+                target_type = "ts_guess" if source.label == "ts_guess" else "irc_validation"
                 
             else:
                 continue # Skip IRC tasks (they link statically to ts_opt)
@@ -677,7 +715,7 @@ class InputParser:
 
                 if prev_task.task_type == target_type:
                     # Check LOT and Software match
-                    if target_type == "gsm":
+                    if target_type == "ts_guess":
                         prev_lot = getattr(prev_task.config, "gsm_lot", "").lower()
                     else:
                         prev_lot = getattr(prev_task.config, "lot", "").lower()

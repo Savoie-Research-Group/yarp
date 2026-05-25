@@ -28,7 +28,7 @@ def test_happy_path_initialization(enum_egat_llpath_llrefine):
     expected_pipeline_tasks = [
         "ll_path.reactant_conformer",
         "ll_path.product_conformer",
-        "ll_path.gsm",
+        "ll_path.ts_guess",
         "ll_refine.reactant_optimization",
         "ll_refine.product_optimization",
         "ll_refine.transition_state_optimization",
@@ -46,7 +46,7 @@ def test_happy_path_initialization(enum_egat_llpath_llrefine):
     assert rxn_tasks["ll_path.product_conformer"]["status"] == "pending"
     
     # GSM depends on the conformers, so it MUST be pending
-    assert rxn_tasks["ll_path.gsm"]["status"] == "pending"
+    assert rxn_tasks["ll_path.ts_guess"]["status"] == "pending"
 
     # Reactant-Product OPT waits for conformers to be generated, so they are pending
     assert rxn_tasks["ll_refine.reactant_optimization"]["status"] == "pending"

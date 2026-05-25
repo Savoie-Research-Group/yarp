@@ -304,7 +304,9 @@ class InputParser:
 
         if self.init_struct.mode == 'species' and not self.enum.ON:
             raise ValueError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
-        if self.init_struct.mode == 'species' and self.enum.pre_enum_filters:
+
+        pre_enum_filters_provided = "pre_enum_filters" in enum_node
+        if self.init_struct.mode == 'species' and pre_enum_filters_provided:
             print(f"WARNING: When starting from single species, all 'pre_enum_filters' are non-applicable!")
 
         # ---------------------------------------------------------

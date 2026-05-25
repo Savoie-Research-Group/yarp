@@ -2,12 +2,20 @@
 Definition of input object class
 """
 import os
+from datetime import datetime
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Dict, Any
 from pathlib import Path
 from yarp.yarpecule.yarpecule import yarpecule
 
+def is_valid_time_format(time_str):
+    try:
+        # %H = 24-hour hour, %M = minute, %S = second
+        datetime.strptime(time_str, "%H:%M:%S")
+        return True
+    except ValueError:
+        return False
 
 # --- CONFIGURATION OBJECTS ---
 # These classes act as simple containers for user provided settings.
@@ -165,10 +173,20 @@ class InitialGeomConfig:
 @dataclass
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
-    model: str
-    n_cpus: int = 1
+    model: str = 'egat_rgd1'
+    n_cpus: int = 8
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
+
+    def __post_init__(self):
+        if self.model not in ['egat_rgd1']:
+            raise ValueError(f"Invalid 'model' provided: '{self.model}' Currently, only option is 'egat_rdg1'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide 'max_runtime' time in HH:MM:SS!")
 
 @dataclass
 class ConformerConfig:

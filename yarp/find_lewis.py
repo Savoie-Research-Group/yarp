@@ -1,14 +1,6 @@
 """
-This module contains the 'find_lewis()' function and associated helper functions to find the 
+This module contains the find_lewis() function and associated helper functions to find the 
 best resonance structures for yarpecules.
-
-Example Usage: 
-    from find_lewis import find_lewis
-    lewis_structures = find_lewis(molecule_data)
-
-Functions:
-    - find_lewis(molecule): Compute the best Lewis resonance structures.
-    - main(argv): Entry point for command-line execution.
 """
 
 import sys
@@ -21,12 +13,6 @@ from yarp.hashes import bmat_hash
 from yarp.properties import el_to_an,an_to_el,el_valence,el_n_deficient,el_expand_octet,el_en,el_pol,el_max_valence,el_n_expand_octet,el_metals
 
 def main(argv):
-    """
-    Command-line interface for `find_lewis`.
-
-    Args:
-        argv (list): Command-line arguments. Typically contains a molecular identifier or file path.
-    """
 
     # These imports are here just for this main convenience function for testing
     from rdkit.Chem import AllChem,rdchem,BondType,MolFromSmiles,Draw,Atom,AddHs,HybridizationType    
@@ -43,7 +29,14 @@ def main(argv):
             elements, geo = xyz_parse(mol)
             adj_mat = table_generator(elements,geo)
             q = xyz_q_parse(mol)
-
+        # (xyz, q) branch: user passes an .xyz path and an explicit integer total charge
+        elif isinstance(mol, (tuple, list)) and len(mol) == 2 and \
+             isinstance(mol[0], str) and mol[0].endswith(".xyz") and \
+             isinstance(mol[1], int):
+            xyz_file, explicit_q = mol
+            elements, geo = xyz_parse(xyz_file)
+            adj_mat = table_generator(elements, geo)
+            q = explicit_q
         # SMILES branch
         else:
             try:
@@ -85,7 +78,7 @@ def main(argv):
         for i in rings:
             print(f"{i=} {is_aromatic(bond_mats[0],i)=}")
 
-def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_def=-1,w_exp=0.1,w_formal=0.1,w_aro=-24,w_rad=0.1,local_opt=True):
+def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=0.5,w_def=-1,w_exp=0.1,w_formal=0.1,w_aro=-24,w_rad=0.1,local_opt=True):
 
     """ 
     Algorithm for finding relevant Lewis Structures of a molecular graph given an overall charge.
@@ -139,7 +132,7 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
         
     """
     old_rec_limit =sys.getrecursionlimit()
-    sys.setrecursionlimit(5000)            
+    sys.setrecursionlimit(100000)
 
     # Array of atom-wise electroneutral electron expectations for convenience.
     eneutral = np.array([ el_valence[_] for _ in elements ])    
@@ -198,7 +191,8 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
             scores += [score]
             bond_mats += [bond_mat]
             hashes.add(bmat_hash(bond_mat))
-            bond_mats,scores,_,_,_ = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps=np.zeros([len(elements),len(elements)]), min_score=scores[0], ind=len(bond_mats)-1,N_score=1000,N_max=10000,min_win=100.0,min_opt=True)
+            bond_mats,scores,_,_,_ = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps=np.zeros([len(elements),len(elements)]), min_score=scores[0], ind=len(bond_mats)-1,N_score=100,N_max=10000,min_opt=True)
+
     # Update objective function to include (anti)aromaticity considerations and update scores of the current bmats
     obj_fun = lambda x: bmat_score(x,elements,rings,cat_en=en,an_en=en,rad_env=np.zeros(len(elements)),e_def=e_def,e_exp=e_exp,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False)                        
     scores = [ obj_fun(_) for _ in bond_mats ]            
@@ -206,22 +200,14 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
     # Sort by initial scores
     bond_mats = [ _[1] for _ in sorted(zip(scores,bond_mats),key=lambda x:x[0]) ]
     scores = sorted(scores)
-    #print(hashes)
     
     # Generate resonance structures: Run starting from the minimum structure and allow moves that are within s_window of the min_enegy score
-    bond_mats=[bond_mats[0]]
-    #bond_mats = [bond_mats[0]]
-    #for j in range(0, len(bond_mats)):
-    #    for count_i, i in enumerate(elements):
-    #        if i=='o': print(bond_mats[j][count_i])
+    bond_mats = [bond_mats[0]]
     scores = [scores[0]]
     hashes = set([bmat_hash(bond_mats[0])])
-    bond_mats,scores,hashes,_,_ = gen_all_lstructs(obj_fun,bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps, min_score=min(scores), ind=len(bond_mats)-1,N_score=1000,N_max=10000,min_opt=True)
-    #for j in range(0, len(bond_mats)):
-    #    for count_i, i in enumerate(elements):
-    #        if i=='o': print(bond_mats[j][count_i])
-    # Sort by initial scores
+    bond_mats,scores,hashes,_,_ = gen_all_lstructs(obj_fun,bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps, min_score=min(scores), ind=len(bond_mats)-1,N_score=100,N_max=10000,min_opt=False,min_win=0.5)
     
+    # Sort by initial scores
     inds = np.argsort(scores)
     bond_mats = [ bond_mats[_] for _ in inds ]
     scores = [ scores[_] for _ in inds ]
@@ -239,9 +225,11 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
             break
     if flag:
         count += 1
+
     # Shed the excess b_mats
     bond_mats = bond_mats[:count]
     scores = scores[:count]
+
 
     # Calculate the number of charge centers bonded to each atom (determines hybridization)
     # calculated as: number of bonded_atoms + number of unbound electron orbitals (pairs or radicals).
@@ -256,7 +244,10 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
     # cat_en = en + rad_env
     # an_en = en + np.sum(adj_mat*(0.1*en/(100+en)),axis=1) + 0.05*s_char
     # scores = [ bmat_score(_,elements,rings,cat_en,an_en,rad_env,e_tet,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
+
     bond_mats = adjust_metals(bond_mats,adj_mat,elements)
+    
+
     scores = [ bmat_score(_,elements,rings,en,en,rad_env,e_def,e_exp,w_def=w_def,w_exp=w_exp,w_formal=w_formal,w_aro=w_aro,w_rad=w_rad,factor=factor,verbose=False) for _ in bond_mats ]
 
     
@@ -269,7 +260,7 @@ def find_lewis(elements,adj_mat,q=0,rings=None,mats_max=10,mats_thresh=10.0,w_de
     inds = np.argsort(scores)
     bond_mats = [ bond_mats[_] for _ in inds ]
     scores = [ scores[_] for _ in inds ]
-    sys.setrecursionlimit(old_rec_limit)
+    sys.setrecursionlimit(old_rec_limit)            
     return bond_mats,scores
 
 class LewisStructureError(Exception):
@@ -544,7 +535,7 @@ def gen_init(obj_fun,adj_mat,elements,rings,q):
 
         yield obj_fun(bond_mat),bond_mat,reactive
 
-def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps, min_score, ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
+def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rings, ring_atoms, bridgeheads, seps, min_score, ind=0, counter=0, N_score=100, N_max=10000, min_opt=False, min_win=False):
 
     """ 
     A generator for find_lewis() that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
@@ -612,74 +603,73 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements, reactive, rin
     
     # Loop over all possible moves, recursively calling this function to account for the order dependence. 
     # This could get very expensive very quickly, but with a well-curated moveset things are still very quick for most tested chemistries. 
-    for ind in range(0, len(bond_mats)):
-        for j in valid_moves(bond_mats[ind],elements,reactive,rings,ring_atoms,bridgeheads,seps):
+    for j in valid_moves(bond_mats[ind],elements,reactive,rings,ring_atoms,bridgeheads,seps):
 
-            # Carry out moves on trial bond_mat
-            tmp = copy(bond_mats[ind])        
-            for k in j: tmp[k[1],k[2]]+=k[0]
+        # Carry out moves on trial bond_mat
+        tmp = copy(bond_mats[ind])        
+        for k in j: tmp[k[1],k[2]]+=k[0]
 
-            # calc objective function and hash value
-            score = obj_fun(tmp)
-            b_hash = bmat_hash(tmp)    
+        # calc objective function and hash value
+        score = obj_fun(tmp)
+        b_hash = bmat_hash(tmp)    
         
-            # Check if a new best Lewis structure has been found, if so, then reset counter and record new best score
-            if score <= min_score:
-                counter = 0
-                min_score = score
-            else:
-                counter += 1
+        # Check if a new best Lewis structure has been found, if so, then reset counter and record new best score
+        if score <= min_score:
+            counter = 0
+            min_score = score
+        else:
+            counter += 1
 
-            # Break if too long (> N_score) has passed without finding a better Lewis structure
-            if counter >= N_score:
-                return bond_mats,scores,hashes,min_score,counter
+        # Break if too long (> N_score) has passed without finding a better Lewis structure
+        if counter >= N_score:
+            return bond_mats,scores,hashes,min_score,counter
 
-            # If min_opt=True then the search is run in a greedy mode where only moves that reduce the score are accepted
-            if min_opt:
+        # If min_opt=True then the search is run in a greedy mode where only moves that reduce the score are accepted
+        if min_opt:
 
-                if counter == 0:
+            if counter == 0:
+                # Check that the resulting bond_mat is not already in the existing bond_mats
+                if b_hash not in hashes: 
+                    bond_mats += [tmp]
+                    scores += [score]
+                    hashes.add(b_hash)
+
+                    # Recursively call this function with the updated bond_mat resulting from this iteration's move. 
+                    bond_mats,scores,hashes,min_score,counter = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps,\
+                                                                          min_score,ind=len(bond_mats)-1,counter=counter,N_score=N_score,N_max=N_max,min_opt=min_opt,min_win=min_win)
+
+        else:
+            # min_win option allows the search to follow structures that increase the score up to min_win above the score of the best structure
+            if min_win:
+                if (score-min_score) < min_win:
+
                     # Check that the resulting bond_mat is not already in the existing bond_mats
                     if b_hash not in hashes: 
                         bond_mats += [tmp]
                         scores += [score]
                         hashes.add(b_hash)
-
-                        # Recursively call this function with the updated bond_mat resulting from this iteration's move. 
-                        bond_mats,scores,hashes,min_score,counter = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps,\
-                                                                              min_score,ind=len(bond_mats)-1,counter=counter,N_score=N_score,N_max=N_max,min_opt=min_opt,min_win=min_win)
-
-            else:
-                # min_win option allows the search to follow structures that increase the score up to min_win above the score of the best structure
-                if min_win:
-                    if (score-min_score) < min_win:
-
-                        # Check that the resulting bond_mat is not already in the existing bond_mats
-                        if b_hash not in hashes: 
-                            bond_mats += [tmp]
-                            scores += [score]
-                            hashes.add(b_hash)
                         
-                            # Recursively call this function with the updated bond_mat resulting from this iteration's move. 
-                            bond_mats,scores,hashes,min_score,counter = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps,\
-                                                                                  min_score,ind=len(bond_mats)-1,counter=counter,N_score=N_score,N_max=N_max,min_opt=min_opt,min_win=min_win)
-
-                # otherwise all structures are recursively explored (can be very expensive)
-                else:
-
-                    # Check that the resulting bond_mat is not already in the existing bond_mats
-                    if b_hash not in hashes:
-                    
-                        bond_mats += [tmp]
-                        scores += [score]
-                        hashes.add(b_hash)
-
                         # Recursively call this function with the updated bond_mat resulting from this iteration's move. 
                         bond_mats,scores,hashes,min_score,counter = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps,\
                                                                               min_score,ind=len(bond_mats)-1,counter=counter,N_score=N_score,N_max=N_max,min_opt=min_opt,min_win=min_win)
+
+            # otherwise all structures are recursively explored (can be very expensive)
+            else:
+
+                # Check that the resulting bond_mat is not already in the existing bond_mats
+                if b_hash not in hashes:
                     
-            # Break if max has been encountered.
-            if len(bond_mats) > N_max:
-                return bond_mats,scores,hashes,min_score,counter
+                    bond_mats += [tmp]
+                    scores += [score]
+                    hashes.add(b_hash)
+
+                    # Recursively call this function with the updated bond_mat resulting from this iteration's move. 
+                    bond_mats,scores,hashes,min_score,counter = gen_all_lstructs(obj_fun,bond_mats,scores,hashes,elements,reactive,rings,ring_atoms,bridgeheads,seps,\
+                                                                          min_score,ind=len(bond_mats)-1,counter=counter,N_score=N_score,N_max=N_max,min_opt=min_opt,min_win=min_win)
+                    
+        # Break if max has been encountered.
+        if len(bond_mats) > N_max:
+            return bond_mats,scores,hashes,min_score,counter
     
     return bond_mats,scores,hashes,min_score,counter
     
@@ -749,7 +739,6 @@ def valid_moves(bond_mat,elements,reactive,rings,ring_atoms,bridgeheads,seps):
     (7) transfer an electron to i from its neighbor j, if i is electron deficient and has a greater electronegativity.
     (8) transfer a charge from i to another atom if i has an expanded octet and unbound electrons. 
     (9) shuffle aromatic and anti-aromatic bonds (i.e., change bond alteration along the cycle). 
-    (10) forming a pi-bond between two radicals
     All of these moves are contingent on the ability of atoms to expand octet, whether they are electron deficient, and whether the move would lead to unphysical ring-strain. 
 
     """    
@@ -780,11 +769,6 @@ def valid_moves(bond_mat,elements,reactive,rings,ring_atoms,bridgeheads,seps):
                     for k in [ _ for _ in return_connections(j,bond_mat,inds=reactive,min_order=2) if _ != i ]:
                         yield [(1,i,j),(1,j,i),(-1,j,k),(-1,k,j),(-2,i,i),(2,k,k)]
 
-            if bond_mat[i, i]%2!=0:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    if bond_mat[j, j]%2!=0:
-                        for k in [ _ for _ in return_connections(j,bond_mat,inds=reactive,min_order=2) if _ != i ]:
-                            yield [(-1, i, i), (-1, j, j), (1, i, j), (1, j, i)]
             # Move 4: i has a radical and a neighbor with unbound electrons, form a bond between i and the neighbor
             if bond_mat[i,i] % 2 != 0 and ( el_expand_octet[elements[i]] or e[i] < el_n_deficient[elements[i]] ):
 
@@ -901,7 +885,6 @@ def valid_moves(bond_mat,elements,reactive,rings,ring_atoms,bridgeheads,seps):
 
                 # If a shuffle was generated then yield the move
                 if move:
-                    #print("move9")
                     yield move
 
 def delta_aromatic(bond_mat,rings,move):
@@ -1268,7 +1251,7 @@ def return_n_e_donate(bond_mat,elements):
                This array is indexed to the elements list. 
 
     elements : list 
-            `   Contains elemental information indexed to the supplied adjacency matrix. 
+               Contains elemental information indexed to the supplied adjacency matrix. 
                Expects a list of lower-case elemental symbols.
 
     Returns
@@ -1382,18 +1365,25 @@ def adjust_metals(bond_mats,adj_mat,elements):
 
                 # type M - metal metal are handled at the end
                 if con in m_inds:
-                    continue                
+                    continue
                 # type L - dative bonds
                 elif defs[con] == 0:
-                    continue                    
+                    continue
                 # type X - covalent bonds
-                elif b[con,con] % 2 != 0:                    
+                elif b[con,con] % 2 != 0:
+                    # GUARD (2026-05-22 ZL): only form X if metal has electrons to spend.
+                    # Otherwise leave the partner radical and treat the bond as dative-like.
+                    if b[m_ind,m_ind] < 1:
+                        continue
                     b[con,con] += -1
                     b[m_ind,m_ind] += -1
                     b[con,m_ind] += 1
                     b[m_ind,con] += 1
                 # type Z - covalent bond, empty p orbital, using two electrons from the metal
                 else:
+                    # GUARD (2026-05-22 ZL): Z bond needs 2 electrons from metal.
+                    if b[m_ind,m_ind] < 2:
+                        continue
                     b[m_ind,m_ind] += -2
                     b[con,m_ind] += 1
                     b[m_ind,con] += 1
@@ -1403,12 +1393,15 @@ def adjust_metals(bond_mats,adj_mat,elements):
         for m_ind in m_inds:
             for con in return_connections(m_ind,adj_mat,inds=m_inds):
                 count = 0
-                while electrons[m_ind] < 12 and electrons[con] < 12 and b[con,con] > 0:
+                # GUARD (2026-05-22 ZL): also require b[m_ind,m_ind] > 0 so both
+                # partners have an electron to contribute to the M-M bond.
+                while (electrons[m_ind] < 12 and electrons[con] < 12
+                       and b[con,con] > 0 and b[m_ind,m_ind] > 0):
                     b[m_ind,m_ind] += -1
                     b[con,con] += -1
                     b[m_ind,con] += 1
                     b[con,m_ind] += 1
-                    electrons = return_e(b)                    
+                    electrons = return_e(b)
                     count += 1
                     if count == 4:
                         break

@@ -1,7 +1,7 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, react_atoms=[], verbose=False):
+def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, verbose=False):
     """
     Parameters:
     -----------
@@ -19,13 +19,6 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
 
     netconfig : NetworkConfig object
         Dataclass that holds settings for network exploration mode from input file
-
-    react_atoms : list
-        Reactive atom-map ids from the input file. This argument is accepted for
-        API continuity with generation code, but candidate filtering no longer
-        validates or rejects missing reactive maps. Each eventual enumeration
-        candidate resolves the map intersection locally and skips itself if none
-        of the requested maps are present.
 
     Returns:
     --------

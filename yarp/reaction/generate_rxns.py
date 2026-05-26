@@ -50,8 +50,7 @@ def generate_rxns(inp):
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore, react_atoms=inp.enum.react_atoms, verbose=verbose
-            )
+                netconfig=inp.net_explore, verbose=verbose)
 
             new_rxns = dict()
             for mol in candidates:

@@ -1,6 +1,5 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
-from yarp.reaction.enum import validate_reactive_maps_against_starting_species
 
 def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, react_atoms=[], verbose=False):
     """
@@ -22,9 +21,11 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         Dataclass that holds settings for network exploration mode from input file
 
     react_atoms : list
-        Reactive atom-map ids from the input file. When product separation is
-        enabled, these are validated against the unseparated product before
-        fragments are generated.
+        Reactive atom-map ids from the input file. This argument is accepted for
+        API continuity with generation code, but candidate filtering no longer
+        validates or rejects missing reactive maps. Each eventual enumeration
+        candidate resolves the map intersection locally and skips itself if none
+        of the requested maps are present.
 
     Returns:
     --------
@@ -79,9 +80,13 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     unique_candidates = []
     for mol in candidates:
 
-        # Apply separate product routine to each/select products (optionally)
+        # Apply the existing product-separation behavior without interpreting
+        # reactive atom maps here. The important design point is that filtering
+        # decides which molecular graphs become enumeration candidates; it does
+        # not decide whether a candidate has the requested reactive atoms. That
+        # check happens later in enumerate_products, after any split fragment has
+        # its final local atom indexing.
         if separate_prods == 'all':
-            validate_reactive_maps_against_starting_species(mol, react_atoms)
             prod = separate_molecules(mol)
         else:
             prod = [mol]

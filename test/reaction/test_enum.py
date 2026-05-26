@@ -263,21 +263,8 @@ class TestSequentialPhoto:
 
 
 class TestReactiveAtomMaps:
-    def test_invalid_reactive_map_raises(self):
+    def test_missing_reactive_map_skips_candidate(self):
         mol = yarpecule('O=CCCOO')
-
-        with pytest.raises(ValueError, match="Reactive atom maps missing"):
-            enumerate_products(
-                mol,
-                n_break=1,
-                n_form=1,
-                react=[set([999])],
-                mode="concerted",
-                verbose=False,
-            )
-
-    def test_fragment_policy_skips_empty_intersection(self):
-        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
 
         products = enumerate_products(
             mol,
@@ -286,12 +273,11 @@ class TestReactiveAtomMaps:
             react=[set([999])],
             mode="concerted",
             verbose=False,
-            fragment_policy=True,
         )
 
         assert products == []
 
-    def test_fragment_policy_skip_logs_only_when_verbose(self, capsys):
+    def test_empty_reactive_map_intersection_skips_candidate(self):
         mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
 
         products = enumerate_products(
@@ -301,7 +287,20 @@ class TestReactiveAtomMaps:
             react=[set([999])],
             mode="concerted",
             verbose=False,
-            fragment_policy=True,
+        )
+
+        assert products == []
+
+    def test_reactive_map_skip_logs_only_when_verbose(self, capsys):
+        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
         )
 
         assert products == []
@@ -314,13 +313,12 @@ class TestReactiveAtomMaps:
             react=[set([999])],
             mode="concerted",
             verbose=True,
-            fragment_policy=True,
         )
 
         assert products == []
         assert "Molecule contains no atoms in reactive set" in capsys.readouterr().out
 
-    def test_fragment_policy_allows_partial_map_intersection(self, capsys):
+    def test_partial_reactive_map_intersection_enumerates_present_maps(self, capsys):
         mol = yarpecule('[C:0][O:1]', canon=False)
 
         enumerate_products(
@@ -330,7 +328,6 @@ class TestReactiveAtomMaps:
             react=[set([0, 999])],
             mode="concerted",
             verbose=True,
-            fragment_policy=True,
         )
 
         output = capsys.readouterr().out

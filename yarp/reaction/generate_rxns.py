@@ -57,10 +57,15 @@ def generate_rxns(inp):
             for mol in candidates:
                 if verbose:
                     print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+
+                # Reactive atom maps are resolved inside enumerate_products
+                # against this final candidate graph. That is deliberately
+                # later than candidate filtering/product separation, because a
+                # split fragment can have a smaller atom-map subset and a new
+                # local atom index order.
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
                     react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose,
-                    fragment_policy=inp.enum_filters.separate_prods == 'all'
                 )
 
                 clean_products = filter_enum_products(

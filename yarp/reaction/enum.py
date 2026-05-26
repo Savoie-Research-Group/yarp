@@ -42,49 +42,45 @@ def atom_map_to_local_index(yarp_like):
     return by_map
 
 
-def validate_reactive_maps_against_starting_species(starting_species, react):
-    """
-    Validate public reactive atom-map ids against starting/root species.
-    """
-    react_maps = _reactive_maps_from_react(react)
-    if not react_maps:
-        return
-
-    for count_s, species in enumerate(prepare_list(starting_species)):
-        available_maps = set(atom_map_to_local_index(species))
-        missing = sorted(react_maps - available_maps)
-        if missing:
-            raise ValueError(
-                "Reactive atom maps missing from starting species "
-                f"{count_s}: {missing}"
-            )
-
-
-def _resolve_reactive_atoms_for_candidate(yarp_like, react, fragment_policy=False, verbose=False):
+def _resolve_reactive_atoms_for_candidate(yarp_like, react, verbose=False):
     """
     Resolve public reactive atom maps to candidate-local atom indices.
+
+    The public YAML/API value is expressed as atom-map IDs because those are the
+    only stable atom identifiers across pickle restarts, product separation, and
+    local atom reordering. The low-level enumeration code still operates on
+    candidate-local atom indices, so every candidate has to resolve the map IDs
+    against its own current atom table immediately before enumeration.
+
+    Missing maps are intentionally not errors. A candidate can be a separated
+    product fragment, or just a molecule that does not contain this depth's
+    requested reactive atom subset. In those cases we use the intersection of
+    requested maps and candidate maps. If the intersection is empty, the caller
+    skips this candidate cleanly by returning no products.
     """
     react_maps = _reactive_maps_from_react(react)
     if not react_maps:
         return [], [], []
 
+    # ``by_map`` is the bridge from stable user-facing map IDs to the local
+    # integer indices expected by adjacency/bond-matrix enumeration routines.
     by_map = atom_map_to_local_index(yarp_like)
     present = sorted(react_maps & set(by_map))
     missing = sorted(react_maps - set(by_map))
-
-    if missing and not fragment_policy:
-        raise ValueError(f"Reactive atom maps missing from reactant: {missing}")
 
     if not present:
         if verbose:
             print("   + Molecule contains no atoms in reactive set; skipping enumeration.")
         return None, present, missing
 
+    # Preserve the historical internal shape: a list of sets, where each set is
+    # a candidate-local reactive atom group. The public representation remains
+    # atom-map IDs; only enumeration internals see local indices.
     local_react = [set(by_map[_] for _ in present)]
     return local_react, present, missing
 
 
-def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False, fragment_policy=False):
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
     """
     Master wrapper function for all enumeration routines
 
@@ -100,15 +96,12 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         Number of bonds to form
 
     react : set (default = None)
-        When supplied this is interpreted as zero-based atom-map ids to restrict
+        When supplied this is interpreted as atom-map ids to restrict
         enumeration. These maps are resolved to candidate-local indices before
-        low-level adjacency/BEM operations. An empty list is interpreted as all
-        atoms being available to react.
-
-    fragment_policy : bool (default = False)
-        When True, missing reactive maps are allowed and candidates containing
-        none of the requested maps are skipped. This should only be used for
-        fragments from a previously validated separated product.
+        low-level adjacency/BEM operations. Missing maps are ignored for this
+        candidate. If none of the requested maps are present, no products are
+        enumerated for this candidate. An empty list is interpreted as all atoms
+        being available to react.
 
     mode : string
         Toggle between the two available product enumeration modes:
@@ -126,7 +119,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
 
     if _reactive_maps_from_react(react):
         local_react, present_maps, missing_maps = _resolve_reactive_atoms_for_candidate(
-            r_yp, react, fragment_policy=fragment_policy, verbose=verbose
+            r_yp, react, verbose=verbose
         )
         if local_react is None:
             return []

@@ -300,6 +300,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
         self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
         self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
         self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
+        dg_rxn = b_barrier - f_barrier
+        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
 
         return True
 
@@ -520,6 +522,8 @@ class OrcaIRCValCalculator(IRCValTask):
         self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
         self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
         self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
+        dg_rxn = b_barrier - f_barrier
+        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
 
         return True
 

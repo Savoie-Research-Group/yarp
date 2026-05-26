@@ -696,6 +696,16 @@ class InputParser:
 
             ig_config = self._parse_initial_geom(ig_node)
 
+            missing_blocks = [
+                block for block in ("rp_opt", "ts_opt", "irc_val")
+                if not data.get(block)
+            ]
+            if missing_blocks:
+                raise ValueError(
+                    f"Stage '{name}' uses 'refine_rxn_path' but is missing required block(s): "
+                    f"{', '.join(missing_blocks)}"
+                )
+
             rp_data = data.get('rp_opt', {})
             rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
             rp_cfg.initial_geom = ig_config

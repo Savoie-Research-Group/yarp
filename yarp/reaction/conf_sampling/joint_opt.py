@@ -32,13 +32,12 @@ def ob_joint_optimize(conformer_ind, conformer, target_bem, ff_name="uff"):
     ff.GetCoordinates(obMol)
     
     biased_conf = copy.deepcopy(conformer)
-    print("biased_conf.geo BEFORE replacing geo by the OB optimized geo = ", biased_conf.geo)
+#    print("biased_conf.geo BEFORE replacing geo by the OB optimized geo = ", biased_conf.geo)
     biased_conf.geo = np.array([[obMol.GetAtom(i).GetX(), obMol.GetAtom(i).GetY(), obMol.GetAtom(i).GetZ()] 
                                 for i in range(1, obMol.NumAtoms() + 1)])
-    print("biased_conf.geo AFTER replacing geo by the OB optimized geo = ", biased_conf.geo)
-    print("biased_conf.type = ", biased_conf.type)
+#    print("biased_conf.geo AFTER replacing geo by the OB optimized geo = ", biased_conf.geo)
+#    print("biased_conf.type = ", biased_conf.type)
     biased_conf.type = f"biased_{conformer.type}"
-    print("biased_conf.type = ", biased_conf.type)
 
     # Save final optimized geometry to a xyz file
     xyz_file = f"opt_{conformer_ind}.xyz"

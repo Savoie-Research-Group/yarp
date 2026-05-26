@@ -58,7 +58,7 @@ class EgatMLPredict(MLPredictTask):
 
         # Grab the container execution command from the base class
         prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
-        print("SH; prefix = ", prefix)    # SHQK : Why the heck there is no actual executable mentioned in the submission script??
+        print("prefix = ", prefix)    # SHQK : Why is there no actual executable mentioned in the submission script??
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n\n")

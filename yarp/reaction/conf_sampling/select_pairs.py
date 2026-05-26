@@ -35,8 +35,8 @@ def select_gsm_pairs(rxn, config):
     biased_r = [ob_joint_optimize(f"{c_ind}_p", c, rxn.product.paired_bem, lot) for c_ind, c in enumerate(p_confs)] if mode in ['dual', 'p_only'] else p_confs
 
 
-    print("Type of biased_r:", type(biased_r))
-    print("Type of biased_p:", type(biased_p))
+#    print("Type of biased_r:", type(biased_r))
+#    print("Type of biased_p:", type(biased_p))
 
     # --- STEP B: Cross-Product Evaluation & Tournament ---
     # ERM: We'll see... this is probably an unacceptable bottleneck...
@@ -48,11 +48,9 @@ def select_gsm_pairs(rxn, config):
 
     module_dir = Path(__file__).parent.resolve()
     if total_conf/n_conf > 3.0:
-        print("total_conf/n_conf = ", total_conf/n_conf)
         model_path = module_dir / 'rich_model.sav'
         print("rich model is chosen to generate aligned reaction conformers")
     else:
-        print("total_conf/n_conf = ", total_conf/n_conf)
         model_path = module_dir / 'poor_model.sav'
         print("poor model is chosen to generate aligned reaction conformers")
 

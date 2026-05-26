@@ -7,123 +7,13 @@ import pickle
 import numpy as np
 from openbabel import pybel
 from pathlib import Path
-from rdkit import Chem
 
 from yarp.yarpecule.yarpecule import yarpecule
-from yarp.yarpecule.input_parsers import reaction_xyz_parse
-from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_reactions_from_xyz_directory, load_reactions_from_smiles_file
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.write_files import mol_write_yp
-
-
-def _load_reaction_from_xyz_file(xyz_file):
-    reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
-
-    reactant_adj = table_generator(reactant_elements, reactant_geo)
-    product_adj = table_generator(product_elements, product_geo)
-
-    reactant = yarpecule((reactant_adj, reactant_geo, reactant_elements, reactant_q), canon=False)
-    product = yarpecule((product_adj, product_geo, product_elements, product_q), canon=False)
-
-    return reaction(reactant, product)
-
-
-def _print_reaction_load_failures(source, failures):
-    if len(failures) == 0:
-        return
-
-    print(f" - Failed to initialize {len(failures)} reaction(s) from {source}:")
-    for label, error in failures:
-        print(f"   * {label}: {error}")
-
-
-def _load_reactions_from_xyz_directory(xyz_dir):
-    xyz_files = sorted([_ for _ in xyz_dir.iterdir() if _.is_file() and _.suffix.lower() == ".xyz"])
-
-    if len(xyz_files) == 0:
-        raise RuntimeError(f"No xyz reaction files were found in {xyz_dir}.")
-
-    output = dict()
-    failures = []
-    for xyz_file in xyz_files:
-        try:
-            rxn = _load_reaction_from_xyz_file(xyz_file)
-        except Exception as exc:
-            failures.append((str(xyz_file), str(exc)))
-            continue
-
-        output[rxn.hash] = rxn
-
-    _print_reaction_load_failures(xyz_dir, failures)
-
-    return output
-
-
-def _parse_mapped_reaction_smiles(smiles, line_number, source_path):
-    mol = Chem.MolFromSmiles(smiles, sanitize=False)
-
-    if mol is None:
-        raise RuntimeError(
-            f"Line {line_number} in {source_path}: could not parse reaction SMILES."
-        )
-
-    atom_maps = []
-    for atom in mol.GetAtoms():
-        atom_props = atom.GetPropsAsDict()
-        if "molAtomMapNumber" not in atom_props:
-            raise RuntimeError(
-                f"Line {line_number} in {source_path}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization"
-            )
-        atom_map = int(atom_props["molAtomMapNumber"])
-        atom_maps.append(atom_map)
-
-    if len(atom_maps) != len(set(atom_maps)):
-        raise RuntimeError(
-            f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
-        )
-
-    return atom_maps
-
-
-def _load_reactions_from_smiles_file(source_path):
-    output = dict()
-    failures = []
-
-    with open(source_path, 'r') as f:
-        for line_number, raw_line in enumerate(f, start=1):
-            line = raw_line.strip()
-
-            if len(line) == 0 or line.startswith("#"):
-                continue
-
-            if line.count(">>") != 1:
-                failures.append((f"Line {line_number}", "No >> or more than 1 >>"))
-                continue
-
-            try:
-                reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
-                reactant_maps = _parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
-                product_maps = _parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
-
-                if set(reactant_maps) != set(product_maps):
-                    raise RuntimeError(
-                        f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
-                    )
-
-                reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
-                product = yarpecule(product_smiles, mode="yarp", canon=False)
-            except Exception as exc:
-                failures.append((f"Line {line_number}", str(exc)))
-                continue
-
-            rxn = reaction(reactant, product)
-            output[rxn.hash] = rxn
-
-    _print_reaction_load_failures(source_path, failures)
-
-    return output
 
 
 def generate_rxns(inp):
@@ -224,14 +114,14 @@ def generate_rxns(inp):
             output = og_rxns
         elif Path(inp.d0_node).is_dir():
             print(f" - Processing starting node(s) as reaction xyz files in {inp.d0_node}")
-            output = _load_reactions_from_xyz_directory(Path(inp.d0_node))
+            output = load_reactions_from_xyz_directory(Path(inp.d0_node))
         elif Path(inp.d0_node).is_file() and Path(inp.d0_node).suffix.lower() == ".xyz":
             print(f" - Processing starting node(s) as reaction xyz file {inp.d0_node}")
-            rxn = _load_reaction_from_xyz_file(Path(inp.d0_node))
+            rxn = load_reaction_from_xyz_file(Path(inp.d0_node))
             output = {rxn.hash: rxn}
         elif Path(inp.d0_node).is_file():
             print(f" - Processing starting node(s) as mapped reaction SMILES in {inp.d0_node}")
-            output = _load_reactions_from_smiles_file(inp.d0_node)
+            output = load_reactions_from_smiles_file(inp.d0_node)
         else:
             raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 

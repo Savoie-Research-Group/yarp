@@ -2,6 +2,8 @@
 Helper functions for parsing molecular information from a variety of input formats.
 Consider moving this to util if anything outside of yarpecule needs to access it.
 """
+from pathlib import Path
+
 import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
@@ -150,49 +152,54 @@ def xyz_parse(xyz, read_types=False, multiple=False):
             return Elements, Geometry, Atom_types
 
 
-def xyz_q_parse(xyz):
+def xyz_q_parse(xyz=None, comment_line=None):
     """
-    This function grabs charge information from the comment line of an xyz file. The charge information is 
+    This function grabs charge information from an xyz comment line. The charge information is 
     interpreted as the first field following the `q` keyword. If no charge information is specified the function
-    returns neutral as a the default behavior.
+    returns neutral as the default behavior.
 
     Parameters
     ----------
-    xyz : filename
+    xyz : filename, optional
           This is the xyz file that is read by the function.
+
+    comment_line : str, optional
+                   A comment line that should be parsed directly.
 
     Returns
     -------
     q : int
         The charge information.
     """
-    with open(xyz, 'r') as f:
-        for lc, lines in enumerate(f):
-            if lc == 1:
-                fields = lines.split()
-                if "q" in fields:
-                    try:
-                        q = int(float(fields[fields.index("q")+1]))
-                    except:
-                        q = 0
-                else:
-                    q = 0
-                break
+    q = 0
+    if comment_line is not None:
+        fields = comment_line.split()
+    else:
+        with open(xyz, 'r') as f:
+            for lc, lines in enumerate(f):
+                if lc == 1:
+                    fields = lines.split()
+                    break
 
-    return q
-
-
-def _comment_q_parse(comment_line):
-    fields = comment_line.split()
     if "q" in fields:
         try:
             q = int(float(fields[fields.index("q")+1]))
         except:
             q = 0
-    else:
-        q = 0
 
     return q
+
+
+def is_coordinate_line(fields):
+    if len(fields) != 4:
+        return False
+    try:
+        float(fields[1])
+        float(fields[2])
+        float(fields[3])
+        return True
+    except:
+        return False
 
 
 def reaction_xyz_parse(xyz):
@@ -232,17 +239,6 @@ def reaction_xyz_parse(xyz):
     if len(lines) == 0:
         raise RuntimeError(f"ERROR in reaction_xyz_parse: {xyz} is empty.")
 
-    def _is_coordinate_line(fields):
-        if len(fields) != 4:
-            return False
-        try:
-            float(fields[1])
-            float(fields[2])
-            float(fields[3])
-            return True
-        except:
-            return False
-
     frames = []
     line_idx = 0
 
@@ -267,7 +263,7 @@ def reaction_xyz_parse(xyz):
 
         comment_line = lines[line_idx].rstrip("\n")
         comment_fields = comment_line.split()
-        if len(comment_fields) == 0 or _is_coordinate_line(comment_fields):
+        if is_coordinate_line(comment_fields):
             raise RuntimeError(
                 f"ERROR in reaction_xyz_parse: {xyz} is missing the required comment line after atom count {n_atoms}.")
 
@@ -282,7 +278,7 @@ def reaction_xyz_parse(xyz):
                     f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
 
             fields = lines[line_idx].split()
-            if _is_coordinate_line(fields) is False:
+            if is_coordinate_line(fields) is False:
                 raise RuntimeError(
                     f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
 
@@ -291,7 +287,15 @@ def reaction_xyz_parse(xyz):
                 [float(fields[1]), float(fields[2]), float(fields[3])])
             line_idx += 1
 
-        frames.append((elements, geometry, _comment_q_parse(comment_line)))
+        next_idx = line_idx
+        while next_idx < len(lines) and len(lines[next_idx].split()) == 0:
+            next_idx += 1
+
+        if next_idx < len(lines) and is_coordinate_line(lines[next_idx].split()):
+            raise RuntimeError(
+                f"ERROR in reaction_xyz_parse: {xyz} has more coordinate lines than indicated by the atom count {n_atoms}.")
+
+        frames.append((elements, geometry, xyz_q_parse(comment_line=comment_line)))
 
     if len(frames) != 2:
         raise RuntimeError(
@@ -309,6 +313,122 @@ def reaction_xyz_parse(xyz):
             f"ERROR in reaction_xyz_parse: {xyz} requires identical atom ordering between reactant and product.")
 
     return reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q
+
+
+def print_reaction_load_failures(source, failures):
+    if len(failures) == 0:
+        return
+
+    print(f" - Failed to initialize {len(failures)} reaction(s) from {source}:")
+    for label, error in failures:
+        print(f"   * {label}: {error}")
+
+
+def load_reaction_from_xyz_file(xyz_file):
+    from yarp.yarpecule.yarpecule import yarpecule
+    from yarp.yarpecule.graph.adjacency import table_generator
+    from yarp.reaction.reaction import reaction
+
+    reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+    reactant_adj = table_generator(reactant_elements, reactant_geo)
+    product_adj = table_generator(product_elements, product_geo)
+
+    reactant = yarpecule((reactant_adj, reactant_geo, reactant_elements, reactant_q), canon=False)
+    product = yarpecule((product_adj, product_geo, product_elements, product_q), canon=False)
+
+    return reaction(reactant, product)
+
+
+def load_reactions_from_xyz_directory(xyz_dir):
+    xyz_dir = Path(xyz_dir)
+    xyz_files = sorted([_ for _ in xyz_dir.iterdir() if _.is_file() and _.suffix.lower() == ".xyz"])
+
+    if len(xyz_files) == 0:
+        raise RuntimeError(f"No xyz reaction files were found in {xyz_dir}.")
+
+    output = dict()
+    failures = []
+    for xyz_file in xyz_files:
+        try:
+            rxn = load_reaction_from_xyz_file(xyz_file)
+        except Exception as exc:
+            failures.append((str(xyz_file), str(exc)))
+            continue
+
+        output[rxn.hash] = rxn
+
+    print_reaction_load_failures(xyz_dir, failures)
+
+    return output
+
+
+def parse_mapped_reaction_smiles(smiles, line_number, source_path):
+    mol = MolFromSmiles(smiles, sanitize=False)
+
+    if mol is None:
+        raise RuntimeError(
+            f"Line {line_number} in {source_path}: could not parse reaction SMILES."
+        )
+
+    atom_maps = []
+    for atom in mol.GetAtoms():
+        atom_props = atom.GetPropsAsDict()
+        if "molAtomMapNumber" not in atom_props:
+            raise RuntimeError(
+                f"Line {line_number} in {source_path}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization"
+            )
+        atom_map = int(atom_props["molAtomMapNumber"])
+        atom_maps.append(atom_map)
+
+    if len(atom_maps) != len(set(atom_maps)):
+        raise RuntimeError(
+            f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
+        )
+
+    return atom_maps
+
+
+def load_reactions_from_smiles_file(source_path):
+    from yarp.yarpecule.yarpecule import yarpecule
+    from yarp.reaction.reaction import reaction
+
+    output = dict()
+    failures = []
+
+    with open(source_path, 'r') as f:
+        for line_number, raw_line in enumerate(f, start=1):
+            line = raw_line.strip()
+
+            if len(line) == 0 or line.startswith("#"):
+                continue
+
+            if line.count(">>") != 1:
+                failures.append((f"Line {line_number}", "No >> or more than 1 >>"))
+                continue
+
+            try:
+                reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
+                reactant_maps = parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
+                product_maps = parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
+
+                if set(reactant_maps) != set(product_maps):
+                    raise RuntimeError(
+                        f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
+                    )
+
+                reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+                product = yarpecule(product_smiles, mode="yarp", canon=False)
+            except Exception as exc:
+                failures.append((f"Line {line_number}", str(exc)))
+                continue
+
+            rxn = reaction(reactant, product)
+            output[rxn.hash] = rxn
+
+    print_reaction_load_failures(source_path, failures)
+
+    return output
 
 
 def mol_parse(mol):

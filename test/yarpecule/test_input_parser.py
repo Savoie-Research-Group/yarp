@@ -6,7 +6,11 @@ import pytest
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.yarpecule.input_parsers import xyz_q_parse
 from yarp.yarpecule.input_parsers import mol_parse
+from yarp.yarpecule.input_parsers import reaction_xyz_parse
+from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory
+from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
 from yarp.yarpecule.input_parsers import xyz_from_smiles
+from yarp.yarpecule.yarpecule import yarpecule
 
 
 class TestXYZParser:
@@ -228,3 +232,216 @@ class TestMolParser:
 
         # charge
         assert q == 0
+
+
+class TestXYZRxn:
+    def test_initialize_xyz_reaction_folder(self, test_xyz_dir, capsys):
+        reactions = load_reactions_from_xyz_directory(test_xyz_dir)
+        captured = capsys.readouterr()
+
+        assert f"Failed to initialize 6 reaction(s) from {test_xyz_dir}:" in captured.out
+        assert f"{test_xyz_dir / 'failure1.xyz'} has mismatched reactant/product atom counts." in captured.out
+        assert f"{test_xyz_dir / 'failure2.xyz'} requires identical atom ordering between reactant and product." in captured.out
+        assert f"{test_xyz_dir / 'failure3.xyz'} must contain exactly two coordinate sets (reactant first, product second)." in captured.out
+        assert f"{test_xyz_dir / 'failure4.xyz'} has fewer coordinate lines than indicated by the atom count 27." in captured.out
+        assert f"{test_xyz_dir / 'failure5.xyz'} has more coordinate lines than indicated by the atom count 25." in captured.out
+        assert f"{test_xyz_dir / 'failure6.xyz'} is missing the required comment line after atom count 26." in captured.out
+
+        assert len(reactions) == 5
+
+    def test_reaction1_xyz_parse(self, test_xyz_dir):
+        xyz_file = test_xyz_dir / "reaction1.xyz"
+        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+        assert reactant_elements == ["N", "C", "C", "O", "N", "N", "H", "H", "H"]
+        assert product_elements == ["N", "C", "C", "O", "N", "N", "H", "H", "H"]
+        assert reactant_geo.shape == (9, 3)
+        assert product_geo.shape == (9, 3)
+        assert reactant_q == pytest.approx(0, rel=1e-5)
+        assert product_q == pytest.approx(0, rel=1e-5)
+
+        assert reactant_geo[0, 0] == pytest.approx(-1.31331, rel=1e-5)
+        assert reactant_geo[0, 1] == pytest.approx(0.63116, rel=1e-5)
+        assert reactant_geo[0, 2] == pytest.approx(-0.60438, rel=1e-5)
+        assert reactant_geo[8, 0] == pytest.approx(0.04874, rel=1e-5)
+        assert reactant_geo[8, 1] == pytest.approx(-2.22984, rel=1e-5)
+        assert reactant_geo[8, 2] == pytest.approx(-0.36590, rel=1e-5)
+
+        assert product_geo[0, 0] == pytest.approx(-1.33568, rel=1e-5)
+        assert product_geo[0, 1] == pytest.approx(0.52530, rel=1e-5)
+        assert product_geo[0, 2] == pytest.approx(-0.03371, rel=1e-5)
+        assert product_geo[8, 0] == pytest.approx(0.21102, rel=1e-5)
+        assert product_geo[8, 1] == pytest.approx(-2.14752, rel=1e-5)
+        assert product_geo[8, 2] == pytest.approx(-0.10526, rel=1e-5)
+
+    def test_reaction2_xyz_parse(self, test_xyz_dir):
+        xyz_file = test_xyz_dir / "reaction2.xyz"
+        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+        assert reactant_elements == ["N", "C", "C", "C", "N", "N", "O", "H", "H", "H"]
+        assert product_elements == ["N", "C", "C", "C", "N", "N", "O", "H", "H", "H"]
+        assert reactant_geo.shape == (10, 3)
+        assert product_geo.shape == (10, 3)
+        assert reactant_q == pytest.approx(0, rel=1e-5)
+        assert product_q == pytest.approx(0, rel=1e-5)
+
+        assert reactant_geo[0, 0] == pytest.approx(-0.54214, rel=1e-5)
+        assert reactant_geo[0, 1] == pytest.approx(0.96718, rel=1e-5)
+        assert reactant_geo[0, 2] == pytest.approx(1.01861, rel=1e-5)
+        assert reactant_geo[9, 0] == pytest.approx(1.33727, rel=1e-5)
+        assert reactant_geo[9, 1] == pytest.approx(-1.59717, rel=1e-5)
+        assert reactant_geo[9, 2] == pytest.approx(1.83977, rel=1e-5)
+
+        assert product_geo[0, 0] == pytest.approx(-0.25240, rel=1e-5)
+        assert product_geo[0, 1] == pytest.approx(1.11134, rel=1e-5)
+        assert product_geo[0, 2] == pytest.approx(0.03026, rel=1e-5)
+        assert product_geo[9, 0] == pytest.approx(-0.60766, rel=1e-5)
+        assert product_geo[9, 1] == pytest.approx(-2.19988, rel=1e-5)
+        assert product_geo[9, 2] == pytest.approx(-0.23692, rel=1e-5)
+
+    def test_reaction3_xyz_parse(self, test_xyz_dir):
+        xyz_file = test_xyz_dir / "reaction3.xyz"
+        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+        assert reactant_elements == ["N", "O", "O", "O"]
+        assert product_elements == ["N", "O", "O", "O"]
+        assert reactant_geo.shape == (4, 3)
+        assert product_geo.shape == (4, 3)
+        assert reactant_q == pytest.approx(-1, rel=1e-5)
+        assert product_q == pytest.approx(-1, rel=1e-5)
+
+        assert reactant_geo[1, 0] == pytest.approx(1.24218, rel=1e-5)
+        assert reactant_geo[1, 1] == pytest.approx(0.00000, rel=1e-5)
+        assert reactant_geo[1, 2] == pytest.approx(0.00000, rel=1e-5)
+        assert reactant_geo[3, 0] == pytest.approx(-0.62109, rel=1e-5)
+        assert reactant_geo[3, 1] == pytest.approx(-1.07576, rel=1e-5)
+        assert reactant_geo[3, 2] == pytest.approx(0.00000, rel=1e-5)
+
+        assert product_geo[1, 0] == pytest.approx(1.25218, rel=1e-5)
+        assert product_geo[1, 1] == pytest.approx(0.00000, rel=1e-5)
+        assert product_geo[1, 2] == pytest.approx(0.00000, rel=1e-5)
+        assert product_geo[3, 0] == pytest.approx(-0.64102, rel=1e-5)
+        assert product_geo[3, 1] == pytest.approx(-1.07588, rel=1e-5)
+        assert product_geo[3, 2] == pytest.approx(0.00000, rel=1e-5)
+
+    def test_reaction4_xyz_parse(self, test_xyz_dir):
+        xyz_file = test_xyz_dir / "reaction4.xyz"
+        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+        assert reactant_elements == ["O", "C", "C", "O", "C", "C", "C", "C", "C", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H"]
+        assert product_elements == ["O", "C", "C", "O", "C", "C", "C", "C", "C", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H"]
+        assert reactant_geo.shape == (19, 3)
+        assert product_geo.shape == (19, 3)
+        assert reactant_q == pytest.approx(0, rel=1e-5)
+        assert product_q == pytest.approx(0, rel=1e-5)
+
+        assert reactant_geo[0, 0] == pytest.approx(-2.1948489, rel=1e-5)
+        assert reactant_geo[0, 1] == pytest.approx(0.1648506, rel=1e-5)
+        assert reactant_geo[0, 2] == pytest.approx(0.0001947, rel=1e-5)
+        assert reactant_geo[18, 0] == pytest.approx(2.2861461, rel=1e-5)
+        assert reactant_geo[18, 1] == pytest.approx(0.0419516, rel=1e-5)
+        assert reactant_geo[18, 2] == pytest.approx(-0.0001223, rel=1e-5)
+
+        assert product_geo[0, 0] == pytest.approx(-3.2453563, rel=1e-5)
+        assert product_geo[0, 1] == pytest.approx(0.0109114, rel=1e-5)
+        assert product_geo[0, 2] == pytest.approx(-0.1465026, rel=1e-5)
+        assert product_geo[18, 0] == pytest.approx(-0.6064293, rel=1e-5)
+        assert product_geo[18, 1] == pytest.approx(2.0484554, rel=1e-5)
+        assert product_geo[18, 2] == pytest.approx(0.4130904, rel=1e-5)
+
+    def test_reaction5_xyz_parse(self, test_xyz_dir):
+        xyz_file = test_xyz_dir / "reaction5.xyz"
+        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+
+        assert reactant_elements == ["N", "H", "H", "H", "H"]
+        assert product_elements == ["N", "H", "H", "H", "H"]
+        assert reactant_geo.shape == (5, 3)
+        assert product_geo.shape == (5, 3)
+        assert reactant_q == pytest.approx(1, rel=1e-5)
+        assert product_q == pytest.approx(1, rel=1e-5)
+
+        assert reactant_geo[0, 0] == pytest.approx(0.00040, rel=1e-5)
+        assert reactant_geo[0, 1] == pytest.approx(-0.00000, rel=1e-5)
+        assert reactant_geo[0, 2] == pytest.approx(-0.00000, rel=1e-5)
+        assert reactant_geo[4, 0] == pytest.approx(-0.34185, rel=1e-5)
+        assert reactant_geo[4, 1] == pytest.approx(-0.48402, rel=1e-5)
+        assert reactant_geo[4, 2] == pytest.approx(-0.83835, rel=1e-5)
+
+        assert product_geo[0, 0] == pytest.approx(0.00040, rel=1e-5)
+        assert product_geo[0, 1] == pytest.approx(-0.00000, rel=1e-5)
+        assert product_geo[0, 2] == pytest.approx(-0.00000, rel=1e-5)
+        assert product_geo[4, 0] == pytest.approx(-0.34185, rel=1e-5)
+        assert product_geo[4, 1] == pytest.approx(-0.50402, rel=1e-5)
+        assert product_geo[4, 2] == pytest.approx(-0.83837, rel=1e-5)
+
+
+class TestSMILESRxn:
+    def test_initialize_smiles_reaction_file(self, test_smiles_file, capsys):
+        reactions = load_reactions_from_smiles_file(test_smiles_file)
+        captured = capsys.readouterr()
+
+        assert f"Failed to initialize 3 reaction(s) from {test_smiles_file}:" in captured.out
+        assert f"Line 5 in {test_smiles_file}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization" in captured.out
+        assert "Line 6: No >> or more than 1 >>" in captured.out
+        assert f"Line 7 in {test_smiles_file}: Mismatched atom mapping. Check again" in captured.out
+
+        assert len(reactions) == 4
+
+    def test_reaction1_smiles_parse(self, test_smiles_file):
+        with open(test_smiles_file, "r") as f:
+            reactant_smiles, product_smiles = [_.strip() for _ in f.readline().strip().split(">>")]
+
+        reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+        product = yarpecule(product_smiles, mode="yarp", canon=False)
+        reactant.get_smiles()
+        product.get_smiles()
+
+        assert reactant.elements == ['c', 'c', 'o', 'o', 'h', 'h', 'h', 'h', 'n', 'h', 'h', 'h']
+        assert product.elements == ['c', 'c', 'o', 'h', 'h', 'h', 'n', 'h', 'h', 'o', 'h', 'h']
+        assert reactant.map_smi == "[C:1]([C:2](=[O:3])[O:4][H:5])([H:6])([H:7])[H:8].[N:9]([H:10])([H:11])[H:12]"
+        assert product.map_smi == "[C:1]([C:2]([O-:3])=[N+:9]([H:10])[H:11])([H:6])([H:7])[H:8].[O:4]([H:5])[H:12]"
+
+    def test_reaction2_smiles_parse(self, test_smiles_file):
+        with open(test_smiles_file, "r") as f:
+            lines = f.readlines()
+        reactant_smiles, product_smiles = [_.strip() for _ in lines[1].strip().split(">>")]
+
+        reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+        product = yarpecule(product_smiles, mode="yarp", canon=False)
+        reactant.get_smiles()
+        product.get_smiles()
+
+        assert reactant.elements == ['n', 'c', 'c', 'c', 'n', 'n', 'o', 'h', 'h', 'h']
+        assert product.elements == ['n', 'c', 'c', 'c', 'n', 'n', 'o', 'h', 'h', 'h']
+        assert reactant.map_smi == "[N:0]1([H:7])[C:1](=[O:6])[N:4]1[C@@:2]1([H:8])[C:3]([H:9])=[N:5]1"
+        assert product.map_smi == "[n+:0]1([H:7])[c:1]([O-:6])[c:3]([H:9])[n:5][c:2]([H:8])[n:4]1"
+
+    def test_reaction3_smiles_parse(self, test_smiles_file):
+        with open(test_smiles_file, "r") as f:
+            lines = f.readlines()
+        reactant_smiles, product_smiles = [_.strip() for _ in lines[2].strip().split(">>")]
+
+        reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+        product = yarpecule(product_smiles, mode="yarp", canon=False)
+        reactant.get_smiles()
+        product.get_smiles()
+
+        assert reactant.elements == ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'n', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h']
+        assert product.elements == ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'n', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h']
+        assert reactant.map_smi == "[C:0]([C:3]([H:11])([H:12])[H:13])([C:4]([H:14])([H:15])[H:16])([C:5]([H:17])([H:18])[H:19])[N:8]1[C@@:1]([C:6]([H:20])([H:22])[H:23])([H:9])[C@@:2]1([C:7]([H:21])([H:24])[H:25])[H:10]"
+        assert product.map_smi == "[C:0]([C:3]([H:11])([H:12])[H:13])([C:4]([H:14])([H:15])[H:16])([C:5]([H:17])([H:18])[H:19])/[N+:8](=[C:1](\\[C:6]([H:20])([H:22])[H:23])[H:9])[C-:2]([C:7]([H:21])([H:24])[H:25])[H:10]"
+
+    def test_reaction4_smiles_parse(self, test_smiles_file):
+        with open(test_smiles_file, "r") as f:
+            lines = f.readlines()
+        reactant_smiles, product_smiles = [_.strip() for _ in lines[3].strip().split(">>")]
+
+        reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
+        product = yarpecule(product_smiles, mode="yarp", canon=False)
+        reactant.get_smiles()
+        product.get_smiles()
+
+        assert reactant.elements == ['o', 'c', 'c', 'o', 'c', 'h', 'h', 'h', 'h', 'c', 'c', 'c', 'c', 'h', 'h', 'h', 'h', 'h', 'h']
+        assert product.elements == ['o', 'c', 'c', 'o', 'c', 'c', 'c', 'c', 'c', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h']
+        assert reactant.map_smi == "[C:4](=[C:5]([C:6](=[C:7]([H:15])[H:16])[H:14])[H:13])([H:11])[H:12].[O:0]=[C:1]([C:2]([O:3][H:10])=[C:8]([H:17])[H:18])[H:9]"
+        assert product.map_smi == "[O:0]=[C:1]([C@:2]1([O:3][H:10])[C:4]([H:11])([H:12])[C:5]([H:13])=[C:6]([H:14])[C:7]([H:15])([H:16])[C:8]1([H:17])[H:18])[H:9]"

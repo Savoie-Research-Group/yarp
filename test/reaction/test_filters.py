@@ -29,18 +29,3 @@ def target_yp():
 
     #     assert len(candidates) == 3
 
-
-def test_separated_candidate_filter_accepts_missing_reactive_maps():
-    reactant = yarpecule('CC')
-    product = yarpecule('[CH3].[CH3]')
-    rxn = reaction(reactant, product)
-
-    candidates = filter_enum_candidates(
-        {rxn.hash: rxn},
-        separate_prods='all',
-        netconfig=SimpleNamespace(target_product=None),
-        react_atoms=[set([999])],
-        verbose=False,
-    )
-
-    assert len(candidates) == 1

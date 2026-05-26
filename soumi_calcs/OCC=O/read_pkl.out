@@ -1,0 +1,30 @@
+Well folks, looks like we have 1 reactions on our hands
+type of rxns =  <class 'dict'>
+type of rxn_list =  <class 'list'>
+################################################################
+Printing all Reaction Attributes Below for each rxn in rxn_list
+################################################################
+reactant: <yarp.reaction.state.state object at 0x7fe5a5d2b700>
+product: <yarp.reaction.state.state object at 0x7fe5900b4280>
+ts_geom: {'ts_guess_1_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b4e20>, 'ts_guess_2_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b4e80>, 'ts_guess_3_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b4ee0>, '1_tsopt_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b4f40>, '2_tsopt_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b5030>, '3_tsopt_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b5120>, 'validated_ts_xtb_pysisyphus': <yarp.reaction.conformer.conformer object at 0x7fe5900b5120>}
+bond_changes: [[ 0  0  1 -1  0  0  0  0]
+ [ 0  0 -1  0  0  0  0  0]
+ [ 1 -1  0  0  0  0  0  0]
+ [-1  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]]
+barrier: {'xtb_pysisyphus': 79.29493307839387}
+reverse_barrier: {'xtb_pysisyphus': 73.79302103250478}
+heat_of_rxn: {}
+id: WGCNASOHLSPBMP_to_DOAMZWOPDPPKJS
+hash: 2409865.289214986
+outcome_label: {'xtb_pysisyphus': 'intended'}
+network_meta: {}
+unique_barrier_keys =  ['xtb_pysisyphus']
++----------------------------------+----------+---------+------------------------------+
+|           Reaction ID            | Reactant | Product | xtb_pysisyphus dG_activation |
++----------------------------------+----------+---------+------------------------------+
+| WGCNASOHLSPBMP_to_DOAMZWOPDPPKJS |  O=CCO   | OC1CO1  |            79.295            |
++----------------------------------+----------+---------+------------------------------+

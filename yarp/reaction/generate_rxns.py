@@ -32,14 +32,13 @@ def generate_rxns(inp):
         Reactant-product pairs contained in a reaction object and ready for further processing!
     """
     output = None
-    verbose = inp.verbose
 
     # Initialize reactions for product enumeration
     if inp.enum.enumerate:
-        print("Product enumeration enabled. Enumerating products.")
+
+        print("Product enumeration routine selected")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
+            print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
@@ -50,21 +49,20 @@ def generate_rxns(inp):
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum_filters.separate_prods,
                 dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore, verbose=verbose
+                netconfig=inp.net_explore
             )
 
             new_rxns = dict()
             for mol in candidates:
-                if verbose:
-                    print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+                print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                    react=inp.enum.react_atoms, mode=inp.enum.mode
                 )
 
                 clean_products = filter_enum_products(
                     raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
                 )
 
                 for prod in clean_products:
@@ -80,19 +78,18 @@ def generate_rxns(inp):
             output = og_rxns | new_rxns
             
         else:
-            if verbose:
-                print(f" - Initializing starting reactant node from {inp.d0_node}")
+            print(f" - Initializing starting reactant node from {inp.d0_node}")
             output = dict()
             reactant = yarpecule(inp.d0_node, mode="yarp")
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                    react=inp.enum.react_atoms, mode=inp.enum.mode
                 )
 
             clean_products = filter_enum_products(
                 raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
             )
 
             for prod in clean_products:
@@ -100,10 +97,9 @@ def generate_rxns(inp):
                 output[r2p.hash] = r2p
 
     else:
-        print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
+        print("Loading reactions")
         if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
+            print(" - Processing starting node(s) as YARP generated pickle file")
 
             og_rxns = pickle.load(open(inp.d0_node, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
@@ -138,6 +134,11 @@ def quick_geom_opt(molecule, lot="uff"):
 
     # Write yarpecule object to a temporary mol file
     mol_file = '.tmp.mol'
+    print("Attributes of the yarpecule object passed to quick_geom_opt:")
+    print("elements = \n", molecule.elements)
+    print("geo = \n", molecule.geo)
+    print("bond_mats = \n", molecule.bond_mats)
+    print("adj_mat = \n", molecule.adj_mat)
     mol_write_yp(mol_file, molecule.elements, molecule.geo,
                  molecule.bond_mats[0], molecule.adj_mat)
 

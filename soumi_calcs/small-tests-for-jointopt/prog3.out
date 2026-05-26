@@ -1,0 +1,198 @@
+Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    
+Processing YARP progress in /users/shaldar/afs-backups/Apps/yarp-again-fixed-JO/yarp-again/soumi_calcs/small-tests-for-jointopt...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 4
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2409865.289214986] Task 'll_path.reactant_conformer' (gfn_crest) already characterized/synced. Fast-forwarding...
+   * [2107297.9154397324] Task 'll_path.gsm' finished running. Checking output...
+     * Run 1 failed: Missing expected output files.
+     * Run 2 failed: Missing expected output files.
+     * Run 3 failed: Missing expected output files.
+   * [2107297.9154397324] Task 'll_path.gsm' failed output validation.
+   * [2107297.9154397324] Task 'll_refine.reactant_optimization' finished running. Checking output...
+   * [2107297.9154397324] Task 'll_refine.reactant_optimization' completed successfully.
+   * [2107297.9154397324] Task 'll_refine.product_optimization' finished running. Checking output...
+   * [2107297.9154397324] Task 'll_refine.product_optimization' completed successfully.
+   * [2409865.289214986] Task 'll_refine.product_optimization' finished running. Checking output...
+   * [2409865.289214986] Task 'll_refine.product_optimization' completed successfully.
+   * [2409865.289214986] Task 'll_path.gsm' prerequisites met. Marked as READY.
+   * [2409865.289214986] Task 'll_refine.reactant_optimization' prerequisites met. Marked as READY.
+Current active jobs: 0 / 4
+   * [2409865.289214986] Submitting task 'll_path.gsm'...
+     * [2409865.289214986] Selecting 3 conformer pairs for GSM...
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-0.56746952 -0.19737239  0.13582223]
+ [ 0.89770105 -0.42234412 -0.05890338]
+ [-0.89606371  0.97286172 -0.54164833]
+ [ 1.60417948  0.33214668 -0.70860724]
+ [-0.37169943  1.73603061 -0.19446983]
+ [-0.83045439 -0.07167981  1.21059525]
+ [-1.17286865 -1.03169156 -0.25895478]
+ [ 1.33667518 -1.31795112  0.41616608]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.57534191 -0.65761295 -0.15917376]
+ [ 0.62615688  0.16801141  0.10634976]
+ [ 0.35328004  1.44157738  0.61522895]
+ [ 0.09997755  0.02368765 -1.1896624 ]
+ [ 0.81170657  2.07767741  0.0075816 ]
+ [-1.57648182 -0.19362608 -0.03579027]
+ [-0.42960383 -1.74731411 -0.30906661]
+ [ 1.64030489 -0.27555956  0.19329278]]
+biased_conf.type =  initial_mol_graph
+biased_conf.type =  biased_initial_mol_graph
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-6.93264719e-01 -6.84832153e-01  1.20777000e-05]
+ [ 8.01350820e-01 -5.32752688e-01 -1.76667700e-04]
+ [-1.34345053e+00  5.49927903e-01 -1.57467000e-05]
+ [ 1.34161330e+00  5.39358248e-01  2.83867000e-05]
+ [-6.52255344e-01  1.23314688e+00  4.05323500e-04]
+ [-9.85220970e-01 -1.26652075e+00  8.87132219e-01]
+ [-9.85329358e-01 -1.26686268e+00 -8.86777234e-01]
+ [ 1.36400243e+00 -1.48151449e+00  1.00032650e-03]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.70680082 -1.19478839  0.55301606]
+ [ 0.21963361 -0.28844473 -0.16530341]
+ [-0.40851427  0.62463061 -1.01818931]
+ [-0.14963478 -0.05978169  1.17213162]
+ [-0.08473465  1.5197489  -0.73912016]
+ [-0.27646518 -2.09847225  1.03190094]
+ [-1.79968856 -1.02980051  0.44733604]
+ [ 1.30345162 -0.5082439  -0.2637845 ]]
+biased_conf.type =  conf_gen_rank0_gfn_crest
+biased_conf.type =  biased_conf_gen_rank0_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-0.57512172 -0.48965389 -0.09533213]
+ [ 0.69615516  0.29158667  0.13117778]
+ [-1.74151579  0.27091717  0.06572882]
+ [ 1.80162761 -0.12502634 -0.06102641]
+ [-1.75739882  0.98298865 -0.58365118]
+ [-0.62329808 -1.28429618  0.65717649]
+ [-0.53043064 -0.97341604 -1.08253297]
+ [ 0.51470298  1.31913748  0.50722375]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.01782647 -0.82878675 -0.32734986]
+ [-0.04472241  0.62946271 -0.05409879]
+ [-1.14404396  1.08213769  0.67905399]
+ [ 0.70800714 -0.26054108  0.73320036]
+ [-1.8905137   1.12463482  0.02798019]
+ [-0.83498754 -1.45455793  0.08913128]
+ [ 0.69146813 -1.18632319 -1.10211729]
+ [ 0.6362818   1.36151586 -0.5361649 ]]
+biased_conf.type =  conf_gen_rank1_gfn_crest
+biased_conf.type =  biased_conf_gen_rank1_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-5.63816283e-01 -5.22685477e-01  2.51628000e-05]
+ [ 6.80877375e-01  3.27973846e-01  2.58142000e-05]
+ [-1.69132269e+00  3.15460915e-01 -1.96544000e-05]
+ [ 1.79975778e+00 -9.65334097e-02 -5.29447000e-05]
+ [-2.49162827e+00 -2.19675643e-01  5.94141000e-05]
+ [-5.38129590e-01 -1.17162323e+00  8.88530123e-01]
+ [-5.38090085e-01 -1.17183383e+00 -8.88341227e-01]
+ [ 4.51705722e-01  1.40822372e+00  2.96633300e-04]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.06423152 -0.95475359 -0.08124438]
+ [-0.36312974  0.49684945 -0.15499279]
+ [-1.39674576  0.93893488  0.67398837]
+ [ 0.68658931 -0.00673014  0.63439114]
+ [-2.23232535  0.66848746  0.21383603]
+ [-0.64431201 -1.57232996  0.63642702]
+ [ 0.56577732 -1.38374095 -0.88745336]
+ [ 0.05100189  1.17484958 -0.93006284]]
+biased_conf.type =  conf_gen_rank2_gfn_crest
+biased_conf.type =  biased_conf_gen_rank2_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-0.56746952 -0.19737239  0.13582223]
+ [ 0.89770105 -0.42234412 -0.05890338]
+ [-0.89606371  0.97286172 -0.54164833]
+ [ 1.60417948  0.33214668 -0.70860724]
+ [-0.37169943  1.73603061 -0.19446983]
+ [-0.83045439 -0.07167981  1.21059525]
+ [-1.17286865 -1.03169156 -0.25895478]
+ [ 1.33667518 -1.31795112  0.41616608]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.52984929 -0.149467    0.11642119]
+ [ 0.92613145 -0.4716885  -0.05633534]
+ [-0.88848364  0.99927143 -0.60448187]
+ [ 1.65225513  0.23403175 -0.73949464]
+ [-0.56240896  1.77666102 -0.07957165]
+ [-0.76675254 -0.01831572  1.1963223 ]
+ [-1.1331875  -1.00342904 -0.25586704]
+ [ 1.33977301 -1.34632356  0.43375957]]
+biased_conf.type =  initial_mol_graph
+biased_conf.type =  biased_initial_mol_graph
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-6.93239989e-01 -6.84823533e-01 -5.17946000e-05]
+ [ 8.01335042e-01 -5.32731538e-01 -3.22394000e-05]
+ [-1.34338981e+00  5.49906222e-01  5.81535000e-05]
+ [ 1.34153779e+00  5.39350357e-01 -5.31610000e-06]
+ [-6.52232872e-01  1.23310845e+00 -2.43809600e-04]
+ [-9.85324461e-01 -1.26669167e+00  8.86805280e-01]
+ [-9.85143648e-01 -1.26655142e+00 -8.87094814e-01]
+ [ 1.36402587e+00 -1.48150174e+00  6.95995600e-04]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-6.79705184e-01 -6.80305719e-01  9.28131255e-06]
+ [ 8.31505444e-01 -5.78074341e-01  3.00686774e-04]
+ [-1.37461130e+00  5.48687035e-01  2.50974372e-05]
+ [ 1.41669918e+00  4.93766926e-01  3.87137261e-04]
+ [-7.49184152e-01  1.31518987e+00 -4.97037655e-04]
+ [-9.81654618e-01 -1.25119464e+00  9.02602910e-01]
+ [-9.81411724e-01 -1.25115550e+00 -9.02693720e-01]
+ [ 1.41327080e+00 -1.49390277e+00  3.77207094e-04]]
+biased_conf.type =  conf_gen_rank0_gfn_crest
+biased_conf.type =  biased_conf_gen_rank0_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-0.57515332 -0.48957693  0.09597029]
+ [ 0.69614814  0.29133415 -0.13185696]
+ [-1.74149519  0.27085489 -0.06600415]
+ [ 1.80164793 -0.12484562  0.0613808 ]
+ [-1.75728119  0.98375237  0.58245491]
+ [-0.53049607 -0.97209472  1.08377351]
+ [-0.62354642 -1.28523201 -0.65544075]
+ [ 0.5147097   1.31820026 -0.50976996]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-0.57091277 -0.48170269  0.07766829]
+ [ 0.66979593  0.32132159 -0.16380859]
+ [-1.71156078  0.30169626 -0.14271955]
+ [ 1.76715086 -0.19741681 -0.03828645]
+ [-1.81069654  0.88922649  0.65182161]
+ [-0.57523883 -0.88877598  1.11394634]
+ [-0.59170793 -1.34274126 -0.62281886]
+ [ 0.60251982  1.3661683  -0.45074867]]
+biased_conf.type =  conf_gen_rank1_gfn_crest
+biased_conf.type =  biased_conf_gen_rank1_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-5.63812069e-01 -5.22668932e-01 -6.43780000e-06]
+ [ 6.80892733e-01  3.27975548e-01 -3.05178000e-05]
+ [-1.69133649e+00  3.15448169e-01  4.31376000e-05]
+ [ 1.79975901e+00 -9.65341855e-02 -1.58242000e-05]
+ [-2.49164726e+00 -2.19715927e-01  7.27526000e-05]
+ [-5.38103404e-01 -1.17171067e+00  8.88430563e-01]
+ [-5.38155091e-01 -1.17170896e+00 -8.88453632e-01]
+ [ 4.51729828e-01  1.40822376e+00 -4.28733000e-05]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-5.59939681e-01 -5.05625625e-01 -1.82523069e-05]
+ [ 6.62407808e-01  3.55414412e-01 -1.87002576e-05]
+ [-1.70134823e+00  3.04454516e-01  3.40917118e-06]
+ [ 1.77051868e+00 -1.56045253e-01 -3.58761911e-05]
+ [-2.47673143e+00 -3.14760982e-01  8.64013331e-05]
+ [-5.47606296e-01 -1.14179160e+00  9.12572105e-01]
+ [-5.47628623e-01 -1.14176990e+00 -9.12629914e-01]
+ [ 5.74169230e-01  1.43748269e+00 -3.49688930e-06]]
+biased_conf.type =  conf_gen_rank2_gfn_crest
+biased_conf.type =  biased_conf_gen_rank2_gfn_crest
+biased_conf.geo BEFORE replacing geo by the OB optimized geo =  [[-6.93239990e-01 -6.84823530e-01 -5.17900000e-05]
+ [ 8.01335040e-01 -5.32731540e-01 -3.22400000e-05]
+ [-1.34338981e+00  5.49906220e-01  5.81500000e-05]
+ [ 1.34153779e+00  5.39350360e-01 -5.32000000e-06]
+ [-6.52232870e-01  1.23310845e+00 -2.43810000e-04]
+ [-9.85324460e-01 -1.26669167e+00  8.86805280e-01]
+ [-9.85143650e-01 -1.26655142e+00 -8.87094810e-01]
+ [ 1.36402587e+00 -1.48150174e+00  6.96000000e-04]]
+biased_conf.geo AFTER replacing geo by the OB optimized geo =  [[-6.79705184e-01 -6.80305719e-01  9.28131255e-06]
+ [ 8.31505444e-01 -5.78074341e-01  3.00686774e-04]
+ [-1.37461130e+00  5.48687035e-01  2.50974372e-05]
+ [ 1.41669918e+00  4.93766926e-01  3.87137261e-04]
+ [-7.49184152e-01  1.31518987e+00 -4.97037655e-04]
+ [-9.81654618e-01 -1.25119464e+00  9.02602910e-01]
+ [-9.81411724e-01 -1.25115550e+00 -9.02693720e-01]
+ [ 1.41327080e+00 -1.49390277e+00  3.77207094e-04]]
+biased_conf.type =  rpopt_xtb_pysisyphus
+biased_conf.type =  biased_rpopt_xtb_pysisyphus
+Type of biased_r: <class 'list'>
+Type of biased_p: <class 'list'>
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+YARP progress tracking complete.
+======================
+

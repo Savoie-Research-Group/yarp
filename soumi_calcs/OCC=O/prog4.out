@@ -1,0 +1,18 @@
+Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    
+Processing YARP progress in /users/shaldar/afs-backups/Apps/yarp-again-fixed-JO/yarp-again/soumi_calcs/OCC=O...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 4
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2409865.289214986] Task 'll_refine.irc_validation' is still running. Come back later...
+Current active jobs: 1 / 4
+YARP progress tracking complete.
+======================
+

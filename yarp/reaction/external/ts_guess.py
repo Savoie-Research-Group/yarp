@@ -1,5 +1,6 @@
 import os
 import shutil
+import fnmatch
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
@@ -210,13 +211,24 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             run_dir = self.scratch_dir / f"gsm_run{i}"
             if not run_dir.exists():
                 continue
-            keep = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
+#            keep = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
+            
+            # SHQK : Do not delete the reactant.xyz, product.xyz and .trj files. These are important to inspect in case GSM fails! 
+            # (e.g., I found the big problem in Joint Optimization routine by inspecting the GSM string!)
+
+            keep_exact = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
+            keep_patterns = ["*.trj", "*.xyz"]
+
             for item in run_dir.iterdir():
-                if item.name not in keep:
-                    if item.is_file():
-                        item.unlink()
-                    elif item.is_dir():
-                        shutil.rmtree(item)
+                if item.name in keep_exact:
+                    continue
+                if item.is_file() and any(fnmatch.fnmatch(item.name, p) for p in keep_patterns):
+                    continue
+                # Delete everything else
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
 
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)

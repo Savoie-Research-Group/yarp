@@ -1,0 +1,30 @@
+Well folks, looks like we have 1 reactions on our hands
+type of rxns =  <class 'dict'>
+type of rxn_list =  <class 'list'>
+################################################################
+Printing all Reaction Attributes Below for each rxn in rxn_list
+################################################################
+reactant: <yarp.reaction.state.state object at 0x7ff1f0adb700>
+product: <yarp.reaction.state.state object at 0x7ff1dae6c190>
+ts_geom: {}
+bond_changes: [[ 0  0  1  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 1  0  0 -1  0  0  0  0]
+ [ 0  0 -1  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]
+ [ 0  0  0  0  0  0  0  0]]
+barrier: {}
+reverse_barrier: {}
+heat_of_rxn: {}
+id: WGCNASOHLSPBMP_to_IEZWOVIWXFLQTP
+hash: 2107297.9154397324
+outcome_label: {}
+network_meta: {}
+unique_barrier_keys =  []
++----------------------------------+----------+---------+
+|           Reaction ID            | Reactant | Product |
++----------------------------------+----------+---------+
+| WGCNASOHLSPBMP_to_IEZWOVIWXFLQTP |  O=CCO   |  C=COO  |
++----------------------------------+----------+---------+

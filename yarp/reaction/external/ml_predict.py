@@ -56,8 +56,9 @@ class EgatMLPredict(MLPredictTask):
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"
 
-        # EGAT flags (--input/--output) follow Docker ENTRYPOINT; use `apptainer run`, not `exec`.
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir), apptainer_run=True)
+        # Grab the container execution command from the base class
+        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
+        print("SH; prefix = ", prefix)    # SHQK : Why the heck there is no actual executable mentioned in the submission script??
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
@@ -66,10 +67,12 @@ class EgatMLPredict(MLPredictTask):
 
             f.write(f"cd {self.scratch_dir}\n")
 
-            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
+#            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
+            cmd1 = f"apptainer run --bind {self.scratch_dir}:/work --pwd /work docker://erm42/yarp:egat --input forward_in.csv --output forward_out.csv"    # SHQK: fixed this cmd as the previous one doesn't work
             f.write(f"{cmd1} > forward.log 2> forward.err\n")
 
-            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
+#            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
+            cmd2 = f"apptainer run --bind {self.scratch_dir}:/work --pwd /work docker://erm42/yarp:egat --input reverse_in.csv --output reverse_out.csv"    # SHQK: fixed this cmd as the previous one doesn't work
             f.write(f"{cmd2} > reverse.log 2> reverse.err\n")
 
         script_path.chmod(0o755)
@@ -121,12 +124,6 @@ class EgatMLPredict(MLPredictTask):
                     rxn.reverse_barrier[self.config.model] = barrier
 
     def cleanup(self):
-        # remove everything except output csv files
-        keep = {"forward_out.csv", "reverse_out.csv"}
-        for item in self.scratch_dir.iterdir():
-            if item.name not in keep:
-                if item.is_file():
-                    item.unlink()
-                elif item.is_dir():
-                    shutil.rmtree(item)
-        return
+        # # EGAT is lightweight, maybe just delete the folder
+        # shutil.rmtree(self.scratch_dir)
+        pass

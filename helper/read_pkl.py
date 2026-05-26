@@ -20,26 +20,55 @@ def main(args):
     rxns = pickle.load(open(file, 'rb')) # rxns is a dictionary object!
     print(f"Well folks, looks like we have {len(rxns)} reactions on our hands")
 
+    # Convert dict_values to a list so we can sort it
+    rxn_list = list(rxns.values())
+
+
+##################################################################################
+    # SHQK : To view the contents of the rxn objects:
+    print("type of rxns = ", type(rxns))
+    print("type of rxn_list = ", type(rxn_list))
+    print("################################################################")
+    print("Printing all Reaction Attributes Below for each rxn in rxn_list")
+    print("################################################################")
+    for i, rxn in enumerate(rxn_list):
+#        print("################################################################")
+#        print("Rxn Attributes for ", rxn.reactant_inchi, "to", rxn.product_inchi)
+#        print("################################################################")
+        for key, value in vars(rxn).items():    # SHQK : Returns the __dict__ atribute of an object. The __dict__ attribute is a dictionary containing the object's changeable attributes in key-value format.
+            print(f"{key}: {value}")
+    # SHQK : End
+##################################################################################
+
+
+
+
     # 1. First pass: Find all unique barrier keys across all reactions
     unique_barrier_keys = set()
-    for rxn in rxns.values():
+    for rxn in rxn_list:
         if rxn.barrier:
             unique_barrier_keys.update(rxn.barrier.keys())
             
     # Sort the keys alphabetically so the columns are always in a consistent order
     unique_barrier_keys = sorted(list(unique_barrier_keys))
+    print ("unique_barrier_keys = ", unique_barrier_keys)
+
+    # SHQK: Sort the data in increasing order of EGAT barrier
+    # float('inf') ensures reactions without an 'egat' key go to the bottom
+    rxn_list.sort(key=lambda r: r.barrier.get('egat_rgd1', float('inf')) if r.barrier else float('inf'))
 
     # 2. Dynamically build the headers
-    headers = ['Reaction Hash', 'Reactant', 'Product']
+    headers = ['Reaction ID', 'Reactant', 'Product']
     for key in unique_barrier_keys:
         headers.append(f"{key} dG_activation")
 
     # 3. Second pass: Extract the data for the table
     data = []
-    for rxn in rxns.values():
+    for rxn in rxn_list:
         # Start the row with the standard identifiers
         row = [
-            rxn.hash,
+#            rxn.hash,
+            rxn.id,    # SHQK: Changing this from hash to id because that's easier to track
             rxn.reactant.canon_smi,
             rxn.product.canon_smi
         ]
@@ -58,7 +87,7 @@ def main(args):
             os.makedirs(folder, exist_ok=True)
             rxn.reactant._graph.draw_bmats(outfile=f"{folder}/reactant.pdf")
             rxn.product._graph.draw_bmats(outfile=f"{folder}/product.pdf")
-    
+   
     print(tabulate(data, headers=headers, tablefmt='pretty'))
 
 

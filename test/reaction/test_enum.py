@@ -4,6 +4,7 @@ Testing suite for functions contained in yarp/reaction/enum.py
 import pytest
 import numpy as np
 from yarp.reaction.enum import bnfn, enumerate_products
+from yarp.reaction.enum import _resolve_reactive_atoms_for_candidate
 from yarp.reaction.filters import filter_enum_products
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
@@ -259,3 +260,88 @@ class TestSequentialPhoto:
 
         assert c2.hash in b2f1_filt_hash
         assert c3.hash in b2f1_filt_hash
+
+
+class TestReactiveAtomMaps:
+    def test_missing_reactive_map_skips_candidate(self):
+        mol = yarpecule('O=CCCOO')
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
+        )
+
+        assert products == []
+
+    def test_empty_reactive_map_intersection_skips_candidate(self):
+        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
+        )
+
+        assert products == []
+
+    def test_reactive_map_skip_logs_only_when_verbose(self, capsys):
+        mol = yarpecule('[C:0]([H:1])([H:2])[H:3]', canon=False)
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=False,
+        )
+
+        assert products == []
+        assert "Molecule contains no atoms in reactive set" not in capsys.readouterr().out
+
+        products = enumerate_products(
+            mol,
+            n_break=1,
+            n_form=1,
+            react=[set([999])],
+            mode="concerted",
+            verbose=True,
+        )
+
+        assert products == []
+        assert "Molecule contains no atoms in reactive set" in capsys.readouterr().out
+
+    def test_partial_reactive_map_intersection_enumerates_present_maps(self, capsys):
+        mol = yarpecule('[C:0][O:1]', canon=False)
+
+        enumerate_products(
+            mol,
+            n_break=1,
+            n_form=0,
+            react=[set([0, 999])],
+            mode="concerted",
+            verbose=True,
+        )
+
+        output = capsys.readouterr().out
+        assert "Reactive atoms defined as: map [0]" in output
+        assert "candidate missing maps [999]" in output
+
+    def test_nonprefix_reactive_maps_resolve_to_local_indices(self):
+        mol = yarpecule('O=CCCOO')
+        local_react, present, missing = _resolve_reactive_atoms_for_candidate(
+            mol,
+            react=[set([0, 4, 5])],
+        )
+
+        assert present == [0, 4, 5]
+        assert missing == []
+        assert len(local_react) == 1
+        assert len(local_react[0]) == 3

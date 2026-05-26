@@ -12,6 +12,74 @@ from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
+def _reactive_maps_from_react(react):
+    """
+    Convert the public reactive-atoms value to a set of atom-map ids.
+    """
+    if react is None or react == []:
+        return set()
+    if isinstance(react, set):
+        return set(react)
+    if isinstance(react, tuple):
+        return set(react)
+    if isinstance(react, list) and len(react) == 1 and isinstance(react[0], (set, list, tuple)):
+        return set(react[0])
+    return set(react)
+
+
+def atom_map_to_local_index(yarp_like):
+    """
+    Return {atom_map: local_index} for a yarpecule and reject duplicate maps.
+    """
+    by_map = {}
+    for local_idx, info in yarp_like._atom_info.items():
+        atom_map = info.get("atom_map")
+        if atom_map is None:
+            continue
+        if atom_map in by_map:
+            raise ValueError(f"Duplicate atom map {atom_map} found in reactant.")
+        by_map[atom_map] = local_idx
+    return by_map
+
+
+def _resolve_reactive_atoms_for_candidate(yarp_like, react, verbose=False):
+    """
+    Resolve public reactive atom maps to candidate-local atom indices.
+
+    The public YAML/API value is expressed as atom-map IDs because those are the
+    only stable atom identifiers across pickle restarts, product separation, and
+    local atom reordering. The low-level enumeration code still operates on
+    candidate-local atom indices, so every candidate has to resolve the map IDs
+    against its own current atom table immediately before enumeration.
+
+    Missing maps are intentionally not errors. A candidate can be a separated
+    product fragment, or just a molecule that does not contain this depth's
+    requested reactive atom subset. In those cases we use the intersection of
+    requested maps and candidate maps. If the intersection is empty, the caller
+    skips this candidate cleanly by returning no products.
+    """
+    react_maps = _reactive_maps_from_react(react)
+    if not react_maps:
+        return [], [], []
+
+    # ``by_map`` is the bridge from stable user-facing map IDs to the local
+    # integer indices expected by adjacency/bond-matrix enumeration routines.
+    by_map = atom_map_to_local_index(yarp_like)
+    present = sorted(react_maps & set(by_map))
+    missing = sorted(react_maps - set(by_map))
+
+    if not present:
+        if verbose:
+            print("   + Molecule contains no atoms in reactive set; skipping enumeration.")
+        return None, present, missing
+
+    # Preserve the historical internal shape: a list of sets, where each set is
+    # a candidate-local reactive atom group. The public representation remains
+    # atom-map IDs; only enumeration internals see local indices.
+    local_react = [set(by_map[_] for _ in present)]
+    return local_react, present, missing
+
+
 def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
     """
     Master wrapper function for all enumeration routines
@@ -28,10 +96,12 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         Number of bonds to form
 
     react : set (default = None)
-        When supplied this is used to restrict bond formations only to those atoms in this set.
-        If supplied, then `react` must have a searchable list or set
-        (i.e., the function uses an `in` call, so sets are better) per `yarpecule`.
-        An empty list is interpreted as all atoms being available to react. 
+        When supplied this is interpreted as atom-map ids to restrict
+        enumeration. These maps are resolved to candidate-local indices before
+        low-level adjacency/BEM operations. Missing maps are ignored for this
+        candidate. If none of the requested maps are present, no products are
+        enumerated for this candidate. An empty list is interpreted as all atoms
+        being available to react.
 
     mode : string
         Toggle between the two available product enumeration modes:
@@ -47,13 +117,23 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
         print(f"  * Product enumeration with break {n_break}, form {n_form} "
             f"will be performed in {mode} mode.")
 
-    if react != []:
-        react_list = list(react[0])
-        element_list = []
-        for i in react_list:
-            element_list.append(r_yp.elements[i])
+    if _reactive_maps_from_react(react):
+        local_react, present_maps, missing_maps = _resolve_reactive_atoms_for_candidate(
+            r_yp, react, verbose=verbose
+        )
+        if local_react is None:
+            return []
+
         if verbose:
-            print(f"   + Reactive atoms defined as: index {react_list} --> element {element_list}")
+            print(f"   + Reactive atoms: {r_yp.reactive_map_smi(react)}")
+            react_list = sorted(local_react[0])
+            element_list = [r_yp.elements[i] for i in react_list]
+            msg = f"   + Reactive atoms defined as: map {present_maps} --> element {element_list}"
+            if missing_maps:
+                msg += f" (candidate missing maps {missing_maps})"
+            print(msg)
+    else:
+        local_react = []
 
     if mode == "sequential":
         if verbose:
@@ -61,14 +141,14 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
                 "may cause memory blow-up issues!")
 
         # Break bonds
-        break_mol = list(break_bonds(r_yp, n=n_break, react=react, debug=debug))
+        break_mol = list(break_bonds(r_yp, n=n_break, react=local_react, debug=debug))
         if verbose:
             print(f"   + Breaking {n_break} bonds formed "
                 f"{len(break_mol)} intermediates")
 
         # Form bonds
         if n_form > 0:
-            products = form_n_bonds(break_mol, n=n_form, react=react, hashes={r_yp.hash}, debug=debug)
+            products = form_n_bonds(break_mol, n=n_form, react=local_react, hashes={r_yp.hash}, debug=debug)
             if verbose:
                 print(f"   + Forming {n_form} bonds formed "
                     f"{len(products)} potential products")
@@ -80,7 +160,7 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
             print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=react, verbose=verbose, debug=debug))
+        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=local_react, verbose=verbose, debug=debug))
         if verbose:
             print(f"   + Enumerated {len(products)} products")
 
@@ -277,8 +357,17 @@ def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True,
     yarpecules = prepare_list(yarpecules) 
 
     # Prepare react list if it isn't the same length as the number of yarpecules
-    if len(react) != len(yarpecules):
-        react = [ set(range(len(y))) for y in yarpecules ]
+    if react == []:
+        react_sets = [set(range(len(y))) for y in yarpecules]
+    elif len(react) == 1:
+        react_sets = [set(react[0]) for _ in yarpecules]
+    elif len(react) == len(yarpecules):
+        react_sets = [set(_) for _ in react]
+    else:
+        raise ValueError(
+            "form_n_bonds() received a reactive-atom list whose length does not "
+            "match the candidate list and cannot be safely broadcast."
+        )
 
     if hashes is None:
         hashes = set([ _.hash for _ in yarpecules])
@@ -286,20 +375,20 @@ def form_n_bonds(yarpecules, n=2, react=[], hashes=None, inter=True, intra=True,
     # Loop over the originals
     new = []
     
-    for y in yarpecules:
-        newest = list(form_bonds(y,hashes=hashes, def_only=def_only))
+    for count_y, y in enumerate(yarpecules):
+        newest = list(form_bonds(y, react=[react_sets[count_y]], hashes=hashes, inter=inter, intra=intra, def_only=def_only, hash_filter=hash_filter))
         hashes.update([ _.hash for _ in newest ])
-        new += newest
+        new += [(new_y, set(react_sets[count_y])) for new_y in newest]
     # Loop over the new molecules until no new structures are enumerated
     nf=1
     while nf<n:
-        for y in new:
-            newest = list(form_bonds(y,hashes=hashes, def_only=def_only))
+        for y, react_set in new:
+            newest = list(form_bonds(y, react=[react_set], hashes=hashes, inter=inter, intra=intra, def_only=def_only, hash_filter=hash_filter))
             hashes.update([ _.hash for _ in newest ])
-            new += newest
+            new += [(new_y, set(react_set)) for new_y in newest]
         nf=nf+1
     
-    return new
+    return [y for y, _ in new]
 
 
 def form_bonds_all(yarpecules,react=[],hashes=None,inter=True,intra=True,def_only=False,hash_filter=True,verbose=False):

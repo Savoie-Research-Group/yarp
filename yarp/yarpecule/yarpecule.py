@@ -2,6 +2,7 @@
 Definition of yarpecule object class
 """
 import os
+import re
 import numpy as np
 from openbabel import pybel
 from rdkit import Chem
@@ -434,6 +435,41 @@ class yarpecule:
         # Remove temporary file
         os.remove(tmp_file)
 
+    def reactive_map_smi(self, react, debug=False):
+        """
+        Return a display-only mapped SMILES with selected atom maps marked.
+
+        The `react` values are zero-based atom-map ids. This helper does not
+        mutate map_smi and the returned string should not be parsed as SMILES.
+        """
+        if self.map_smi is None:
+            self.get_smiles()
+
+        if react is None or react == []:
+            return self.map_smi
+        if isinstance(react, set):
+            react_maps = set(react)
+        elif isinstance(react, tuple):
+            react_maps = set(react)
+        elif isinstance(react, list) and len(react) == 1 and isinstance(react[0], (set, list, tuple)):
+            react_maps = set(react[0])
+        else:
+            react_maps = set(react)
+
+        def mark_atom(match):
+            body = match.group("body")
+            atom_map = int(match.group("map"))
+            if atom_map not in react_maps:
+                return match.group(0)
+            return f"[{body}*:{atom_map}]"
+
+        marked = re.sub(r"\[(?P<body>[^\]:]+):(?P<map>\d+)\]", mark_atom, self.map_smi)
+        if debug:
+            print(f"Reactive atom maps requested: {sorted(react_maps)}")
+            print(f"Canonical mapped SMILES: {self.map_smi}")
+            print(f"Marked reactive-map display: {marked}")
+        return marked
+
     def get_inchi(self, verbose=False):
         """
         Generate the InChIKey for a given yarpecule using RDKit.
@@ -533,6 +569,9 @@ class yarpecule:
         Notes
         -----
         The resulting yarpecule will not retain any of the bond-electron matrix information of the parent yarpecules.
+        Atom maps are preserved when possible. If joined components have missing
+        or overlapping atom maps, new zero-based maps are assigned where needed
+        and the before/after mapped SMILES are printed.
         """
         yarpecules = prepare_list(yarpecules) # handles the singular case
         all_y = [self] + yarpecules # add self to the list
@@ -544,27 +583,56 @@ class yarpecule:
 
         atom_info = {}
         offset = 0
-        map_order = sorted(
-            range(len(all_y)),
-            key=lambda idx: (-sum(1 for e in all_y[idx].elements if e != "h"), idx),
-        )
-        map_offsets = {}
+        used_maps = set()
         next_map = 0
-        for idx in map_order:
-            map_offsets[idx] = next_map
-            next_map += len(all_y[idx].elements)
+        remapped = []
 
         for count_y, y in enumerate(all_y):
             for i in range(len(y.elements)):
+                original_info = dict(y._atom_info[i])
+                original_map = original_info.get("atom_map")
+
+                if original_map is None or original_map in used_maps:
+                    while next_map in used_maps:
+                        next_map += 1
+                    atom_map = next_map
+                    next_map += 1
+                    used_maps.add(atom_map)
+                else:
+                    atom_map = original_map
+                    used_maps.add(atom_map)
+
+                if original_map is not None and original_map != atom_map:
+                    remapped.append((count_y, i, original_map, atom_map))
+
                 atom_info[offset + i] = {
-                    **dict(y._atom_info[i]),
+                    **original_info,
                     "atom_index": offset + i,
-                    "atom_map": map_offsets[count_y] + i,
+                    "atom_map": atom_map,
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
                 }
             offset += len(y.elements)
-        return yarpecule((adj_mat, geo, elements, q, atom_info), canon=canon)
+
+        joined = yarpecule((adj_mat, geo, elements, q, atom_info), canon=canon)
+        if remapped:
+            before = []
+            for count_y, y in enumerate(all_y):
+                if y.map_smi is None:
+                    y.get_smiles()
+                before.append(f"component {count_y}: {y.map_smi}")
+            joined.get_smiles()
+            print("WARNING: yarpecule.join() remapped overlapping atom maps.")
+            print("Before join:")
+            for line in before:
+                print(f"  {line}")
+            print(f"After join: {joined.map_smi}")
+            for count_y, atom_i, old_map, new_map in remapped:
+                print(
+                    f"  component {count_y}, atom index {atom_i}: "
+                    f"atom map {old_map} -> {new_map}"
+                )
+        return joined
 
     def separate(self, canon=True):
         """

@@ -1,5 +1,8 @@
 import pytest
+from types import SimpleNamespace
 from yarp.reaction.filters import apply_target_blinders
+from yarp.reaction.filters import filter_enum_candidates
+from yarp.reaction.reaction import reaction
 from yarp.yarpecule.yarpecule import yarpecule
 
 @pytest.fixture
@@ -25,5 +28,4 @@ def target_yp():
     #     )
 
     #     assert len(candidates) == 3
-
 

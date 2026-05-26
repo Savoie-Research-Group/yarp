@@ -559,7 +559,7 @@ class InputParser:
             )
 
         elif method == 'init_rxn_path':
-            pre_filter_node = data.get("pre_process_filtering")
+            pre_filter_node = data.get("pre_characterize_filters")
             if pre_filter_node:
                 self.stage_filters[name] = PropertyFilterConfig(**{k: v for k, v in pre_filter_node.items() if k in PropertyFilterConfig.__dataclass_fields__})
 

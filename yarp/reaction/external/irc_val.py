@@ -363,7 +363,7 @@ class OrcaIRCValCalculator(IRCValTask):
         # ERM: Add a failure check here if the user hasn't built these already
         if self.job_manager.container == "docker":
             self.image_name = "orca:6.0.1"
-        elif self.job_manager.container == "apptainer":
+        elif self.job_manager.container == "apptainer" or self.job_manager.container == "singularity":
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):

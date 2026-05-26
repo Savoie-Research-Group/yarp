@@ -74,8 +74,8 @@ class JobManagerConfig:
         # Sanity Checks
         if self.scheduler not in ["local", "sge", "slurm"]:
             raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', and 'slurm'")
-        if self.container not in ["apptainer", "docker"]:
-            raise ValueError(f"Invalid 'container' entered: '{self.container}'. Valid options are 'apptainer' and 'docker'")
+        if self.container not in ["apptainer", "docker", 'singularity']:
+            raise ValueError(f"Invalid 'container' entered: '{self.container}'. Valid options are 'apptainer', 'singularity', and 'docker'")
         if self.scheduler in ["sge", "slurm"] and not self.queue:
             raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
 

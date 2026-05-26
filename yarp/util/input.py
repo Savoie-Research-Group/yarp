@@ -296,49 +296,116 @@ class TSGuessConfig:
 @dataclass
 class RPOptConfig:
     """Holds settings specific to optimizing reactant/product conformers"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
+    software: str = None
+    lot: str = None
+    charge: int = None
+    multiplicity: int = None
     hessian_recalc: int = 3
     max_cycles: int = 300
-    charge: int = 0
-    multiplicity: int = 1
     initial_geom: Optional[InitialGeomConfig] = None
+    # ERM: To-do -> put in convergence threshold and solvent options?
 
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
+
+    def __post_init__(self):
+        if self.charge == None:
+            raise ValueError("Missing required key! Please provide 'charge' in rp_opt block!")
+        if self.multiplicity == None:
+            raise ValueError("Missing required key! Please provide 'multiplicity' in rp_opt block!")
+        if self.software not in ['pysisyphus', 'orca']:
+            raise ValueError(f"Invalid rp_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
+            raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        # ERM: To-do -> add a valid input check function for ORCA keyword block?
+
+        if not isinstance(self.hessian_recalc, int):
+            raise ValueError("Please provide an integer value to rp_opt: 'hessian_recalc'")
+        if not isinstance(self.max_cycles, int):
+            raise ValueError("Please provide an integer value to rp_opt: 'max_cycles'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to rp_opt: 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to rp_opt: 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide rp_opt: 'max_runtime' time in HH:MM:SS!")
 
 
 @dataclass
 class TSOptConfig:
     """Holds settings specific to optimizing transition state conformers"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
+    software: str = None
+    lot: str = None
+    charge: int = None
+    multiplicity: int = None
     hessian_recalc: int = 3
     max_cycles: int = 300
-    conv_thresh: str = 'gau'
-    charge: int = 0
-    multiplicity: int = 1
+    conv_thresh: str = 'gau' # ERM: only used for xTB right now...
     initial_geom: Optional[InitialGeomConfig] = None
 
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
 
+    def __post_init__(self):
+        if self.charge == None:
+            raise ValueError("Missing required key! Please provide 'charge' in ts_opt block!")
+        if self.multiplicity == None:
+            raise ValueError("Missing required key! Please provide 'multiplicity' in ts_opt block!")
+        if self.software not in ['pysisyphus', 'orca']:
+            raise ValueError(f"Invalid ts_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
+            raise ValueError(f"Invalid ts_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        # ERM: To-do -> add a valid input check function for ORCA keyword block?
+        # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
+
+        if not isinstance(self.hessian_recalc, int):
+            raise ValueError("Please provide an integer value to ts_opt: 'hessian_recalc'")
+        if not isinstance(self.max_cycles, int):
+            raise ValueError("Please provide an integer value to ts_opt: 'max_cycles'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to ts_opt: 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to ts_opt: 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide ts_opt: 'max_runtime' time in HH:MM:SS!")
+
 
 @dataclass
 class IRCValConfig:
     """Holds settings specific to validating transition states with IRC"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
+    software: str = None
+    lot: str = None
+    charge: int = None
+    multiplicity: int = None
     max_cycles: int = 300
-    conv_thresh: str = 'gau'
-    charge: int = 0
-    multiplicity: int = 1
+    conv_thresh: str = 'gau' # ERM: only used for xTB right now...
 
     n_cpus: int = 1
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
+
+    def __post_init__(self):
+        if self.charge == None:
+            raise ValueError("Missing required key! Please provide 'charge' in irc_val block!")
+        if self.multiplicity == None:
+            raise ValueError("Missing required key! Please provide 'multiplicity' in irc_val block!")
+        if self.software not in ['pysisyphus', 'orca']:
+            raise ValueError(f"Invalid irc_val.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
+            raise ValueError(f"Invalid irc_val.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        # ERM: To-do -> add a valid input check function for ORCA keyword block?
+        # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
+
+        if not isinstance(self.max_cycles, int):
+            raise ValueError("Please provide an integer value to irc_val: 'max_cycles'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to irc_val: 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to irc_val: 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide irc_val: 'max_runtime' time in HH:MM:SS!")
 
 
 @dataclass

@@ -95,7 +95,6 @@ class EgatMLPredict(MLPredictTask):
             for row in reader:
                 rxn_smiles = row["reaction_smiles"]
                 barrier = float(row["activation_barrier"])
-                enthalpy = float(row["reaction_enthalpy"])
 
                 # Retrieve the original reaction hash
                 rxn_hash = forward_smiles_to_hash.get(rxn_smiles)
@@ -103,7 +102,6 @@ class EgatMLPredict(MLPredictTask):
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.barrier[self.config.model] = barrier
-                    rxn.heat_of_rxn[self.config.model] = enthalpy
 
         reverse_out_csv = self.scratch_dir / "reverse_out.csv"
         with open(reverse_out_csv, "r") as f:
@@ -119,6 +117,9 @@ class EgatMLPredict(MLPredictTask):
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.reverse_barrier[self.config.model] = barrier
+                    f_barrier = rxn.barrier[self.config.model]
+                    dg_rxn = barrier - f_barrier
+                    rxn.dg_rxn[self.config.model] = dg_rxn
 
     def cleanup(self):
         # # EGAT is lightweight, maybe just delete the folder

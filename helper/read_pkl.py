@@ -25,14 +25,34 @@ def main(args):
     for rxn in rxns.values():
         if rxn.barrier:
             unique_barrier_keys.update(rxn.barrier.keys())
-            
+
     # Sort the keys alphabetically so the columns are always in a consistent order
     unique_barrier_keys = sorted(list(unique_barrier_keys))
+
+    unique_rev_barrier_keys = set()
+    for rxn in rxns.values():
+        if rxn.reverse_barrier:
+            unique_rev_barrier_keys.update(rxn.reverse_barrier.keys())
+
+    # Sort the keys alphabetically so the columns are always in a consistent order
+    unique_rev_barrier_keys = sorted(list(unique_rev_barrier_keys))
+
+    unique_dg_keys = set()
+    for rxn in rxns.values():
+        if rxn.dg_rxn:
+            unique_dg_keys.update(rxn.dg_rxn.keys())
+
+    # Sort the keys alphabetically so the columns are always in a consistent order
+    unique_dg_keys = sorted(list(unique_dg_keys))
 
     # 2. Dynamically build the headers
     headers = ['Reaction Hash', 'Reactant', 'Product']
     for key in unique_barrier_keys:
         headers.append(f"{key} dG_activation")
+    for key in unique_rev_barrier_keys:
+        headers.append(f"{key} reverse dG_activation")
+    for key in unique_dg_keys:
+        headers.append(f"{key} dG_RXN")
 
     # 3. Second pass: Extract the data for the table
     data = []
@@ -47,8 +67,18 @@ def main(args):
         # Dynamically pull the barriers for each unique key we found
         for key in unique_barrier_keys:
             fwd_barrier = rxn.barrier.get(key) if rxn.barrier else None
-            
+
             row.append(_format_optional_barrier(fwd_barrier))
+
+        for key in unique_rev_barrier_keys:
+            rev_barrier = rxn.reverse_barrier.get(key) if rxn.reverse_barrier else None
+
+            row.append(_format_optional_barrier(rev_barrier))
+
+        for key in unique_dg_keys:
+            dg_rxn = rxn.dg_rxn.get(key) if rxn.dg_rxn else None
+
+            row.append(_format_optional_barrier(dg_rxn))
             
         data.append(row)
         

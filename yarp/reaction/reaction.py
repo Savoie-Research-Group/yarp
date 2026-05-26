@@ -37,6 +37,10 @@ class reaction:
     heat_of_rxn : dict
         Heat of reaction (dH) of the reaction R --> P (kcal/mol).
 
+    dg_rxn : dict
+        Change in Gibbs free energy (dG) of the reaction R --> P (kcal/mol).
+        Computed as reverse_barrier - barrier (for EGAT)
+
     id : str
         Human-readable name of reaction used to generate folders/files.
 
@@ -66,6 +70,7 @@ class reaction:
         self.barrier = dict()
         self.reverse_barrier = dict()
         self.heat_of_rxn = dict()
+        self.dg_rxn = dict()
 
         # Identifiers & Metadata
         self.id = self.reactant.inchi + "_to_" + self.product.inchi

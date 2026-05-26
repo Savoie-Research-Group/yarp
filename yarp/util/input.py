@@ -164,11 +164,27 @@ class GeomSourceConfig:
     lot: str
     software: str
 
+    def __post_init__(self):
+        if not self.label or not isinstance(self.label, str):
+            raise ValueError("initial_geom source must include a non-empty 'label'")
+        if not self.lot or not isinstance(self.lot, str):
+            raise ValueError("initial_geom source must include a non-empty 'lot'")
+        if not self.software or not isinstance(self.software, str):
+            raise ValueError("initial_geom source must include a non-empty 'software'")
+
 @dataclass
 class InitialGeomConfig:
     reactant: GeomSourceConfig
     product: GeomSourceConfig
     transition_state: GeomSourceConfig
+
+    def __post_init__(self):
+        if self.reactant.label not in ['conf_gen', 'rp_opt']:
+            raise ValueError(f"Invalid 'label' for initial_geom.reactant: '{self.reactant.label}'; valid options are 'conf_gen', 'rp_opt'")
+        if self.product.label not in ['conf_gen', 'rp_opt']:
+            raise ValueError(f"Invalid 'label' for initial_geom.product: '{self.product.label}'; valid options are 'conf_gen', 'rp_opt'")
+        if self.transition_state.label not in ['ts_guess', 'ts_opt']:
+            raise ValueError(f"Invalid 'label' for initial_geom.transition_state: '{self.transition_state.label}'; valid options are 'ts_guess', 'ts_opt'")
 
 @dataclass
 class MLPropConfig:
@@ -611,11 +627,7 @@ class InputParser:
             if not ig_node:
                 raise ValueError(f"Stage '{name}' uses 'refine_rxn_path' but is missing the required 'initial_geom' block.")
 
-            ig_config = InitialGeomConfig(
-                reactant=GeomSourceConfig(**ig_node.get("reactant", {})),
-                product=GeomSourceConfig(**ig_node.get("product", {})),
-                transition_state=GeomSourceConfig(**ig_node.get("transition_state", {}))
-            )
+            ig_config = self._parse_initial_geom(ig_node)
 
             rp_data = data.get('rp_opt', {})
             rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
@@ -675,6 +687,32 @@ class InputParser:
             )
 
         return config
+
+    def _parse_initial_geom(self, ig_node: dict) -> InitialGeomConfig:
+        if not isinstance(ig_node, dict):
+            raise ValueError("'initial_geom' must be a mapping/dictionary")
+        required = ["reactant", "product", "transition_state"]
+        missing = [k for k in required if k not in ig_node]
+        if missing:
+            raise ValueError(f"'initial_geom' is missing required entries: {missing}")
+        extra = [k for k in ig_node if k not in required]
+        if extra:
+            raise ValueError(f"Unexpected keys in 'initial_geom': {extra}")
+
+        return InitialGeomConfig(
+            reactant=self._parse_geom_source(ig_node["reactant"], "reactant"),
+            product=self._parse_geom_source(ig_node["product"], "product"),
+            transition_state=self._parse_geom_source(ig_node["transition_state"], "transition_state")
+        )
+
+    def _parse_geom_source(self, section: dict, name: str) -> GeomSourceConfig:
+        if not isinstance(section, dict):
+            raise ValueError(f"'initial_geom.{name}' must be a dictionary")
+        kwargs = {k.replace(" ", "_"): v for k, v in section.items() if v is not None}
+        try:
+            return GeomSourceConfig(**{k: v for k, v in kwargs.items() if k in GeomSourceConfig.__dataclass_fields__})
+        except TypeError as e:
+            raise ValueError(f"Invalid 'initial_geom.{name}' configuration: {e}")
 
     def _link_refine_dependencies(self):
         """

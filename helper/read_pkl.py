@@ -127,7 +127,7 @@ def _load_pickle(filename):
 
 def main(args):
     rxns = _load_pickle(args.filename)
-    print(f"Loaded {len(rxns)} reactions from {args.filename}")
+    print(f"Well folks, I've got {len(rxns)} reactions from {args.filename}")
     selected_rxns = list(rxns.values())
     if args.limit is not None:
         selected_rxns = selected_rxns[:args.limit]
@@ -163,7 +163,7 @@ def main(args):
             os.makedirs(folder, exist_ok=True)
             _draw_state(rxn.reactant, folder / "reactant.pdf")
             _draw_state(rxn.product, folder / "product.pdf")
-
+    print(f"And here they are!")
     print(tabulate(data, headers=headers, tablefmt=args.tablefmt))
 
 

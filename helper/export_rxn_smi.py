@@ -110,9 +110,9 @@ def _load_pickle(filename):
 
 
 def main(args):
-    print("Exporting reaction SMILES...")
+    print("So I've heard you'd like some SMILES strings...")
     rxns = _load_pickle(args.filename)
-
+    print(f"Loaded {len(rxns)} reactions from {args.filename}.")
     value_columns = _value_columns(rxns, _selected_value_groups(args))
 
     rows = []
@@ -139,7 +139,7 @@ def main(args):
             )
 
         rows.append(row)
-
+    print(f"Extracted SMILES and values for {len(rows)} reactions.")
     base_cols = ["rxn_id", "reactant_canon_smi", "product_canon_smi"]
     if args.ids:
         base_cols.insert(1, "rxn_hash")
@@ -152,7 +152,7 @@ def main(args):
     output_cols = base_cols + extra_cols
     df = pd.DataFrame(rows, columns=output_cols)
     df.to_csv(args.output, index=False)
-    print(f"Wrote {len(df)} reactions to {args.output}")
+    print(f"...and now I've exported them to {args.output}!")
 
 
 def _add_options(parser):

@@ -1,21 +1,21 @@
 initialize:
   verbose: True
-  output: tmp.pkl
+  output: HAA_depth1.pkl
   status: STATUS.json
   initial_structure:
-    source: OCC=O
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
     type: smiles
     mode: species
   job_manager:
-     scheduler: local
-     container: docker
+     scheduler: sge
+     queue: long
+     container: apptainer
      max_active_jobs: 100
   enumeration:
     mode: concerted
     n_break: 2
     n_form: 2
-    pre_enum_filters:
-      separate_prods: True
+    react_atoms: [0, 1, 2, 3]
     post_enum_filters:
       lewis_score: 0.0
       formal_charge: 2.0
@@ -39,12 +39,14 @@ ll_path:
      n_unpaired_electrons: 0
      software: crest
      lot: gfn2
-     n_cpus: 2
+     n_cpus: 4
+     mem_per_cpu: 2000
   ts_guess:
      software: pysisyphus
      gsm_lot: xtb
      n_conf: 3
-     n_cpus: 2
+     n_cpus: 4
+     mem_per_cpu: 2000
      joint_opt: dual
      bias_lot: uff
      charge: 0
@@ -68,7 +70,8 @@ ll_refine:
   rp_opt:
     software: pysisyphus
     lot: xtb
-    n_cpus: 2
+    n_cpus: 4
+    mem_per_cpu: 2000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -77,7 +80,8 @@ ll_refine:
     software: pysisyphus
     lot: xtb
     conv_thresh: gau
-    n_cpus: 2
+    n_cpus: 4
+    mem_per_cpu: 2000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -86,7 +90,8 @@ ll_refine:
     software: pysisyphus
     lot: xtb
     conv_thresh: gau
-    n_cpus: 2
+    n_cpus: 4
+    mem_per_cpu: 2000
     max_cycles: 100
     charge: 0
     multiplicity: 1

@@ -372,7 +372,7 @@ def progress_yarp(work_dir: Path):
                         rxn_obj = reactions[rxn_hash]
 
                         # Dynamically grab the dictionary from the reaction object (e.g. rxn.barrier)
-                        prop_dict = getattr(rxn_obj, stage_filter.property, None)
+                        prop_dict = getattr(rxn_obj, stage_filter.type, None)
 
                         if prop_dict is not None and stage_filter.source in prop_dict:
                             val = prop_dict[stage_filter.source]
@@ -380,22 +380,22 @@ def progress_yarp(work_dir: Path):
                             # If it exceeds the threshold, kill the run cleanly
                             if val > stage_filter.threshold:
                                 meta["status"] = "filtered_out"
-                                meta["error_log"] = f"Filtered out: {stage_filter.property} ({val:.2f}) > threshold ({stage_filter.threshold})"
+                                meta["error_log"] = f"Filtered out: {stage_filter.type} ({val:.2f}) > threshold ({stage_filter.threshold})"
 
                                 # Prevent printing the error twice (once for reactant, once for product)
                                 if rxn_hash not in failed_rxns:
                                     failed_rxns[rxn_hash] = rxn_obj
-                                    print(f"   * [{rxn_hash}] Filtered out! {stage_filter.property} ({val:.2f}) > {stage_filter.threshold}")
+                                    print(f"   * [{rxn_hash}] Filtered out! {stage_filter.type} ({val:.2f}) > {stage_filter.threshold}")
 
                                 continue # Skip setting this task to 'ready'
                         else:
                             # If EGAT finished but data is missing entirely, fail it out
                             meta["status"] = "finished_with_error"
-                            meta["error_log"] = f"Missing filter property: {stage_filter.property} from {stage_filter.source}"
+                            meta["error_log"] = f"Missing filter property: {stage_filter.type} from {stage_filter.source}"
 
                             if rxn_hash not in failed_rxns:
                                 failed_rxns[rxn_hash] = rxn_obj
-                                print(f"   * [{rxn_hash}] Pipeline aborted: Missing ML property '{stage_filter.property}' from '{stage_filter.source}'.")
+                                print(f"   * [{rxn_hash}] Pipeline aborted: Missing ML property '{stage_filter.type}' from '{stage_filter.source}'.")
 
                             continue # Skip setting this task to 'ready'
 

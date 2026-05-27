@@ -1,184 +1,42 @@
 """
 Definition of input object class
 """
+import os
+import re
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Union, Dict, Any
-from pathlib import Path
-from yarp.yarpecule.yarpecule import yarpecule
+from typing import List, Dict, Any
 
+from yarp.util.config import InitalStructConfig, JobManagerConfig, EnumerationConfig, PreEnumFilters, PropertyFilterConfig, ProductBlindersConfig, PostEnumFilters, MLPropConfig, ConformerConfig, RPOptConfig, TSOptConfig, TSGuessConfig, IRCValConfig, InitialGeomConfig, GeomSourceConfig
 
-# --- CONFIGURATION OBJECTS ---
-# These classes act as simple containers for user provided settings.
-@dataclass
-class JobManagerConfig:
-    """Holds settings for job scheduling and container execution."""
-    scheduler: str = "local"
-    container: str = "docker"
-    sif_location: Optional[str] = None
-    module_container: Optional[str] = None
-    max_active_jobs: int = 100
-    queue: Optional[str] = None
-    job_name: str = "yarp"
-    account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
+def has_atom_maps(smiles: str) -> bool:
+    """
+    Checks if a SMILES string contains atom mapping.
 
-    def __post_init__(self):
-        # Normalize inputs for easier checking
-        if self.scheduler is not None:
-            self.scheduler = self.scheduler.lower()
-        if self.container is not None:
-            self.container = self.container.lower()
+    Atom maps are formatted as a colon followed by numbers inside 
+    square brackets, for example: [C:1] or [O:12].
 
-        # Sanity Check 1: Schedulers that require a queue
-        if self.scheduler in ["sge", "slurm"] and not self.queue:
-            raise ValueError(f"Sanity Check Failed: A 'queue' must be specified when using the '{self.scheduler}' scheduler.")
+    Parameters:
+    smiles (str): The SMILES string to check.
 
-        # Sanity Check 2: Apptainer/Singularity environments
-        if self.container == "apptainer" and not self.sif_location:
-            # Dynamically resolve the path relative to this file
-            # __file__       == base_git_repo/yarp/util/input.py
-            # .resolve()     == converts to absolute path resolving any symlinks
-            # .parents[0]    == base_git_repo/yarp/util
-            # .parents[1]    == base_git_repo/yarp
-            # .parents[2]    == base_git_repo
-            base_repo_path = Path(__file__).resolve().parents[2]
-            
-            self.sif_location = str(base_repo_path / "containers")
+    Returns:
+    bool: True if atom maps are found, False otherwise.
+    """
+    # Regex breakdown:
+    # \[     -> matches the opening square bracket
+    # [^\]]+ -> matches one or more characters that are NOT a closing bracket (the element/isotopes)
+    # :      -> matches the literal colon used for mapping
+    # \d+    -> matches one or more digits (the map number)
+    # \]     -> matches the closing square bracket
+    atom_map_pattern = r'\[[^\]]+:\d+\]'
 
-@dataclass
-class EnumerationConfig:
-    """Holds settings specific to the generation of products via enumeration."""
-    enumerate: bool = False
-    mode: str = "concerted"
-    n_break: int = 2
-    n_form: int = 2
-    react_atoms: List[set] = field(default_factory=list)
-
-@dataclass
-class EnumFilterConfig:
-    """Holds settings specific to cleaning up enumeration outputs"""
-    # Pre-enumeration filters
-    dG_cutoff: float = 1000.0
-    dG_source: Optional[str] = None
-    separate_prods: Union[str, List[int]] = field(default_factory=list)
-
-    # Post-enumeration filters
-    l_cutoff: float = 0.0
-    fc_cutoff: float = 2.0
-    ring_filter: bool = False
-
-@dataclass
-class NetworkConfig:
-    """Holds settings specific to generating a multi-layered reaction network"""
-    target_product: Optional[yarpecule] = None
-    distance: str = 'sorgel'
-    mode: str = 'capped'
-    n_nodes: Optional[int] = 1
-    tolerance: float = 0.0
-    cap: str = 'moderate'
-
-@dataclass
-class PreProcessFilterConfig:
-    """Holds settings for filtering out reactions before downstream reaction characterization steps."""
-    property: str
-    source: str
-    threshold: float
-
-@dataclass
-class GeomSourceConfig:
-    label: str
-    lot: str
-    software: str
-
-@dataclass
-class InitialGeomConfig:
-    reactant: GeomSourceConfig
-    product: GeomSourceConfig
-    transition_state: GeomSourceConfig
-
-@dataclass
-class MLPropConfig:
-    """Holds settings for global ML reaction property predictions."""
-    model: str
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-
-@dataclass
-class ConformerConfig:
-    """Holds settings specific to generating a reactant/product conformers"""
-    software: str = "crest"
-    lot: str = "gfn2"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-    energy_window: float = 6.0
-    solvent: Optional[Dict[str, str]] = None
-    charge: int = 0
-    n_unpaired_electrons: int = 0
-
-@dataclass
-class GSMConfig:
-    """Holds settings specific to generating transition state guesses via GSM"""
-    software: str = "pysisyphus"
-    selector: str = "rich"
-    joint_opt: str = "dual"
-    n_conf: int = 1
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-    bias_lot: str = "uff"
-    gsm_lot: str = "xtb"
-    max_gsm_nodes: int = 30
-    charge: int = 0
-    multiplicity: int = 1
-
-@dataclass
-class RPOptConfig:
-    """Holds settings specific to optimizing reactant/product conformers"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-    hessian_recalc: int = 3
-    max_cycles: int = 300
-    charge: int = 0
-    multiplicity: int = 1
-    initial_geom: Optional[InitialGeomConfig] = None
-
-@dataclass
-class TSOptConfig:
-    """Holds settings specific to optimizing transition state conformers"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-    hessian_recalc: int = 3
-    max_cycles: int = 300
-    conv_thresh: str = 'gau'
-    charge: int = 0
-    multiplicity: int = 1
-    initial_geom: Optional[InitialGeomConfig] = None
-
-@dataclass
-class IRCValConfig:
-    """Holds settings specific to validating transition states with IRC"""
-    software: str = "pysisyphus"
-    lot: str = "xtb"
-    n_cpus: int = 1
-    mem_per_cpu: int = 1000
-    max_runtime: str = "01:00:00"
-    max_cycles: int = 300
-    conv_thresh: str = 'gau'
-    charge: int = 0
-    multiplicity: int = 1
+    return bool(re.search(atom_map_pattern, smiles))
 
 @dataclass
 class TaskDef:
     """A specific executable step within a stage and its execution prerequisites."""
-    task_id: str             # Unique identifier (e.g., 'll_path.gsm')
-    task_type: str           # The YARP functional type (e.g., 'gsm', 'reactant_conformer')
+    task_id: str             # Unique identifier (e.g., 'll_path.ts_guess')
+    task_type: str           # The YARP functional type (e.g., 'ts_guess', 'reactant_conformer')
     parent_stage: str        # The arbitrary user-defined stage name (e.g., 'll_path')
     depends_on: List[str]    # List of prerequisite task_ids that must complete first
     config: Any              # The specific dataclass configuration for this task
@@ -208,25 +66,46 @@ class InputParser:
             raise RuntimeError("Hey bro beans, I need some molecules or reactions to work with. "
                                "Missing `initialize` node in YAML file.")
 
-        # Core level inputs
-        self.d0_node = initnode.get("initial species", None)
-        if not self.d0_node:
-            raise RuntimeError("Please provide an initial species for enumeration.")
+        # Control of output generation
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
+        if os.path.splitext(self.out_file)[1].lower() != '.pkl':
+            raise ValueError(f"'output' must be a .pkl file, got: '{self.out_file}'")
+
         self.status_file = initnode.get("status", "STATUS.json")
+        if os.path.splitext(self.status_file)[1].lower() != '.json':
+            raise ValueError(f"'status' must be a .json file, got: '{self.status_file}'")
+
         self.verbose = initnode.get("verbose", False) # bool, initialize_yarp only
+        if self.verbose not in [True, False]:
+            raise ValueError(f"Acceptable inputs for 'verbose' are 'True' or 'False', got: '{self.verbose}'")
+
+        # Reading in intial structure controls
+        init_struct_node = initnode.get("initial_structure", {})
+        self.init_struct = self._parse_init_struct(init_struct_node)
 
         # Job manager configuration
-        jm_node = initnode.get("job manager", {})
+        jm_node = initnode.get("job_manager", {})
         self.job_manager = self._parse_job_manager(jm_node)
 
         # Enumeration configs
         enum_node = initnode.get("enumeration", {})
+        if enum_node != {}:
+            enum_node['ON'] = True
         self.enum = self._parse_enum_config(enum_node)
-        self.enum_filters = self._parse_enum_filters(enum_node)
-        self.net_explore = self._parse_network_config(enum_node)
 
-        # Process stages node
+        if self.init_struct.mode == 'species' and not self.enum.ON:
+            raise ValueError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
+
+        if self.enum.react_atoms != [] and self.init_struct.mode =='species' and self.init_struct.type == 'smiles' and not has_atom_maps(self.init_struct.source):
+            raise ValueError("Invalid input configuration! Reactive atoms require user to provide atom mapped SMILES!")
+
+        pre_enum_filters_provided = "pre_enum_filters" in enum_node
+        if self.init_struct.mode == 'species' and pre_enum_filters_provided:
+            print(f"WARNING: When starting from single species, all 'pre_enum_filters' are non-applicable!")
+
+        # ---------------------------------------------------------
+        # 2. Process Stages Node(s)
+        # ---------------------------------------------------------
         self.stage_names = file_dict.get('stages', [])
         self.stage_configs: Dict[str, StageConfig] = {}
 
@@ -265,6 +144,26 @@ class InputParser:
         # Dynamically link inter-stage dependencies for path refinement
         self._link_refine_dependencies()
 
+    def _parse_init_struct(self, init_struct: dict) -> InitalStructConfig:
+        if not init_struct or init_struct == {}:
+            raise ValueError("Missing required block! 'initial_structure' must be provided!")
+
+         # 1. Normalize keys (spaces to underscores) and drop None values.
+        # Dropping None ensures we don't accidentally overwrite a dataclass default.
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in init_struct.items()
+            if value is not None
+        }
+        # 2. Unpack the clean dictionary into the dataclass
+        try:
+            return InitalStructConfig(**kwargs)
+        except TypeError as e:
+            # Python's dataclass automatically raises a TypeError for two reasons:
+            # A) A required field (one without a default) is missing.
+            # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
+            raise ValueError(f"Invalid 'initial_structure' configuration in YAML: {e}")
+
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
         # If the user omitted the block entirely, use all dataclass defaults
@@ -274,96 +173,72 @@ class InputParser:
         # 1. Normalize keys (spaces to underscores) and drop None values.
         # Dropping None ensures we don't accidentally overwrite a dataclass default.
         kwargs = {
-            key.replace(" ", "_"): value 
-            for key, value in jm_node.items() 
+            key.replace(" ", "_"): value
+            for key, value in jm_node.items()
             if value is not None
         }
 
         # 2. Unpack the clean dictionary into the dataclass
         try:
-            return JobManagerConfig(**kwargs)
+            return JobManagerConfig(**{k: v for k, v in kwargs.items() if k in JobManagerConfig.__dataclass_fields__})
         except TypeError as e:
             # Python's dataclass automatically raises a TypeError for two reasons:
             # A) A required field (one without a default) is missing.
             # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
             raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
 
-    def _parse_separate_prods(self, raw_value) -> Union[str, List[int]]:
-        """Handles the logic for the 'separate products' input."""
-        if raw_value is None:
-            return []
-        if isinstance(raw_value, str) and raw_value.lower() == 'all':
-            return 'all'
-        if isinstance(raw_value, int):
-            return [raw_value]
-        if isinstance(raw_value, list):
-            return raw_value
-
-        raise RuntimeError(f"Invalid value for separate products: {raw_value}")
-
     def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
-        """Extracts enumeration settings and returns a clean EnumerationConfig object."""
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in enum_node.items()
+            if value is not None
+        }
 
-        # Handle the reactive atoms list-to-set conversion
-        raw_react = enum_node.get("reactive atoms", None)
-        react_atoms_processed = []
-        if raw_react:
-            react_atoms_processed = [set(raw_react)]
+        pre_node = kwargs.pop("pre_enum_filters", {}) or {}
+        post_node = kwargs.pop("post_enum_filters", {}) or {}
 
-        return EnumerationConfig(
-            enumerate=enum_node.get("enumerate", False),
-            mode=enum_node.get("mode", "concerted"),
-            n_break=enum_node.get("bonds to break", 2),
-            n_form=enum_node.get("bonds to form", 2),
-            react_atoms=react_atoms_processed,
+        pre_filters = self._parse_pre_enum_filters(pre_node)
+        post_filters = self._parse_post_enum_filters(post_node)
+
+        try:
+            return EnumerationConfig(
+                pre_enum_filters=pre_filters,
+                post_enum_filters=post_filters,
+                **{k: v for k, v in kwargs.items() if k in EnumerationConfig.__dataclass_fields__}
+            )
+        except TypeError as e:
+            raise ValueError(f"Invalid 'enumeration' configuration in YAML: {e}")
+
+    def _parse_pre_enum_filters(self, pre_node: dict) -> PreEnumFilters:
+        if pre_node is None:
+            pre_node = {}
+
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in pre_node.items()
+            if value is not None
+        }
+
+        property_data = kwargs.pop("property", {}) or {}
+        product_blinders_data = kwargs.pop("product_blinders", {}) or {}
+
+        return PreEnumFilters(
+            property_filter=PropertyFilterConfig(**property_data) if property_data else None,
+            product_blinders=ProductBlindersConfig(**product_blinders_data) if product_blinders_data else None,
+            **{k: v for k, v in kwargs.items() if k in PreEnumFilters.__dataclass_fields__}
         )
 
-    def _parse_enum_filters(self, enum_node: dict) -> EnumFilterConfig:
-        """Extracts enumeration filtering settings and returns a clean EnumFilterConfig object."""
+    def _parse_post_enum_filters(self, post_node: dict) -> PostEnumFilters:
+        if post_node is None:
+            post_node = {}
 
-        # Handle complex "separate products" logic using a helper method
-        separate_prods = self._parse_separate_prods(enum_node.get("separate products"))
+        kwargs = {
+            key.replace(" ", "_"): value
+            for key, value in post_node.items()
+            if value is not None
+        }
 
-        # Handle nested filters
-        filters = enum_node.get('enumeration filters', {})
-        # If filters is None (yaml key exists but is empty), treat as empty dict
-        if filters is None: 
-            filters = {}
-
-        return EnumFilterConfig(
-            l_cutoff=filters.get('lewis score', 0.0),
-            fc_cutoff=filters.get('formal charge', 2.0),
-            ring_filter=filters.get('discard strained rings', False),
-            dG_cutoff=filters.get('barrier cutoff', -100.00),
-            dG_source=filters.get('barrier source', None),
-            separate_prods=separate_prods
-        )
-
-    def _parse_network_config(self, enum_node: dict) -> NetworkConfig:
-        """Extracts network exploration settings and returns a clean NetworkConfig object."""
-
-        # Handle nested filters
-        netconfig = enum_node.get('network exploration', {})
-        # If netconfig is None (yaml key exists but is empty), treat as empty dict
-        if netconfig is None: 
-            netconfig = {}
-
-        target = netconfig.get("target product", None)
-        if target is not None:
-            target_yp = yarpecule(target)
-            target_yp.get_inchi()
-            target_yp.get_smiles()
-        else:
-            target_yp = None
-
-        return NetworkConfig(
-            target_product=target_yp,
-            distance=netconfig.get("distance metric", 'soergel'),
-            mode=netconfig.get("mode", 'capped'),
-            n_nodes=netconfig.get("n_nodes", 1),
-            tolerance=netconfig.get("tie window", 0.0),
-            cap=netconfig.get("cutoff", "moderate")
-        )
+        return PostEnumFilters(**{k: v for k, v in kwargs.items() if k in PostEnumFilters.__dataclass_fields__})
 
     def _parse_stage(self, name: str, data: dict) -> StageConfig:
         method = data.get('method')
@@ -394,25 +269,20 @@ class InputParser:
             )
 
         elif method == 'init_rxn_path':
-            pre_filter_node = data.get("pre_process_filtering")
-            pre_filter_node = data.get("pre_process_filtering")
+            pre_filter_node = data.get("pre_characterize_filters")
             if pre_filter_node:
-                self.stage_filters[name] = PreProcessFilterConfig(
-                    property=pre_filter_node.get("property"),
-                    source=pre_filter_node.get("source"),
-                    threshold=float(pre_filter_node.get("threshold"))
-                )
+                self.stage_filters[name] = PropertyFilterConfig(**{k: v for k, v in pre_filter_node.items() if k in PropertyFilterConfig.__dataclass_fields__})
 
-            conf_data = data.get('conformers', {})
+            conf_data = data.get('conf_gen', {})
             conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})
 
-            gsm_data = data.get('gsm', {})
-            gsm_cfg = GSMConfig(**{k: v for k, v in gsm_data.items() if k in GSMConfig.__dataclass_fields__})
+            tsg_data = data.get('ts_guess', {})
+            tsg_cfg = TSGuessConfig(**{k: v for k, v in tsg_data.items() if k in TSGuessConfig.__dataclass_fields__})
 
             # Define Unique Task IDs
             r_conf_id = f"{name}.reactant_conformer"
             p_conf_id = f"{name}.product_conformer"
-            gsm_id = f"{name}.gsm"
+            tsg_id = f"{name}.ts_guess"
 
             # Determine initial dependencies: Wait for ML if it exists!
             initial_deps = [self.ml_task_id] if self.ml_task_id else []
@@ -436,12 +306,12 @@ class InputParser:
                 provides_data=["product_conf"]
             )
 
-            config.tasks[gsm_id] = TaskDef(
-                task_id=gsm_id, 
-                task_type="gsm", 
+            config.tasks[tsg_id] = TaskDef(
+                task_id=tsg_id, 
+                task_type="ts_guess", 
                 parent_stage=name, 
                 depends_on=[r_conf_id, p_conf_id],
-                config=gsm_cfg,
+                config=tsg_cfg,
                 requires_data=["reactant_conf", "product_conf"], # Needs 2 starting nodes to run!
                 provides_data=["ts_guess"]
             )
@@ -451,11 +321,17 @@ class InputParser:
             if not ig_node:
                 raise ValueError(f"Stage '{name}' uses 'refine_rxn_path' but is missing the required 'initial_geom' block.")
 
-            ig_config = InitialGeomConfig(
-                reactant=GeomSourceConfig(**ig_node.get("reactant", {})),
-                product=GeomSourceConfig(**ig_node.get("product", {})),
-                transition_state=GeomSourceConfig(**ig_node.get("transition_state", {}))
-            )
+            ig_config = self._parse_initial_geom(ig_node)
+
+            missing_blocks = [
+                block for block in ("rp_opt", "ts_opt", "irc_val")
+                if not data.get(block)
+            ]
+            if missing_blocks:
+                raise ValueError(
+                    f"Stage '{name}' uses 'refine_rxn_path' but is missing required block(s): "
+                    f"{', '.join(missing_blocks)}"
+                )
 
             rp_data = data.get('rp_opt', {})
             rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
@@ -516,6 +392,32 @@ class InputParser:
 
         return config
 
+    def _parse_initial_geom(self, ig_node: dict) -> InitialGeomConfig:
+        if not isinstance(ig_node, dict):
+            raise ValueError("'initial_geom' must be a mapping/dictionary")
+        required = ["reactant", "product", "transition_state"]
+        missing = [k for k in required if k not in ig_node]
+        if missing:
+            raise ValueError(f"'initial_geom' is missing required entries: {missing}")
+        extra = [k for k in ig_node if k not in required]
+        if extra:
+            raise ValueError(f"Unexpected keys in 'initial_geom': {extra}")
+
+        return InitialGeomConfig(
+            reactant=self._parse_geom_source(ig_node["reactant"], "reactant"),
+            product=self._parse_geom_source(ig_node["product"], "product"),
+            transition_state=self._parse_geom_source(ig_node["transition_state"], "transition_state")
+        )
+
+    def _parse_geom_source(self, section: dict, name: str) -> GeomSourceConfig:
+        if not isinstance(section, dict):
+            raise ValueError(f"'initial_geom.{name}' must be a dictionary")
+        kwargs = {k.replace(" ", "_"): v for k, v in section.items() if v is not None}
+        try:
+            return GeomSourceConfig(**{k: v for k, v in kwargs.items() if k in GeomSourceConfig.__dataclass_fields__})
+        except TypeError as e:
+            raise ValueError(f"Invalid 'initial_geom.{name}' configuration: {e}")
+
     def _link_refine_dependencies(self):
         """
         Scans pipeline tasks for 'refine_rxn_path' tasks. Looks backward to find the 
@@ -542,7 +444,7 @@ class InputParser:
                 source = ig.transition_state
                 # CRITICAL: If the user requests 'ts_opt', we must wait for the IRC task 
                 # of that refinement layer, because IRC produces the validated_ts dict!
-                target_type = "gsm" if source.label == "ts_guess" else "irc_validation"
+                target_type = "ts_guess" if source.label == "ts_guess" else "irc_validation"
                 
             else:
                 continue # Skip IRC tasks (they link statically to ts_opt)
@@ -555,7 +457,7 @@ class InputParser:
 
                 if prev_task.task_type == target_type:
                     # Check LOT and Software match
-                    if target_type == "gsm":
+                    if target_type == "ts_guess":
                         prev_lot = getattr(prev_task.config, "gsm_lot", "").lower()
                     else:
                         prev_lot = getattr(prev_task.config, "lot", "").lower()

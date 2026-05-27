@@ -2,10 +2,6 @@ initialize:
   verbose: True
   output: tmp.pkl
   status: STATUS.json
-  initial_structure:
-    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
-    type: smiles
-    mode: species
   job_manager:
      scheduler: local
      container: docker

@@ -82,6 +82,41 @@ class AsyncYarpCalculator:
             verb = "run" if apptainer_run else "exec"
             return f"apptainer {verb} --bind {work_dir}:/work --pwd /work {sif_path}"
 
+        elif self.job_manager.container == "singularity":
+            # Sanitize the image name so it works as a safe, flat filename
+            # e.g., "erm42/yarp:crest" -> "erm42_yarp_crest.sif"
+            sanitized = image_name.replace("/", "_").replace(":", "_")
+            if sanitized.endswith(".sif"):
+                safe_filename = sanitized
+                local_sif_only = True
+            else:
+                safe_filename = f"{sanitized}.sif"
+                local_sif_only = False
+
+            sif_path = Path(self.job_manager.sif_location) / safe_filename
+            # 1. Check if the .sif file exists on disk
+            if not sif_path.exists():
+                if local_sif_only:
+                    raise FileNotFoundError(
+                        f"Local Singularity image not found: {sif_path}\n"
+                        f"(image_name={image_name!r}). This name is treated as a filename under "
+                        f"`job_manager.sif_location`, not a Docker Hub image.\n"
+                        "Build the .sif from your definition file, for example:\n"
+                        f"  singularity build {sif_path} /path/to/orca_6.0.1.def\n"
+                        "Place the ORCA installer tarball next to the .def as documented in that file."
+                    )
+                print(f"Singularity image not found at {sif_path}. Pulling from Docker Hub...")
+                # Ensure the target directory actually exists before pulling
+                sif_path.parent.mkdir(parents=True, exist_ok=True)
+                # 2. Pull the docker image and convert it to a .sif file
+                subprocess.run(
+                    ["singularity", "pull", str(sif_path), f"docker://{image_name}"],
+                    check=True,
+                )
+
+            verb = "run" if apptainer_run else "exec"
+            return f"singularity {verb} --bind {work_dir}:/work --pwd /work {sif_path}"
+
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")
 

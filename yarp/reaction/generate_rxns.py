@@ -35,13 +35,13 @@ def generate_rxns(inp):
     verbose = inp.verbose
 
     # Initialize reactions for product enumeration
-    if inp.enum.enumerate:
+    if inp.enum.ON:
         print("Product enumeration enabled. Enumerating products.")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+        if inp.init_struct.type == 'yarp_pickle':
             if verbose:
                 print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
@@ -68,8 +68,9 @@ def generate_rxns(inp):
                 )
 
                 clean_products = filter_enum_products(
-                    raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                    raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                    fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                    verbose=verbose
                 )
 
                 for prod in clean_products:
@@ -86,9 +87,9 @@ def generate_rxns(inp):
             
         else:
             if verbose:
-                print(f" - Initializing starting reactant node from {inp.d0_node}")
+                print(f" - Initializing starting reactant node from {inp.init_struct.source}")
             output = dict()
-            reactant = yarpecule(inp.d0_node, mode="yarp")
+            reactant = yarpecule(inp.init_struct.source, mode="yarp")
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
@@ -96,8 +97,9 @@ def generate_rxns(inp):
                 )
 
             clean_products = filter_enum_products(
-                raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter, verbose=verbose
+                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                verbose=verbose
             )
 
             for prod in clean_products:
@@ -106,11 +108,11 @@ def generate_rxns(inp):
 
     else:
         print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
+        if inp.init_struct.type == 'yarp_pickle':
             if verbose:
                 print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 

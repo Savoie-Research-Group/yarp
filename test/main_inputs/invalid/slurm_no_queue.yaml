@@ -1,9 +1,15 @@
 initialize:
+  verbose: True
   output: tmp.pkl
+  status: STATUS.json
   initial_structure:
     source: OCC=O
     type: smiles
     mode: species
+  job_manager:
+     scheduler: slurm
+     container: apptainer
+     max_active_jobs: 100
   enumeration:
     mode: concerted
     n_break: 2

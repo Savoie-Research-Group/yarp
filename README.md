@@ -70,6 +70,31 @@ egat:
   mem_per_cpu: 1000           # in MB
 ```
 
+### Enumeration notes
+
+The `reactive atoms` enumeration option restricts bond breaking/forming to the
+selected atom-map IDs. These are zero-based YARP atom maps, not necessarily the
+current local atom indices of a candidate molecule. For unmapped input SMILES,
+XYZ, or MOL files, YARP generates zero-based atom maps during yarpecule
+construction; use the mapped SMILES printed by YARP to audit the selection.
+
+Example:
+
+```yaml
+initialize:
+  enumeration:
+     enumerate: True
+     mode: concerted
+     bonds to break: 2
+     bonds to form: 2
+     reactive atoms: [0, 1, 2, 3] # atom-map IDs to include in enumeration
+```
+
+When restarting from a YARP pickle and using `separate products`, YARP validates
+the reactive atom-map list against the unseparated product before separation.
+Separated fragments that contain none of the selected maps are skipped rather
+than enumerated without the restriction.
+
 ### Installation Notes
 
 First, get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`

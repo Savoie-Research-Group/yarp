@@ -42,6 +42,14 @@ class TestSMILESFromYarpecule:
         assert mol.canon_smi == '[CH2]C'
         assert mol.map_smi == '[C:1]([C:2]([H:3])[H:7])([H:4])([H:5])[H:6]' # revist if this is the correct output - ERM
 
+    def test_reactive_map_smi_display(self):
+        mol = ypcule('[C:0]([O:1][H:2])([H:3])([H:4])[H:5]', canon=False)
+        marked = mol.reactive_map_smi([set([0, 1])])
+
+        assert '[C*:0]' in marked
+        assert '[O*:1]' in marked
+        assert '[H:2]' in marked
+
 class TestInchiFromYarpecule:
     def test_haa(self, haa_full_map_smi):
         mol = ypcule(haa_full_map_smi)
@@ -93,6 +101,9 @@ class TestJoinYarpecules:
         assert adj[1, 4] == 1
         assert adj[1, 5] == 1
         assert adj[1, 6] == 0
+
+        joined_maps = [joined._atom_info[i]["atom_map"] for i in joined._atom_info]
+        assert len(joined_maps) == len(set(joined_maps))
         assert adj[1, 7] == 0
         assert adj[1, 8] == 0
 

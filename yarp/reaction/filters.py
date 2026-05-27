@@ -1,7 +1,7 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None,verbose=False):
+def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, verbose=False):
     """
     Parameters:
     -----------
@@ -73,7 +73,12 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     unique_candidates = []
     for mol in candidates:
 
-        # Apply separate product routine to each/select products (optionally)
+        # Apply the existing product-separation behavior without interpreting
+        # reactive atom maps here. The important design point is that filtering
+        # decides which molecular graphs become enumeration candidates; it does
+        # not decide whether a candidate has the requested reactive atoms. That
+        # check happens later in enumerate_products, after any split fragment has
+        # its final local atom indexing.
         if separate_prods == 'all':
             prod = separate_molecules(mol)
         else:

@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
@@ -203,13 +204,19 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         return True
 
     def cleanup(self):
-        """Clean up but keep logs and final TS xyz files."""
-        pass
-        # for file in self.scratch_dir.iterdir():
-        #     if file.name.startswith("ts_guess_") or file.name.startswith("gsm_") or file.name == "submit.sh":
-        #         continue
-        #     if file.is_file(): file.unlink()
-        #     elif file.is_dir(): shutil.rmtree(file)
+        """Per run dir: keep input yaml, log, and TS guess xyz; delete trajectories and xTB calc dirs."""
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"gsm_run{i}"
+            if not run_dir.exists():
+                continue
+            keep = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
+            for item in run_dir.iterdir():
+                if item.name not in keep:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
 
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)

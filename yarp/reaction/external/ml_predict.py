@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.ml_barrier import dense_reaction_smiles_for_egat
 
 class MLPredictTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -32,7 +33,7 @@ class EgatMLPredict(MLPredictTask):
                     skipped_forward +=1
                     continue
 
-                mapped_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
+                mapped_smiles = dense_reaction_smiles_for_egat(rxn.reactant.map_smi, rxn.product.map_smi)
                 writer.writerow([mapped_smiles])
 
         skipped_reverse = 0
@@ -47,7 +48,7 @@ class EgatMLPredict(MLPredictTask):
                     skipped_reverse += 1
                     continue
 
-                mapped_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
+                mapped_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
                 writer.writerow([mapped_smiles])
 
         if skipped_forward > 0 or skipped_reverse > 0:
@@ -82,10 +83,10 @@ class EgatMLPredict(MLPredictTask):
         forward_smiles_to_hash = dict()
         reverse_smiles_to_hash = dict()
         for rxn_hash, rxn in self.reactions.items():
-            fwd_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
+            fwd_smiles = dense_reaction_smiles_for_egat(rxn.reactant.map_smi, rxn.product.map_smi)
             forward_smiles_to_hash[fwd_smiles] = rxn_hash
 
-            rev_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
+            rev_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
             reverse_smiles_to_hash[rev_smiles] = rxn_hash
 
         forward_out_csv = self.scratch_dir / "forward_out.csv"
@@ -122,6 +123,12 @@ class EgatMLPredict(MLPredictTask):
                     rxn.dg_rxn[self.config.model] = dg_rxn
 
     def cleanup(self):
-        # # EGAT is lightweight, maybe just delete the folder
-        # shutil.rmtree(self.scratch_dir)
-        pass
+        # remove everything except output csv files
+        keep = {"forward_out.csv", "reverse_out.csv"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        return

@@ -2,11 +2,35 @@
 Definition of input object class
 """
 import os
+import re
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from yarp.util.config import InitalStructConfig, JobManagerConfig, EnumerationConfig, PreEnumFilters, PropertyFilterConfig, ProductBlindersConfig, PostEnumFilters, MLPropConfig, ConformerConfig, RPOptConfig, TSOptConfig, TSGuessConfig, IRCValConfig, InitialGeomConfig, GeomSourceConfig
+
+def has_atom_maps(smiles: str) -> bool:
+    """
+    Checks if a SMILES string contains atom mapping.
+
+    Atom maps are formatted as a colon followed by numbers inside 
+    square brackets, for example: [C:1] or [O:12].
+
+    Parameters:
+    smiles (str): The SMILES string to check.
+
+    Returns:
+    bool: True if atom maps are found, False otherwise.
+    """
+    # Regex breakdown:
+    # \[     -> matches the opening square bracket
+    # [^\]]+ -> matches one or more characters that are NOT a closing bracket (the element/isotopes)
+    # :      -> matches the literal colon used for mapping
+    # \d+    -> matches one or more digits (the map number)
+    # \]     -> matches the closing square bracket
+    atom_map_pattern = r'\[[^\]]+:\d+\]'
+
+    return bool(re.search(atom_map_pattern, smiles))
 
 @dataclass
 class TaskDef:
@@ -71,6 +95,9 @@ class InputParser:
 
         if self.init_struct.mode == 'species' and not self.enum.ON:
             raise ValueError("Invalid input configuration! Enumeration must be turned on if starting from a 'species' rather than a 'reaction'!")
+
+        if self.enum.react_atoms != [] and self.init_struct.mode =='species' and self.init_struct.type == 'smiles' and not has_atom_maps(self.init_struct.source):
+            raise ValueError("Invalid input configuration! Reactive atoms require user to provide atom mapped SMILES!")
 
         pre_enum_filters_provided = "pre_enum_filters" in enum_node
         if self.init_struct.mode == 'species' and pre_enum_filters_provided:

@@ -12,7 +12,7 @@ egat:
   mem_per_cpu: 1000
   method: ml_rxn_prop
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
 initialize:
   enumeration:
     mode: concerted
@@ -29,12 +29,13 @@ initialize:
     - 3
   initial_structure:
     mode: species
-    source: O=CCO
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
     type: smiles
   job_manager:
-    container: docker
-    max_active_jobs: 4
-    scheduler: local
+    container: apptainer
+    max_active_jobs: 100
+    queue: long
+    scheduler: sge
   output: HAA_depth1.pkl
   status: STATUS.json
   verbose: true
@@ -42,7 +43,8 @@ ll_path:
   conf_gen:
     charge: 0
     lot: gfn2
-    n_cpus: 2
+    mem_per_cpu: 2000
+    n_cpus: 4
     n_unpaired_electrons: 0
     software: crest
   method: init_rxn_path
@@ -51,9 +53,10 @@ ll_path:
     charge: 0
     gsm_lot: xtb
     joint_opt: dual
+    mem_per_cpu: 2000
     multiplicity: 1
     n_conf: 3
-    n_cpus: 2
+    n_cpus: 4
     software: pysisyphus
 ll_refine:
   initial_geom:
@@ -74,8 +77,9 @@ ll_refine:
     conv_thresh: gau
     lot: xtb
     max_cycles: 100
+    mem_per_cpu: 2000
     multiplicity: 1
-    n_cpus: 2
+    n_cpus: 4
     software: pysisyphus
   method: refine_rxn_path
   rp_opt:
@@ -83,8 +87,9 @@ ll_refine:
     hessian_recalc: 3
     lot: xtb
     max_cycles: 100
+    mem_per_cpu: 2000
     multiplicity: 1
-    n_cpus: 2
+    n_cpus: 4
     software: pysisyphus
   ts_opt:
     charge: 0
@@ -92,8 +97,9 @@ ll_refine:
     hessian_recalc: 3
     lot: xtb
     max_cycles: 100
+    mem_per_cpu: 2000
     multiplicity: 1
-    n_cpus: 2
+    n_cpus: 4
     software: pysisyphus
 stages:
 - egat
@@ -103,9 +109,10 @@ stages:
 =====================================
 Let's generate some initial reaction objects...
 Product enumeration enabled. Enumerating products.
- - Initializing starting reactant node from O=CCO
+ - Initializing starting reactant node from [O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]
   * Product enumeration with break 2, form 2 will be performed in concerted mode.
-   + Reactive atoms defined as: index [0, 1, 2, 3] --> element ['c', 'c', 'o', 'o']
+   + Reactive atoms: [O*:0]=[C*:1]([C*:2]([O*:3][H:7])([H:5])[H:6])[H:4]
+   + Reactive atoms defined as: map [0, 1, 2, 3] --> element ['c', 'c', 'o', 'o']
 Enumerating break 2 form 2 products for 1 yarpecules.
 Reactive atoms defined as: [{0, 1, 2, 3}]
    + Enumerated 2 products

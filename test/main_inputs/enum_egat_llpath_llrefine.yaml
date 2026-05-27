@@ -29,7 +29,7 @@ stages:
 egat:
   method: ml_rxn_prop
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
   mem_per_cpu: 1000 # in MB
 
 ll_path:

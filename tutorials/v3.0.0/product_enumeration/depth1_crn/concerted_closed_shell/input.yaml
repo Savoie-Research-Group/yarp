@@ -7,9 +7,10 @@ initialize:
     type: smiles
     mode: species
   job_manager:
-     scheduler: local
-     container: docker
-     max_active_jobs: 4
+     scheduler: sge
+     queue: long
+     container: apptainer
+     max_active_jobs: 100
   enumeration:
     mode: concerted
     n_break: 2
@@ -25,5 +26,5 @@ stages:
 egat:
   method: ml_rxn_prop
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
   mem_per_cpu: 1000 # in MB

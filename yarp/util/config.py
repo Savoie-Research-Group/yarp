@@ -200,6 +200,8 @@ class MLPropConfig:
             raise ValueError(f"Invalid 'model' provided: '{self.model}' Currently, only valid option is 'egat_rdg1'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ml_rxn_prop -> 'n_cpus'")
+        if self.n_cpus < 8:
+            raise ValueError(f"EGAT requires 8 CPUs in order to run safely! Number selected: {self.n_cpus}")
         if not isinstance(self.mem_per_cpu, int):
             raise ValueError("Please provide an integer value (in MB) to ml_rxn_prop -> 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):

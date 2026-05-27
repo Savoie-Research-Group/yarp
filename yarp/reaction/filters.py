@@ -1,21 +1,18 @@
 import numpy as np
 from yarp.yarpecule.distance_metrics import compute_min_distance
 
-def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=None, netconfig=None, verbose=False):
+def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconfig=None, verbose=False):
     """
     Parameters:
     -----------
     rxns : dict of reaction objects
         Reactions to extract enumeration candidates from
 
-    separate_prods : str or list of integers
+    separate_prods : bool
         Control whether enumeration candidates are separated into individual species or not
 
-    dG_cutoff : float
-        Upperbound of energy of activation barriers to be considered for enumeration
-
-    dG_source : str
-        Level of theory to use for dG_cutoff checks
+    prop_filter : PropertyFilterConfig
+        Controls whether reactions are examined for certain properties before enumerating
 
     netconfig : NetworkConfig object
         Dataclass that holds settings for network exploration mode from input file
@@ -28,9 +25,9 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     if verbose:
         print(f" - Reading in {len(rxns)} total reactions")
 
-    if isinstance(dG_source, str) and verbose:
+    if prop_filter is not None and verbose:
         print(f" - Barrier filtering selected!")
-        print(f"   Reactions with {dG_source} dG above {dG_cutoff} kcal/mol will be excluded from enumeration.")
+        print(f"   Reactions with {prop_filter.source} {prop_filter.type} above {prop_filter.threshold} kcal/mol will be excluded from enumeration.")
     elif verbose:
         print(" - No barrier filtering will be performed prior to enumeration")
 
@@ -38,12 +35,14 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
     clean_rxns = dict()
     for count_r, rxn in enumerate(rxns.values()):
         # Throw away all reactions above dG barrier (optionally)
-        if isinstance(dG_source, str):
-            dG = rxn.barrier.get(dG_source, None)
-            if dG is not None and dG > dG_cutoff:
-                if verbose:
-                    print(f"  + Excluding {rxn.hash} (dG = {dG}) from enumeration")
-                continue
+        if prop_filter is not None:
+            rxn_prop_dict = getattr(rxn, prop_filter.type, None)
+            if rxn_prop_dict is not None:
+                prop = rxn_prop_dict.get(prop_filter.source, None)
+                if prop is not None and prop > prop_filter.threshold:
+                    if verbose:
+                        print(f"  + Excluding {rxn.hash} ({prop_filter.type} = {prop}) from enumeration")
+                    continue
 
         clean_rxns[count_r] = rxn
 
@@ -51,20 +50,21 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         r_set.add(rxn.reactant.hash)
 
     candidates = []
-    if netconfig.target_product is not None:
-        if verbose:
-            print(f" - Constrained network exploration mode selected!")
-        candidates = apply_target_blinders(
-            raw_rxns=clean_rxns, target_yp=netconfig.target_product,
-            dist=netconfig.distance, mode=netconfig.mode,
-            k_nodes=netconfig.n_nodes, tolerance=netconfig.tolerance,
-            cap=netconfig.cap
-        )
+    if netconfig is not None:
+        if netconfig.target_product is not None: # ERM: To-do this is fragile!
+            if verbose:
+                print(f" - Constrained network exploration mode selected!")
+            candidates = apply_target_blinders(
+                raw_rxns=clean_rxns, target_yp=netconfig.target_product,
+                dist=netconfig.distance, mode=netconfig.mode,
+                k_nodes=netconfig.n_nodes, tolerance=netconfig.tolerance,
+                cap=netconfig.cap
+            )
     else:
         for rxn in clean_rxns.values():
             candidates.append(rxn.product.graph)
 
-    if separate_prods == 'all' and verbose:
+    if separate_prods and verbose:
         print(f" - Performing product separation on all reactions prior to enumeration")
     elif verbose:
         print(" - No product separation will be performed prior to enumeration")
@@ -79,7 +79,7 @@ def filter_enum_candidates(rxns, separate_prods=[], dG_cutoff=1000.0, dG_source=
         # not decide whether a candidate has the requested reactive atoms. That
         # check happens later in enumerate_products, after any split fragment has
         # its final local atom indexing.
-        if separate_prods == 'all':
+        if separate_prods:
             prod = separate_molecules(mol)
         else:
             prod = [mol]

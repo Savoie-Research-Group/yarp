@@ -219,7 +219,7 @@ class InputParser:
             if value is not None
         }
 
-        property_data = kwargs.pop("property", {}) or {}
+        property_data = kwargs.pop("property_filter", {}) or {}
         product_blinders_data = kwargs.pop("product_blinders", {}) or {}
 
         return PreEnumFilters(

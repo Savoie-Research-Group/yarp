@@ -48,9 +48,9 @@ def generate_rxns(inp):
             og_rxns_hash = set(og_rxns.keys())
 
             candidates = filter_enum_candidates(
-                og_rxns, separate_prods=inp.enum_filters.separate_prods,
-                dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore, verbose=verbose)
+                og_rxns, separate_prods=inp.enum.pre_enum_filters.separate_prods,
+                prop_filter=inp.enum.pre_enum_filters.property_filter,
+                netconfig=inp.enum.pre_enum_filters.product_blinders, verbose=verbose)
 
             new_rxns = dict()
             for mol in candidates:

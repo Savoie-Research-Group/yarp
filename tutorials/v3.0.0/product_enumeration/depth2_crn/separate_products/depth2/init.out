@@ -1,0 +1,149 @@
+Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    
+First off, here's the input file you provided:
+=====================================
+initialize:
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      formal_charge: 2.0
+      lewis_score: 0.0
+      ring_filter: false
+    pre_enum_filters:
+      separate_prods: true
+  initial_structure:
+    mode: reaction
+    source: ../depth1/HAA_depth1.pkl
+    type: yarp_pickle
+  job_manager:
+    container: apptainer
+    max_active_jobs: 100
+    queue: long
+    scheduler: sge
+  output: HAA_depth2.pkl
+  status: STATUS.json
+  verbose: true
+
+=====================================
+Let's generate some initial reaction objects...
+Product enumeration enabled. Enumerating products.
+ - Processing starting node(s) as YARP generated pickle file
+ - Reading in 11 total reactions
+ - No barrier filtering will be performed prior to enumeration
+ - Performing product separation on all reactions prior to enumeration
+ - 13 unique products identified for enumeration
+ - Enumerating from WSFSSNUMVMOOMR (C=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from TZIHFWKZFHZASV (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 8 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 8 products after filtering
+ - Enumerating from IEZWOVIWXFLQTP (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 12 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 12 products after filtering
+ - Enumerating from DOAMZWOPDPPKJS (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 11 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 11 products after filtering
+ - Enumerating from CCGKOQOJPYTBIH (C=C=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 1 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 1 products after filtering
+ - Enumerating from XLYOFNOQVPJJNP (O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from QTBSBXVTEAMEQO (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 8 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 8 products after filtering
+ - Enumerating from JMCRDEBJJPRTPV (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 9 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 9 products after filtering
+ - Enumerating from WVKOKNQPFFEMSR (O=C=CO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 6 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 6 products after filtering
+ - Enumerating from UFHFLCQGNIYNRP ([H][H]) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from LEQAOMBKQFMDFZ (O=CC=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 5 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 5 products after filtering
+ - Enumerating from BVTJGGGYKAMDBN (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 8 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 8 products after filtering
+ - Enumerating from HZSIFDFXFAXICF (O=C1CO1) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 4 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 4 products after filtering
+Initialized 83 reactions and saved to disk!
+If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.
+See ya, bye!

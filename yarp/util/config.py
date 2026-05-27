@@ -38,6 +38,9 @@ class InitalStructConfig:
                 raise ValueError(f"'source' must be a .pkl file, got: '{self.source}'")
         # TO-DO: Put in checks for XYZ and SMILES, which are compatible with Tanveer's changes
 
+        if self.type == 'smiles' and self.mode == 'reaction':
+            raise ValueError("Initialization of reactions from SMILES is still under development! Sorry, you'll have to use XYZ or YARP pickle files")
+
 @dataclass
 class JobManagerConfig:
     """Holds settings for job scheduling and container execution."""

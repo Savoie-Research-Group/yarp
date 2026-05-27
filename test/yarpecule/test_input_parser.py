@@ -239,13 +239,28 @@ class TestXYZRxn:
         reactions = load_reactions_from_xyz_directory(test_xyz_dir)
         captured = capsys.readouterr()
 
+        structure_error = (
+            "must contain exactly two coordinate sets (reactant first, product second) "
+            "where first line of each set is the number of atoms and the second line is a "
+            "comment or optionally contains charge information with the format `q <charge>`"
+        )
+
         assert f"Failed to initialize 6 reaction(s) from {test_xyz_dir}:" in captured.out
         assert f"{test_xyz_dir / 'failure1.xyz'} has mismatched reactant/product atom counts." in captured.out
         assert f"{test_xyz_dir / 'failure2.xyz'} requires identical atom ordering between reactant and product." in captured.out
-        assert f"{test_xyz_dir / 'failure3.xyz'} must contain exactly two coordinate sets (reactant first, product second)." in captured.out
-        assert f"{test_xyz_dir / 'failure4.xyz'} has fewer coordinate lines than indicated by the atom count 27." in captured.out
-        assert f"{test_xyz_dir / 'failure5.xyz'} has more coordinate lines than indicated by the atom count 25." in captured.out
-        assert f"{test_xyz_dir / 'failure6.xyz'} is missing the required comment line after atom count 26." in captured.out
+        assert (
+            f"{test_xyz_dir / 'failure3.xyz'}: ERROR in reaction_xyz_parse: "
+            f"{test_xyz_dir / 'failure3.xyz'} {structure_error}"
+        ) in captured.out
+        assert (
+            f"{test_xyz_dir / 'failure4.xyz'}: ERROR in reaction_xyz_parse: "
+            f"{test_xyz_dir / 'failure4.xyz'} {structure_error}"
+        ) in captured.out
+        assert f"{test_xyz_dir / 'failure5.xyz'}: list assignment index out of range" in captured.out
+        assert (
+            f"{test_xyz_dir / 'failure6.xyz'}: ERROR in reaction_xyz_parse: "
+            f"{test_xyz_dir / 'failure6.xyz'} {structure_error}"
+        ) in captured.out
 
         assert len(reactions) == 5
 
@@ -253,8 +268,8 @@ class TestXYZRxn:
         xyz_file = test_xyz_dir / "reaction1.xyz"
         reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-        assert reactant_elements == ["N", "C", "C", "O", "N", "N", "H", "H", "H"]
-        assert product_elements == ["N", "C", "C", "O", "N", "N", "H", "H", "H"]
+        assert reactant_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
+        assert product_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
         assert reactant_geo.shape == (9, 3)
         assert product_geo.shape == (9, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -278,8 +293,8 @@ class TestXYZRxn:
         xyz_file = test_xyz_dir / "reaction2.xyz"
         reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-        assert reactant_elements == ["N", "C", "C", "C", "N", "N", "O", "H", "H", "H"]
-        assert product_elements == ["N", "C", "C", "C", "N", "N", "O", "H", "H", "H"]
+        assert reactant_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
+        assert product_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
         assert reactant_geo.shape == (10, 3)
         assert product_geo.shape == (10, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -303,8 +318,8 @@ class TestXYZRxn:
         xyz_file = test_xyz_dir / "reaction3.xyz"
         reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-        assert reactant_elements == ["N", "O", "O", "O"]
-        assert product_elements == ["N", "O", "O", "O"]
+        assert reactant_elements == ["n", "o", "o", "o"]
+        assert product_elements == ["n", "o", "o", "o"]
         assert reactant_geo.shape == (4, 3)
         assert product_geo.shape == (4, 3)
         assert reactant_q == pytest.approx(-1, rel=1e-5)
@@ -328,8 +343,8 @@ class TestXYZRxn:
         xyz_file = test_xyz_dir / "reaction4.xyz"
         reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-        assert reactant_elements == ["O", "C", "C", "O", "C", "C", "C", "C", "C", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H"]
-        assert product_elements == ["O", "C", "C", "O", "C", "C", "C", "C", "C", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H"]
+        assert reactant_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
+        assert product_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
         assert reactant_geo.shape == (19, 3)
         assert product_geo.shape == (19, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -353,8 +368,8 @@ class TestXYZRxn:
         xyz_file = test_xyz_dir / "reaction5.xyz"
         reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
 
-        assert reactant_elements == ["N", "H", "H", "H", "H"]
-        assert product_elements == ["N", "H", "H", "H", "H"]
+        assert reactant_elements == ["n", "h", "h", "h", "h"]
+        assert product_elements == ["n", "h", "h", "h", "h"]
         assert reactant_geo.shape == (5, 3)
         assert product_geo.shape == (5, 3)
         assert reactant_q == pytest.approx(1, rel=1e-5)

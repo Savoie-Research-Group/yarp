@@ -152,168 +152,26 @@ def xyz_parse(xyz, read_types=False, multiple=False):
             return Elements, Geometry, Atom_types
 
 
-def xyz_q_parse(xyz=None, comment_line=None):
+def xyz_q_parse(xyz):
     """
-    This function grabs charge information from an xyz comment line. The charge information is 
+    This function grabs charge information from the comment line of an xyz file. The charge information is 
     interpreted as the first field following the `q` keyword. If no charge information is specified the function
     returns neutral as the default behavior.
-
-    Parameters
-    ----------
-    xyz : filename, optional
-          This is the xyz file that is read by the function.
-
-    comment_line : str, optional
-                   A comment line that should be parsed directly.
-
-    Returns
-    -------
-    q : int
-        The charge information.
     """
-    q = 0
-    if comment_line is not None:
-        fields = comment_line.split()
-    else:
-        with open(xyz, 'r') as f:
-            for lc, lines in enumerate(f):
-                if lc == 1:
-                    fields = lines.split()
-                    break
-
-    if "q" in fields:
-        try:
-            q = int(float(fields[fields.index("q")+1]))
-        except:
-            q = 0
+    with open(xyz, 'r') as f:
+        for lc, lines in enumerate(f):
+            if lc == 1:
+                fields = lines.split()
+                if "q" in fields:
+                    try:
+                        q = int(float(fields[fields.index("q") + 1]))
+                    except:
+                        q = 0
+                else:
+                    q = 0
+                break
 
     return q
-
-
-def is_coordinate_line(fields):
-    if len(fields) != 4:
-        return False
-    try:
-        float(fields[1])
-        float(fields[2])
-        float(fields[3])
-        return True
-    except:
-        return False
-
-
-def reaction_xyz_parse(xyz):
-    """
-    Parse a reaction xyz file containing exactly two xyz coordinate sets:
-    the reactant first and the product second.
-
-    Parameters
-    ----------
-    xyz : filename
-          This is the reaction xyz file being parsed.
-
-    Returns
-    -------
-    reactant_elements : list
-                        A list with the reactant element labels indexed to the geometry.
-
-    reactant_geo : array
-                   An nx3 numpy array holding the reactant cartesian coordinates.
-
-    reactant_q : int
-                 The reactant charge parsed from the reactant comment line.
-
-    product_elements : list
-                       A list with the product element labels indexed to the geometry.
-
-    product_geo : array
-                  An nx3 numpy array holding the product cartesian coordinates.
-
-    product_q : int
-                The product charge parsed from the product comment line.
-    """
-
-    with open(xyz, 'r') as f:
-        lines = f.readlines()
-
-    if len(lines) == 0:
-        raise RuntimeError(f"ERROR in reaction_xyz_parse: {xyz} is empty.")
-
-    frames = []
-    line_idx = 0
-
-    while line_idx < len(lines):
-        while line_idx < len(lines) and len(lines[line_idx].split()) == 0:
-            line_idx += 1
-
-        if line_idx >= len(lines):
-            break
-
-        fields = lines[line_idx].split()
-        if len(fields) != 1 or fields[0].isdigit() is False:
-            raise RuntimeError(
-                f"ERROR in reaction_xyz_parse: {xyz} must start each coordinate set with an atom-count line.")
-
-        n_atoms = int(fields[0])
-        line_idx += 1
-
-        if line_idx >= len(lines):
-            raise RuntimeError(
-                f"ERROR in reaction_xyz_parse: {xyz} is missing the required comment line after atom count {n_atoms}.")
-
-        comment_line = lines[line_idx].rstrip("\n")
-        comment_fields = comment_line.split()
-        if is_coordinate_line(comment_fields):
-            raise RuntimeError(
-                f"ERROR in reaction_xyz_parse: {xyz} is missing the required comment line after atom count {n_atoms}.")
-
-        line_idx += 1
-
-        elements = ["X"] * n_atoms
-        geometry = np.zeros([n_atoms, 3])
-
-        for atom_idx in range(n_atoms):
-            if line_idx >= len(lines):
-                raise RuntimeError(
-                    f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
-
-            fields = lines[line_idx].split()
-            if is_coordinate_line(fields) is False:
-                raise RuntimeError(
-                    f"ERROR in reaction_xyz_parse: {xyz} has fewer coordinate lines than indicated by the atom count {n_atoms}.")
-
-            elements[atom_idx] = fields[0]
-            geometry[atom_idx, :] = np.array(
-                [float(fields[1]), float(fields[2]), float(fields[3])])
-            line_idx += 1
-
-        next_idx = line_idx
-        while next_idx < len(lines) and len(lines[next_idx].split()) == 0:
-            next_idx += 1
-
-        if next_idx < len(lines) and is_coordinate_line(lines[next_idx].split()):
-            raise RuntimeError(
-                f"ERROR in reaction_xyz_parse: {xyz} has more coordinate lines than indicated by the atom count {n_atoms}.")
-
-        frames.append((elements, geometry, xyz_q_parse(comment_line=comment_line)))
-
-    if len(frames) != 2:
-        raise RuntimeError(
-            f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets (reactant first, product second).")
-
-    reactant_elements, reactant_geo, reactant_q = frames[0]
-    product_elements, product_geo, product_q = frames[1]
-
-    if len(reactant_elements) != len(product_elements):
-        raise RuntimeError(
-            f"ERROR in reaction_xyz_parse: {xyz} has mismatched reactant/product atom counts.")
-
-    if reactant_elements != product_elements:
-        raise RuntimeError(
-            f"ERROR in reaction_xyz_parse: {xyz} requires identical atom ordering between reactant and product.")
-
-    return reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q
-
 
 def print_reaction_load_failures(source, failures):
     if len(failures) == 0:
@@ -322,6 +180,42 @@ def print_reaction_load_failures(source, failures):
     print(f" - Failed to initialize {len(failures)} reaction(s) from {source}:")
     for label, error in failures:
         print(f"   * {label}: {error}")
+
+def reaction_xyz_parse(xyz):
+    """
+    Parse a reaction xyz file containing exactly two xyz coordinate sets:
+    the reactant first and the product second.
+    """
+
+    elements, geos = xyz_parse(xyz, multiple=True)
+    q = xyz_q_parse(xyz)
+
+    if len(elements) != 2 or len(geos) != 2:
+        raise RuntimeError(
+        f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets "
+        "(reactant first, product second) where first line of each set is the number "
+        "of atoms and the second line is a comment or optionally contains charge "
+        "information with the format `q <charge>`"
+    )
+
+
+    reactant_elements = elements[0]
+    reactant_geo = geos[0]
+    product_elements = elements[1]
+    product_geo = geos[1]
+
+    if len(reactant_elements) != len(product_elements):
+        raise RuntimeError(
+            f"ERROR in reaction_xyz_parse: {xyz} has mismatched reactant/product atom counts."
+        )
+
+    if reactant_elements != product_elements:
+        raise RuntimeError(
+            f"ERROR in reaction_xyz_parse: {xyz} requires identical atom ordering between reactant and product."
+        )
+
+    return [element.lower() for element in reactant_elements], reactant_geo, q, [element.lower() for element in product_elements], product_geo, q
+
 
 
 def load_reaction_from_xyz_file(xyz_file):
@@ -362,32 +256,24 @@ def load_reactions_from_xyz_directory(xyz_dir):
 
     return output
 
-
-def parse_mapped_reaction_smiles(smiles, line_number, source_path):
-    mol = MolFromSmiles(smiles, sanitize=False)
-
-    if mol is None:
+def reaction_smiles_atom_maps(smiles, line_number, source_path):
+    
+    try:
+        _, _, _, _, atom_info = xyz_from_smiles(smiles, mode="yarp")
+    except Exception:
         raise RuntimeError(
             f"Line {line_number} in {source_path}: could not parse reaction SMILES."
         )
 
-    atom_maps = []
-    for atom in mol.GetAtoms():
-        atom_props = atom.GetPropsAsDict()
-        if "molAtomMapNumber" not in atom_props:
-            raise RuntimeError(
-                f"Line {line_number} in {source_path}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization"
-            )
-        atom_map = int(atom_props["molAtomMapNumber"])
-        atom_maps.append(atom_map)
+    atom_maps = [atom_info[i]["atom_map"] for i in atom_info]
 
-    if len(atom_maps) != len(set(atom_maps)):
+    if any(_ is None for _ in atom_maps):
         raise RuntimeError(
-            f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
+            f"Line {line_number} in {source_path}: Unmapped smiles string. "
+            "Please provide mapped reaction for this particular type of initialization"
         )
 
     return atom_maps
-
 
 def load_reactions_from_smiles_file(source_path):
     from yarp.yarpecule.yarpecule import yarpecule
@@ -409,8 +295,9 @@ def load_reactions_from_smiles_file(source_path):
 
             try:
                 reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
-                reactant_maps = parse_mapped_reaction_smiles(reactant_smiles, line_number, source_path)
-                product_maps = parse_mapped_reaction_smiles(product_smiles, line_number, source_path)
+
+                reactant_maps = reaction_smiles_atom_maps(reactant_smiles, line_number, source_path)
+                product_maps = reaction_smiles_atom_maps(product_smiles, line_number, source_path)
 
                 if set(reactant_maps) != set(product_maps):
                     raise RuntimeError(
@@ -419,6 +306,7 @@ def load_reactions_from_smiles_file(source_path):
 
                 reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
                 product = yarpecule(product_smiles, mode="yarp", canon=False)
+
             except Exception as exc:
                 failures.append((f"Line {line_number}", str(exc)))
                 continue

@@ -1,5 +1,10 @@
 initialize:
-  initial species: OCC=O # can also be a path to an XYZ or MOL file
   output: tmp.pkl
+  initial_structure:
+    source: OCC=O
+    type: smiles
+    mode: species
   enumeration:
-    enumerate: True
+    mode: concerted
+    n_break: 2
+    n_form: 2

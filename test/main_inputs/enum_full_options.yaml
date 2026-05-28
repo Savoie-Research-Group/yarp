@@ -1,13 +1,23 @@
 initialize:
-  initial species: OCC=O # can also be a path to an XYZ or MOL file
+  verbose: True
   output: tmp.pkl
+  status: STATUS.json
+  initial_structure:
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
+    type: smiles
+    mode: species
+  job_manager:
+     scheduler: local
+     container: docker
+     max_active_jobs: 100
   enumeration:
-    enumerate: True
     mode: concerted
-    bonds to break: 2
-    bonds to form: 2
-    reactive atoms: [0, 1, 2, 3] # atom-map IDs to include in enumeration
-    enumeration filters:
-      lewis score: 0.0
-      formal charge: 2.0
-      discard strained rings: False
+    n_break: 2
+    n_form: 2
+    react_atoms: [0, 1, 2, 3]
+    pre_enum_filters:
+      separate_prods: True
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: False

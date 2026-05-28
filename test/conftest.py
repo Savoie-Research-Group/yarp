@@ -8,6 +8,90 @@ import pickle
 
 # YAML input files
 @pytest.fixture
+def no_initial_struct(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "invalid" / "no_initial_struct.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_no_initial_struct_output.pkl"
+    safe_status = tmp_path / "test_no_initial_struct_STATUS.json"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def species_noenum(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "invalid" / "species_noenum.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_species_noenum_output.pkl"
+    safe_status = tmp_path / "test_species_noenum_STATUS.json"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def slurm_no_queue(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "invalid" / "slurm_no_queue.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_slurm_no_queue_output.pkl"
+    safe_status = tmp_path / "test_slurm_no_queue_STATUS.json"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def sge_no_queue(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "invalid" / "sge_no_queue.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_sge_no_queue_output.pkl"
+    safe_status = tmp_path / "test_sge_no_queue_STATUS.json"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
 def enum_egat_llpath_llrefine(tmp_path):
     # 1. Load the real YAML
     yaml_path = Path(__file__).parent / "main_inputs" / "enum_egat_llpath_llrefine.yaml"
@@ -60,69 +144,6 @@ def enum_full_options(tmp_path):
     # 2. Define the safe temporary output path
     safe_output = tmp_path / "test_enum_full_options_output.pkl"
     safe_status = tmp_path / "test_enum_full_options_STATUS.json"
-
-    # 3. Overwrite the nested key
-    if 'initialize' in data:
-        data['initialize']['output'] = str(safe_output)
-        data['initialize']['status'] = str(safe_status)
-    else:
-        # Fallback if the YAML structure changes in the future
-        pytest.fail("The input YAML does not contain an 'initialize' block.")
-
-    return data
-
-@pytest.fixture
-def d2_default_enum(tmp_path):
-    # 1. Load the real YAML
-    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_default.yaml"
-    with open(yaml_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    # 2. Define the safe temporary output path
-    safe_output = tmp_path / "test_d2_default_enum_output.pkl"
-    safe_status = tmp_path / "test_d2_default_enum_STATUS.json"
-
-    # 3. Overwrite the nested key
-    if 'initialize' in data:
-        data['initialize']['output'] = str(safe_output)
-        data['initialize']['status'] = str(safe_status)
-    else:
-        # Fallback if the YAML structure changes in the future
-        pytest.fail("The input YAML does not contain an 'initialize' block.")
-
-    return data
-
-@pytest.fixture
-def d2_sep_prods_enum(tmp_path):
-    # 1. Load the real YAML
-    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_sep_prods.yaml"
-    with open(yaml_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    # 2. Define the safe temporary output path
-    safe_output = tmp_path / "test_d2_sep_prods_enum_output.pkl"
-    safe_status = tmp_path / "test_d2_sep_prods_enum_STATUS.json"
-
-    # 3. Overwrite the nested key
-    if 'initialize' in data:
-        data['initialize']['output'] = str(safe_output)
-        data['initialize']['status'] = str(safe_status)
-    else:
-        # Fallback if the YAML structure changes in the future
-        pytest.fail("The input YAML does not contain an 'initialize' block.")
-
-    return data
-
-@pytest.fixture
-def d2_dg_filter_enum(tmp_path):
-    # 1. Load the real YAML
-    yaml_path = Path(__file__).parent / "main_inputs" / "depth2_dg_filter.yaml"
-    with open(yaml_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    # 2. Define the safe temporary output path
-    safe_output = tmp_path / "test_d2_dg_filter_enum_output.pkl"
-    safe_status = tmp_path / "test_d2_dg_filter_enum_STATUS.json"
 
     # 3. Overwrite the nested key
     if 'initialize' in data:

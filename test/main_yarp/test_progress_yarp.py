@@ -34,7 +34,7 @@ def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators,
             "rxn_1": {
                 "tasks": {
                     "stage1.conf": {"status": "ready", "job_id": None, "scratch_dir": None},
-                    "stage1.gsm": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "stage1.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
                 }
             }
         }
@@ -58,7 +58,7 @@ def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators,
 
     inp_mock.pipeline_tasks = {
         "stage1.conf": MagicMock(task_type="reactant_conformer", parent_stage="stage1", depends_on=[]),
-        "stage1.gsm": MagicMock(task_type="gsm", parent_stage="stage1", depends_on=["stage1.conf"])
+        "stage1.ts_guess": MagicMock(task_type="gsm", parent_stage="stage1", depends_on=["stage1.conf"])
     }
 
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
@@ -68,7 +68,7 @@ def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators,
     
     assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["status"] == "submitted"
     assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["job_id"] == "9999"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.gsm"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["status"] == "pending"
 
     # --- TICK 2: Completion & Advancing the DAG ---
     # We alter the state slightly to simulate that the job is no longer running on the cluster
@@ -80,6 +80,6 @@ def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators,
     # Task 1 should be finished
     assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["status"] == "terminated_normally"
     # Task 2 should now see its dependency met (ready) and IMMEDIATELY get submitted!
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.gsm"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.gsm"]["job_id"] == "9999"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["job_id"] == "9999"
 

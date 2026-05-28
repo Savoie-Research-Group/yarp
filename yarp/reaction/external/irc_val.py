@@ -301,6 +301,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
         self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
         self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
         self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
+        dg_rxn = b_barrier - f_barrier
+        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
 
         return True
 
@@ -376,7 +378,7 @@ class OrcaIRCValCalculator(IRCValTask):
         # ERM: Add a failure check here if the user hasn't built these already
         if self.job_manager.container == "docker":
             self.image_name = "orca:6.0.1"
-        elif self.job_manager.container == "apptainer":
+        elif self.job_manager.container == "apptainer" or self.job_manager.container == "singularity":
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):
@@ -533,6 +535,8 @@ class OrcaIRCValCalculator(IRCValTask):
         self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
         self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
         self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
+        dg_rxn = b_barrier - f_barrier
+        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
 
         return True
 

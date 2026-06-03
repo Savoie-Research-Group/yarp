@@ -73,6 +73,9 @@ class CrestConfCalculator(ConfTask):
                         termination_msg_exists = True
             except:
                 termination_msg_exists = False
+            
+        if not termination_msg_exists:
+            print('   ! Successful termination message not found in crest_run.log. Check mem_per_cpu allocation for tasks using "crest"')
 
         return xyz_exists and energies_exists and termination_msg_exists
 

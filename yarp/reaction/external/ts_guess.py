@@ -135,12 +135,12 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 log_text = f.read()
 
             if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
-                print(f"     * Run {i} failed: Did not find successful termination message in log.")
+                print(f"     ! Run {i} failed: Did not find successful termination message in log. Try increasing mem_per_cpu for tasks using 'pysisyphus'.")
                 continue
 
             # If it passes all checks, at least one run succeeded!
             one_successful = True
-        
+            
         # We only care if at least one succeeded
         return one_successful
 

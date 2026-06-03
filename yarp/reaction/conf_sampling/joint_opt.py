@@ -1,177 +1,65 @@
 import copy
 import numpy as np
 from openbabel import openbabel as ob
-from yarp.yarpecule.lewis.bem_score import return_formals
+from yarp.util.write_files import mol_write_yp
 
-def ob_joint_optimize(conformer_ind, conformer, target_bem, ff_name="uff"):
+def ob_joint_optimize(conformer, target_bem, ff_name="uff"):
     """
     Applies constraints based on the target BEM and runs an OpenBabel FF optimization.
     Returns a NEW conformer object with the biased geometry.
     """
-    obMol = build_ob_mol(conformer.elements, conformer.geo, target_bem, conformer_ind, q=0)
-    ff = ob.OBForceField.FindForceField(ff_name)
-    success = ff.Setup(obMol)
-    if not success:
-        ff = ob.OBForceField.FindForceField("uff")
-        ff.Setup(obMol)
-    
-    # Write the mol to a file
-#    conv.WriteFile(obMmol,tmp_xyz_file)
+    obMol = build_ob_mol(conformer.elements, conformer.geo, target_bem)
+    ff = ob.OBForceField.FindForceField(ff_name) or ob.OBForceField.FindForceField("uff")
+    if ff is None:
+        raise RuntimeError(f"OpenBabel force field not found: {ff_name} or uff")
 
-    
-    # Mock constraints based on Target BEM
-#    constraints = ob.OBFFConstraints()
-#    num_atoms = len(conformer.elements)
-#    for i in range(num_atoms):
-#        for j in range(i + 1, num_atoms):
-#            if target_bem[i][j] > 0:
-#                constraints.AddDistanceConstraint(i + 1, j + 1, 1.5)    # SHQK : This hardcoded distance constraint causes wrong/missing topology
-                
-#    ff.SetConstraints(constraints)
+    if not ff.Setup(obMol):
+        ff = ob.OBForceField.FindForceField("uff")
+        if ff is None or not ff.Setup(obMol):
+            raise RuntimeError("Failed to set up OpenBabel force field for joint optimization")
+
     ff.ConjugateGradients(500)
     ff.GetCoordinates(obMol)
-    
+
     biased_conf = copy.deepcopy(conformer)
-#    print("biased_conf.geo BEFORE replacing geo by the OB optimized geo = ", biased_conf.geo)
-    biased_conf.geo = np.array([[obMol.GetAtom(i).GetX(), obMol.GetAtom(i).GetY(), obMol.GetAtom(i).GetZ()] 
+    biased_conf.geo = np.array([[obMol.GetAtom(i).GetX(), obMol.GetAtom(i).GetY(), obMol.GetAtom(i).GetZ()]
                                 for i in range(1, obMol.NumAtoms() + 1)])
-#    print("biased_conf.geo AFTER replacing geo by the OB optimized geo = ", biased_conf.geo)
-#    print("biased_conf.type = ", biased_conf.type)
     biased_conf.type = f"biased_{conformer.type}"
-
-    # Save final optimized geometry to a xyz file
-    xyz_file = f"opt_{conformer_ind}.xyz"
-
-    conv_out = ob.OBConversion()
-    conv_out.SetOutFormat("xyz")
-    conv_out.WriteFile(obMol, xyz_file)
-    print(f"Saved OB optimized geometry to: {xyz_file}")
 
     return biased_conf
 
 
-#def build_ob_mol(elements, coords):    # SHQK: This is incorrect. It's not making any use of the target bem!! Instead, creating the mol object based only on the elements and coords. This should be equivalnt to the "mol_write" function of classy-yarp that takes the elements, geom, and the target bem to build the mol object
-#    """Converts a Yarpecule/Conformer geometry to an OpenBabel OBMol."""
-#    obMol = ob.OBMol()
-#    for el, coord in zip(elements, coords):
-#        obAtom = obMol.NewAtom()
-#        obAtom.SetAtomicNum(ob.GetAtomicNum(el))
-#        obAtom.SetVector(*coord)
-#
-#    obMol.ConnectTheDots()
-#    obMol.PerceiveBondOrders()
-#    return obMol
-
 def bondmat_to_adjmat(bond_mat):
-    adj_mat=copy.deepcopy(bond_mat)
+    adj_mat = copy.deepcopy(bond_mat)
     for count_i, i in enumerate(bond_mat):
         for count_j, j in enumerate(i):
-            if j and count_i!=count_j: adj_mat[count_i][count_j]=1.0
-            if count_i==count_j: adj_mat[count_i][count_i]=0.0
+            if j and count_i != count_j:
+                adj_mat[count_i][count_j] = 1.0
+            if count_i == count_j:
+                adj_mat[count_i][count_i] = 0.0
     return adj_mat
 
-def mol_write(name, elements, geo, bond_mat, q=0, append_opt=False):
-    adj_mat=bondmat_to_adjmat(bond_mat)
-    if len(elements) >= 1000:
-        print( "ERROR in mol_write: the V2000 format can only accomodate up to 1000 atoms per molecule.")
-        return
-    mol_dict={3:1, 2:2, 1:3, -1:5, -2:6, -3:7, 0:0}
-    # Check for append vs overwrite condition
-    if append_opt == True:
-        open_cond = 'a'
-    else:
-        open_cond = 'w'
 
-    # Parse the basename for the mol header
-    base_name = name.split(".")
-    if len(base_name) > 1:
-        base_name = ".".join(base_name[:-1])
-    else:
-        base_name = base_name[0]
-
-    keep_lone=[count_i for count_i, i in enumerate(bond_mat) if i[count_i]%2==1]
-    # deal with radicals
-    fc = list(return_formals(bond_mat, elements))
-    # deal with charges 
-    chrg = len([i for i in fc if i != 0])
-    valence=[] # count the number of bonds for mol file
-    for count_i, i in enumerate(bond_mat):
-        bond=0
-        for count_j, j in enumerate(i):
-            if count_i!=count_j: bond=bond+int(j)
-        valence.append(bond)
-    # Write the file
-    with open(name,open_cond) as f:
-        # Write the header
-        f.write('{}\nGenerated by mol_write.py\n\n'.format(base_name))
-
-        # Write the number of atoms and bonds
-        f.write("{:>3d}{:>3d}  0  0  0  0  0  0  0  0  1 V2000\n".format(len(elements),int(np.sum(adj_mat/2.0))))
-
-        # Write the geometry
-        for count_i,i in enumerate(elements):
-            f.write(" {:> 9.4f} {:> 9.4f} {:> 9.4f} {:<3s} 0 {:>2d}  0  0  0  {:>2d}  0  0  0  0  0  0\n".format(geo[count_i][0],geo[count_i][1],geo[count_i][2], i.capitalize(), mol_dict[fc[count_i]], valence[count_i]))
-        # Write the bonds
-        bonds = [ (count_i,count_j) for count_i,i in enumerate(adj_mat) for count_j,j in enumerate(i) if j == 1 and count_j > count_i ]
-        for i in bonds:
-            # Calculate bond order from the bond_mat
-            bond_order = int(bond_mat[i[0],i[1]])
-
-            # add fix of bond order for dative bonds around the transition metal
-            bond_elements = [elements[i[0]],elements[i[1]]]
-            '''
-            #print(f"bond_elements: {bond_elements}", flush = True)
-            if (_ in el_metals for _ in bond_elements):# and (bond_order == 0):
-                #print(f"FOUND METAL! bond_elements: {bond_elements}", flush = True)
-                bond_order = 1
-            '''
-            if bond_order==0: bond_order=1
-            f.write("{:>3d}{:>3d}{:>3d}  0  0  0  0\n".format(i[0]+1,i[1]+1,bond_order))
-
-        # write radical info if exist
-        if len(keep_lone) > 0:
-            if len(keep_lone) == 1:
-                f.write("M  RAD{:>3d}{:>4d}{:>4d}\n".format(1,keep_lone[0]+1,2))
-            elif len(keep_lone) == 2:
-                f.write("M  RAD{:>3d}{:>4d}{:>4d}{:>4d}{:>4d}\n".format(2,keep_lone[0]+1,2,keep_lone[1]+1,2))
-            else:
-                print("Only support one/two radical containing compounds, radical info will be skip in the output mol file...")
-
-        if chrg > 0:
-            if chrg == 1:
-                charge = [i for i in fc if i != 0][0]
-                f.write("M  CHG{:>3d}{:>4d}{:>4d}\n".format(1,fc.index(charge)+1,int(charge)))
-            else:
-                info = ""
-                fc_counter = 0
-                for count_c,charge in enumerate(fc):
-                    if charge != 0:
-                        if(fc_counter % 8 == 0): #Only 8 items a line#
-                            info += "\nM  CHG{:>3d}".format(chrg - fc_counter if chrg - fc_counter <= 8 else 8)
-                        info += '{:>4d}{:>4d}'.format(count_c+1,int(charge))
-                        fc_counter += 1
-                info += '\n'
-                f.write(info)
-
-        f.write("M  END\n$$$$\n")
-
-    return
-
-
-def build_ob_mol(elements, coords, bond_mat, conformer_ind, q=0):
+def build_ob_mol(elements, coords, bond_mat):
     """
-    Builds an OBMol object using explicit BEM bonding info,
-    by fisrt using mol_write to create a .mol file and then reading it into a OBMol object
+    Builds an OBMol object using explicit BEM bonding info.
     """
-    # Write to a temporary .mol file
-    tmp_file = f"tmp_{conformer_ind}.mol"
-    mol_write(tmp_file, elements, coords, bond_mat, q=q)
-
-    # Read it back into an OBMol object
+    adj_mat = bondmat_to_adjmat(bond_mat)
+    obMol = ob.OBMol()
     conv = ob.OBConversion()
     conv.SetInFormat("mol")
 
-    obMol = ob.OBMol()
-    conv.ReadFile(obMol, tmp_file)
+    import os
+    import tempfile
+
+    tmp_file = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mol", delete=False) as tmp:
+            tmp_file = tmp.name
+        mol_write_yp(tmp_file, elements, coords, bond_mat, adj_mat)
+        conv.ReadFile(obMol, tmp_file)
+    finally:
+        if tmp_file is not None:
+            os.unlink(tmp_file)
 
     return obMol

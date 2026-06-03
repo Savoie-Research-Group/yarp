@@ -1,4 +1,5 @@
 import os
+import shutil
 import h5py
 import re
 import numpy as np
@@ -153,14 +154,26 @@ class PysisyphusTSOptCalculator(TSOptTask):
         return True
 
     def cleanup(self):
-        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
-        pass
+        """Per run dir: keep yaml input, log, and final TS geometry; delete Hessian (scraped) and xTB calc dirs."""
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"tsopt_run{i}"
+            if not run_dir.exists():
+                continue
+            keep = {f"tsopt_{i}_input.yaml", f"tsopt_{i}.log", "ts_final_geometry.xyz"}
+            for item in run_dir.iterdir():
+                if item.name not in keep:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
 
     def _write_pysis_ts_opt_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
         lot = self.config.lot.lower()
-        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now"
+        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
 
+        # Write the file! Yay, YAML friend!
         with open(input_path, 'a') as f:
             # set geom block
             f.write(f'geom:\n type: cart\n fn: {input_geo_xyz}\n')
@@ -225,7 +238,7 @@ class OrcaTSOptCalculator(TSOptTask):
         super().__init__(*args, **kwargs)
         if self.job_manager.container == "docker":
             self.image_name = "orca:6.0.1"
-        elif self.job_manager.container == "apptainer":
+        elif self.job_manager.container == "apptainer" or self.job_manager.container == "singularity":
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):
@@ -354,8 +367,19 @@ class OrcaTSOptCalculator(TSOptTask):
         return True
 
     def cleanup(self):
-        # Keep .inp, .out, .xyz. Delete .tmp, .densities, etc.
-        pass
+        """Per run dir: keep inp, output log, and final TS geometry; delete Hessian (scraped), .gbw, .densities, etc."""
+        num_runs = self._get_num_runs()
+        for i in range(1, num_runs + 1):
+            run_dir = self.scratch_dir / f"tsopt_run{i}"
+            if not run_dir.exists():
+                continue
+            keep = {f"tsopt_{i}.inp", f"tsopt_{i}.out", f"tsopt_{i}.xyz"}
+            for item in run_dir.iterdir():
+                if item.name not in keep:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
 
     def _write_orca_ts_opt_input(self, input_path, input_geo_xyz):
 

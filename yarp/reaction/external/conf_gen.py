@@ -144,9 +144,6 @@ class CrestConfCalculator(ConfTask):
         confs=[]
         elements, geometries = xyz_parse(xyz_file_name, multiple=True)
         for count_i, i in enumerate(elements):
-            print("count_i = ", count_i)
-            print("elements[count_i] = ", elements[count_i])
-            print("geometries[count_i]  = ", geometries[count_i])
             conf = {
                 'conf_rank': count_i,
                 'elements': elements[count_i],

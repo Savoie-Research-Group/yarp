@@ -24,19 +24,14 @@ def select_gsm_pairs(rxn, config):
     lot = config.bias_lot
     mode = config.joint_opt.lower()
 
-#    biased_r = [ob_joint_optimize(f"{c_ind}_r", c, rxn.reactant.paired_bem, lot) for c_ind, c in enumerate(r_confs)] if mode in ['dual', 'r_only'] else r_confs
-#    biased_p = [ob_joint_optimize(f"{c_ind}_p", c, rxn.product.paired_bem, lot) for c_ind, c in enumerate(p_confs)] if mode in ['dual', 'p_only'] else p_confs
-
-    # SHQK : Fixed the biased_r and biased_p designations. Currently the way it's written swaps the original reactant and product
-    # SHQK : Also added the c_ind to save the input and output geometries for joint optimizations. This files saving part can be commented out in joint_opt.py. Currently keeping it for debugging purpose 
-    # SHQK : biased_p: product geometries (guided by reactant geometries)
-    # SHQK : biased_r: reactant geometries (guided by product geometries)
-    biased_p = [ob_joint_optimize(f"{c_ind}_r", c, rxn.reactant.paired_bem, lot) for c_ind, c in enumerate(r_confs)] if mode in ['dual', 'r_only'] else r_confs
-    biased_r = [ob_joint_optimize(f"{c_ind}_p", c, rxn.product.paired_bem, lot) for c_ind, c in enumerate(p_confs)] if mode in ['dual', 'p_only'] else p_confs
-
-
-#    print("Type of biased_r:", type(biased_r))
-#    print("Type of biased_p:", type(biased_p))
+    biased_r = r_confs
+    biased_p = p_confs
+    # biased_p: product geometries guided by reactant geometries
+    # biased_r: reactant geometries guided by product geometries
+    if mode in ['dual', 'r_only']:
+        biased_p = [ob_joint_optimize(c, rxn.reactant.paired_bem, lot) for c in r_confs]
+    if mode in ['dual', 'p_only']:
+        biased_r = [ob_joint_optimize(c, rxn.product.paired_bem, lot) for c in p_confs]
 
     # --- STEP B: Cross-Product Evaluation & Tournament ---
     # ERM: We'll see... this is probably an unacceptable bottleneck...
@@ -44,15 +39,17 @@ def select_gsm_pairs(rxn, config):
     # Default to "conformation-poor" model, unless an excess of conformers is present
     n_conf = config.n_conf
     total_conf = len(r_confs) + len(p_confs)
-    print("Total number of reactant + product conformers generated = ", total_conf)
+    verbose = getattr(config, "verbose", False)
+    if verbose:
+        print("Total number of reactant + product conformers generated = ", total_conf)
 
     module_dir = Path(__file__).parent.resolve()
     if total_conf/n_conf > 3.0:
         model_path = module_dir / 'rich_model.sav'
-        print("rich model is chosen to generate aligned reaction conformers")
     else:
         model_path = module_dir / 'poor_model.sav'
-        print("poor model is chosen to generate aligned reaction conformers")
+    if verbose:
+        print(f"{model_path.stem} is chosen to generate aligned reaction conformers")
 
     with open(model_path, 'rb') as f:
         model = pickle.load(f)

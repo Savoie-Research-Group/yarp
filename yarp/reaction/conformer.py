@@ -2,7 +2,7 @@
 Definition of the conformer object class.
 """
 import numpy as np
-from yarp.util.write_files import xyz_generate_string, mol_write_yp, xyz_write
+from yarp.util.write_files import xyz_generate_string
 
 class conformer:
     """
@@ -109,26 +109,3 @@ class conformer:
             return xyz_generate_string(elements=self.elements, geo=self.geo)
         else:
             return None
-
-
-    def export_geometry(self, filename, format='xyz'):
-        """
-        Export the geometry of the conformer to a file.
-        This shouldn't ever change any of the attributes of the conformer.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the file to export the geometry to.
-
-        format : str, default='xyz'
-            The format of the file to export the geometry to.
-        """
-        if format == 'xyz':
-#            if self._canon_smi is None:
-#                self.get_smiles()
-            xyz_write(filename, self.elements, self.geo)
-        elif format == 'mol':
-            mol_write_yp(filename, self.elements, self.geo, self.bond_mats[0], self.adj_mat, atom_info=self._atom_info)
-        else:
-            raise RuntimeError("Valid export formats: xyz or mol")

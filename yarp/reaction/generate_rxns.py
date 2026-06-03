@@ -32,37 +32,45 @@ def generate_rxns(inp):
         Reactant-product pairs contained in a reaction object and ready for further processing!
     """
     output = None
+    verbose = inp.verbose
 
     # Initialize reactions for product enumeration
-    if inp.enum.enumerate:
+    if inp.enum.ON:
+        print("Product enumeration enabled. Enumerating products.")
+        if inp.init_struct.type == 'yarp_pickle':
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
-        print("Product enumeration routine selected")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
-
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
             og_rxns_hash = set(og_rxns.keys())
 
             candidates = filter_enum_candidates(
-                og_rxns, separate_prods=inp.enum_filters.separate_prods,
-                dG_cutoff=inp.enum_filters.dG_cutoff, dG_source=inp.enum_filters.dG_source,
-                netconfig=inp.net_explore
-            )
+                og_rxns, separate_prods=inp.enum.pre_enum_filters.separate_prods,
+                prop_filter=inp.enum.pre_enum_filters.property_filter,
+                netconfig=inp.enum.pre_enum_filters.product_blinders, verbose=verbose)
 
             new_rxns = dict()
             for mol in candidates:
-                print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+                if verbose:
+                    print(f" - Enumerating from {mol.inchi} ({mol.canon_smi}) node")
+
+                # Reactive atom maps are resolved inside enumerate_products
+                # against this final candidate graph. That is deliberately
+                # later than candidate filtering/product separation, because a
+                # split fragment can have a smaller atom-map subset and a new
+                # local atom index order.
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose,
                 )
 
                 clean_products = filter_enum_products(
-                    raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                    fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                    raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                    fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                    verbose=verbose
                 )
 
                 for prod in clean_products:
@@ -78,18 +86,20 @@ def generate_rxns(inp):
             output = og_rxns | new_rxns
             
         else:
-            print(f" - Initializing starting reactant node from {inp.d0_node}")
+            if verbose:
+                print(f" - Initializing starting reactant node from {inp.init_struct.source}")
             output = dict()
-            reactant = yarpecule(inp.d0_node, mode="yarp")
+            reactant = yarpecule(inp.init_struct.source, mode="yarp")
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
                 )
 
             clean_products = filter_enum_products(
-                raw_products, l_cutoff=inp.enum_filters.l_cutoff,
-                fc_cutoff=inp.enum_filters.fc_cutoff, ring_filter=inp.enum_filters.ring_filter
+                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                verbose=verbose
             )
 
             for prod in clean_products:
@@ -97,11 +107,12 @@ def generate_rxns(inp):
                 output[r2p.hash] = r2p
 
     else:
-        print("Loading reactions")
-        if fnmatch.fnmatch(inp.d0_node, "*.p") or fnmatch.fnmatch(inp.d0_node, "*.pickle") or fnmatch.fnmatch(inp.d0_node, "*.pkl"):
-            print(" - Processing starting node(s) as YARP generated pickle file")
+        print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
+        if inp.init_struct.type == 'yarp_pickle':
+            if verbose:
+                print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.d0_node, 'rb'))
+            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
@@ -134,11 +145,6 @@ def quick_geom_opt(molecule, lot="uff"):
 
     # Write yarpecule object to a temporary mol file
     mol_file = '.tmp.mol'
-    print("Attributes of the yarpecule object passed to quick_geom_opt:")
-    print("elements = \n", molecule.elements)
-    print("geo = \n", molecule.geo)
-    print("bond_mats = \n", molecule.bond_mats)
-    print("adj_mat = \n", molecule.adj_mat)
     mol_write_yp(mol_file, molecule.elements, molecule.geo,
                  molecule.bond_mats[0], molecule.adj_mat)
 

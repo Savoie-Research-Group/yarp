@@ -205,16 +205,12 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         return True
 
     def cleanup(self):
-        """Per run dir: keep input yaml, log, and TS guess xyz; delete trajectories and xTB calc dirs."""
+        """Per run dir: keep inputs, logs, xyzs, and trajectories; delete xTB calc dirs."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"gsm_run{i}"
             if not run_dir.exists():
                 continue
-#            keep = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
-            
-            # SHQK : Do not delete the reactant.xyz, product.xyz and .trj files. These are important to inspect in case GSM fails! 
-            # (e.g., I found the big problem in Joint Optimization routine by inspecting the GSM string!)
 
             keep_exact = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}
             keep_patterns = ["*.trj", "*.xyz"]
@@ -224,7 +220,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     continue
                 if item.is_file() and any(fnmatch.fnmatch(item.name, p) for p in keep_patterns):
                     continue
-                # Delete everything else
                 if item.is_file():
                     item.unlink()
                 elif item.is_dir():

@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.ml_barrier import dense_reaction_smiles_for_egat
 
 class MLPredictTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -32,7 +33,7 @@ class EgatMLPredict(MLPredictTask):
                     skipped_forward +=1
                     continue
 
-                mapped_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
+                mapped_smiles = dense_reaction_smiles_for_egat(rxn.reactant.map_smi, rxn.product.map_smi)
                 writer.writerow([mapped_smiles])
 
         skipped_reverse = 0
@@ -47,7 +48,7 @@ class EgatMLPredict(MLPredictTask):
                     skipped_reverse += 1
                     continue
 
-                mapped_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
+                mapped_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
                 writer.writerow([mapped_smiles])
 
         if skipped_forward > 0 or skipped_reverse > 0:
@@ -56,9 +57,8 @@ class EgatMLPredict(MLPredictTask):
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"
 
-        # Grab the container execution command from the base class
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
-        print("prefix = ", prefix)    # SHQK : Why is there no actual executable mentioned in the submission script??
+        # EGAT flags (--input/--output) follow Docker ENTRYPOINT; use `apptainer run`, not `exec`.
+        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir), apptainer_run=True)
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
@@ -67,12 +67,10 @@ class EgatMLPredict(MLPredictTask):
 
             f.write(f"cd {self.scratch_dir}\n")
 
-#            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
-            cmd1 = f"apptainer run --bind {self.scratch_dir}:/work --pwd /work docker://erm42/yarp:egat --input forward_in.csv --output forward_out.csv"    # SHQK: fixed this cmd as the previous one doesn't work
+            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
             f.write(f"{cmd1} > forward.log 2> forward.err\n")
 
-#            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
-            cmd2 = f"apptainer run --bind {self.scratch_dir}:/work --pwd /work docker://erm42/yarp:egat --input reverse_in.csv --output reverse_out.csv"    # SHQK: fixed this cmd as the previous one doesn't work
+            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
             f.write(f"{cmd2} > reverse.log 2> reverse.err\n")
 
         script_path.chmod(0o755)
@@ -85,10 +83,10 @@ class EgatMLPredict(MLPredictTask):
         forward_smiles_to_hash = dict()
         reverse_smiles_to_hash = dict()
         for rxn_hash, rxn in self.reactions.items():
-            fwd_smiles = rxn.reactant.map_smi + ">>" + rxn.product.map_smi
+            fwd_smiles = dense_reaction_smiles_for_egat(rxn.reactant.map_smi, rxn.product.map_smi)
             forward_smiles_to_hash[fwd_smiles] = rxn_hash
 
-            rev_smiles = rxn.product.map_smi + ">>" + rxn.reactant.map_smi
+            rev_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
             reverse_smiles_to_hash[rev_smiles] = rxn_hash
 
         forward_out_csv = self.scratch_dir / "forward_out.csv"
@@ -98,7 +96,6 @@ class EgatMLPredict(MLPredictTask):
             for row in reader:
                 rxn_smiles = row["reaction_smiles"]
                 barrier = float(row["activation_barrier"])
-                enthalpy = float(row["reaction_enthalpy"])
 
                 # Retrieve the original reaction hash
                 rxn_hash = forward_smiles_to_hash.get(rxn_smiles)
@@ -106,7 +103,6 @@ class EgatMLPredict(MLPredictTask):
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.barrier[self.config.model] = barrier
-                    rxn.heat_of_rxn[self.config.model] = enthalpy
 
         reverse_out_csv = self.scratch_dir / "reverse_out.csv"
         with open(reverse_out_csv, "r") as f:
@@ -122,8 +118,17 @@ class EgatMLPredict(MLPredictTask):
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.reverse_barrier[self.config.model] = barrier
+                    f_barrier = rxn.barrier[self.config.model]
+                    dg_rxn = barrier - f_barrier
+                    rxn.dg_rxn[self.config.model] = dg_rxn
 
     def cleanup(self):
-        # # EGAT is lightweight, maybe just delete the folder
-        # shutil.rmtree(self.scratch_dir)
-        pass
+        # remove everything except output csv files
+        keep = {"forward_out.csv", "reverse_out.csv"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        return

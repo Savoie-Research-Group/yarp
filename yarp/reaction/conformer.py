@@ -109,5 +109,3 @@ class conformer:
             return xyz_generate_string(elements=self.elements, geo=self.geo)
         else:
             return None
-
-

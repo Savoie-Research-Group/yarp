@@ -217,7 +217,7 @@ def progress_yarp(work_dir: Path):
                 # Execute the fast-forward!
                 if already_done:
                     meta["status"] = "terminated_normally"
-                    print(f"   * [{rxn_hash}] Task '{task_id}' ({desired_key}) already characterized/synced. Fast-forwarding...")
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' ({desired_key}) already characterized/synced. Fast-forwarding...")
 
     # 0.2.B. Fast-Forward Global Tasks
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
@@ -302,16 +302,16 @@ def progress_yarp(work_dir: Path):
 
                 if job_manager.is_running(meta["job_id"]):
                     # Job is still going, add it to our tally!
-                    print(f"   * [{rxn_hash}] Task '{task_id}' is still running. Come back later...")
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' is still running. Come back later...")
                     active_jobs += 1
                 else:
                     # Job finished! Time to process it.
-                    print(f"   * [{rxn_hash}] Task '{task_id}' finished running. Checking output...")
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' finished running. Checking output...")
                     if calc.check_output():
                         if calc.scrape_data():
                             calc.cleanup()
                             meta["status"] = "terminated_normally"
-                            print(f"   * [{rxn_hash}] Task '{task_id}' completed successfully.")
+                            print(f"   * [{rxn_hash}] \tTask '{task_id}' completed successfully.")
 
                             # --- Evaluate IRC Outcome ---
                             if task_def.task_type == "irc_validation":
@@ -329,17 +329,17 @@ def progress_yarp(work_dir: Path):
                                     if rxn_hash not in failed_rxns:
                                         failed_rxns[rxn_hash] = rxn_obj
 
-                                    print(f"   * [{rxn_hash}] Reaction failed IRC validation (Outcome: '{outcome}'). Routing to failed_rxns.")
+                                    print(f"   * [{rxn_hash}] \tReaction failed IRC validation (Outcome: '{outcome}'). Routing to failed_rxns.")
                         else:
                             meta["status"] = "finished_with_error"
                             meta["error_log"] = "Data scraping failed."
                             failed_rxns[rxn_hash] = rxn_obj
-                            print(f"   * [{rxn_hash}] Task '{task_id}' failed during data scraping.")
+                            print(f"   * [{rxn_hash}] \tTask '{task_id}' failed during data scraping.")
                     else:
                         meta["status"] = "finished_with_error"
                         meta["error_log"] = "Output validation failed."
                         failed_rxns[rxn_hash] = rxn_obj
-                        print(f"   * [{rxn_hash}] Task '{task_id}' failed output validation.")
+                        print(f"   * [{rxn_hash}] \tTask '{task_id}' failed output validation.")
  
     # =================================================================
     # PASS 2: Update Pending Tasks to Ready
@@ -385,7 +385,7 @@ def progress_yarp(work_dir: Path):
                                 # Prevent printing the error twice (once for reactant, once for product)
                                 if rxn_hash not in failed_rxns:
                                     failed_rxns[rxn_hash] = rxn_obj
-                                    print(f"   * [{rxn_hash}] Filtered out! {stage_filter.type} ({val:.2f}) > {stage_filter.threshold}")
+                                    print(f"   * [{rxn_hash}] \tFiltered out! {stage_filter.type} ({val:.2f}) > {stage_filter.threshold}")
 
                                 continue # Skip setting this task to 'ready'
                         else:
@@ -395,12 +395,12 @@ def progress_yarp(work_dir: Path):
 
                             if rxn_hash not in failed_rxns:
                                 failed_rxns[rxn_hash] = rxn_obj
-                                print(f"   * [{rxn_hash}] Pipeline aborted: Missing ML property '{stage_filter.type}' from '{stage_filter.source}'.")
+                                print(f"   * [{rxn_hash}] \tPipeline aborted: Missing ML property '{stage_filter.type}' from '{stage_filter.source}'.")
 
                             continue # Skip setting this task to 'ready'
 
                     meta["status"] = "ready"
-                    print(f"   * [{rxn_hash}] Task '{task_id}' prerequisites met. Marked as READY.")
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' prerequisites met. Marked as READY.")
 
     # =================================================================
     # PASS 3: Submit New Jobs (Respecting the Limit)
@@ -492,11 +492,11 @@ def progress_yarp(work_dir: Path):
                     meta["status"] = "finished_with_error"
                     meta["error_log"] = "Pre-flight check failed: Missing required data in reaction object."
                     failed_rxns[rxn_hash] = rxn_obj
-                    print(f"   * [{rxn_hash}] Task '{task_id}' aborted: Pre-flight check failed.")
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' aborted: Pre-flight check failed.")
                     continue
 
                 # Generate and Submit
-                print(f"   * [{rxn_hash}] Submitting task '{task_id}'...")
+                print(f"   * [{rxn_hash}] \tSubmitting task '{task_id}'...")
                 calc.generate_input()
                 script_path = calc.write_submission_script()
 

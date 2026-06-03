@@ -119,8 +119,8 @@ class PysisyphusTSOptCalculator(TSOptTask):
             if self._is_run_successful(i):
                 one_successful = True
             else:
-                print(f"     * Run {i} failed or did not finish successfully.")
-        
+                print(f"     ! Run {i} failed or did not finish successfully. Try increasing mem_per_cpu for tasks using 'pysisyphus'.")
+                
         return one_successful
 
     def scrape_data(self) -> bool:

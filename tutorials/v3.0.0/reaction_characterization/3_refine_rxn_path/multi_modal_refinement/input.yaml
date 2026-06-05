@@ -42,13 +42,13 @@ ll_path:
      software: crest
      lot: gfn2
      n_cpus: 4
-     mem_per_cpu: 2000
+     mem_per_cpu: 4000
   ts_guess:
      software: pysisyphus
      gsm_lot: xtb
      n_conf: 3
      n_cpus: 4
-     mem_per_cpu: 2000
+     mem_per_cpu: 4000
      joint_opt: dual
      bias_lot: uff
      charge: 0

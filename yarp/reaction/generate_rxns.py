@@ -105,11 +105,14 @@ def generate_rxns(inp):
             )
 
             for prod in clean_products:
+                prod = quick_geom_opt(prod)
                 r2p = reaction(reactant, prod)
                 output[r2p.hash] = r2p
 
     else:
+        source = Path(inp.init_struct.source)
         print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
+        print(f" - Input node source: {source}")
         if inp.init_struct.type == 'yarp_pickle':
             if verbose:
                 print(" - Processing starting node(s) as YARP generated pickle file")
@@ -119,16 +122,19 @@ def generate_rxns(inp):
             assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
 
             output = og_rxns
-        elif Path(inp.d0_node).is_dir():
-            print(f" - Processing starting node(s) as reaction xyz files in {inp.d0_node}")
-            output = load_reactions_from_xyz_directory(Path(inp.d0_node))
-        elif Path(inp.d0_node).is_file() and Path(inp.d0_node).suffix.lower() == ".xyz":
-            print(f" - Processing starting node(s) as reaction xyz file {inp.d0_node}")
-            rxn = load_reaction_from_xyz_file(Path(inp.d0_node))
+        elif source.is_dir():
+            print(f" - Processing starting node(s) as reaction xyz files in {source}")
+            output = load_reactions_from_xyz_directory(source)
+
+        elif source.is_file() and source.suffix.lower() == ".xyz":
+            print(f" - Processing starting node(s) as reaction xyz file {source}")
+            rxn = load_reaction_from_xyz_file(source)
             output = {rxn.hash: rxn}
-        elif Path(inp.d0_node).is_file():
-            print(f" - Processing starting node(s) as mapped reaction SMILES in {inp.d0_node}")
-            output = load_reactions_from_smiles_file(inp.d0_node)
+
+        elif source.is_file():
+            print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
+            output = load_reactions_from_smiles_file(source)
+
         else:
             raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 

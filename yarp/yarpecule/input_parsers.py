@@ -42,7 +42,7 @@ def xyz_parse(xyz, read_types=False, multiple=False):
     elements = []
     geo = []
 
-    if len(open(xyz, 'r+').readlines()) == 0:
+    if len(open(xyz, 'r').readlines()) == 0:
         # this seems like it should be a runtime error - ERM
         print('An empty file: {xyz}')
         return elements, geo

@@ -30,29 +30,28 @@ def main():
     with open(output_file, "a") as out_f:
         out_f.write(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}\n")
 
-    # Route stdout AND stderr from yarp-progress to output file
-    ACTIVE = True
-    while ACTIVE:
+    while True:
         execute_counter += 1
+        # Route stdout AND stderr from yarp-progress to output file
         with open(output_file, "a") as out_f:
-            out_f.write(f"[{datetime.now()}] Executing yarp_progress (Run {execute_counter})...\n---*****---\n")
             subprocess.run(
                 ["python", str(target_script), str(work_dir)], 
                 stdout=out_f,
                 stderr=subprocess.STDOUT 
             )
+            out_f.write(f"[{datetime.now()}] Run {execute_counter} of yarp_progress has been executed...\n---*****---\n")
 
         # Stop if the log contains a shutdown marker
         stop_marker = "No active or pending tasks remain; YARP has reached a quiescent state."
         if stop_marker in output_file.read_text():
-            ACTIVE = False
-            print("Shutdown marker found in output file; exiting loop.", flush=True)
+            with open(output_file, "a") as out_f:
+                out_f.write("Shutdown marker found in output file; exiting loop.\n")
             break
 
         # Exit on time limit too
         if datetime.now() >= end_time:
-            ACTIVE = False
-            print("YARP total runtime reached. Shutting down.", flush=True)
+            with open(output_file, "a") as out_f:
+                out_f.write("YARP total runtime reached. Shutting down.\n")
             break
 
         # Calculate next run time and sleep

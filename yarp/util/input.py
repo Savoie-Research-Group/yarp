@@ -4,7 +4,8 @@ Definition of input object class
 import os
 import re
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pprint import pformat
 from typing import List, Dict, Any
 
 from yarp.util.config import InitalStructConfig, JobManagerConfig, EnumerationConfig, PreEnumFilters, PropertyFilterConfig, ProductBlindersConfig, PostEnumFilters, MLPropConfig, ConformerConfig, RPOptConfig, TSOptConfig, TSGuessConfig, IRCValConfig, InitialGeomConfig, GeomSourceConfig
@@ -61,10 +62,13 @@ class InputParser:
         # ---------------------------------------------------------
         # 1. Parse Initialize Node
         # ---------------------------------------------------------
+        # Normalize keys before parsing so all downstream code can assume underscores.
+        file_dict = self._normalize_keys(file_dict)
+
         initnode = file_dict.get('initialize', None)
         if not initnode:
             raise RuntimeError("Hey bro beans, I need some molecules or reactions to work with. "
-                               "Missing `initialize` node in YAML file.")
+                                "Missing `initialize` node in YAML file.")
 
         # Control of output generation
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
@@ -84,6 +88,8 @@ class InputParser:
         self.init_struct = self._parse_init_struct(init_struct_node)
 
         # Job manager configuration
+        if "job_manager" not in initnode:
+            raise ValueError("Missing required block! 'job_manager' must be provided!")
         jm_node = initnode.get("job_manager", {})
         self.job_manager = self._parse_job_manager(jm_node)
 
@@ -106,7 +112,10 @@ class InputParser:
         # ---------------------------------------------------------
         # 2. Process Stages Node(s)
         # ---------------------------------------------------------
-        self.stage_names = file_dict.get('stages', [])
+        self.stage_names = [
+            self._normalize_key(name)
+            for name in file_dict.get('stages', [])
+        ]
         self.stage_configs: Dict[str, StageConfig] = {}
 
         # A global, flat dictionary of all executable tasks across all stages.
@@ -144,17 +153,30 @@ class InputParser:
         # Dynamically link inter-stage dependencies for path refinement
         self._link_refine_dependencies()
 
+    def __repr__(self):
+        return pformat({
+            "output": self.out_file,
+            "status": self.status_file,
+            "verbose": self.verbose,
+            "initial_structure": asdict(self.init_struct),
+            "job_manager": asdict(self.job_manager),
+            "enumeration": asdict(self.enum),
+            "stages": self.stage_names,
+            "pipeline_tasks": {
+                task_id: self._task_asdict(task_def)
+                for task_id, task_def in self.pipeline_tasks.items()
+            },
+            "global_tasks": {
+                task_id: self._task_asdict(task_def)
+                for task_id, task_def in self.global_tasks.items()
+            },
+        })
+
     def _parse_init_struct(self, init_struct: dict) -> InitalStructConfig:
         if not init_struct or init_struct == {}:
             raise ValueError("Missing required block! 'initial_structure' must be provided!")
 
-         # 1. Normalize keys (spaces to underscores) and drop None values.
-        # Dropping None ensures we don't accidentally overwrite a dataclass default.
-        kwargs = {
-            key.replace(" ", "_"): value
-            for key, value in init_struct.items()
-            if value is not None
-        }
+        kwargs = init_struct
         # 2. Unpack the clean dictionary into the dataclass
         try:
             return InitalStructConfig(**kwargs)
@@ -166,17 +188,8 @@ class InputParser:
 
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
-        # If the user omitted the block entirely, use all dataclass defaults
-        if not jm_node:
-            return JobManagerConfig()
 
-        # 1. Normalize keys (spaces to underscores) and drop None values.
-        # Dropping None ensures we don't accidentally overwrite a dataclass default.
-        kwargs = {
-            key.replace(" ", "_"): value
-            for key, value in jm_node.items()
-            if value is not None
-        }
+        kwargs = jm_node
 
         # 2. Unpack the clean dictionary into the dataclass
         try:
@@ -188,11 +201,7 @@ class InputParser:
             raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
 
     def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
-        kwargs = {
-            key.replace(" ", "_"): value
-            for key, value in enum_node.items()
-            if value is not None
-        }
+        kwargs = dict(enum_node)
 
         pre_node = kwargs.pop("pre_enum_filters", {}) or {}
         post_node = kwargs.pop("post_enum_filters", {}) or {}
@@ -213,11 +222,7 @@ class InputParser:
         if pre_node is None:
             pre_node = {}
 
-        kwargs = {
-            key.replace(" ", "_"): value
-            for key, value in pre_node.items()
-            if value is not None
-        }
+        kwargs = dict(pre_node)
 
         property_data = kwargs.pop("property_filter", {}) or {}
         product_blinders_data = kwargs.pop("product_blinders", {}) or {}
@@ -232,13 +237,7 @@ class InputParser:
         if post_node is None:
             post_node = {}
 
-        kwargs = {
-            key.replace(" ", "_"): value
-            for key, value in post_node.items()
-            if value is not None
-        }
-
-        return PostEnumFilters(**{k: v for k, v in kwargs.items() if k in PostEnumFilters.__dataclass_fields__})
+        return PostEnumFilters(**{k: v for k, v in post_node.items() if k in PostEnumFilters.__dataclass_fields__})
 
     def _parse_stage(self, name: str, data: dict) -> StageConfig:
         method = data.get('method')
@@ -250,7 +249,7 @@ class InputParser:
         if method == "ml_rxn_prop":
             # Save the ID to the instance so downstream stages can see it
             self.ml_task_id = f"{name}.ml_predict" 
-            
+
             ml_cfg = MLPropConfig(
                 model=data.get("model"),
                 n_cpus=data.get("n_cpus", 1),
@@ -412,9 +411,8 @@ class InputParser:
     def _parse_geom_source(self, section: dict, name: str) -> GeomSourceConfig:
         if not isinstance(section, dict):
             raise ValueError(f"'initial_geom.{name}' must be a dictionary")
-        kwargs = {k.replace(" ", "_"): v for k, v in section.items() if v is not None}
         try:
-            return GeomSourceConfig(**{k: v for k, v in kwargs.items() if k in GeomSourceConfig.__dataclass_fields__})
+            return GeomSourceConfig(**{k: v for k, v in section.items() if k in GeomSourceConfig.__dataclass_fields__})
         except TypeError as e:
             raise ValueError(f"Invalid 'initial_geom.{name}' configuration: {e}")
 
@@ -477,3 +475,45 @@ class InputParser:
                     f"  - Software: {source.software}\n"
                     f"...but no preceding task in the pipeline matches these criteria."
                 )
+
+    def _normalize_keys(self, d: dict) -> dict:
+        """Helper function to convert keys with spaces to underscores, and drop None values"""
+        if isinstance(d, list):
+            return [self._normalize_keys(item) for item in d]
+        if not isinstance(d, dict):
+            return d
+
+        self._duplicate_key_check(d, normalize=True, recurse=False)
+        return {
+            self._normalize_key(key): self._normalize_keys(value)
+            for key, value in d.items()
+            if value is not None
+        }
+
+    def _normalize_key(self, key):
+        return key.replace(" ", "_") if isinstance(key, str) else key
+
+    def _config_asdict(self, config):
+        return asdict(config) if hasattr(config, "__dataclass_fields__") else config
+
+    def _task_asdict(self, task_def: TaskDef) -> dict:
+        return {
+            "task_type": task_def.task_type,
+            "parent_stage": task_def.parent_stage,
+            "depends_on": task_def.depends_on,
+            "config": self._config_asdict(task_def.config),
+        }
+
+    def _duplicate_key_check(self, d: dict, path="", normalize=False, recurse=True):
+        """Recursively checks for duplicate keys in the input dictionary."""
+        if not isinstance(d, dict):
+            return d
+        seen = set()
+        for key, value in d.items():
+            check_key = self._normalize_key(key) if normalize else key
+            if check_key in seen:
+                raise ValueError(f"Duplicate key detected: '{check_key}' at path '{path}'")
+            seen.add(check_key)
+            if recurse:
+                self._duplicate_key_check(value, path + f".{check_key}", normalize=normalize)
+        return d

@@ -16,6 +16,9 @@ def initialize_from_dict(file_dict):
     """
     inp = InputParser(file_dict)
 
+    if inp.verbose:
+        print(f"Full configuration seen here: \n{inp}\n")
+
     if inp.job_manager.container == "apptainer":
         sif_path = Path(inp.job_manager.sif_location)
         if not sif_path.exists() or not sif_path.is_dir():

@@ -407,6 +407,22 @@ def progress_yarp(work_dir: Path):
     # =================================================================
     print(f"Current active jobs: {active_jobs} / {max_active_jobs}")
 
+    # Check for idle state: no active jobs and no remaining pending/ready tasks
+    pending_or_ready = False
+    for rxn_data in status_tracker["reactions"].values():
+        if any(meta["status"] in ["pending", "ready"] for meta in rxn_data["tasks"].values()):
+            pending_or_ready = True
+            break
+
+    if not pending_or_ready:
+        for g_meta in status_tracker.get("global_tasks", {}).values():
+            if g_meta["status"] in ["pending", "ready"]:
+                pending_or_ready = True
+                break
+
+    if active_jobs == 0 and not pending_or_ready:
+        print("No active or pending tasks remain; YARP has reached a quiescent state.")
+
     # =================================================================
     # PASS 3.1: Submit New GLOBAL Jobs
     # =================================================================
@@ -522,15 +538,8 @@ def progress_yarp(work_dir: Path):
     print(f"======================\n")
 
 def main():
-    print(f"""Welcome to
-               __   __ _    ____  ____  
-               \ \ / // \  |  _ \|  _ \ 
-                \ V // _ \ | |_) | |_) |
-                 | |/ ___ \|  _ <|  __/ 
-                 |_/_/   \_\_| \_\_|
-                        // Yet Another Reaction Program
-    """)
-
+    print("Launching YARP job submitter: yarp-progress")
+    print(f"======================")
     parser = argparse.ArgumentParser(description="Initialize YARP with a YAML config.")
     parser.add_argument("work_dir", type=str, help="Path to the YARP working directory")
     args = parser.parse_args()

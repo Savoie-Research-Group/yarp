@@ -26,23 +26,35 @@ def main():
 
     # Background periodic execution loop
     execute_counter = 0
-    while datetime.now() < end_time:
+    # Open the output file, and route stdout AND stderr to it
+    output_file = work_dir / f"yarp_progress.out"
+    ACTIVE = True
+    while ACTIVE:
         execute_counter += 1
-        print(f"[{datetime.now()}] Executing progress_yarp.py (Run {execute_counter})...", flush=True)
-
-        # Open the output file, and route stdout AND stderr to it
-        output_file = work_dir / f"prog{execute_counter}.out"
-        with open(output_file, "w") as out_f:
+        with open(output_file, "a") as out_f:
+            out_f.write(f"[{datetime.now()}] Executing yarp_progress (Run {execute_counter})...\n---*****---\n")
             subprocess.run(
                 ["python", str(target_script), str(work_dir)], 
-                stdout=out_f, 
+                stdout=out_f,
                 stderr=subprocess.STDOUT 
             )
+
+        # Stop if the log contains a shutdown marker
+        stop_marker = "No active or pending tasks remain; YARP has reached a quiescent state."
+        if stop_marker in output_file.read_text():
+            ACTIVE = False
+            print("Shutdown marker found in output file; exiting loop.", flush=True)
+            break
+
+        # Exit on time limit too
+        if datetime.now() >= end_time:
+            ACTIVE = False
+            print("YARP total runtime reached. Shutting down.", flush=True)
+            break
 
         # Calculate next run time and sleep
         time.sleep(args.interval * 60)
 
-    print("YARP total runtime reached. Shutting down.", flush=True)
 
 if __name__ == "__main__":
     main()

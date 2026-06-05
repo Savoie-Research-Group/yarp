@@ -22,12 +22,15 @@ def main():
     script_location = Path(__file__).parent.resolve()
     target_script = script_location / "progress_yarp.py"
 
-    print(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}", flush=True)
-
     # Background periodic execution loop
     execute_counter = 0
-    # Open the output file, and route stdout AND stderr to it
-    output_file = work_dir / f"yarp_progress.out"
+
+    # Open the output file, and record initial message
+    output_file = work_dir / f"yarp_loop.out"
+    with open(output_file, "a") as out_f:
+        out_f.write(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}\n")
+
+    # Route stdout AND stderr from yarp-progress to output file
     ACTIVE = True
     while ACTIVE:
         execute_counter += 1

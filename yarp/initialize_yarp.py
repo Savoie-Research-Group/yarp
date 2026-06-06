@@ -5,10 +5,6 @@ import argparse
 import yaml
 import pickle
 import json
-import sys
-import numpy.core.numeric as numpy_core_numeric
-
-sys.modules["numpy._core.numeric"] = numpy_core_numeric
 from pathlib import Path
 from yarp.util.input import InputParser
 from yarp.reaction.generate_rxns import generate_rxns

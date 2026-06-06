@@ -44,10 +44,9 @@ class InitalStructConfig:
             source = Path(self.source)
 
             if self.mode == "species":
-                if not (source.is_dir() or (source.is_file() and source.suffix.lower() == ".xyz")):
+                if not (source.is_file() and source.suffix.lower() == ".xyz"):
                     raise ValueError(
-                f"For 'type = xyz' and 'mode = species', 'source' must be either a .xyz file "
-                f"or a directory of .xyz files, got: '{self.source}'"
+                f"For 'type = xyz' and 'mode = species', 'source' must be .xyz file "
             )
 
             if self.mode == "reaction":

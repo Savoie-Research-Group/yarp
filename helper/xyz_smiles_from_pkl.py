@@ -3,13 +3,9 @@
 import argparse
 import os
 import pickle
-import sys
-import numpy.core.numeric as numpy_core_numeric
 from yarp.reaction.reaction import reaction
 from yarp.util.write_files import xyz_write
 
-
-sys.modules["numpy._core.numeric"] = numpy_core_numeric
 
 def _state_smiles(state, attr):
     value = getattr(state, attr, None)

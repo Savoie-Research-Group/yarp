@@ -23,10 +23,7 @@ import argparse
 import os
 import pickle
 import textwrap
-import sys
-import numpy.core.numeric as numpy_core_numeric
 
-sys.modules["numpy._core.numeric"] = numpy_core_numeric
 
 
 from pathlib import Path

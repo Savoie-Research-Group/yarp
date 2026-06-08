@@ -252,7 +252,7 @@ class ConformerConfig:
     solvent: Optional[Dict[str, str]] = None
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
 
@@ -295,7 +295,7 @@ class TSGuessConfig:
     joint_opt: str = "dual"
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -340,7 +340,7 @@ class RPOptConfig:
     # ERM: To-do -> put in convergence threshold and solvent options?
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -379,7 +379,7 @@ class TSOptConfig:
     initial_geom: Optional[InitialGeomConfig] = None
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -417,7 +417,7 @@ class IRCValConfig:
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):

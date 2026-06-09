@@ -241,7 +241,7 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                         bonds.update([(donor,acceptor),(acceptor,donor)])
                         product = yarpecule((
                             adj_mat,
-                            y.geo,
+                            y.geo.copy(),
                             y.elements,
                             y.q,
                             {
@@ -270,7 +270,7 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                         bonds.update([(donor,acceptor),(acceptor,donor)])
                         product = yarpecule((
                             adj_mat,
-                            y.geo,
+                            y.geo.copy(),
                             y.elements,
                             y.q,
                             {
@@ -541,7 +541,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                 adj_mat[b[1],b[0]] = 0
                 tmp = yarpecule((
                     adj_mat,
-                    y.geo,
+                    y.geo.copy(),
                     y.elements,
                     y.q,
                     {
@@ -707,7 +707,7 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=Tru
                 # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
                 product = yarpecule((
                     np.where(adj_mat > 0, 1, 0).astype(int),
-                    y.geo,
+                    y.geo.copy(),
                     y.elements,
                     y.q,
                     {

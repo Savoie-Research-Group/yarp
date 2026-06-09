@@ -24,8 +24,14 @@ def select_gsm_pairs(rxn, config):
     lot = config.bias_lot
     mode = config.joint_opt.lower()
 
-    biased_r = [ob_joint_optimize(c, rxn.reactant.paired_bem, lot) for c in r_confs] if mode in ['dual', 'r_only'] else r_confs
-    biased_p = [ob_joint_optimize(c, rxn.product.paired_bem, lot) for c in p_confs] if mode in ['dual', 'p_only'] else p_confs
+    biased_r = r_confs
+    biased_p = p_confs
+    # biased_p: product geometries guided by reactant geometries
+    # biased_r: reactant geometries guided by product geometries
+    if mode in ['dual', 'r_only']:
+        biased_p = [ob_joint_optimize(c, rxn.reactant.paired_bem, lot) for c in r_confs]
+    if mode in ['dual', 'p_only']:
+        biased_r = [ob_joint_optimize(c, rxn.product.paired_bem, lot) for c in p_confs]
 
     # --- STEP B: Cross-Product Evaluation & Tournament ---
     # ERM: We'll see... this is probably an unacceptable bottleneck...
@@ -33,15 +39,26 @@ def select_gsm_pairs(rxn, config):
     # Default to "conformation-poor" model, unless an excess of conformers is present
     n_conf = config.n_conf
     total_conf = len(r_confs) + len(p_confs)
+    verbose = getattr(config, "verbose", False)
+    if verbose:
+        print("Total number of reactant + product conformers generated = ", total_conf)
 
     module_dir = Path(__file__).parent.resolve()
-    if n_conf / total_conf > 3.0:
+    if total_conf/n_conf > 3.0:
         model_path = module_dir / 'rich_model.sav'
     else:
         model_path = module_dir / 'poor_model.sav'
+    if verbose:
+        print(f"{model_path.stem} is chosen to generate aligned reaction conformers")
 
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
+
+
+    if len(biased_r) > n_conf * 5:
+        biased_r = biased_r[:n_conf * 5]
+    if len(biased_p) > n_conf * 5:
+        biased_p = biased_p[:n_conf * 5]
 
     approved_pairs = []
     approved_indicators = []

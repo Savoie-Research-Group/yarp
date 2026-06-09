@@ -4,3 +4,5 @@ initialize:
     source: OCC=O
     type: smiles
     mode: species
+  job_manager:
+    scheduler: local

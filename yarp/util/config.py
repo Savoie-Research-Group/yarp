@@ -36,11 +36,42 @@ class InitalStructConfig:
         if self.type == 'yarp_pickle':
             if os.path.splitext(self.source)[1].lower() != '.pkl':
                 raise ValueError(f"'source' must be a .pkl file, got: '{self.source}'")
+            
         # TO-DO: Put in checks for XYZ and SMILES, which are compatible with Tanveer's changes
+        #For xyz, initialization is either a directory of .xyz files or single .xyz file. 
+        #Directories are compatible with both species and reaction mode. 
+        if self.type == "xyz":
+            source = Path(self.source)
 
-        if self.type == 'smiles' and self.mode == 'reaction':
-            raise ValueError("Initialization of reactions from SMILES is still under development! Sorry, you'll have to use XYZ or YARP pickle files")
+            if self.mode == "species":
+                if not (source.is_file() and source.suffix.lower() == ".xyz"):
+                    raise ValueError(
+                f"For 'type = xyz' and 'mode = species', 'source' must be .xyz file "
+            )
 
+            if self.mode == "reaction":
+                if not (source.is_dir() or (source.is_file() and source.suffix.lower() == ".xyz")):
+                    raise ValueError(
+                        f"For 'type = xyz' and 'mode = reaction', 'source' must be either a reaction .xyz file "
+                        f"or a directory of reaction .xyz files, got: '{self.source}'"
+                    )
+        if self.type == "smiles":
+            source = Path(self.source)
+
+            if self.mode == "species":
+                # species smiles are literal SMILES strings, not files
+                #technically its fine to have a file with a literal SMILES string but lets not. 
+                if source.exists():
+                    raise ValueError(
+                        f"For 'type = smiles' and 'mode = species', 'source' should be a literal SMILES string, "
+                        f"not a filesystem path: '{self.source}'"
+                    )
+            if self.mode == "reaction":
+                if not source.is_file():
+                    raise ValueError(
+                        f"For 'type = smiles' and 'mode = reaction', 'source' must be a file containing mapped "
+                        f"reaction SMILES, got: '{self.source}'"
+                    )
 @dataclass
 class JobManagerConfig:
     """Holds settings for job scheduling and container execution."""
@@ -221,7 +252,7 @@ class ConformerConfig:
     solvent: Optional[Dict[str, str]] = None
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
 
@@ -264,7 +295,7 @@ class TSGuessConfig:
     joint_opt: str = "dual"
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -309,7 +340,7 @@ class RPOptConfig:
     # ERM: To-do -> put in convergence threshold and solvent options?
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -348,7 +379,7 @@ class TSOptConfig:
     initial_geom: Optional[InitialGeomConfig] = None
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
@@ -386,7 +417,7 @@ class IRCValConfig:
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
 
     n_cpus: int = 1
-    mem_per_cpu: int = 1000
+    mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):

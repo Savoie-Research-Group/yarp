@@ -1,0 +1,21 @@
+initialize:
+  verbose: true
+  output: rxns.pkl
+  status: STATUS.json
+  initial_structure:
+    source: batch_xyz_rxn
+    type: xyz
+    mode: reaction
+  job_manager:
+    scheduler: local
+    container: docker
+    max_active_jobs: 100
+
+stages:
+  - egat
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000 # in MB

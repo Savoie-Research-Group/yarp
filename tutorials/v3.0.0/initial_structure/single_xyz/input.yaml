@@ -3,9 +3,13 @@ initialize:
   output: rxns.pkl
   status: STATUS.json
   initial_structure:
-    source: rxn
+    source: mol.xyz
     type: xyz
-    mode: reaction
+    mode: species
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
 
   job_manager:
     scheduler: local

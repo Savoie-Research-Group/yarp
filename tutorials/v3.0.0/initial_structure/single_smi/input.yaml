@@ -3,9 +3,13 @@ initialize:
   output: rxns.pkl
   status: STATUS.json
   initial_structure:
-    source: rxn.txt
+    source: [C:1]([C:2](=[O:3])[O:4][H:5])([H:6])([H:7])[H:8].[N:9]([H:10])([H:11])[H:12]
     type: smiles
-    mode: reaction
+    mode: species
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
 
   job_manager:
     scheduler: local

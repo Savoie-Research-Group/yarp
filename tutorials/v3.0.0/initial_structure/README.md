@@ -1,57 +1,60 @@
 # Initial Structure Tutorial
 
-This tutorial demonstrates two ways to initialize a YARP job for a batch of reactions — using **reaction SMILES strings** or **paired XYZ geometries** — followed by EGAT barrier prediction.
+This tutorial demonstrates four ways to initialize a YARP job — using **reaction SMILES strings** or **paired XYZ geometries**, each in single-reaction and batch variants — followed by EGAT barrier prediction.
 
-## Contents
+Each subdirectory is self-contained. `cd` into any of them and run `yarp-init input.yaml` without overwriting output from other examples.
 
-| File/Directory | Description |
-|---|---|
-| `input.yaml` | YARP configuration for SMILES-based input |
-| `input_xyz.yaml` | YARP configuration for XYZ-based input |
-| `batch_SMILES_rxn.txt` | Reaction SMILES strings (one per line) |
-| `batch_xyz_rxn/` | Paired reactant/product XYZ files (one per reaction) |
+## Subdirectories
+
+| Directory | Input type | # Reactions | Source file/dir |
+|---|---|---|---|
+| `single_smi/` | Reaction SMILES (`.txt`) | 1 | `rxn.txt` |
+| `batch_smi/` | Reaction SMILES (`.txt`) | 7 | `batch_SMILES_rxn.txt` |
+| `single_xyz/` | Paired XYZ geometries (directory) | 1 | `rxn/` |
+| `batch_xyz/` | Paired XYZ geometries (directory) | 5 | `batch_xyz_rxn/` |
 
 ## Input Formats
 
-### SMILES (`input.yaml`)
+### SMILES
 
 Reactions are provided as a plain-text file of reaction SMILES strings. Each line encodes one reaction in the form `reactants>>products`.
 
 ```yaml
-initial_structure:
-  source: batch_SMILES_rxn.txt
-  type: smiles
-  mode: reaction
+initialize:
+  initial_structure:
+    source: rxn.txt          # or batch_SMILES_rxn.txt for batch
+    type: smiles
+    mode: reaction
 ```
 
-### XYZ (`input_xyz.yaml`)
+### XYZ
 
-Reactions are provided as a directory of `.xyz` files, where each file contains two concatenated geometry blocks — the reactant geometry followed by the product geometry.
+Reactions are provided as a directory of `.xyz` files. Each file contains two concatenated geometry blocks — the reactant geometry followed by the product geometry.
 
 ```yaml
-initial_structure:
-  source: batch_xyz_rxn
-  type: xyz
-  mode: reaction
+initialize:
+  initial_structure:
+    source: rxn              # or batch_xyz_rxn for batch
+    type: xyz
+    mode: reaction
 ```
-
-Both configurations use the same job manager and EGAT stage settings: SLURM/Apptainer, up to 4 active jobs, and the `egat_rgd1` model with 8 CPUs and 1 GB RAM per CPU.
 
 ## Reproducing This Tutorial
 
-The steps below apply to either input file. Substitute `input_xyz.yaml` in place of `input.yaml` to run the XYZ variant.
+From any subdirectory, the steps are the same. For example, to run the batch SMILES variant:
+
+```bash
+cd batch_smi
+yarp-init input.yaml
+```
 
 ### Step 1 — Initialize
 
-From the directory containing the input file, run:
-
 ```bash
 yarp-init input.yaml
-# or
-yarp-init input_xyz.yaml
 ```
 
-After this step, two new files will appear:
+After this step, two new files appear:
 
 - `rxns.pkl` — serialized reaction data
 - `STATUS.json` — job status tracking file

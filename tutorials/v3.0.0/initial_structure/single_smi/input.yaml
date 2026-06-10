@@ -3,10 +3,10 @@ initialize:
   output: rxns.pkl
   status: STATUS.json
   initial_structure:
-    source: batch_SMILES_rxn.txt
+    source: rxn.txt
     type: smiles
     mode: reaction
-  
+
   job_manager:
     scheduler: local
     container: docker

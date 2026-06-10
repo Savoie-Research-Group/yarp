@@ -6,10 +6,13 @@ initialize:
     source: batch_xyz_rxn
     type: xyz
     mode: reaction
+
   job_manager:
-    scheduler: local
-    container: docker
+    scheduler: sge
+    queue: long
+    container: apptainer
     max_active_jobs: 100
+
 
 stages:
   - egat

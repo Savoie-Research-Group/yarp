@@ -80,7 +80,7 @@ class AsyncYarpCalculator:
                 )
 
             verb = "run" if apptainer_run else "exec"
-            return f"apptainer {verb} --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"apptainer {verb} -e --bind {work_dir}:/work --pwd /work {sif_path}"
 
         elif self.job_manager.container == "singularity":
             # Sanitize the image name so it works as a safe, flat filename
@@ -115,7 +115,7 @@ class AsyncYarpCalculator:
                 )
 
             verb = "run" if apptainer_run else "exec"
-            return f"singularity {verb} --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"singularity {verb} -e --bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")

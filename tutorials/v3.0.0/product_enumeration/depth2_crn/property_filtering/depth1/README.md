@@ -9,4 +9,4 @@
 3. Once the job has completed, run `yarp-progress .` again from the same directory level as `3HP_depth1.pkl` and `STATUS.json`
     - Now the STDOUT should look nearly identical to the contents of `prog2.out`
 4. Check the contents of the EGAT characterized reactions with `yarp-read -ia 3HP_depth1.pkl`
-    - The STDOUT should look identical to the contents of `3HP_depth1_read_pkl.out`
+    - The STDOUT should look identical to the contents of `yarp-read.out`

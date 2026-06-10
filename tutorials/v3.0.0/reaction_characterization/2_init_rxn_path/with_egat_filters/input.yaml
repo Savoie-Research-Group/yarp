@@ -7,14 +7,14 @@ initialize:
     type: smiles
     mode: species
   job_manager:
-     scheduler: local
-     container: docker
-     max_active_jobs: 4
+     scheduler: sge
+     queue: long
+     container: apptainer
+     max_active_jobs: 100
   enumeration:
     mode: concerted
     n_break: 2
     n_form: 2
-    react_atoms: [0, 1, 2, 3]
     post_enum_filters:
       lewis_score: 0.0
       formal_charge: 2.0
@@ -27,7 +27,7 @@ stages:
 egat:
   method: ml_rxn_prop
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
   mem_per_cpu: 1000 # in MB
 
 ll_path:
@@ -42,6 +42,7 @@ ll_path:
      software: crest
      lot: gfn2
      n_cpus: 2
+     mem_per_cpu: 4000
   ts_guess:
      software: pysisyphus
      gsm_lot: xtb
@@ -51,3 +52,4 @@ ll_path:
      bias_lot: uff
      charge: 0
      multiplicity: 1
+     mem_per_cpu: 4000

@@ -42,12 +42,18 @@ class CrestConfCalculator(ConfTask):
         crest_cmd = self._get_crest_command()
         full_command = f"{prefix} {crest_cmd}"
 
-        with open(script_path, "w") as f:
-            f.write("#!/bin/bash\n")
-            self.write_scheduler_headers(f)
-            f.write(f"cd {self.scratch_dir}\n")
-            # Pipe output to a log file so it doesn't flood the local terminal
-            f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
+        try:
+            with open(script_path, "w") as f:
+                f.write("#!/bin/bash\n")
+                self.write_scheduler_headers(f)
+                f.write(f"cd {self.scratch_dir}\n")
+                # Pipe output to a log file so it doesn't flood the local terminal
+                f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
+        except PermissionError:
+            raise PermissionError(
+                f"Cannot write submission script to {script_path}. "
+                f"Delete the SCRATCH directory and try again."
+            )
 
         # Make the script executable (important for LocalJobManager)
         script_path.chmod(0x755)
@@ -66,15 +72,42 @@ class CrestConfCalculator(ConfTask):
         termination_msg_exists = False
         outfile = self.scratch_dir / "crest_run.log"
         if outfile.exists():
-            try: 
+            try:
                 lines = open(outfile, 'r', encoding="utf-8").readlines()
                 for n_line, line in enumerate(reversed(lines)):
                     if 'CREST terminated normally.' in line:
                         termination_msg_exists = True
             except:
                 termination_msg_exists = False
+            
+        if not termination_msg_exists:
+            print('   ! Successful termination message not found in crest_run.log. Check mem_per_cpu allocation for tasks using "crest"')
 
-        return xyz_exists and energies_exists and termination_msg_exists
+        if not (xyz_exists and energies_exists and termination_msg_exists):
+            reasons = []
+            if not xyz_exists:
+                reasons.append("missing crest_conformers.xyz")
+            if not energies_exists:
+                reasons.append("missing crest.energies")
+            if not termination_msg_exists:
+                reasons.append("'CREST terminated normally.' not found in crest_run.log")
+            print(f"     [CREST] Output validation failed: {'; '.join(reasons)}")
+
+            # Surface any apptainer/container errors from stderr
+            errfile = self.scratch_dir / "crest_run.err"
+            if errfile.exists():
+                try:
+                    err_lines = open(errfile, 'r', encoding="utf-8").readlines()
+                    if err_lines:
+                        tail = err_lines[-10:]
+                        print(f"     [CREST] Last lines of crest_run.err:")
+                        for l in tail:
+                            print(f"       {l}", end="")
+                except Exception:
+                    pass
+            return False
+
+        return True
 
     def scrape_data(self) -> bool:
         """Parse the XYZ and update self.target_species."""

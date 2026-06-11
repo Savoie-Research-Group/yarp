@@ -14,28 +14,6 @@
 # - pandoc (brew install pandoc)
 # - (Optional) myst-parser (pip install myst-parser) for MyST markdown support
 #
-# Files that have to be manually updated as developmend proceeds:
-# - docs/source/conf.py
-# - docs/source/index.rst
-# - docs/README.md
-# - docs/LICENSE.md
-
-# Files that automatically update:
-# - docs/source/README.rst
-# - docs/source/LICENSE.rst
-# - docs/source/yarp.rst
-# - docs/source/yarp.constants.rst
-# - docs/source/yarp.enums.rst
-# - docs/source/yarp.find_lewis.rst
-# - docs/source/yarp.hashes.rst
-# - docs/source/yarp.input_parsers.rst
-# - docs/source/yarp.misc.rst
-# - docs/source/yarp.properties.rst
-# - docs/source/yarp.sieve.rst
-# - docs/source/yarp.smiles.rst
-# - docs/source/yarp.taffi_functions.rst
-# - docs/source/yarp.yarpecule.rst
-
 #!/bin/bash
 
 # Navigate to the directory where the script is located
@@ -44,7 +22,8 @@ cd "$(dirname "$0")"
 # Define paths
 SOURCE_DIR="source"
 BUILD_DIR="build"
-YARP_DIR="../../yarp"
+YARP_DIR="../yarp"
+#TEST_DIR="../test"
 
 # Ensure we're in the docs directory
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -55,6 +34,14 @@ fi
 # Remove old .rst files (excluding index.rst)
 echo "Removing old autodoc .rst files..."
 find "$SOURCE_DIR" -type f -name "*.rst" ! -name "index.rst" -delete
+
+# Clean out auto-generated API docs
+# Clean out auto-generated API docs
+echo "Removing old autoapi files..."
+rm -rf "$SOURCE_DIR/autoapi"
+rm -rf "$BUILD_DIR/doctrees"  # Prevent stale reference warnings
+
+
 
 # Convert README and LICENSE to .rst if they exist
 if [ -f "../README.md" ]; then
@@ -74,13 +61,19 @@ fi
 
 # Re-run sphinx-apidoc to regenerate .rst files
 #Run for YARP
-echo "Generating new .rst files..."
-sphinx-apidoc --force --separate -o "$SOURCE_DIR" "$YARP_DIR"
+#echo "Generating new .rst files..."
+sphinx-apidoc --force --module-first --no-toc -o "$SOURCE_DIR/autoapi" "$YARP_DIR" --separate
 
+#sphinx-apidoc --force --separate --no-toc -o "$SOURCE_DIR" "../test"
 
 # Build the HTML documentation
 echo "Building HTML documentation..."
+
+#Silent Mode:
 make html > /dev/null 2>&1
+
+#Debugging Mode:
+#make html
 
 if [ $? -eq 0 ]; then
     echo "Documentation successfully updated."
@@ -106,3 +99,12 @@ if [ -f "$DOC_PATH" ]; then
 else
     echo "Error: Documentation HTML file not found."
 fi
+
+echo "Welcome to
+                __   __ _    ____  ____  AGAIN!
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        """

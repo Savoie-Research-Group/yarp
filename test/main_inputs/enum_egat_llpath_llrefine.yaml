@@ -1,0 +1,92 @@
+initialize:
+  verbose: True
+  output: tmp.pkl
+  status: STATUS.json
+  initial_structure:
+    source: OCC=O
+    type: smiles
+    mode: species
+  job_manager:
+     scheduler: local
+     container: docker
+     max_active_jobs: 100
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    pre_enum_filters:
+      separate_prods: True
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: False
+
+stages:
+ - egat
+ - ll_path
+ - ll_refine
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000 # in MB
+
+ll_path:
+  method: init_rxn_path
+  conf_gen:
+     charge: 0
+     n_unpaired_electrons: 0
+     software: crest
+     lot: gfn2
+     n_cpus: 2
+  ts_guess:
+     software: pysisyphus
+     gsm_lot: xtb
+     n_conf: 3
+     n_cpus: 2
+     joint_opt: dual
+     bias_lot: uff
+     charge: 0
+     multiplicity: 1
+
+ll_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 2
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 2
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1

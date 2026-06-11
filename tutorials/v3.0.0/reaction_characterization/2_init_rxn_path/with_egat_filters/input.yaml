@@ -1,0 +1,55 @@
+initialize:
+  verbose: True
+  output: HAA_depth1.pkl
+  status: STATUS.json
+  initial_structure:
+    source: O=CCO
+    type: smiles
+    mode: species
+  job_manager:
+     scheduler: sge
+     queue: long
+     container: apptainer
+     max_active_jobs: 100
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: False
+
+stages:
+ - egat
+ - ll_path
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000 # in MB
+
+ll_path:
+  method: init_rxn_path
+  pre_characterize_filters:
+     type: barrier
+     source: egat_rgd1
+     threshold: 80.0
+  conf_gen:
+     charge: 0
+     n_unpaired_electrons: 0
+     software: crest
+     lot: gfn2
+     n_cpus: 2
+     mem_per_cpu: 4000
+  ts_guess:
+     software: pysisyphus
+     gsm_lot: xtb
+     n_conf: 3
+     n_cpus: 2
+     joint_opt: dual
+     bias_lot: uff
+     charge: 0
+     multiplicity: 1
+     mem_per_cpu: 4000

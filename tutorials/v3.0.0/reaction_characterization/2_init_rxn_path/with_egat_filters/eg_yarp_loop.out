@@ -1,0 +1,158 @@
+Starting YARP loop. Running progress_yarp.py every 1 mins until 2026-06-10 22:32:31.219311
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+Current active jobs: 0 / 100
+ * Submitting global task 'egat.ml_predict'...
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:32:35.997952] Run 1 of yarp_progress has been executed...
+---*****---
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+ * Global Task 'egat.ml_predict' finished successfully!
+   * [1562673.284283097] 	Filtered out! barrier (95.01) > 80.0
+   * [1905743.232001659] 	Filtered out! barrier (115.67) > 80.0
+   * [2107297.9154397324] 	Filtered out! barrier (96.84) > 80.0
+   * [2409865.289214986] 	Task 'll_path.reactant_conformer' prerequisites met. Marked as READY.
+   * [2409865.289214986] 	Task 'll_path.product_conformer' prerequisites met. Marked as READY.
+   * [1723512.1826500506] 	Filtered out! barrier (80.99) > 80.0
+   * [1965699.3133637556] 	Filtered out! barrier (87.27) > 80.0
+   * [2127341.145513862] 	Task 'll_path.reactant_conformer' prerequisites met. Marked as READY.
+   * [2127341.145513862] 	Task 'll_path.product_conformer' prerequisites met. Marked as READY.
+   * [1764795.0334897155] 	Task 'll_path.reactant_conformer' prerequisites met. Marked as READY.
+   * [1764795.0334897155] 	Task 'll_path.product_conformer' prerequisites met. Marked as READY.
+   * [1643919.3725672879] 	Filtered out! barrier (93.93) > 80.0
+   * [2369441.659746829] 	Filtered out! barrier (126.59) > 80.0
+   * [2027467.9606149115] 	Task 'll_path.reactant_conformer' prerequisites met. Marked as READY.
+   * [2027467.9606149115] 	Task 'll_path.product_conformer' prerequisites met. Marked as READY.
+Current active jobs: 0 / 100
+   * [2409865.289214986] 	Submitting task 'll_path.reactant_conformer'...
+   * [2409865.289214986] 	Submitting task 'll_path.product_conformer'...
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+   * [2127341.145513862] 	Submitting task 'll_path.product_conformer'...
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+   * [1764795.0334897155] 	Submitting task 'll_path.product_conformer'...
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+   * [2027467.9606149115] 	Submitting task 'll_path.product_conformer'...
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:33:47.661810] Run 2 of yarp_progress has been executed...
+---*****---
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2409865.289214986] 	Task 'll_path.reactant_conformer' finished running. Checking output...
+   * [2409865.289214986] 	Task 'll_path.reactant_conformer' completed successfully.
+   * [2409865.289214986] 	Task 'll_path.product_conformer' finished running. Checking output...
+   * [2409865.289214986] 	Task 'll_path.product_conformer' completed successfully.
+   * [2127341.145513862] 	Task 'll_path.product_conformer' finished running. Checking output...
+   * [2127341.145513862] 	Task 'll_path.product_conformer' completed successfully.
+   * [1764795.0334897155] 	Task 'll_path.product_conformer' finished running. Checking output...
+   ! Successful termination message not found in crest_run.log. Check mem_per_cpu allocation for tasks using "crest"
+     [CREST] Output validation failed: missing crest_conformers.xyz; missing crest.energies; 'CREST terminated normally.' not found in crest_run.log
+     [CREST] Last lines of crest_run.err:
+       #1  0x564260c676a5 in trialmd_
+       	at /usr/local/src/conda/crest-3.0.2/src/legacy_wrappers.f90:319
+       #2  0x5642609bba1f in crest_search_imtdgc_
+       	at /usr/local/src/conda/crest-3.0.2/src/algos/search_conformers.f90:91
+       #3  0x564260c66c35 in confscript2i_
+       	at /usr/local/src/conda/crest-3.0.2/src/legacy_wrappers.f90:148
+       #4  0x5642608abe53 in crest
+       	at /usr/local/src/conda/crest-3.0.2/src/crest_main.f90:240
+       #5  0x5642608aa2b0 in main
+       	at /usr/local/src/conda/crest-3.0.2/src/crest_main.f90:26
+   * [1764795.0334897155] 	Task 'll_path.product_conformer' failed output validation.
+   * [2027467.9606149115] 	Task 'll_path.product_conformer' finished running. Checking output...
+   ! Successful termination message not found in crest_run.log. Check mem_per_cpu allocation for tasks using "crest"
+     [CREST] Output validation failed: missing crest_conformers.xyz; missing crest.energies; 'CREST terminated normally.' not found in crest_run.log
+     [CREST] Last lines of crest_run.err:
+       #0  0x55807c359868 in trialopt_warning_
+       	at /usr/local/src/conda/crest-3.0.2/src/algos/setuptest.f90:402
+       #1  0x55807c387dfe in trialopt_calculator_
+       	at /usr/local/src/conda/crest-3.0.2/src/algos/setuptest.f90:312
+       #2  0x55807c1aa725 in trialopt_
+       	at /usr/local/src/conda/crest-3.0.2/src/legacy_wrappers.f90:341
+       #3  0x55807bdee86c in crest
+       	at /usr/local/src/conda/crest-3.0.2/src/crest_main.f90:227
+       #4  0x55807bded2b0 in main
+       	at /usr/local/src/conda/crest-3.0.2/src/crest_main.f90:26
+   * [2027467.9606149115] 	Task 'll_path.product_conformer' failed output validation.
+   * [2409865.289214986] 	Task 'll_path.ts_guess' prerequisites met. Marked as READY.
+Current active jobs: 0 / 100
+   * [2409865.289214986] 	Submitting task 'll_path.ts_guess'...
+     * [2409865.289214986] Selecting 3 conformer pairs for GSM...
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+   [DEBUG] ---> Blocked! Identical species calculation already active.
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:34:56.374354] Run 3 of yarp_progress has been executed...
+---*****---
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2127341.145513862] 	Task 'll_path.reactant_conformer' (gfn2_crest) already characterized/synced. Fast-forwarding...
+   * [2409865.289214986] 	Task 'll_path.ts_guess' is still running. Come back later...
+   * [2127341.145513862] 	Task 'll_path.ts_guess' prerequisites met. Marked as READY.
+Current active jobs: 1 / 100
+   * [2127341.145513862] 	Submitting task 'll_path.ts_guess'...
+     * [2127341.145513862] Selecting 3 conformer pairs for GSM...
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:36:01.936753] Run 4 of yarp_progress has been executed...
+---*****---
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2409865.289214986] 	Task 'll_path.ts_guess' finished running. Checking output...
+   * [2409865.289214986] 	Task 'll_path.ts_guess' completed successfully.
+   * [2127341.145513862] 	Task 'll_path.ts_guess' is still running. Come back later...
+Current active jobs: 1 / 100
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:37:15.721770] Run 5 of yarp_progress has been executed...
+---*****---
+Launching YARP job submitter: yarp-progress
+======================
+Processing YARP progress in /users/khubler/yarp-again/tutorials/v3.0.0/reaction_characterization/2_init_rxn_path/with_egat_filters...
+Jobs will be run using 'sge' scheduler and 'apptainer' containers.
+Max active jobs allowed: 100
+Synchronizing conformer data across identical chemical species...
+Performing pre-flight checks to skip already characterized reactions...
+   * [2127341.145513862] 	Task 'll_path.ts_guess' finished running. Checking output...
+   * [2127341.145513862] 	Task 'll_path.ts_guess' completed successfully.
+Current active jobs: 0 / 100
+No active or pending tasks remain; YARP has reached a quiescent state.
+YARP progress tracking complete.
+======================
+
+[2026-06-10 21:38:22.146369] Run 6 of yarp_progress has been executed...
+---*****---
+Shutdown marker found in output file; exiting loop.

@@ -1,0 +1,30 @@
+initialize:
+  verbose: True
+  output: 3HP_depth1.pkl
+  status: STATUS.json
+  initial_structure:
+    source: O=CCOO
+    type: smiles
+    mode: species
+  job_manager:
+     scheduler: sge
+     queue: long
+     container: apptainer
+     max_active_jobs: 100
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: False
+
+stages:
+ - egat
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000 # in MB

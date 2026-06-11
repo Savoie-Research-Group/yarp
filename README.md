@@ -1,5 +1,7 @@
 # Welcome to Yet Another Reaction Program (YARP)
 
+High throughput reaction characterization engine for the exploration of chemical reaction networks and beyond!
+
 <img src="images/yarp_3.0_logo.png" alt="YARP 3.0 Overview" width="500">
 
 Here is the available functionality for YARP version 3.0.0:
@@ -15,6 +17,31 @@ Have questions or find a bug? Please hop over to our Issues tab, and let us know
 ## Getting Started with YARP
 
 Detailed examples and user instructions can be found in `tutorials/`!
+
+### Installation Notes
+
+To access the latest (possibly experimental) version of the code:
+```bash
+git clone git@github.com:Savoie-Research-Group/yarp.git
+```
+
+For the latest stable release, you can access the following tag:
+```bash
+git checkout v3.0.0
+```
+
+Once you have your desired source code version,
+get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
+from the root directory. Then do a good old `conda activate yarp`
+
+Also from the root directory of this git repository, run `pip install -e .`
+- This will give you access to the `yarp-init`, `yarp-progress`, and `yarp-loop` executables
+- If you're here to use YARP, not develop YARP, feel free to run `pip install .` instead for a non-editable installation
+
+**How do you know everything's working correctly?**
+
+Run the test suite via the command `pytest test/` from the base-level of this git repository.
+You should see that all tests passed.
 
 ### Quick Start - Basic Usage
 
@@ -75,32 +102,7 @@ egat:
   mem_per_cpu: 1000           # in MB
 ```
 
-### Installation Notes
-
-To access the latest (possibly experimental) version of the code:
-```bash
-git clone git@github.com:Savoie-Research-Group/yarp-again.git
-```
-
-For the latest stable release, you can access the following tag:
-```bash
-git checkout v3.0.0
-```
-
-Once you have your desired source code version,
-get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
-from the root directory. Then do a good old `conda activate yarp`
-
-Also from the root directory of this git repository, run `pip install -e .`
-- This will give you access to the `yarp-init`, `yarp-progress`, and `yarp-loop` executables
-- If you're here to use YARP, not develop YARP, feel free to run `pip install .` instead for a non-editable installation
-
-**How do you know everything's working correctly?**
-
-Run the test suite via the command `pytest test/` from the base-level of this git repository.
-You should see that all tests passed.
-
-**Heads up about containers!**
+## Heads up about containers!
 
 YARP relies extensively on containers to manage software dependencies necessary for reaction path characterization.
 YARP is set up to interface with both Docker and Apptainer container services.

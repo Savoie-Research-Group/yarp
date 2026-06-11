@@ -15,7 +15,6 @@ initialize:
     mode: concerted
     n_break: 2
     n_form: 2
-    react_atoms: [0, 1, 2, 3]
     post_enum_filters:
       lewis_score: 0.0
       formal_charge: 2.0

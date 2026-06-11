@@ -1,0 +1,74 @@
+Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    
+First off, here's the input file you provided:
+=====================================
+initialize:
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      formal_charge: 2.0
+      lewis_score: 0.0
+      ring_filter: false
+  initial_structure:
+    mode: species
+    source: O=CCO
+    type: smiles
+  job_manager:
+    container: apptainer
+    max_active_jobs: 100
+    queue: long
+    scheduler: sge
+  output: HAA_depth1.pkl
+  status: STATUS.json
+  verbose: true
+
+=====================================
+Full configuration seen here: 
+{'enumeration': {'ON': True,
+                 'mode': 'concerted',
+                 'n_break': 2,
+                 'n_form': 2,
+                 'post_enum_filters': {'formal_charge': 2.0,
+                                       'lewis_score': 0.0,
+                                       'ring_filter': False},
+                 'pre_enum_filters': {'product_blinders': None,
+                                      'property_filter': None,
+                                      'separate_prods': False},
+                 'react_atoms': []},
+ 'global_tasks': {},
+ 'initial_structure': {'mode': 'species', 'source': 'O=CCO', 'type': 'smiles'},
+ 'job_manager': {'account': None,
+                 'container': 'apptainer',
+                 'job_name': 'yarp',
+                 'max_active_jobs': 100,
+                 'module_container': None,
+                 'queue': 'long',
+                 'scheduler': 'sge',
+                 'sif_location': '/users/khubler/yarp-again/containers'},
+ 'output': 'HAA_depth1.pkl',
+ 'pipeline_tasks': {},
+ 'stages': [],
+ 'status': 'STATUS.json',
+ 'verbose': True}
+
+Let's generate some initial reaction objects...
+Product enumeration enabled. Enumerating products.
+ - Initializing starting reactant node from O=CCO
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 11 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 11 products after filtering
+Initialized 11 reactions and saved to disk!
+If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.
+See ya, bye!

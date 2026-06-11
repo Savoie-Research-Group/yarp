@@ -1,0 +1,184 @@
+initialize:
+  verbose: True
+  output: HAA_depth1.pkl
+  status: STATUS.json
+  initial_structure:
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
+    type: smiles
+    mode: species
+  job_manager:
+     scheduler: sge
+     queue: long
+     container: apptainer
+     max_active_jobs: 100
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    react_atoms: [0, 1, 2, 3]
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: False
+
+stages:
+ - egat
+ - ll_path
+ - ll_refine
+ - hl_refine
+ - hl_refine2
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000 # in MB
+
+ll_path:
+  method: init_rxn_path
+  conf_gen:
+     charge: 0
+     n_unpaired_electrons: 0
+     software: crest
+     lot: gfn2
+     n_cpus: 4
+     mem_per_cpu: 8000
+  ts_guess:
+     software: pysisyphus
+     gsm_lot: xtb
+     n_conf: 3
+     n_cpus: 4
+     mem_per_cpu: 8000
+     joint_opt: dual
+     bias_lot: uff
+     charge: 0
+     multiplicity: 1
+
+ll_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 4
+    mem_per_cpu: 8000
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+
+hl_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    product:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    transition_state:
+      label: ts_opt
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: orca
+    lot: PBE D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+
+hl_refine2:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: rp_opt
+      lot: PBE D3BJ def2-SVP
+      software: orca
+    product:
+      label: rp_opt
+      lot: PBE D3BJ def2-SVP
+      software: orca
+    transition_state:
+      label: ts_opt
+      lot: PBE D3BJ def2-SVP
+      software: orca
+  rp_opt:
+    software: orca
+    lot: PBE0 D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: orca
+    lot: PBE0 D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: orca
+    lot: PBE0 D3BJ def2-SVP
+    n_cpus: 4
+    mem_per_cpu: 8000
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+

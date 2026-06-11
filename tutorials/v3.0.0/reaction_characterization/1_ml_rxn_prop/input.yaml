@@ -24,7 +24,6 @@ initialize:
 
 stages:
  - egat
- - ll_path
 
 egat:
   method: ml_rxn_prop
@@ -32,22 +31,3 @@ egat:
   n_cpus: 8
   mem_per_cpu: 1000 # in MB
 
-ll_path:
-  method: init_rxn_path
-  conf_gen:
-     charge: 0
-     n_unpaired_electrons: 0
-     software: crest
-     lot: gfn2
-     n_cpus: 2
-     mem_per_cpu: 4000
-  ts_guess:
-     software: pysisyphus
-     gsm_lot: xtb
-     n_conf: 3
-     n_cpus: 2
-     joint_opt: dual
-     bias_lot: uff
-     charge: 0
-     multiplicity: 1
-     mem_per_cpu: 4000

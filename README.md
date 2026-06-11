@@ -1,30 +1,29 @@
 # Welcome to Yet Another Reaction Program (YARP)
-Come on in, the water's (probably) fine!
 
-Here is the available functionality for version 0.3.0 of the code:
+<img src="images/yarp_3.0_logo.png" alt="YARP 3.0 Overview" width="500">
+
+Here is the available functionality for YARP version 3.0.0:
 - Visualize and manipulate molecules with yarpecules
-- Perform break-n, form-m product enumeration to generate chemical reaction networks
+- Perform multiple cycles of break-n, form-m product enumeration to generate chemical reaction networks
 - Estimate forward and reverse reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
 - Generate an initial guess at a TS structure using CREST conformer generation + double-ended growing string method at the xTB level of theory
 - Refine reaction paths (reactant - transition state - product) at both the xTB and DFT levels of theory, using Pysisyphus and ORCA, respectively
 - Perform basic network analysis on chemical reaction networks
 
-To access this version, checkout the associated tag:
-```
-git clone git@github.com:Savoie-Research-Group/yarp-again.git
-git checkout v0.3.0
-```
+Have questions or find a bug? Please hop over to our Issues tab, and let us know!
 
 ## Getting Started with YARP
 
-### Basic Usage
+Detailed examples and user instructions can be found in `tutorials/`!
+
+### Quick Start - Basic Usage
 
 There are three core YARP execution scripts:
 1. `yarp-init`: (source code --> `yarp/initialize_yarp.py`)
     - Parses user input configuration, initializes reaction objects, and sets up task scheduler
     - If product enumeration is requested by user, that logic is executed here
     - How to use from command-line:
-    ```
+    ```bash
     cd /path/to/your/working/directory
     yarp-init input.yaml
     ```
@@ -33,31 +32,37 @@ There are three core YARP execution scripts:
     - Checks active jobs, submits additional ones, analyzes completed jobs
     - Requires user to re-execute in order to complete all tasks specified by `yarp-init`
     - How to use from command-line:
-    ```
+    ```bash
     yarp-progress /path/to/your/working/directory
     ```
 3. `yarp-loop`: (source code --> `yarp/run_yarp_loop.py`)
     - This is a convenience wrapper for `yarp-progress`, which will re-execute that script at set intervals
+    - All YARP outputs will be written to a `yarp_loop.out` file, generated in the provided working directory
     - How to use from command-line (via nohup background processes):
-    ```
-    nohup yarp-loop -w /path/to/your/working/directory -i <interval_length_in_minutes> -d <total_duration_in_minutes> > yarp_loop.out &
+    ```bash
+    nohup yarp-loop -w /path/to/your/working/directory -i <interval_length_in_minutes> -d <total_duration_in_minutes> &
     ```
 
 YARP provides quite a lot of options for reaction exploration and characterization.
 These are all accessible through the YAML input file provided to `yarp-init`
 Checkout the `tutorials/` folder for more details, but here is a minimal example YARP input:
-```
+```yaml
 # PART 1: Initialization of reactions and task manager settings
 initialize:
-  initial species: OCC=O      # can also be a path to an XYZ or MOL file, or a YARP pickle file
+  initial_structure: # block to control starting point structure(s) for YARP
+    source: O=CCOO
+    type: smiles
+    mode: species
   output: YARP_RXNS.pkl       # where YARP reaction objects are written to (default = YARP_RXNS.pkl)
   status: STATUS.json         # keeps track of all reaction characterization tasks (default = STATUS.json)
   job manager:                # block to define how reaction characterization tasks are executed
      scheduler: local
      container: docker
      max_active_jobs: 4       # upper limit of how many jobs can be submitted (default = 100)
-  enumeration:                # block to control product enumeration
-     enumerate: True
+  enumeration:                # block to control product enumeration; if absent, no product enum will be performed
+    mode: concerted
+    n_break: 2
+    n_form: 2
 
 # PART 2: Characterization of reactions
 stages:
@@ -66,38 +71,24 @@ stages:
 egat:
   method: ml_rxn_prop         # these are pre-set options that determine what tasks will be put in the pipeline for a given reaction!
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
   mem_per_cpu: 1000           # in MB
 ```
 
-### Enumeration notes
-
-The `reactive atoms` enumeration option restricts bond breaking/forming to the
-selected atom-map IDs. These are zero-based YARP atom maps, not necessarily the
-current local atom indices of a candidate molecule. For unmapped input SMILES,
-XYZ, or MOL files, YARP generates zero-based atom maps during yarpecule
-construction; use the mapped SMILES printed by YARP to audit the selection.
-
-Example:
-
-```yaml
-initialize:
-  enumeration:
-     enumerate: True
-     mode: concerted
-     bonds to break: 2
-     bonds to form: 2
-     reactive atoms: [0, 1, 2, 3] # atom-map IDs to include in enumeration
-```
-
-When restarting from a YARP pickle and using `separate products`, YARP validates
-the reactive atom-map list against the unseparated product before separation.
-Separated fragments that contain none of the selected maps are skipped rather
-than enumerated without the restriction.
-
 ### Installation Notes
 
-First, get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
+To access the latest (possibly experimental) version of the code:
+```bash
+git clone git@github.com:Savoie-Research-Group/yarp-again.git
+```
+
+For the latest stable release, you can access the following tag:
+```bash
+git checkout v3.0.0
+```
+
+Once you have your desired source code version,
+get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
 from the root directory. Then do a good old `conda activate yarp`
 
 Also from the root directory of this git repository, run `pip install -e .`
@@ -106,7 +97,7 @@ Also from the root directory of this git repository, run `pip install -e .`
 
 **How do you know everything's working correctly?**
 
-Run the test suite via the command `pytest -v test/` from the base-level of this git repository.
+Run the test suite via the command `pytest test/` from the base-level of this git repository.
 You should see that all tests passed.
 
 **Heads up about containers!**
@@ -134,41 +125,46 @@ To build an ORCA container, take the following steps:
     - This will place the Apptainer container in the default location that YARP looks for `.sif` files!
     - However, you can place the `.sif` file anywhere and provide the absolute file path as an input to `initialize_yarp.py` when executing YARP jobs via Apptainer
 
-The trickiest part of an ORCA installation is ensuring the parallelization features are working properly.
-If you use our provided Docker/Apptainer files, you should be good to go, but it's always good to double-check these things.
+Need to use a different version of ORCA? Feel free to adjust the relevant sections of our provided Docker and Apptainer files.
+
+Relevant portion of `containers/orca/Dockerfile`:
+```bash
+# Create a micromamba environment containing exactly OpenMPI 4.1.6, xTB, and CREST
+RUN micromamba create -y -p /home/${USER}/env -c conda-forge openmpi=4.1.6 xtb crest && \
+    micromamba clean --all --yes
+
+# Copy the ORCA tarball into the image and extract it
+# Assuming it is named 'orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz'
+COPY --chown=${USER}:${GROUP} orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /home/${USER}/
+RUN mkdir /home/${USER}/orca && \
+    tar -xf /home/${USER}/orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz -C /home/${USER}/orca --strip-components=1 && \
+    rm /home/${USER}/orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz
+```
+
+Relevant portion of `containers/orca/orca_6.0.1.def`:
+```bash
+%files
+    # Copy the ORCA tarball from your host machine into the container's /opt directory
+    orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /opt/orca_installer.tar.xz
+
+...
+
+%post
+
+...
+
+    # Create a micromamba environment containing exactly OpenMPI 4.1.6, xTB, and CREST
+    # We install this into /opt/env instead of a user's home directory
+    micromamba create -y -p /opt/env -c conda-forge openmpi=4.1.6 xtb crest
+    micromamba clean --all --yes
+
+    # Extract the ORCA tarball we copied in the %files section into /opt/orca
+    mkdir -p /opt/orca
+    tar -xf /opt/orca_installer.tar.xz -C /opt/orca --strip-components=1
+
+```
+
+**WARNING: Make sure you use the correct OpenMPI version associated with your specific version of ORCA!!!!**
+Many performance issues arise from having the wrong OpenMPI version, most notably, parallelization.
 Please see `containers/orca/example` for a minimal functionality example you can run to ensure your ORCA container has been properly configured.
 
-## YARP Developer FYIs!
-
-### How to add tests cases to the pytest suite
-
-All tests should be contained in the folder `test/`.
-The structure of `test/` should mirror the structure of the source code contained in `yarp/`.
-- For example, the source code file `yarp/yarpecule/input_parsers.py` as a corresponding testing
-    file `test/yarpecule/test_input_parsers.py`
-- It is important that all testing files start with `test_` so that pytest will detect them.
-
-The file `test/conftest.py` contains pytest fixtures, which are objects that all tests within `test/`
-have access to and can use in their tests.
-- Example: `test_input_parsers.py` uses the fixture `ethene_xyz` as an input for its
-    tests related to parsing XYZ files
-- Feel free to add additional XYZ and MOL files to the `test/molecules/` folder,
-    and use them to set up additional fixtures in `conftest.py`
-    
-### Local Sphinx Documentation
-
-If you've cloned the repo and want to browse the documentation locally:
-
-1. Activate the `yarp_env` Conda environment
-2. Run the build script:
-
-    ```bash
-    cd docs
-    ./update_docs.sh
-    ```
-
-After building the docs with `./update_docs.sh`, view the docs by running:
-./view_docs.sh
-
-The HTML files are located in:  
-📁 `docs/build/html/index.html`

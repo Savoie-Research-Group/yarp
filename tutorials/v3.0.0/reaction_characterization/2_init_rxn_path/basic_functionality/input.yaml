@@ -3,7 +3,7 @@ initialize:
   output: HAA_depth1.pkl
   status: STATUS.json
   initial_structure:
-    source: O=CCO
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
     type: smiles
     mode: species
   job_manager:
@@ -19,6 +19,7 @@ initialize:
       lewis_score: 0.0
       formal_charge: 2.0
       ring_filter: False
+
 
 stages:
  - egat

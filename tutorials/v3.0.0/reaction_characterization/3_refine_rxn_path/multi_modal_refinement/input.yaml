@@ -73,7 +73,7 @@ ll_refine:
     software: pysisyphus
     lot: xtb
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 4000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -83,7 +83,7 @@ ll_refine:
     lot: xtb
     conv_thresh: gau
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 4000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -93,7 +93,7 @@ ll_refine:
     lot: xtb
     conv_thresh: gau
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 4000
     max_cycles: 100
     charge: 0
     multiplicity: 1

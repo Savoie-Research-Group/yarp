@@ -44,6 +44,44 @@ stages:
 - egat
 
 =====================================
+Full configuration seen here: 
+{'enumeration': {'ON': True,
+                 'mode': 'concerted',
+                 'n_break': 2,
+                 'n_form': 2,
+                 'post_enum_filters': {'formal_charge': 2.0,
+                                       'lewis_score': 0.0,
+                                       'ring_filter': False},
+                 'pre_enum_filters': {'product_blinders': None,
+                                      'property_filter': {'source': 'egat_rgd1',
+                                                          'threshold': 55.0,
+                                                          'type': 'barrier'},
+                                      'separate_prods': True},
+                 'react_atoms': []},
+ 'global_tasks': {'egat.ml_predict': {'config': {'max_runtime': '01:00:00',
+                                                 'mem_per_cpu': 1000,
+                                                 'model': 'egat_rgd1',
+                                                 'n_cpus': 8},
+                                      'depends_on': [],
+                                      'parent_stage': 'egat',
+                                      'task_type': 'ml_predict'}},
+ 'initial_structure': {'mode': 'reaction',
+                       'source': '../depth1/3HP_depth1.pkl',
+                       'type': 'yarp_pickle'},
+ 'job_manager': {'account': None,
+                 'container': 'apptainer',
+                 'job_name': 'yarp',
+                 'max_active_jobs': 100,
+                 'module_container': None,
+                 'queue': 'long',
+                 'scheduler': 'sge',
+                 'sif_location': '/users/khubler/yarp-again/containers'},
+ 'output': '3HP_depth2.pkl',
+ 'pipeline_tasks': {},
+ 'stages': ['egat'],
+ 'status': 'STATUS.json',
+ 'verbose': True}
+
 Let's generate some initial reaction objects...
 Product enumeration enabled. Enumerating products.
  - Processing starting node(s) as YARP generated pickle file
@@ -53,18 +91,18 @@ Product enumeration enabled. Enumerating products.
   + Excluding 2415605.9261953793 (barrier = 76.61646270751953) from enumeration
   + Excluding 2395214.3978448925 (barrier = 68.74866485595703) from enumeration
   + Excluding 2596760.3707471034 (barrier = 73.33732604980469) from enumeration
-  + Excluding 2899373.0066312575 (barrier = 71.49890899658203) from enumeration
+  + Excluding 2899373.0066312575 (barrier = 73.80352020263672) from enumeration
   + Excluding 2212843.919711775 (barrier = 71.87579345703125) from enumeration
-  + Excluding 2455167.9764962974 (barrier = 79.14697265625) from enumeration
-  + Excluding 2069910.6282797283 (barrier = 89.48712158203125) from enumeration
-  + Excluding 2616810.498100545 (barrier = 68.86351013183594) from enumeration
+  + Excluding 2455167.9764962974 (barrier = 79.14698028564453) from enumeration
+  + Excluding 2069910.6282797283 (barrier = 89.48711395263672) from enumeration
+  + Excluding 2616810.498100545 (barrier = 68.8635025024414) from enumeration
   + Excluding 2254259.8477397324 (barrier = 80.6509780883789) from enumeration
   + Excluding 2515797.8577118726 (barrier = 67.97367858886719) from enumeration
-  + Excluding 2537310.875147058 (barrier = 72.85060119628906) from enumeration
-  + Excluding 2899368.4867536672 (barrier = 77.64442443847656) from enumeration
-  + Excluding 2858907.921511296 (barrier = 87.6809310913086) from enumeration
+  + Excluding 2537310.875147058 (barrier = 72.8506088256836) from enumeration
+  + Excluding 2899368.4867536672 (barrier = 78.37548065185547) from enumeration
+  + Excluding 2858907.921511296 (barrier = 87.68090057373047) from enumeration
   + Excluding 2495472.844473039 (barrier = 63.19371795654297) from enumeration
-  + Excluding 2516961.939590296 (barrier = 67.69712829589844) from enumeration
+  + Excluding 2516961.939590296 (barrier = 67.6971435546875) from enumeration
  - Performing product separation on all reactions prior to enumeration
  - 6 unique products identified for enumeration
  - Enumerating from WSFSSNUMVMOOMR (C=O) node

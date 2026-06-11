@@ -3,6 +3,8 @@
 1. Run `yarp-init input.yaml`
     - STDOUT should look nearly identical to contents of `init.out`
     - You should see `HAA_depth1.pkl` and `STATUS.json` files generated in the same directory level as `input.yaml`
-2. Run `nohup yarp-loop -w . -i 1 -d 16 > loop.out &` from the same directory level as `HAA_depth1.pkl` and `STATUS.json`
-    - Takes 16 minutes to finish
+2. Run `yarp-loop -w . -i 1 -d 60` from the same directory as `HAA_depth1.pkl` and `STATUS.json`
+    - To run loop in background instead, run `nohup yarp-loop -w . -i 1 -d 60 > loop.out &`. This folder will take a bit of time, so this method may be best here. 
+    - An output `yarp_loop.out` file should look nearly identical to `eg_yarp_loop.out`
 3. Check the contents of the EGAT characterized reactions with `yarp-read -ia HAA_depth1.pkl`
+    - STDOUT should look identical to `yarp_read.out`

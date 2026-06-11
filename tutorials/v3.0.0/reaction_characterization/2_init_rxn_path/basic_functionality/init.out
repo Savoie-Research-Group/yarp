@@ -12,7 +12,7 @@ egat:
   mem_per_cpu: 1000
   method: ml_rxn_prop
   model: egat_rgd1
-  n_cpus: 1
+  n_cpus: 8
 initialize:
   enumeration:
     mode: concerted
@@ -29,12 +29,13 @@ initialize:
     - 3
   initial_structure:
     mode: species
-    source: O=CCO
+    source: '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]'
     type: smiles
   job_manager:
-    container: docker
-    max_active_jobs: 4
-    scheduler: local
+    container: apptainer
+    max_active_jobs: 100
+    queue: long
+    scheduler: sge
   output: HAA_depth1.pkl
   status: STATUS.json
   verbose: true
@@ -42,6 +43,7 @@ ll_path:
   conf_gen:
     charge: 0
     lot: gfn2
+    mem_per_cpu: 4000
     n_cpus: 2
     n_unpaired_electrons: 0
     software: crest
@@ -51,6 +53,7 @@ ll_path:
     charge: 0
     gsm_lot: xtb
     joint_opt: dual
+    mem_per_cpu: 4000
     multiplicity: 1
     n_conf: 3
     n_cpus: 2
@@ -60,11 +63,88 @@ stages:
 - ll_path
 
 =====================================
+Full configuration seen here: 
+{'enumeration': {'ON': True,
+                 'mode': 'concerted',
+                 'n_break': 2,
+                 'n_form': 2,
+                 'post_enum_filters': {'formal_charge': 2.0,
+                                       'lewis_score': 0.0,
+                                       'ring_filter': False},
+                 'pre_enum_filters': {'product_blinders': None,
+                                      'property_filter': None,
+                                      'separate_prods': False},
+                 'react_atoms': [{0, 1, 2, 3}]},
+ 'global_tasks': {'egat.ml_predict': {'config': {'max_runtime': '01:00:00',
+                                                 'mem_per_cpu': 1000,
+                                                 'model': 'egat_rgd1',
+                                                 'n_cpus': 8},
+                                      'depends_on': [],
+                                      'parent_stage': 'egat',
+                                      'task_type': 'ml_predict'}},
+ 'initial_structure': {'mode': 'species',
+                       'source': '[O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]',
+                       'type': 'smiles'},
+ 'job_manager': {'account': None,
+                 'container': 'apptainer',
+                 'job_name': 'yarp',
+                 'max_active_jobs': 100,
+                 'module_container': None,
+                 'queue': 'long',
+                 'scheduler': 'sge',
+                 'sif_location': '/users/khubler/yarp-again/containers'},
+ 'output': 'HAA_depth1.pkl',
+ 'pipeline_tasks': {'ll_path.product_conformer': {'config': {'charge': 0,
+                                                             'energy_window': 6.0,
+                                                             'lot': 'gfn2',
+                                                             'max_runtime': '01:00:00',
+                                                             'mem_per_cpu': 4000,
+                                                             'n_cpus': 2,
+                                                             'n_unpaired_electrons': 0,
+                                                             'software': 'crest',
+                                                             'solvent': None},
+                                                  'depends_on': ['egat.ml_predict'],
+                                                  'parent_stage': 'll_path',
+                                                  'task_type': 'product_conformer'},
+                    'll_path.reactant_conformer': {'config': {'charge': 0,
+                                                              'energy_window': 6.0,
+                                                              'lot': 'gfn2',
+                                                              'max_runtime': '01:00:00',
+                                                              'mem_per_cpu': 4000,
+                                                              'n_cpus': 2,
+                                                              'n_unpaired_electrons': 0,
+                                                              'software': 'crest',
+                                                              'solvent': None},
+                                                   'depends_on': ['egat.ml_predict'],
+                                                   'parent_stage': 'll_path',
+                                                   'task_type': 'reactant_conformer'},
+                    'll_path.ts_guess': {'config': {'bias_lot': 'uff',
+                                                    'charge': 0,
+                                                    'gsm_lot': 'xtb',
+                                                    'joint_opt': 'dual',
+                                                    'max_gsm_nodes': 30,
+                                                    'max_runtime': '01:00:00',
+                                                    'mem_per_cpu': 4000,
+                                                    'multiplicity': 1,
+                                                    'n_conf': 3,
+                                                    'n_cpus': 2,
+                                                    'software': 'pysisyphus'},
+                                         'depends_on': ['ll_path.reactant_conformer',
+                                                        'll_path.product_conformer',
+                                                        'll_path.reactant_conformer',
+                                                        'll_path.product_conformer'],
+                                         'parent_stage': 'll_path',
+                                         'task_type': 'ts_guess'}},
+ 'stages': ['egat', 'll_path'],
+ 'status': 'STATUS.json',
+ 'verbose': True}
+
 Let's generate some initial reaction objects...
 Product enumeration enabled. Enumerating products.
- - Initializing starting reactant node from O=CCO
+ - Initializing starting reactant node from [O:0]=[C:1]([C:2]([O:3][H:7])([H:5])[H:6])[H:4]
   * Product enumeration with break 2, form 2 will be performed in concerted mode.
-   + Reactive atoms defined as: index [0, 1, 2, 3] --> element ['c', 'c', 'o', 'o']
+   + Reactive atoms: [O*:0]=[C*:1]([C*:2]([O*:3][H:7])([H:5])[H:6])[H:4]
+   + Reactive atoms defined as: map [0, 1, 2, 3] --> element ['c', 'c', 'o', 'o']
 Enumerating break 2 form 2 products for 1 yarpecules.
 Reactive atoms defined as: [{0, 1, 2, 3}]
    + Enumerated 2 products

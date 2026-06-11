@@ -33,6 +33,36 @@ initialize:
   verbose: true
 
 =====================================
+Full configuration seen here: 
+{'enumeration': {'ON': True,
+                 'mode': 'concerted',
+                 'n_break': 2,
+                 'n_form': 2,
+                 'post_enum_filters': {'formal_charge': 2.0,
+                                       'lewis_score': 0.0,
+                                       'ring_filter': False},
+                 'pre_enum_filters': {'product_blinders': None,
+                                      'property_filter': None,
+                                      'separate_prods': True},
+                 'react_atoms': []},
+ 'global_tasks': {},
+ 'initial_structure': {'mode': 'reaction',
+                       'source': '../depth1/HAA_depth1.pkl',
+                       'type': 'yarp_pickle'},
+ 'job_manager': {'account': None,
+                 'container': 'apptainer',
+                 'job_name': 'yarp',
+                 'max_active_jobs': 100,
+                 'module_container': None,
+                 'queue': 'long',
+                 'scheduler': 'sge',
+                 'sif_location': '/users/khubler/yarp-again/containers'},
+ 'output': 'HAA_depth2.pkl',
+ 'pipeline_tasks': {},
+ 'stages': [],
+ 'status': 'STATUS.json',
+ 'verbose': True}
+
 Let's generate some initial reaction objects...
 Product enumeration enabled. Enumerating products.
  - Processing starting node(s) as YARP generated pickle file

@@ -42,13 +42,13 @@ ll_path:
      software: crest
      lot: gfn2
      n_cpus: 4
-     mem_per_cpu: 4000
+     mem_per_cpu: 8000
   ts_guess:
      software: pysisyphus
      gsm_lot: xtb
      n_conf: 3
      n_cpus: 4
-     mem_per_cpu: 4000
+     mem_per_cpu: 8000
      joint_opt: dual
      bias_lot: uff
      charge: 0
@@ -73,7 +73,7 @@ ll_refine:
     software: pysisyphus
     lot: xtb
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -83,7 +83,7 @@ ll_refine:
     lot: xtb
     conv_thresh: gau
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -93,7 +93,7 @@ ll_refine:
     lot: xtb
     conv_thresh: gau
     n_cpus: 4
-    mem_per_cpu: 2000
+    mem_per_cpu: 8000
     max_cycles: 100
     charge: 0
     multiplicity: 1
@@ -117,7 +117,7 @@ hl_refine:
     software: orca
     lot: PBE D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -126,7 +126,7 @@ hl_refine:
     software: orca
     lot: PBE D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -135,7 +135,7 @@ hl_refine:
     software: orca
     lot: PBE D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     max_cycles: 100
     charge: 0
     multiplicity: 1
@@ -159,7 +159,7 @@ hl_refine2:
     software: orca
     lot: PBE0 D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -168,7 +168,7 @@ hl_refine2:
     software: orca
     lot: PBE0 D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     hessian_recalc: 3
     max_cycles: 100
     charge: 0
@@ -177,7 +177,7 @@ hl_refine2:
     software: orca
     lot: PBE0 D3BJ def2-SVP
     n_cpus: 4
-    mem_per_cpu: 4000
+    mem_per_cpu: 8000
     max_cycles: 100
     charge: 0
     multiplicity: 1

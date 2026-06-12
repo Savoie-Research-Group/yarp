@@ -14,8 +14,8 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
     prop_filter : PropertyFilterConfig
         Controls whether reactions are examined for certain properties before enumerating
 
-    netconfig : NetworkConfig object
-        Dataclass that holds settings for network exploration mode from input file
+    netconfig : ProductBlindersConfig object
+        Dataclass that holds settings for product directed network exploration mode from input file
 
     Returns:
     --------
@@ -56,9 +56,9 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
                 print(f" - Constrained network exploration mode selected!")
             candidates = apply_target_blinders(
                 raw_rxns=clean_rxns, target_yp=netconfig.target_product,
-                dist=netconfig.distance, mode=netconfig.mode,
-                k_nodes=netconfig.n_nodes, tolerance=netconfig.tolerance,
-                cap=netconfig.cap
+                dist=netconfig.distance_metric, mode=netconfig.mode,
+                k_nodes=netconfig.n_nodes, tolerance=netconfig.tie_window,
+                verbose=verbose
             )
     else:
         for rxn in clean_rxns.values():

@@ -449,7 +449,7 @@ def progress_yarp(work_dir: Path):
             calc.generate_input()
             script_path = calc.write_submission_script()
 
-            job_id = job_manager.submit(script_path)
+            job_id = job_manager.submit(script_path, task_def.config)
 
             if job_id:
                 g_meta["status"] = "submitted"
@@ -516,7 +516,7 @@ def progress_yarp(work_dir: Path):
                 calc.generate_input()
                 script_path = calc.write_submission_script()
 
-                job_id = job_manager.submit(script_path)
+                job_id = job_manager.submit(script_path, task_def.config)
 
                 if job_id:
                     meta["status"] = "submitted"

@@ -1,12 +1,14 @@
 import subprocess
 import psutil
+from pathlib import Path
+import re
 
 class BaseJobManager:
-    def submit(self, script_path: str) -> str: raise NotImplementedError
+    def submit(self, script_path: str, task_config=None) -> str: raise NotImplementedError
     def is_running(self, job_id: str) -> bool: raise NotImplementedError
 
 class LocalJobManager(BaseJobManager):
-    def submit(self, script_path: str) -> str:
+    def submit(self, script_path: str, task_config=None) -> str:
         # Runs the bash script locally and detaches it
         process = subprocess.Popen(["bash", str(script_path)])
         return str(process.pid)
@@ -16,7 +18,7 @@ class LocalJobManager(BaseJobManager):
         return psutil.pid_exists(int(job_id))
 
 class SlurmJobManager(BaseJobManager):
-    def submit(self, script_path: str) -> str:
+    def submit(self, script_path: str, task_config=None) -> str:
         result = subprocess.run(["sbatch", str(script_path)], capture_output=True, text=True, check=True)
         return result.stdout.strip().split()[-1]
 
@@ -29,7 +31,7 @@ class SlurmJobManager(BaseJobManager):
             return False
 
 class SGEJobManager(BaseJobManager):
-    def submit(self, script_path: str) -> str:
+    def submit(self, script_path: str, task_config=None) -> str:
         # Assuming qsub returns the job ID directly
         result = subprocess.run(["qsub", str(script_path)], capture_output=True, text=True, check=True)
         return result.stdout.strip().split()[2]
@@ -42,6 +44,58 @@ class SGEJobManager(BaseJobManager):
             return result.returncode == 0
         except FileNotFoundError:
             return False
+        
+class CondorJobManager(BaseJobManager):
+    def __init__(self, job_config=None):
+        self.job_config = job_config
+
+    def submit(self, script_path: str, task_config=None) -> str:
+        submit_path = self.write_submit_file(script_path, task_config)
+        result = subprocess.run(["condor_submit", str(submit_path)], capture_output=True, text=True, check=True)
+
+        match = re.search(r"submitted to cluster\s+(\d+)", result.stdout)
+        if not match:
+            raise RuntimeError(f"Could not parse condor_submit output: {result.stdout.strip()}")
+
+        return match.group(1)
+
+    def is_running(self, job_id: str) -> bool:
+        if not job_id: return False
+        try:
+            result = subprocess.run(["condor_q", str(job_id), "-autoformat", "ClusterId"], capture_output=True, text=True)
+            return bool(result.stdout.strip())
+        except FileNotFoundError:
+            return False
+
+    def write_submit_file(self, script_path: str, task_config=None) -> Path:
+        """Write a Condor submit file for the given script."""
+        script_path = Path(script_path).resolve()
+        submit_path = script_path.with_suffix(".submit")
+        script_path.chmod(script_path.stat().st_mode | 0o111)
+
+        cpus = getattr(task_config, "n_cpus", 1)
+        mem = getattr(task_config, "mem_per_cpu", None)
+        disk = getattr(self.job_config, "request_disk", None)
+        log_dir = Path(getattr(self.job_config, "log_dir", script_path.parent))
+        if not log_dir.is_absolute():
+            log_dir = script_path.parent / log_dir
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(submit_path, "w") as f:
+            f.write("universe = vanilla\n")
+            f.write(f"executable = {script_path}\n")
+            f.write("getenv = True\n")
+            f.write(f"request_cpus = {cpus}\n")
+            if mem:
+                f.write(f"request_memory = {int(mem) * int(cpus)}MB\n")
+            if disk:
+                f.write(f"request_disk = {disk}\n")
+            f.write(f"output = {log_dir / (script_path.stem + '.$(Cluster).$(Process).out')}\n")
+            f.write(f"error = {log_dir / (script_path.stem + '.$(Cluster).$(Process).err')}\n")
+            f.write(f"log = {log_dir / (script_path.stem + '.$(Cluster).log')}\n")
+            f.write("notification = Never\n")
+            f.write("queue 1\n")
+        return submit_path
 
 def get_job_manager(scheduler_type: str) -> BaseJobManager:
     if scheduler_type.lower() == "slurm":
@@ -50,5 +104,7 @@ def get_job_manager(scheduler_type: str) -> BaseJobManager:
         return SGEJobManager()
     elif scheduler_type.lower() == "local":
             return LocalJobManager()
+    elif scheduler_type.lower() == "condor":
+        return CondorJobManager()
     else:
         raise ValueError(f"Unsupported scheduler: {scheduler_type}")

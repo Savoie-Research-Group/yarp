@@ -104,8 +104,8 @@ class JobManagerConfig:
             self.sif_location = str(base_repo_path / "containers")
 
         # Sanity Checks
-        if self.scheduler not in ["local", "sge", "slurm"]:
-            raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', and 'slurm'")
+        if self.scheduler not in ["local", "sge", "slurm", "condor"]:
+            raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', 'slurm', and 'condor'")
         if self.container not in ["apptainer", "docker", 'singularity']:
             raise ValueError(f"Invalid 'container' entered: '{self.container}'. Valid options are 'apptainer', 'singularity', and 'docker'")
         if self.scheduler in ["sge", "slurm"] and not self.queue:

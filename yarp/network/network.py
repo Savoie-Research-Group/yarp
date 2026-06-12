@@ -13,7 +13,7 @@ class network:
     Docs here!
     """
 
-    def __init__(self, rxns, dG_lot='DFT'):
+    def __init__(self, rxns, dG_lot=None):
         self.rxns = self._normalize_rxn_dict(rxns)
 
         self.crn = self._gen_s2r_bipartite_graph(self.rxns, barrier_lot=dG_lot)
@@ -49,19 +49,22 @@ class network:
 
         return normalized
 
-    def _gen_s2r_bipartite_graph(self, yp_rxns, barrier_lot='DFT'):
+    def _gen_s2r_bipartite_graph(self, yp_rxns, barrier_lot=None):
         crn = nx.DiGraph()
 
         for rxn in yp_rxns.values():
-            crn.add_node(rxn.hash, type='reaction')
+            rxn_label = f"Rx_{rxn.hash}"
+            crn.add_node(rxn_label, type='reaction')
 
             for r in rxn.reactant.species:
-                crn.add_node(r.hash, type='species', smi=r.canon_smi)
-                crn.add_edge(r.hash, rxn.hash, dG=rxn.barrier[barrier_lot])
+                reactant_label = f'Sp_{r.hash}'
+                crn.add_node(reactant_label, type='species', smi=r.canon_smi)
+                crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, -1000))
 
             for p in rxn.product.species:
-                crn.add_node(p.hash, type='species', smi=p.canon_smi)
-                crn.add_edge(rxn.hash, p.hash, dG=0)
+                product_label = f'Sp_{p.hash}'
+                crn.add_node(product_label, type='species', smi=p.canon_smi)
+                crn.add_edge(rxn_label, product_label, dG=0)
 
         return crn
     
@@ -89,19 +92,24 @@ class network:
 
         if not isinstance(start, yarpecule) or not isinstance(end, yarpecule):
             raise TypeError("Requested start and end nodes must be yarpecule objects")
-        
+
         if len(start.separate()) > 1 or len(end.separate()) > 1:
             raise RuntimeError("Requested start and end nodes must be single molecules")
 
-        path = nx.dijkstra_path(self.crn, start.hash, end.hash, weight=objective)
+        start_label = f'Sp_{start.hash}'
+        end_label = f'Sp_{end.hash}'
+        path = nx.dijkstra_path(self.crn, start_label, end_label, weight=objective)
 
-        rxn_steps = path[1::2] # because we ensure that we always start with a species node!
+        rxn_steps = path[1::2]  # Extract reaction labels from path
 
         path_rxns = dict()
-        for i, hash in enumerate(rxn_steps):
-            path_rxns[i] = self.rxns.get(hash, None)
-        
+        for i, rxn_label in enumerate(rxn_steps):
+            # Extract hash from label (e.g., "Rx_123.456" -> 123.456)
+            rxn_hash = float(rxn_label.split('_', 1)[1])
+            path_rxns[i] = self.rxns.get(rxn_hash, None)
+
         return path_rxns
+
 
     def get_simple_paths(self, start, end, cutoff=None, verbose=False):
         """
@@ -125,24 +133,28 @@ class network:
 
         if not isinstance(start, yarpecule) or not isinstance(end, yarpecule):
             raise TypeError("Requested start and end nodes must be yarpecule objects")
-        
+
         if len(start.separate()) > 1 or len(end.separate()) > 1:
             raise RuntimeError("Requested start and end nodes must be single molecules")
 
         if verbose:
             print(f"Getting all simple paths from {start.canon_smi} to {end.canon_smi}...")
 
-        paths = list(nx.all_simple_paths(self.crn, start.hash, end.hash, cutoff=cutoff))
+        start_label = f'Sp_{start.hash}'
+        end_label = f'Sp_{end.hash}'
+        paths = list(nx.all_simple_paths(self.crn, start_label, end_label, cutoff=cutoff))
 
         rxn_paths = []
         for path in paths:
             if verbose:
                 print(f"\nProcessing path: {path}")
-            rxn_steps = path[1::2] # because we ensure that we always start with a species node!
+            rxn_steps = path[1::2]  # Extract reaction labels from path
             rxn_path = dict()
-            for i, hash in enumerate(rxn_steps):
-                rxn_path[i] = self.rxns.get(hash, None)
-            
+            for i, rxn_label in enumerate(rxn_steps):
+                # Extract hash from label (e.g., "Rx_123.456" -> 123.456)
+                rxn_hash = float(rxn_label.split('_', 1)[1])
+                rxn_path[i] = self.rxns.get(rxn_hash, None)
+
             rxn_paths.append(rxn_path)
 
         if verbose:
@@ -157,30 +169,37 @@ class network:
         """
         if verbose:
             print(f"Getting terminal species nodes...")
-        # Get a list of terminal species nodes
-        terminal_hashes = [
+        # Get a list of terminal species labels (not hashes)
+        terminal_labels = [
             n for n, attr in self.crn.nodes(data=True)
             if attr.get('type') == 'species'
-            and self.crn.out_degree(n) == 0 # no outgoing edges towards a reaction node
-            and self.crn.in_degree(n) > 0 # make sure node is connected to the graph
+            and self.crn.out_degree(n) == 0  # no outgoing edges
+            and self.crn.in_degree(n) > 0    # connected to graph
         ]
         if verbose: 
-            print(f"Found {len(terminal_hashes)} terminal species nodes.")
-        # Get a set of reaction hashes that formed the terminal species
-        producing_rxns = {
+            print(f"Found {len(terminal_labels)} terminal species nodes.")
+
+        # Get a set of reaction labels that produced terminal species
+        producing_rxn_labels = {
             reaction 
-            for species in terminal_hashes 
-            for reaction in self.crn.predecessors(species)
+            for species_label in terminal_labels
+            for reaction in self.crn.predecessors(species_label)
         }
         if verbose:
-            print(f"Found {len(producing_rxns)} reactions that produce terminal species.")
-        # Use reaction hashes to get a subset of relevant reaction objects
-        terminal_rxns = [self.rxns[k] for k in producing_rxns if k in self.rxns]
-        
-        # Search over reaction objects and extract species yarpecules
+            print(f"Found {len(producing_rxn_labels)} reactions that produce terminal species.")
+
+        # Extract hashes from reaction labels and get reaction objects
+        terminal_rxns = []
+        for rxn_label in producing_rxn_labels:
+            rxn_hash = float(rxn_label.split('_', 1)[1])
+            if rxn_hash in self.rxns:
+                terminal_rxns.append(self.rxns[rxn_hash])
+
+        # Extract species from terminal reactions
         terminal_yp = []
         seen = set()
-        terminal_hashes = set(terminal_hashes)
+        terminal_hashes = {float(label.split('_', 1)[1]) for label in terminal_labels}
+
         for rxn in terminal_rxns:
             if verbose:
                 print(f"\nProcessing reaction {rxn.hash} with products {[mol.canon_smi for mol in rxn.product.species]}...")

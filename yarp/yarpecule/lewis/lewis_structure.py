@@ -194,7 +194,10 @@ class lewis_struct:
         # Perhaps one day, we will be able to avoid doing this
         # But today, is not that day - ERM
         old_rec_limit = sys.getrecursionlimit()
-        sys.setrecursionlimit(5000)
+        # Patch A (2026-06-12 ZL): raise recursion limit to match old-YARP
+        # patched behavior (GH commit fed9385); deep Lewis searches on
+        # TM-containing reactants/products hit the 5000 ceiling.
+        sys.setrecursionlimit(100000)
 
         # Initialize score function for ranking bond_mats
         # subtracts off trivial formal charge penalty from cations and anions
@@ -281,14 +284,19 @@ class lewis_struct:
         hashes = set([bmat_hash(seed_bond_mats[0])])
 
         # Next round of BEM searching
-        # N_score=100 rolled back 2026-06-12 ZL (see above).
+        # Patch B (2026-06-12 ZL): switch from greedy descent (min_opt=True)
+        # to exploratory search (min_opt=False, min_win=0.5) to match the
+        # old-YARP patched behavior (GH commit fed9385). The 2nd-pass greedy
+        # descent gets stuck on high-OS local minima for TM-containing
+        # species; min_win=0.5 lets the search jump up to 0.5 above the
+        # current best and find lower-score (chemically sensible) BEMs.
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
                                                            hashes, elements, reactive,
                                                            self._rings, ring_atoms, bridgeheads,
                                                            # set according to local_opt flag
                                                            seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
-                                                           N_score=100, N_max=10000, min_opt=True)
+                                                           N_score=100, N_max=10000, min_opt=False, min_win=0.5)
 
         # Collect all discovered BEMs
         for i, bem in enumerate(seed_bond_mats):

@@ -84,11 +84,11 @@ class JobManagerConfig:
     job_name: str = "yarp"
     account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
     #condor specific
-    request_disk = None
-    log_dir = None
-    getenv = True
-    notification = None
-    condor_universe = None
+    request_disk: Optional[str] = None
+    log_dir: Optional[str] = "./logs"
+    getenv: bool = True
+    notification: Optional[str] = None
+    condor_universe: Optional[str] = "vanilla"
 
     def __post_init__(self):
         # Normalize inputs for easier checking
@@ -121,7 +121,7 @@ class JobManagerConfig:
             raise ValueError("Please provide an integer value to 'max_active_jobs'")
         if self.sif_location and not isinstance(self.sif_location, str):
             raise ValueError("Please provide a valid string value to 'sif_location'")
-        if self.module_container and not isinstance(self.sif_location, str):
+        if self.module_container and not isinstance(self.module_container, str):
             raise ValueError("Please provide a valid string value to 'module_container'")
 
 @dataclass

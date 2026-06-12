@@ -200,13 +200,9 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
         yield obj_fun(bond_mat), bond_mat, reactive
 
 
-# Defaults rolled back 2026-06-12 ZL: upstream bumped N_score=100 → 1000 and
-# counter=0 → 100 (which by itself would break immediately if N_score is also
-# 100). The production OS recalculation pipeline ran with N_score=100, so the
-# old behavior is restored here.
 def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
                      reactive, rings, ring_atoms, bridgeheads, seps, min_score,
-                     ind=0, counter=0, N_score=100, N_max=10000, min_opt=False, min_win=False):
+                     ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
     """ 
     A generator for Lewis search algorithm that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
 

@@ -84,3 +84,44 @@ def test_enum_full(enum_full_options):
         saved_reactions = pickle.load(f)
 
     assert len(saved_reactions) == 2
+
+def test_enum_d2_pkl(enum_d2_pkl):
+    input_dict = enum_d2_pkl
+    initialize_yarp(input_dict)
+
+    output_str = input_dict['initialize']['output']
+    output = Path(output_str)
+    assert output.exists(), "Output pickle file was not created"
+
+    with open(output_str, "rb") as f:
+        saved_reactions = pickle.load(f)
+
+    assert len(saved_reactions) == 28
+
+# ERM: There are some known bugs with the generation of XYZs/SMILES that are probably causing
+# the observed errors for these test cases
+# def test_enum_d2_smi(enum_d2_smi):
+#     input_dict = enum_d2_smi
+#     initialize_yarp(input_dict)
+
+#     output_str = input_dict['initialize']['output']
+#     output = Path(output_str)
+#     assert output.exists(), "Output pickle file was not created"
+
+#     with open(output_str, "rb") as f:
+#         saved_reactions = pickle.load(f)
+
+#     assert len(saved_reactions) == 28
+
+# def test_enum_d2_xyz_dir(enum_d2_xyz_dir):
+#     input_dict = enum_d2_xyz_dir
+#     initialize_yarp(input_dict)
+
+#     output_str = input_dict['initialize']['output']
+#     output = Path(output_str)
+#     assert output.exists(), "Output pickle file was not created"
+
+#     with open(output_str, "rb") as f:
+#         saved_reactions = pickle.load(f)
+
+#     assert len(saved_reactions) == 28

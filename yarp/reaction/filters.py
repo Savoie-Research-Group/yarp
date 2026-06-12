@@ -95,6 +95,7 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
 
             p_set.add(p.hash)
             p.get_inchi()
+            p.get_smiles()
             unique_candidates.append(p)
 
     if verbose:

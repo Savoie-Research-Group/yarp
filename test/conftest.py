@@ -155,6 +155,75 @@ def enum_full_options(tmp_path):
 
     return data
 
+@pytest.fixture
+def enum_d2_pkl(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "d2_pickle.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_enum_d2_pkl_output.pkl"
+    safe_status = tmp_path / "test_enum_d2_pkl_STATUS.json"
+    safe_source = Path(__file__).parent / "molecules/d1_3hp_b2f2_heavy/yarp_rxn.pkl"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+        data['initialize']['initial_structure']['source'] = str(safe_source)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def enum_d2_smi(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "d2_smi.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_enum_d2_pkl_output.pkl"
+    safe_status = tmp_path / "test_enum_d2_pkl_STATUS.json"
+    safe_source = Path(__file__).parent / "molecules/d1_3hp_b2f2_heavy/rxn_smi.txt"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+        data['initialize']['initial_structure']['source'] = str(safe_source)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
+@pytest.fixture
+def enum_d2_xyz_dir(tmp_path):
+    # 1. Load the real YAML
+    yaml_path = Path(__file__).parent / "main_inputs" / "d2_xyz_dir.yaml"
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # 2. Define the safe temporary output path
+    safe_output = tmp_path / "test_enum_d2_pkl_output.pkl"
+    safe_status = tmp_path / "test_enum_d2_pkl_STATUS.json"
+    safe_source = Path(__file__).parent / "molecules/d1_3hp_b2f2_heavy/rxn_xyzs"
+
+    # 3. Overwrite the nested key
+    if 'initialize' in data:
+        data['initialize']['output'] = str(safe_output)
+        data['initialize']['status'] = str(safe_status)
+        data['initialize']['initial_structure']['source'] = str(safe_source)
+    else:
+        # Fallback if the YAML structure changes in the future
+        pytest.fail("The input YAML does not contain an 'initialize' block.")
+
+    return data
+
 # Pickle files
 @pytest.fixture
 def glucose_single_path():

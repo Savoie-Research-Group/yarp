@@ -1,0 +1,175 @@
+Script executing from /users/emille35/dev/yarp-again/yarp
+Welcome to
+                __   __ _    ____  ____  
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        
+First off, here's the input file you provided:
+=====================================
+egat:
+  method: ml_predict
+  model: egat_pretrain
+initialize:
+  bonds to break: 2
+  bonds to form: 2
+  enumerate: true
+  enumeration filters:
+    barrier cutoff: 80.0
+    barrier source: egat
+    discard strained rings: false
+    formal charge: 2.0
+    lewis score: 0.0
+  initial species: ../depth_1/depth1.pkl
+  mode: concerted
+  output: depth2.pkl
+  reactive atoms:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+stages:
+- egat
+
+=====================================
+Product enumeration routine selected
+ - Processing starting node(s) as YARP generated pickle file
+ - Reading in 10 total reactions
+ - Barrier filtering selected!
+   Reactions with egat dG above 80.0 kcal/mol will be excluded from enumeration.
+  + Excluding XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ (dG = 88.3519515991211) from enumeration
+  + Excluding XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN (dG = 84.3137435913086) from enumeration
+  + Excluding XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH (dG = 99.1372299194336) from enumeration
+ - No product separation will be performed prior to enumeration
+ - 7 unique products identified for enumeration
+ - Enumerating from WGCNASOHLSPBMP-WSFSSNUMVMOOMR (C=O.O=CCO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 7 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 7 products after filtering
+ - Enumerating from MQZTXKZTLDDYNK (O=CCOCO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 9 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 9 products after filtering
+ - Enumerating from SCKXCAADGDQQCS-VGGSQFUCUMXWEO (C=C.O=COO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 4 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 4 products after filtering
+ - Enumerating from JQQGJTHDBODIPT (OOC1CCO1) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 13 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 13 products after filtering
+ - Enumerating from BDAGIHXWWSANSR-IAYPIBMASNFSPL (C1CO1.O=CO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 6 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 6 products after filtering
+ - Enumerating from UKQJDWBNQNAJHB (O=COCCO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 10 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 10 products after filtering
+ - Enumerating from KYKDRUWGNWYQSD (OC1CCOO1) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 14 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 14 products after filtering
+Number of reaction objects initialized: 72
+ -- Reaction 0: XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ == O=CCCOO -> OOCC1CO1
+ -- Reaction 1: XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN == O=CCCOO -> C=COCOO
+ -- Reaction 2: XSASRUDTFFBDDK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=CCCOO -> C=O.O=CCO
+ -- Reaction 3: XSASRUDTFFBDDK_to_MQZTXKZTLDDYNK == O=CCCOO -> O=CCOCO
+ -- Reaction 4: XSASRUDTFFBDDK_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == O=CCCOO -> C=C.O=COO
+ -- Reaction 5: XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH == O=CCCOO -> OOOC1CC1
+ -- Reaction 6: XSASRUDTFFBDDK_to_JQQGJTHDBODIPT == O=CCCOO -> OOC1CCO1
+ -- Reaction 7: XSASRUDTFFBDDK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=CCCOO -> C1CO1.O=CO
+ -- Reaction 8: XSASRUDTFFBDDK_to_UKQJDWBNQNAJHB == O=CCCOO -> O=COCCO
+ -- Reaction 9: XSASRUDTFFBDDK_to_KYKDRUWGNWYQSD == O=CCCOO -> OC1CCOO1
+ -- Reaction 10: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_UKQJDWBNQNAJHB == C=O.O=CCO -> O=COCCO
+ -- Reaction 11: MQZTXKZTLDDYNK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=CCOCO -> C=O.O=CCO
+ -- Reaction 12: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_XSASRUDTFFBDDK == C=O.O=CCO -> O=CCCOO
+ -- Reaction 13: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_BFPUSHWBRPMZFN == C=O.O=CCO -> OCC1COO1
+ -- Reaction 14: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_DNNLBMAZSCRRMG == C=O.O=CCO -> OCC1OCO1
+ -- Reaction 15: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_IEZWOVIWXFLQTP-WSFSSNUMVMOOMR == C=O.O=CCO -> C=COO.C=O
+ -- Reaction 16: WGCNASOHLSPBMP-WSFSSNUMVMOOMR_to_DOAMZWOPDPPKJS-WSFSSNUMVMOOMR == C=O.O=CCO -> C=O.OC1CO1
+ -- Reaction 17: MQZTXKZTLDDYNK_to_UKQJDWBNQNAJHB == O=CCOCO -> O=COCCO
+ -- Reaction 18: MQZTXKZTLDDYNK_to_BFPUSHWBRPMZFN == O=CCOCO -> OCC1COO1
+ -- Reaction 19: MQZTXKZTLDDYNK_to_OCSVNKWAJGSUKI == O=CCOCO -> OCOC1CO1
+ -- Reaction 20: MQZTXKZTLDDYNK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=CCOCO -> C1CO1.O=CO
+ -- Reaction 21: MQZTXKZTLDDYNK_to_XSASRUDTFFBDDK == O=CCOCO -> O=CCCOO
+ -- Reaction 22: MQZTXKZTLDDYNK_to_WVFPEXSMTPRZJP == O=CCOCO -> OOC1COC1
+ -- Reaction 23: MQZTXKZTLDDYNK_to_TWGSXTJXQLNWNP == O=CCOCO -> OC1COCO1
+ -- Reaction 24: MQZTXKZTLDDYNK_to_KQBGNBDMOJYJAO == O=CCOCO -> C=COOCO
+ -- Reaction 25: SCKXCAADGDQQCS-VGGSQFUCUMXWEO_to_XSASRUDTFFBDDK == C=C.O=COO -> O=CCCOO
+ -- Reaction 26: SCKXCAADGDQQCS-VGGSQFUCUMXWEO_to_JQQGJTHDBODIPT == C=C.O=COO -> OOC1CCO1
+ -- Reaction 27: SCKXCAADGDQQCS-VGGSQFUCUMXWEO_to_UKQJDWBNQNAJHB == C=C.O=COO -> O=COCCO
+ -- Reaction 28: SCKXCAADGDQQCS-VGGSQFUCUMXWEO_to_CVTVRXGPXQVJAU-VGGSQFUCUMXWEO == C=C.O=COO -> C=C.OC1OO1
+ -- Reaction 29: JQQGJTHDBODIPT_to_PLXVTJBBUQBDRQ == OOC1CCO1 -> OOCC1CO1
+ -- Reaction 30: JQQGJTHDBODIPT_to_LZBZEBHQVXRLLN == OOC1CCO1 -> C=COCOO
+ -- Reaction 31: JQQGJTHDBODIPT_to_WVFPEXSMTPRZJP == OOC1CCO1 -> OOC1COC1
+ -- Reaction 32: JQQGJTHDBODIPT_to_IEZWOVIWXFLQTP-WSFSSNUMVMOOMR == OOC1CCO1 -> C=COO.C=O
+ -- Reaction 33: JQQGJTHDBODIPT_to_DNNLBMAZSCRRMG == OOC1CCO1 -> OCC1OCO1
+ -- Reaction 34: JQQGJTHDBODIPT_to_OCSVNKWAJGSUKI == OOC1CCO1 -> OCOC1CO1
+ -- Reaction 35: JQQGJTHDBODIPT_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == OOC1CCO1 -> C=C.O=COO
+ -- Reaction 36: JQQGJTHDBODIPT_to_UVXJOOHEDLXZGH == OOC1CCO1 -> OOOC1CC1
+ -- Reaction 37: JQQGJTHDBODIPT_to_XSASRUDTFFBDDK == OOC1CCO1 -> O=CCCOO
+ -- Reaction 38: JQQGJTHDBODIPT_to_DTXLZANOYCDGFH == OOC1CCO1 -> OCCC1OO1
+ -- Reaction 39: JQQGJTHDBODIPT_to_VOZDABZCYIIVTM == OOC1CCO1 -> OC1OCCO1
+ -- Reaction 40: JQQGJTHDBODIPT_to_UKQJDWBNQNAJHB == OOC1CCO1 -> O=COCCO
+ -- Reaction 41: JQQGJTHDBODIPT_to_KYKDRUWGNWYQSD == OOC1CCO1 -> OC1CCOO1
+ -- Reaction 42: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_MQZTXKZTLDDYNK == C1CO1.O=CO -> O=CCOCO
+ -- Reaction 43: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_TWGSXTJXQLNWNP == C1CO1.O=CO -> OC1COCO1
+ -- Reaction 44: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_XSASRUDTFFBDDK == C1CO1.O=CO -> O=CCCOO
+ -- Reaction 45: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_UKQJDWBNQNAJHB == C1CO1.O=CO -> O=COCCO
+ -- Reaction 46: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_KYKDRUWGNWYQSD == C1CO1.O=CO -> OC1CCOO1
+ -- Reaction 47: BDAGIHXWWSANSR-IAYPIBMASNFSPL_to_VOZDABZCYIIVTM == C1CO1.O=CO -> OC1OCCO1
+ -- Reaction 48: UKQJDWBNQNAJHB_to_MQZTXKZTLDDYNK == O=COCCO -> O=CCOCO
+ -- Reaction 49: UKQJDWBNQNAJHB_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=COCCO -> C=O.O=CCO
+ -- Reaction 50: UKQJDWBNQNAJHB_to_OCSVNKWAJGSUKI == O=COCCO -> OCOC1CO1
+ -- Reaction 51: UKQJDWBNQNAJHB_to_DNNLBMAZSCRRMG == O=COCCO -> OCC1OCO1
+ -- Reaction 52: UKQJDWBNQNAJHB_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == O=COCCO -> C=C.O=COO
+ -- Reaction 53: UKQJDWBNQNAJHB_to_DTXLZANOYCDGFH == O=COCCO -> OCCC1OO1
+ -- Reaction 54: UKQJDWBNQNAJHB_to_XSASRUDTFFBDDK == O=COCCO -> O=CCCOO
+ -- Reaction 55: UKQJDWBNQNAJHB_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=COCCO -> C1CO1.O=CO
+ -- Reaction 56: UKQJDWBNQNAJHB_to_JQQGJTHDBODIPT == O=COCCO -> OOC1CCO1
+ -- Reaction 57: UKQJDWBNQNAJHB_to_VOZDABZCYIIVTM == O=COCCO -> OC1OCCO1
+ -- Reaction 58: KYKDRUWGNWYQSD_to_BFPUSHWBRPMZFN == OC1CCOO1 -> OCC1COO1
+ -- Reaction 59: KYKDRUWGNWYQSD_to_KQBGNBDMOJYJAO == OC1CCOO1 -> C=COOCO
+ -- Reaction 60: KYKDRUWGNWYQSD_to_TXHBRKKPPAECNB == OC1CCOO1 -> OC1COOC1
+ -- Reaction 61: KYKDRUWGNWYQSD_to_ASQQEOXYFGEFKQ-IMROMDMJAWUWLK == OC1CCOO1 -> C1OO1.C=CO
+ -- Reaction 62: KYKDRUWGNWYQSD_to_DOAMZWOPDPPKJS-WSFSSNUMVMOOMR == OC1CCOO1 -> C=O.OC1CO1
+ -- Reaction 63: KYKDRUWGNWYQSD_to_TWGSXTJXQLNWNP == OC1CCOO1 -> OC1COCO1
+ -- Reaction 64: KYKDRUWGNWYQSD_to_CVTVRXGPXQVJAU-VGGSQFUCUMXWEO == OC1CCOO1 -> C=C.OC1OO1
+ -- Reaction 65: KYKDRUWGNWYQSD_to_UVXJOOHEDLXZGH == OC1CCOO1 -> OOOC1CC1
+ -- Reaction 66: KYKDRUWGNWYQSD_to_DTXLZANOYCDGFH == OC1CCOO1 -> OCCC1OO1
+ -- Reaction 67: KYKDRUWGNWYQSD_to_MYMOFIZGZYHOMD-YOXHCYXIAVIFCZ == OC1CCOO1 -> O=O.OC1CC1
+ -- Reaction 68: KYKDRUWGNWYQSD_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == OC1CCOO1 -> C1CO1.O=CO
+ -- Reaction 69: KYKDRUWGNWYQSD_to_VOZDABZCYIIVTM == OC1CCOO1 -> OC1OCCO1
+ -- Reaction 70: KYKDRUWGNWYQSD_to_JQQGJTHDBODIPT == OC1CCOO1 -> OOC1CCO1
+ -- Reaction 71: KYKDRUWGNWYQSD_to_XSASRUDTFFBDDK == OC1CCOO1 -> O=CCCOO
+Processing stage egat
+Reaction characterization via ML model selected
+ - Loading egat_pretrain model
+ - Predicting barriers for 72 reactions
+Reactions dictionary has been pickled to depth2.pkl.

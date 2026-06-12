@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 
-Welcome to YARP!
+Welcome to YARP Again!
 ======================================
 
 `yarp` is a python package with classes and functions that implement the yarp reaction exploration
@@ -14,9 +14,13 @@ analyzing the outcomes of transition state searches, analyzing networks, and dig
 of reaction data. 
 
 
-Given the generality of these capabilities, we have refactored the original `yarp` workflows into the
-object-oriented package that you are reading the docs for, so that other researchers can leverage these
-algorithms in their own custom chemical workflows. 
+In an effort to make the package more accessible, we are currently working on a new version of the
+package, which is called `YARP Again`. This version is designed to be more user-friendly and
+streamlined, with a focus on ease of use and improved functionality, as well as directly implementable
+on most systems without the need for extensive setup or configuration.
+
+This documentation provides an overview of the package, including its features, installation instructions,
+and usage examples. It is intended to help users get started with YARP Again and make the most of its capabilities.
 
 
 Check out the :doc:`usage` section for further information, including how to
@@ -29,8 +33,6 @@ Take a look at the `license`_ or open an `issue`_.
 .. _license: https://github.com/Savoie-Research-Group/yarp/blob/master/LICENSE.md
 .. _issue: https://github.com/Savoie-Research-Group/yarp/issues
 
---
-=======
 .. toctree::
    :maxdepth: 2
    :caption: Licensing
@@ -38,16 +40,12 @@ Take a look at the `license`_ or open an `issue`_.
    LICENSE
    
    
+=======
+
 --
 =======
 .. toctree::
    :maxdepth: 2
-   :caption: Usage
-
-   README
-
-Modules
-=======
 
 --
 ------------
@@ -75,3 +73,24 @@ Modules
    :caption: Index
 
    yarp
+=======
+   :caption: Package Documentation
+
+   README
+   LICENSE
+
+
+--
+==================================
+API Documentation (YARP Modules)
+==================================
+
+.. toctree::
+   :maxdepth: 5
+   :caption: Modules
+
+   autoapi/index
+   
+
+
+

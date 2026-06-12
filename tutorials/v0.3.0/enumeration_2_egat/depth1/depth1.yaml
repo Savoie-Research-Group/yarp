@@ -1,0 +1,27 @@
+initialize:
+  initial species: OCC=O # can also be a path to an XYZ or MOL file
+  output: depth1.pkl
+  job manager:
+     scheduler: local
+     container: docker
+     max_active_jobs: 4
+  enumeration:
+     enumerate: True
+     mode: concerted
+     bonds to break: 2
+     bonds to form: 2
+     reactive atoms: [0, 1, 2, 3] # only enumerate between heavy atoms
+     enumeration filters:
+       lewis score: 0.0
+       formal charge: 2.0
+       discard strained rings: False
+
+stages:
+ - egat
+
+egat:
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 1
+  mem_per_cpu: 1000 # in MB
+

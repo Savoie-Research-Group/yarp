@@ -1,99 +1,170 @@
-# 0. SPECIAL THING ABOUT THIS BRANCH (in `pyTEST_Example/`)
-* `class_main_dft.py` and `class_refinement.py` as a replacement for `main_dft.py` and `TS_refinement.py`
-* These two `class*` files uses **DFT_Class** for handling rxns and TS conformers and send them to DFT processes (in `DFT_Class.py`)
-* DFT processes are written in classes: `tsopt.py` for **TSOPT**, `irc.py` for **IRC**, `opt.py` for geometry optimization
-* `DFT_Class.py` also contains information about job scheduling and restarting. 
+# Welcome to Yet Another Reaction Program (YARP)
 
+<img src="images/yarp_3.0_logo.png" alt="YARP 3.0 Overview" width="500">
 
-# YARP: Yet Another Reaction Program for Automated Reaction Exploration
+Here is the available functionality for YARP version 3.0.0:
+- Visualize and manipulate molecules with yarpecules
+- Perform multiple cycles of break-n, form-m product enumeration to generate chemical reaction networks
+- Estimate forward and reverse reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
+- Generate an initial guess at a TS structure using CREST conformer generation + double-ended growing string method at the xTB level of theory
+- Refine reaction paths (reactant - transition state - product) at both the xTB and DFT levels of theory, using Pysisyphus and ORCA, respectively
+- Perform basic network analysis on chemical reaction networks
 
-This is an object-oriented refactoring of yarp methodology to be compatible with general reaction-discovery workflows. YARP is a repository that explore the reaction network for a given set of molecules (reactants). YARP consists of construction of bond-electron matrix, product enumeration, reaction conformational sampling, transition state (TS) localization by growing string method (GSM), and TS characterization by Berny optimzation and IRC calculation. More details could be found on:
+Have questions or find a bug? Please hop over to our Issues tab, and let us know!
 
-1. https://www.nature.com/articles/s43588-021-00101-3
-2. https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00081
+## Getting Started with YARP
 
-# 1. Installation:
-* 1.1 Anaconda is recommended and you can get YARP repository by:
-```
-git clone https://github.com/Savoie-Research-Group/yarp.git
-```
-* 1.2 Build the YARP environment and install required packages by:
-```
-cd yarp
-conda env create -f env_linux.yaml
-```
-* 1.3 Install yarp package by:
-```
-conda activate classy-yarp
-pip install .
-```
-* 1.4 Create pysis cmd by:
-```   
-vi ~/.pysisyphusrc
-``` 
-and in `.pysisyphusrc` file add:
-```
-[xtb]
-cmd=xtb
-```
-Finally, save and quit this file.
+Detailed examples and user instructions can be found in `tutorials/`!
 
-# 2. Test Your Installation
-* 2.1 First install pytest via:
-```
-pip install pytest
+### Quick Start - Basic Usage
+
+There are three core YARP execution scripts:
+1. `yarp-init`: (source code --> `yarp/initialize_yarp.py`)
+    - Parses user input configuration, initializes reaction objects, and sets up task scheduler
+    - If product enumeration is requested by user, that logic is executed here
+    - How to use from command-line:
+    ```bash
+    cd /path/to/your/working/directory
+    yarp-init input.yaml
+    ```
+2. `yarp-progress`: (source code --> `yarp/progress_yarp.py`)
+    - Manages the directed acyclic graph workflow for individual YARP tasks
+    - Checks active jobs, submits additional ones, analyzes completed jobs
+    - Requires user to re-execute in order to complete all tasks specified by `yarp-init`
+    - How to use from command-line:
+    ```bash
+    yarp-progress /path/to/your/working/directory
+    ```
+3. `yarp-loop`: (source code --> `yarp/run_yarp_loop.py`)
+    - This is a convenience wrapper for `yarp-progress`, which will re-execute that script at set intervals
+    - All YARP outputs will be written to a `yarp_loop.out` file, generated in the provided working directory
+    - How to use from command-line (via nohup background processes):
+    ```bash
+    nohup yarp-loop -w /path/to/your/working/directory -i <interval_length_in_minutes> -d <total_duration_in_minutes> &
+    ```
+
+YARP provides quite a lot of options for reaction exploration and characterization.
+These are all accessible through the YAML input file provided to `yarp-init`
+Checkout the `tutorials/` folder for more details, but here is a minimal example YARP input:
+```yaml
+# PART 1: Initialization of reactions and task manager settings
+initialize:
+  initial_structure: # block to control starting point structure(s) for YARP
+    source: O=CCOO
+    type: smiles
+    mode: species
+  output: YARP_RXNS.pkl       # where YARP reaction objects are written to (default = YARP_RXNS.pkl)
+  status: STATUS.json         # keeps track of all reaction characterization tasks (default = STATUS.json)
+  job manager:                # block to define how reaction characterization tasks are executed
+     scheduler: local
+     container: docker
+     max_active_jobs: 4       # upper limit of how many jobs can be submitted (default = 100)
+  enumeration:                # block to control product enumeration; if absent, no product enum will be performed
+    mode: concerted
+    n_break: 2
+    n_form: 2
+
+# PART 2: Characterization of reactions
+stages:
+ - egat                       # these can be set to anything, so long as they match downstream header blocks
+
+egat:
+  method: ml_rxn_prop         # these are pre-set options that determine what tasks will be put in the pipeline for a given reaction!
+  model: egat_rgd1
+  n_cpus: 8
+  mem_per_cpu: 1000           # in MB
 ```
 
-* 2.2 Do a simple test (few seconds) that reads the structure of Fe(CO)<sub>5</sub> and returns the **bond-electron matrix**:
-```
-cd examples/
-pytest -s
-```
-* 2.3 Then do a more complicated test (10 mins) that runs **YARP-xTB** that includes **geometry optimization**, **conformational sampling**, **joint optimization**, **Grow-String Method (GSM)**, **Berny optimization**, and **IRC**
-```
-cd pyTEST_Example/
-pytest -s
+### Installation Notes
+
+To access the latest (possibly experimental) version of the code:
+```bash
+git clone git@github.com:Savoie-Research-Group/yarp-again.git
 ```
 
-# 3. How YARP Works:
+For the latest stable release, you can access the following tag:
+```bash
+git checkout v3.0.0
+```
 
-* 3.1 YARP class:
-    * In yarp/yarp folder, several functions are shown
-    * the bond-electron matrix and reaction enumeration are generated via these functions. More details are shown in `yarp/examples/reaction.py` 
+Once you have your desired source code version,
+get yourself a conda environment up and running by executing the command `conda env create -f environment.yml`
+from the root directory. Then do a good old `conda activate yarp`
 
-* 3.2 Reaction class:
-    * All calculations, including conformational sampling, GSM, and TS characterization, are In `yarp/reaction` folder.
-    * In `yarp/reaction/main_xtb.py`, the workflow are shown. To run `main_xtb.py` we need a `parameters.yaml` file.
-    * To build a `parameters.yaml` file, we will need:
-```
-    input: [reaction folder or reaction file] # it could be a folder (store several xyz, mol, or smiles files) or a xyz, mol, or smiles file.
-    scratch: [a path you want to store result]
-    reaction_data: [a pickle file] # a pickle to store and load the result
-    n_break: [an integer, n] # define a break-n-bonds-form-n-bonds reaction
-    form_all: [True/False] # If true, it means you will try all break-n-bonds-form-infinity-bonds reactions.
-    lewis_criteria: [a float] # the criteria to remove unfavorable products by its Lewis structure (0.0 is recommended).
-    ff: [force field name] # the force field to initialize geometry (uff/mmff94 are all available)
-    crest: [cmd for crest] # the command for CREST. (usually it would be crest)
-    lot: [gfn2, gfn1, gfn-ff] # the level of theory in xTB.
-    method: [crest/rdkit] # for conformational sampling, CREST and rdkit (by uff) are available options.
-    enumeration: [True/False] # If it's true, it means that product enumeration will be applied.
-    n_conf: [an integer, n] # define n conformers would be considered for further calculations.
-    nconf_dft: [an integer, n] # define n conformers for DFT calculations.
-    c_nprocs: [an integer] # define how many cpus you are going to use for CREST. (if you run on pc, set this as 1)
-    mem: [integer] # in GB
-    opt_level: [tight, vtight, and etc.] # define the convergence for xTB.
-    crest_quick: [True/False] # if true, the crest with quick mode will be performed.
-    low_solvation: [gbsa, alpb, False] # define the solvation models in xTB.
-    solvent: [solvent name] # define the solvent.
-    pysis_wt: [integer] # the walltime for xTB calculation (in second).
-    charge: [integer] # charge of your system.
-    multiplicity: [integer] # multiplicity for your system.
-    model_path: [your yarp path/reaction/bin] # models we need for yarp.
-    gsm_inp: [your yarp path/reaction/bin/inpfileq] # growing string method bin file.
-```
-More details could be found in `parameters.yaml`.
+Also from the root directory of this git repository, run `pip install -e .`
+- This will give you access to the `yarp-init`, `yarp-progress`, and `yarp-loop` executables
+- If you're here to use YARP, not develop YARP, feel free to run `pip install .` instead for a non-editable installation
 
-* 3.3 As the `parameter.yaml` file is created, you can run yarp by:
+**How do you know everything's working correctly?**
+
+Run the test suite via the command `pytest test/` from the base-level of this git repository.
+You should see that all tests passed.
+
+**Heads up about containers!**
+
+YARP relies extensively on containers to manage software dependencies necessary for reaction path characterization.
+YARP is set up to interface with both Docker and Apptainer container services.
+Typically, we set up Docker when running YARP on personal computers and use Apptainer for HPC systems, where root-level access is restricted.
+Please make sure these are installed/available prior to executing YARP jobs!
+
+Most of YARP's containers have been published to DockerHub, and will be automatically pulled down the first time you
+run a YARP job which uses said containers.
+Expect a few minutes of delay in these cases.
+A few notable exceptions to this exist, and we provide guidance on manual container set up steps below.
+
+#### Setting up ORCA container
+
+As per ORCA's EULA license, we are not able to distribute ORCA's software binaries.
+However, the software is freely available for download at the [ORCA Forum](https://orcaforum.kofo.mpg.de/app.php/portal)
+
+To build an ORCA container, take the following steps:
+1. Download `orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz` from the ORCA Forum portal
+2. Place the tar file into `containers/orca`
+3. For a Docker container, `cd containers/orca` and execute `docker build -t orca:6.0.1 .` from the command-line
+4. For an Apptainer container, `cd containers/orca` and execute `apptainer build ../orca_6.0.1.sif orca_6.0.1.def`
+    - This will place the Apptainer container in the default location that YARP looks for `.sif` files!
+    - However, you can place the `.sif` file anywhere and provide the absolute file path as an input to `initialize_yarp.py` when executing YARP jobs via Apptainer
+
+Need to use a different version of ORCA? Feel free to adjust the relevant sections of our provided Docker and Apptainer files.
+
+Relevant portion of `containers/orca/Dockerfile`:
+```bash
+# Create a micromamba environment containing exactly OpenMPI 4.1.6, xTB, and CREST
+RUN micromamba create -y -p /home/${USER}/env -c conda-forge openmpi=4.1.6 xtb crest && \
+    micromamba clean --all --yes
+
+# Copy the ORCA tarball into the image and extract it
+# Assuming it is named 'orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz'
+COPY --chown=${USER}:${GROUP} orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /home/${USER}/
+RUN mkdir /home/${USER}/orca && \
+    tar -xf /home/${USER}/orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz -C /home/${USER}/orca --strip-components=1 && \
+    rm /home/${USER}/orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz
 ```
-python main_xtb.py [your parameter yaml file]
+
+Relevant portion of `containers/orca/orca_6.0.1.def`:
+```bash
+%files
+    # Copy the ORCA tarball from your host machine into the container's /opt directory
+    orca_6_0_1_linux_x86-64_shared_openmpi416.tar.xz /opt/orca_installer.tar.xz
+
+...
+
+%post
+
+...
+
+    # Create a micromamba environment containing exactly OpenMPI 4.1.6, xTB, and CREST
+    # We install this into /opt/env instead of a user's home directory
+    micromamba create -y -p /opt/env -c conda-forge openmpi=4.1.6 xtb crest
+    micromamba clean --all --yes
+
+    # Extract the ORCA tarball we copied in the %files section into /opt/orca
+    mkdir -p /opt/orca
+    tar -xf /opt/orca_installer.tar.xz -C /opt/orca --strip-components=1
+
 ```
+
+**WARNING: Make sure you use the correct OpenMPI version associated with your specific version of ORCA!!!!**
+Many performance issues arise from having the wrong OpenMPI version, most notably, parallelization.
+Please see `containers/orca/example` for a minimal functionality example you can run to ensure your ORCA container has been properly configured.
+

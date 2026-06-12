@@ -1,0 +1,60 @@
+Script executing from /users/emille35/dev/yarp-again/yarp
+Welcome to
+                __   __ _    ____  ____  
+                \ \ / // \  |  _ \|  _ \ 
+                 \ V // _ \ | |_) | |_) |
+                  | |/ ___ \|  _ <|  __/ 
+                  |_/_/   \_\_| \_\_|
+                          // Yet Another Reaction Program
+        
+First off, here's the input file you provided:
+=====================================
+egat:
+  method: ml_predict
+  model: egat_pretrain
+initialize:
+  bonds to break: 2
+  bonds to form: 2
+  enumerate: true
+  enumeration filters:
+    discard strained rings: false
+    formal charge: 2.0
+    lewis score: 0.0
+  initial species: O=CCCOO
+  mode: concerted
+  output: depth1.pkl
+  reactive atoms:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+stages:
+- egat
+
+=====================================
+Product enumeration routine selected
+ - Initializing starting reactant node from O=CCCOO
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+   + Reactive atoms defined as: index [0, 1, 2, 3, 4, 5] --> element ['c', 'c', 'c', 'o', 'o', 'o']
+   + Enumerated 10 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 10 products after filtering
+Number of reaction objects initialized: 10
+ -- Reaction 0: XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ == O=CCCOO -> OOCC1CO1
+ -- Reaction 1: XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN == O=CCCOO -> C=COCOO
+ -- Reaction 2: XSASRUDTFFBDDK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR == O=CCCOO -> C=O.O=CCO
+ -- Reaction 3: XSASRUDTFFBDDK_to_MQZTXKZTLDDYNK == O=CCCOO -> O=CCOCO
+ -- Reaction 4: XSASRUDTFFBDDK_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO == O=CCCOO -> C=C.O=COO
+ -- Reaction 5: XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH == O=CCCOO -> OOOC1CC1
+ -- Reaction 6: XSASRUDTFFBDDK_to_JQQGJTHDBODIPT == O=CCCOO -> OOC1CCO1
+ -- Reaction 7: XSASRUDTFFBDDK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL == O=CCCOO -> C1CO1.O=CO
+ -- Reaction 8: XSASRUDTFFBDDK_to_UKQJDWBNQNAJHB == O=CCCOO -> O=COCCO
+ -- Reaction 9: XSASRUDTFFBDDK_to_KYKDRUWGNWYQSD == O=CCCOO -> OC1CCOO1
+Processing stage egat
+Reaction characterization via ML model selected
+ - Loading egat_pretrain model
+ - Predicting barriers for 10 reactions
+Reactions dictionary has been pickled to depth1.pkl.

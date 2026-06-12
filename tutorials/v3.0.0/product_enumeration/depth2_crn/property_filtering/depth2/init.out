@@ -1,0 +1,158 @@
+Welcome to
+               __   __ _    ____  ____  
+               \ \ / // \  |  _ \|  _ \ 
+                \ V // _ \ | |_) | |_) |
+                 | |/ ___ \|  _ <|  __/ 
+                 |_/_/   \_\_| \_\_|
+                        // Yet Another Reaction Program
+    
+First off, here's the input file you provided:
+=====================================
+egat:
+  mem_per_cpu: 1000
+  method: ml_rxn_prop
+  model: egat_rgd1
+  n_cpus: 8
+initialize:
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      formal_charge: 2.0
+      lewis_score: 0.0
+      ring_filter: false
+    pre_enum_filters:
+      property_filter:
+        source: egat_rgd1
+        threshold: 55.0
+        type: barrier
+      separate_prods: true
+  initial_structure:
+    mode: reaction
+    source: ../depth1/3HP_depth1.pkl
+    type: yarp_pickle
+  job_manager:
+    container: apptainer
+    max_active_jobs: 100
+    queue: long
+    scheduler: sge
+  output: 3HP_depth2.pkl
+  status: STATUS.json
+  verbose: true
+stages:
+- egat
+
+=====================================
+Full configuration seen here: 
+{'enumeration': {'ON': True,
+                 'mode': 'concerted',
+                 'n_break': 2,
+                 'n_form': 2,
+                 'post_enum_filters': {'formal_charge': 2.0,
+                                       'lewis_score': 0.0,
+                                       'ring_filter': False},
+                 'pre_enum_filters': {'product_blinders': None,
+                                      'property_filter': {'source': 'egat_rgd1',
+                                                          'threshold': 55.0,
+                                                          'type': 'barrier'},
+                                      'separate_prods': True},
+                 'react_atoms': []},
+ 'global_tasks': {'egat.ml_predict': {'config': {'max_runtime': '01:00:00',
+                                                 'mem_per_cpu': 1000,
+                                                 'model': 'egat_rgd1',
+                                                 'n_cpus': 8},
+                                      'depends_on': [],
+                                      'parent_stage': 'egat',
+                                      'task_type': 'ml_predict'}},
+ 'initial_structure': {'mode': 'reaction',
+                       'source': '../depth1/3HP_depth1.pkl',
+                       'type': 'yarp_pickle'},
+ 'job_manager': {'account': None,
+                 'container': 'apptainer',
+                 'job_name': 'yarp',
+                 'max_active_jobs': 100,
+                 'module_container': None,
+                 'queue': 'long',
+                 'scheduler': 'sge',
+                 'sif_location': '/users/khubler/yarp-again/containers'},
+ 'output': '3HP_depth2.pkl',
+ 'pipeline_tasks': {},
+ 'stages': ['egat'],
+ 'status': 'STATUS.json',
+ 'verbose': True}
+
+Let's generate some initial reaction objects...
+Product enumeration enabled. Enumerating products.
+ - Processing starting node(s) as YARP generated pickle file
+ - Reading in 19 total reactions
+ - Barrier filtering selected!
+   Reactions with egat_rgd1 barrier above 55.0 kcal/mol will be excluded from enumeration.
+  + Excluding 2415605.9261953793 (barrier = 76.61646270751953) from enumeration
+  + Excluding 2395214.3978448925 (barrier = 68.74866485595703) from enumeration
+  + Excluding 2596760.3707471034 (barrier = 73.33732604980469) from enumeration
+  + Excluding 2899373.0066312575 (barrier = 73.80352020263672) from enumeration
+  + Excluding 2212843.919711775 (barrier = 71.87579345703125) from enumeration
+  + Excluding 2455167.9764962974 (barrier = 79.14698028564453) from enumeration
+  + Excluding 2069910.6282797283 (barrier = 89.48711395263672) from enumeration
+  + Excluding 2616810.498100545 (barrier = 68.8635025024414) from enumeration
+  + Excluding 2254259.8477397324 (barrier = 80.6509780883789) from enumeration
+  + Excluding 2515797.8577118726 (barrier = 67.97367858886719) from enumeration
+  + Excluding 2537310.875147058 (barrier = 72.8506088256836) from enumeration
+  + Excluding 2899368.4867536672 (barrier = 78.37548065185547) from enumeration
+  + Excluding 2858907.921511296 (barrier = 87.68090057373047) from enumeration
+  + Excluding 2495472.844473039 (barrier = 63.19371795654297) from enumeration
+  + Excluding 2516961.939590296 (barrier = 67.6971435546875) from enumeration
+ - Performing product separation on all reactions prior to enumeration
+ - 6 unique products identified for enumeration
+ - Enumerating from WSFSSNUMVMOOMR (C=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from BDAGIHXWWSANSR (O=CO) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 2 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 2 products after filtering
+ - Enumerating from APUQIHKCZFWODD (None) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 17 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 17 products after filtering
+ - Enumerating from LEQAOMBKQFMDFZ (O=CC=O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 5 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 5 products after filtering
+ - Enumerating from XLYOFNOQVPJJNP (O) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 0 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 0 products after filtering
+ - Enumerating from HZSIFDFXFAXICF (O=C1CO1) node
+  * Product enumeration with break 2, form 2 will be performed in concerted mode.
+Enumerating break 2 form 2 products for 1 yarpecules.
+Reactive atoms defined as: []
+   + Enumerated 4 products
+   + Applying Lewis score cutoff of 0.0
+   + Applying formal charge cutoff of 2.0
+   + Returning 4 products after filtering
+Initialized 47 reactions and saved to disk!
+If you want to characterize these reactions, you'll need to go run 'yarp-progress' next.
+See ya, bye!

@@ -3,7 +3,7 @@ initialize:
   status: STATUS.json
 
   initial_structure:
-    source: mapped_reactions.smi
+    source: "O=CCCOO"
     type: smiles
     mode: reaction
 

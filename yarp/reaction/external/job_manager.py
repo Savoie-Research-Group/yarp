@@ -80,11 +80,17 @@ class CondorJobManager(BaseJobManager):
         if not log_dir.is_absolute():
             log_dir = script_path.parent / log_dir
         log_dir.mkdir(parents=True, exist_ok=True)
+        get_env = getattr(self.job_config, "getenv", True)
+        notification = getattr(self.job_config, "notification", None)
+        condor_universe = getattr(self.job_config, "condor_universe", None)
 
         with open(submit_path, "w") as f:
-            f.write("universe = vanilla\n")
+            f.write(f"universe = {condor_universe}\n")
             f.write(f"executable = {script_path}\n")
-            f.write("getenv = True\n")
+            if get_env:
+                f.write("getenv = True\n")
+            if notification:
+                f.write(f"notification = {notification}\n")
             f.write(f"request_cpus = {cpus}\n")
             if mem:
                 f.write(f"request_memory = {int(mem) * int(cpus)}MB\n")
@@ -93,11 +99,12 @@ class CondorJobManager(BaseJobManager):
             f.write(f"output = {log_dir / (script_path.stem + '.$(Cluster).$(Process).out')}\n")
             f.write(f"error = {log_dir / (script_path.stem + '.$(Cluster).$(Process).err')}\n")
             f.write(f"log = {log_dir / (script_path.stem + '.$(Cluster).log')}\n")
-            f.write("notification = Never\n")
+            if notification is None:
+                f.write("notification = Never\n")
             f.write("queue 1\n")
         return submit_path
 
-def get_job_manager(scheduler_type: str) -> BaseJobManager:
+def get_job_manager(scheduler_type: str, job_config=None) -> BaseJobManager:
     if scheduler_type.lower() == "slurm":
         return SlurmJobManager()
     elif scheduler_type.lower() == "sge":
@@ -105,6 +112,6 @@ def get_job_manager(scheduler_type: str) -> BaseJobManager:
     elif scheduler_type.lower() == "local":
             return LocalJobManager()
     elif scheduler_type.lower() == "condor":
-        return CondorJobManager()
+        return CondorJobManager(job_config)
     else:
         raise ValueError(f"Unsupported scheduler: {scheduler_type}")

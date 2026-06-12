@@ -83,6 +83,12 @@ class JobManagerConfig:
     queue: Optional[str] = None
     job_name: str = "yarp"
     account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
+    #condor specific
+    request_disk = None
+    log_dir = None
+    getenv = True
+    notification = None
+    condor_universe = None
 
     def __post_init__(self):
         # Normalize inputs for easier checking

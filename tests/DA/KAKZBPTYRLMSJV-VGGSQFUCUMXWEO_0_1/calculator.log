@@ -1,0 +1,41 @@
+24-09-12 02:13:44 - 11545.56 MB memory available, 4000.00 MB requested.
+24-09-12 02:13:44 - calculator_000, cycle 000: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--hess']
+24-09-12 02:13:44 - calculator_000, cycle 000: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_000_d7nv1kb9 on hsu205sinch2019.lan
+24-09-12 02:13:44 - calculator_000, cycle 000: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:45 - calculator_000, cycle 000: Skip setting of 'json' file.
+24-09-12 02:13:45 - calculator_000, cycle 000: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_000_d7nv1kb9
+24-09-12 02:13:45 - calculator_000, cycle 001: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:45 - calculator_000, cycle 001: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_001_hfoj_d9w on hsu205sinch2019.lan
+24-09-12 02:13:45 - calculator_000, cycle 001: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:45 - calculator_000, cycle 001: Skip setting of 'json' file.
+24-09-12 02:13:45 - calculator_000, cycle 001: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_001_hfoj_d9w
+24-09-12 02:13:45 - calculator_000, cycle 002: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:45 - calculator_000, cycle 002: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_002_zmdxrbao on hsu205sinch2019.lan
+24-09-12 02:13:45 - calculator_000, cycle 002: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:45 - calculator_000, cycle 002: Skip setting of 'json' file.
+24-09-12 02:13:45 - calculator_000, cycle 002: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_002_zmdxrbao
+24-09-12 02:13:45 - calculator_000, cycle 003: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--hess']
+24-09-12 02:13:45 - calculator_000, cycle 003: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_003_lewzc4tj on hsu205sinch2019.lan
+24-09-12 02:13:45 - calculator_000, cycle 003: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:45 - calculator_000, cycle 003: Skip setting of 'json' file.
+24-09-12 02:13:45 - calculator_000, cycle 003: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_003_lewzc4tj
+24-09-12 02:13:45 - calculator_000, cycle 004: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:45 - calculator_000, cycle 004: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_004_pcm9bs5f on hsu205sinch2019.lan
+24-09-12 02:13:45 - calculator_000, cycle 004: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:45 - calculator_000, cycle 004: Skip setting of 'json' file.
+24-09-12 02:13:45 - calculator_000, cycle 004: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_004_pcm9bs5f
+24-09-12 02:13:45 - calculator_000, cycle 005: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--hess']
+24-09-12 02:13:45 - calculator_000, cycle 005: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_005_1mnmosno on hsu205sinch2019.lan
+24-09-12 02:13:45 - calculator_000, cycle 005: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:46 - calculator_000, cycle 005: Skip setting of 'json' file.
+24-09-12 02:13:46 - calculator_000, cycle 005: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_005_1mnmosno
+24-09-12 02:13:46 - calculator_000, cycle 006: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:46 - calculator_000, cycle 006: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_006_029cdd3_ on hsu205sinch2019.lan
+24-09-12 02:13:46 - calculator_000, cycle 006: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:46 - calculator_000, cycle 006: Skip setting of 'json' file.
+24-09-12 02:13:46 - calculator_000, cycle 006: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_006_029cdd3_
+24-09-12 02:13:46 - calculator_000, cycle 007: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--hess']
+24-09-12 02:13:46 - calculator_000, cycle 007: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_007_lpet0h4o on hsu205sinch2019.lan
+24-09-12 02:13:46 - calculator_000, cycle 007: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/qm_calcs/cur_out'
+24-09-12 02:13:46 - calculator_000, cycle 007: Skip setting of 'json' file.
+24-09-12 02:13:46 - calculator_000, cycle 007: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/calculator_000_007_lpet0h4o

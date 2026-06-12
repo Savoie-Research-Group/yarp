@@ -1,0 +1,983 @@
+Transition state (TS):
+	    energy=-17.812259 au
+	norm(grad)=0.000005
+	 max(grad)=0.000002
+	 rms(grad)=0.000001
+Initial hessian: saved
+Transition vector is mode 0 with wavenumber -393.53 cm⁻¹.
+Crossover temperature T_c: 90.11 K
+Energy-based (ΔE=0.001 au) initial displacement from the TS using 2rd derivatives.
+                                +-------------+
+                                | IRC FORWARD |
+                                +-------------+
+Did inital step of length 0.2033 from the TS.
+Did Bofill hessian update.
+                                ################
+                                # IRC STEP 000 #
+                                ################
+
+Current energy: -17.813507 au
+Un-weighted / mass-weighted conversion factor 3.3023
+Predictor-Euler-integration with Δs=0.000660 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0119 Δ=0.0119
+	100: 0.0232 Δ=0.0114
+	150: 0.0346 Δ=0.0113
+	200: 0.0458 Δ=0.0113
+	250: 0.0571 Δ=0.0112
+	300: 0.0682 Δ=0.0112
+	350: 0.0794 Δ=0.0111
+	400: 0.0905 Δ=0.0111
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 444 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0983
+	k=01 points=  40 step_length=0.0026 Δs=0.0994
+	k=02 points=  80 step_length=0.0013 Δs=0.0994
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=7.6398e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100154
+Calculating energy and gradient at new geometry.
+(rms(grad) > threshold)  fullfilled!
+
+                                ################
+                                # IRC STEP 001 #
+                                ################
+
+Current energy: -17.815404 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3965
+Predictor-Euler-integration with Δs=0.000679 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0119 Δ=0.0119
+	100: 0.0237 Δ=0.0118
+	150: 0.0355 Δ=0.0118
+	200: 0.0473 Δ=0.0118
+	250: 0.0591 Δ=0.0118
+	300: 0.0709 Δ=0.0118
+	350: 0.0826 Δ=0.0118
+	400: 0.0944 Δ=0.0117
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 425 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0989
+	k=01 points=  40 step_length=0.0026 Δs=0.0990
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=1.2057e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100041
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 002 #
+                                ################
+
+Current energy: -17.818395 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3968
+Predictor-Euler-integration with Δs=0.000679 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0119 Δ=0.0119
+	100: 0.0237 Δ=0.0119
+	150: 0.0356 Δ=0.0119
+	200: 0.0475 Δ=0.0119
+	250: 0.0593 Δ=0.0119
+	300: 0.0712 Δ=0.0119
+	350: 0.0830 Δ=0.0119
+	400: 0.0949 Δ=0.0119
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 423 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0975
+	k=01 points=  40 step_length=0.0026 Δs=0.0995
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=7.4312e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100269
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 003 #
+                                ################
+
+Current energy: -17.822638 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3939
+Predictor-Euler-integration with Δs=0.000679 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0119 Δ=0.0119
+	100: 0.0239 Δ=0.0119
+	150: 0.0358 Δ=0.0119
+	200: 0.0478 Δ=0.0119
+	250: 0.0597 Δ=0.0120
+	300: 0.0717 Δ=0.0120
+	350: 0.0836 Δ=0.0120
+	400: 0.0956 Δ=0.0120
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 420 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0983
+	k=01 points=  40 step_length=0.0026 Δs=0.0994
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0997
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=8.2090e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.099958
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 004 #
+                                ################
+
+Current energy: -17.828122 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3907
+Predictor-Euler-integration with Δs=0.000678 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0120 Δ=0.0120
+	100: 0.0240 Δ=0.0120
+	150: 0.0361 Δ=0.0120
+	200: 0.0481 Δ=0.0120
+	250: 0.0601 Δ=0.0120
+	300: 0.0722 Δ=0.0120
+	350: 0.0842 Δ=0.0120
+	400: 0.0962 Δ=0.0120
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 417 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0990
+	k=01 points=  40 step_length=0.0026 Δs=0.0992
+	k=02 points=  80 step_length=0.0013 Δs=0.0998
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=5.0237e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.099853
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 005 #
+                                ################
+
+Current energy: -17.834738 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3878
+Predictor-Euler-integration with Δs=0.000678 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0121 Δ=0.0121
+	100: 0.0242 Δ=0.0121
+	150: 0.0363 Δ=0.0121
+	200: 0.0484 Δ=0.0121
+	250: 0.0605 Δ=0.0121
+	300: 0.0726 Δ=0.0121
+	350: 0.0847 Δ=0.0121
+	400: 0.0968 Δ=0.0121
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 415 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0976
+	k=01 points=  40 step_length=0.0026 Δs=0.0988
+	k=02 points=  80 step_length=0.0013 Δs=0.0998
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=1.2716e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100063
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 006 #
+                                ################
+
+Current energy: -17.842348 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3869
+Predictor-Euler-integration with Δs=0.000677 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0121 Δ=0.0121
+	100: 0.0242 Δ=0.0121
+	150: 0.0363 Δ=0.0121
+	200: 0.0484 Δ=0.0121
+	250: 0.0605 Δ=0.0121
+	300: 0.0726 Δ=0.0121
+	350: 0.0847 Δ=0.0121
+	400: 0.0968 Δ=0.0121
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 415 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0976
+	k=01 points=  40 step_length=0.0026 Δs=0.0988
+	k=02 points=  80 step_length=0.0013 Δs=0.0998
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=1.2716e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100060
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 007 #
+                                ################
+
+Current energy: -17.850868 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3883
+Predictor-Euler-integration with Δs=0.000678 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0121 Δ=0.0121
+	100: 0.0241 Δ=0.0121
+	150: 0.0362 Δ=0.0121
+	200: 0.0483 Δ=0.0121
+	250: 0.0603 Δ=0.0121
+	300: 0.0724 Δ=0.0120
+	350: 0.0844 Δ=0.0120
+	400: 0.0964 Δ=0.0120
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 416 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0974
+	k=01 points=  40 step_length=0.0026 Δs=0.0995
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=5.0626e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100093
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 008 #
+                                ################
+
+Current energy: -17.860181 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3886
+Predictor-Euler-integration with Δs=0.000678 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0121 Δ=0.0121
+	100: 0.0241 Δ=0.0121
+	150: 0.0362 Δ=0.0121
+	200: 0.0483 Δ=0.0121
+	250: 0.0603 Δ=0.0121
+	300: 0.0724 Δ=0.0121
+	350: 0.0844 Δ=0.0121
+	400: 0.0965 Δ=0.0121
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 416 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0977
+	k=01 points=  40 step_length=0.0026 Δs=0.0988
+	k=02 points=  80 step_length=0.0013 Δs=0.0994
+mBS integration converged (error=5.9193e-06)!
+Returning corrected mass-weighted coordinates from richardson[(2,2)]
+Corrected unweighted step length: 0.099920
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 009 #
+                                ################
+
+Current energy: -17.869920 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3856
+Predictor-Euler-integration with Δs=0.000677 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0121 Δ=0.0121
+	100: 0.0243 Δ=0.0122
+	150: 0.0365 Δ=0.0122
+	200: 0.0486 Δ=0.0122
+	250: 0.0608 Δ=0.0122
+	300: 0.0730 Δ=0.0122
+	350: 0.0852 Δ=0.0122
+	400: 0.0973 Δ=0.0122
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 412 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0987
+	k=01 points=  40 step_length=0.0026 Δs=0.0989
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=1.2057e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100071
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 010 #
+                                ################
+
+Current energy: -17.879681 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3788
+Predictor-Euler-integration with Δs=0.000676 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0123 Δ=0.0123
+	100: 0.0246 Δ=0.0123
+	150: 0.0370 Δ=0.0123
+	200: 0.0493 Δ=0.0124
+	250: 0.0617 Δ=0.0124
+	300: 0.0741 Δ=0.0124
+	350: 0.0865 Δ=0.0124
+	400: 0.0989 Δ=0.0124
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 406 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0986
+	k=01 points=  40 step_length=0.0026 Δs=0.0989
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=1.2057e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100089
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 011 #
+                                ################
+
+Current energy: -17.889044 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3678
+Predictor-Euler-integration with Δs=0.000674 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0125 Δ=0.0125
+	100: 0.0251 Δ=0.0126
+	150: 0.0377 Δ=0.0126
+	200: 0.0504 Δ=0.0126
+	250: 0.0630 Δ=0.0127
+	300: 0.0757 Δ=0.0127
+	350: 0.0885 Δ=0.0127
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 397 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0992
+	k=01 points=  40 step_length=0.0026 Δs=0.0996
+	k=02 points=  80 step_length=0.0013 Δs=0.0997
+mBS integration converged (error=1.7298e-06)!
+Returning corrected mass-weighted coordinates from richardson[(2,2)]
+Corrected unweighted step length: 0.099921
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 012 #
+                                ################
+
+Current energy: -17.897647 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3520
+Predictor-Euler-integration with Δs=0.000670 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0129 Δ=0.0129
+	100: 0.0258 Δ=0.0129
+	150: 0.0388 Δ=0.0130
+	200: 0.0518 Δ=0.0130
+	250: 0.0649 Δ=0.0131
+	300: 0.0780 Δ=0.0131
+	350: 0.0911 Δ=0.0131
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 385 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0985
+	k=01 points=  40 step_length=0.0026 Δs=0.0990
+	k=02 points=  80 step_length=0.0013 Δs=0.0998
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=8.2089e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100052
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 013 #
+                                ################
+
+Current energy: -17.905239 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3301
+Predictor-Euler-integration with Δs=0.000666 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0133 Δ=0.0133
+	100: 0.0267 Δ=0.0134
+	150: 0.0402 Δ=0.0134
+	200: 0.0537 Δ=0.0135
+	250: 0.0672 Δ=0.0136
+	300: 0.0809 Δ=0.0136
+	350: 0.0945 Δ=0.0137
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 371 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0986
+	k=01 points=  40 step_length=0.0026 Δs=0.0993
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+mBS integration converged (error=2.7161e-06)!
+Returning corrected mass-weighted coordinates from richardson[(2,2)]
+Corrected unweighted step length: 0.099860
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 014 #
+                                ################
+
+Current energy: -17.911592 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2995
+Predictor-Euler-integration with Δs=0.000660 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0139 Δ=0.0139
+	100: 0.0279 Δ=0.0140
+	150: 0.0419 Δ=0.0140
+	200: 0.0560 Δ=0.0141
+	250: 0.0703 Δ=0.0142
+	300: 0.0846 Δ=0.0143
+	350: 0.0989 Δ=0.0144
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 355 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0996
+	k=01 points=  40 step_length=0.0026 Δs=0.0993
+	k=02 points=  80 step_length=0.0013 Δs=0.0997
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.0998
+mBS integration converged (error=7.9873e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.099636
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 015 #
+                                ################
+
+Current energy: -17.916586 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2550
+Predictor-Euler-integration with Δs=0.000651 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0146 Δ=0.0146
+	100: 0.0293 Δ=0.0147
+	150: 0.0442 Δ=0.0148
+	200: 0.0591 Δ=0.0150
+	250: 0.0742 Δ=0.0151
+	300: 0.0894 Δ=0.0152
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 336 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0995
+	k=01 points=  40 step_length=0.0026 Δs=0.0994
+	k=02 points=  80 step_length=0.0013 Δs=0.0999
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=5.0237e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.099823
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 016 #
+                                ################
+
+Current energy: -17.920206 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.1839
+Predictor-Euler-integration with Δs=0.000637 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0156 Δ=0.0156
+	100: 0.0314 Δ=0.0158
+	150: 0.0473 Δ=0.0159
+	200: 0.0634 Δ=0.0161
+	250: 0.0797 Δ=0.0163
+	300: 0.0962 Δ=0.0165
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 313 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0985
+	k=01 points=  40 step_length=0.0026 Δs=0.1000
+	k=02 points=  80 step_length=0.0013 Δs=0.1000
+	k=03 points= 160 step_length=0.0006 Δs=0.1000
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=6.8632e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100288
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 017 #
+                                ################
+
+Current energy: -17.922527 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.0519
+Predictor-Euler-integration with Δs=0.000610 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0170 Δ=0.0170
+	100: 0.0341 Δ=0.0172
+	150: 0.0516 Δ=0.0174
+	200: 0.0693 Δ=0.0177
+	250: 0.0873 Δ=0.0180
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 286 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0996
+	k=01 points=  40 step_length=0.0026 Δs=0.1001
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.1000
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+	k=06 points=1280 step_length=0.0001 Δs=0.1000
+mBS integration converged (error=2.7016e-06)!
+Returning corrected mass-weighted coordinates from richardson[(6,6)]
+Corrected unweighted step length: 0.099750
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 018 #
+                                ################
+
+Current energy: -17.923749 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 2.7417
+Predictor-Euler-integration with Δs=0.000548 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0184 Δ=0.0184
+	100: 0.0370 Δ=0.0186
+	150: 0.0558 Δ=0.0188
+	200: 0.0749 Δ=0.0190
+	250: 0.0939 Δ=0.0191
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 267 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0976
+	k=01 points=  40 step_length=0.0026 Δs=0.1001
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=9.4148e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.099949
+Calculating energy and gradient at new geometry.
+                                +--------------+
+                                | IRC BACKWARD |
+                                +--------------+
+Did inital step of length 0.2033 from the TS.
+Did Bofill hessian update.
+                                ################
+                                # IRC STEP 000 #
+                                ################
+
+Current energy: -17.813011 au
+Un-weighted / mass-weighted conversion factor 2.9090
+Predictor-Euler-integration with Δs=0.000582 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0145 Δ=0.0145
+	100: 0.0277 Δ=0.0131
+	150: 0.0398 Δ=0.0121
+	200: 0.0512 Δ=0.0114
+	250: 0.0621 Δ=0.0109
+	300: 0.0727 Δ=0.0107
+	350: 0.0832 Δ=0.0105
+	400: 0.0936 Δ=0.0104
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 432 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0986
+	k=01 points=  40 step_length=0.0026 Δs=0.0993
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+mBS integration converged (error=5.0807e-06)!
+Returning corrected mass-weighted coordinates from richardson[(2,2)]
+Corrected unweighted step length: 0.099950
+Calculating energy and gradient at new geometry.
+(rms(grad) > threshold)  fullfilled!
+
+                                ################
+                                # IRC STEP 001 #
+                                ################
+
+Current energy: -17.813634 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3392
+Predictor-Euler-integration with Δs=0.000668 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0130 Δ=0.0130
+	100: 0.0259 Δ=0.0129
+	150: 0.0387 Δ=0.0128
+	200: 0.0514 Δ=0.0127
+	250: 0.0641 Δ=0.0127
+	300: 0.0768 Δ=0.0127
+	350: 0.0894 Δ=0.0127
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 393 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0993
+	k=01 points=  40 step_length=0.0026 Δs=0.0988
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+mBS integration converged (error=6.7815e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.099858
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 002 #
+                                ################
+
+Current energy: -17.814375 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3369
+Predictor-Euler-integration with Δs=0.000667 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0131 Δ=0.0131
+	100: 0.0263 Δ=0.0131
+	150: 0.0394 Δ=0.0131
+	200: 0.0525 Δ=0.0131
+	250: 0.0656 Δ=0.0131
+	300: 0.0787 Δ=0.0131
+	350: 0.0919 Δ=0.0131
+Predictor-Euler integration converged with Δs=0.1003 (desired Δs=0.1000) after 383 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0992
+	k=01 points=  40 step_length=0.0026 Δs=0.0988
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0997
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=2.6939e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100051
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 003 #
+                                ################
+
+Current energy: -17.815147 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3204
+Predictor-Euler-integration with Δs=0.000664 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0135 Δ=0.0135
+	100: 0.0269 Δ=0.0135
+	150: 0.0404 Δ=0.0135
+	200: 0.0539 Δ=0.0135
+	250: 0.0673 Δ=0.0135
+	300: 0.0808 Δ=0.0135
+	350: 0.0943 Δ=0.0135
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 373 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0977
+	k=01 points=  40 step_length=0.0026 Δs=0.0994
+	k=02 points=  80 step_length=0.0013 Δs=0.0997
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+mBS integration converged (error=1.2059e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100040
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 004 #
+                                ################
+
+Current energy: -17.815909 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.3045
+Predictor-Euler-integration with Δs=0.000661 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0138 Δ=0.0138
+	100: 0.0275 Δ=0.0138
+	150: 0.0413 Δ=0.0138
+	200: 0.0550 Δ=0.0138
+	250: 0.0688 Δ=0.0138
+	300: 0.0825 Δ=0.0138
+	350: 0.0963 Δ=0.0138
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 365 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0978
+	k=01 points=  40 step_length=0.0026 Δs=0.0996
+	k=02 points=  80 step_length=0.0013 Δs=0.0994
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+	k=05 points= 640 step_length=0.0002 Δs=0.0999
+mBS integration converged (error=8.5431e-07)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.099856
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 005 #
+                                ################
+
+Current energy: -17.816640 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2906
+Predictor-Euler-integration with Δs=0.000658 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0140 Δ=0.0140
+	100: 0.0280 Δ=0.0140
+	150: 0.0420 Δ=0.0140
+	200: 0.0560 Δ=0.0140
+	250: 0.0700 Δ=0.0140
+	300: 0.0839 Δ=0.0140
+	350: 0.0979 Δ=0.0140
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 359 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0974
+	k=01 points=  40 step_length=0.0026 Δs=0.0993
+	k=02 points=  80 step_length=0.0013 Δs=0.0997
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=6.8632e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100312
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 006 #
+                                ################
+
+Current energy: -17.817333 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2789
+Predictor-Euler-integration with Δs=0.000656 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0142 Δ=0.0142
+	100: 0.0284 Δ=0.0142
+	150: 0.0425 Δ=0.0142
+	200: 0.0567 Δ=0.0142
+	250: 0.0709 Δ=0.0142
+	300: 0.0851 Δ=0.0142
+	350: 0.0993 Δ=0.0142
+Predictor-Euler integration converged with Δs=0.1001 (desired Δs=0.1000) after 354 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0989
+	k=01 points=  40 step_length=0.0026 Δs=0.0998
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+mBS integration converged (error=8.2090e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.099953
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 007 #
+                                ################
+
+Current energy: -17.817976 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2693
+Predictor-Euler-integration with Δs=0.000654 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0143 Δ=0.0143
+	100: 0.0287 Δ=0.0143
+	150: 0.0430 Δ=0.0143
+	200: 0.0573 Δ=0.0143
+	250: 0.0716 Δ=0.0143
+	300: 0.0860 Δ=0.0143
+Predictor-Euler integration converged with Δs=0.1000 (desired Δs=0.1000) after 350 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0978
+	k=01 points=  40 step_length=0.0026 Δs=0.0998
+	k=02 points=  80 step_length=0.0013 Δs=0.0997
+	k=03 points= 160 step_length=0.0006 Δs=0.0999
+	k=04 points= 320 step_length=0.0003 Δs=0.0999
+	k=05 points= 640 step_length=0.0002 Δs=0.1000
+mBS integration converged (error=7.4312e-06)!
+Returning corrected mass-weighted coordinates from richardson[(5,5)]
+Corrected unweighted step length: 0.100332
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 008 #
+                                ################
+
+Current energy: -17.818573 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2616
+Predictor-Euler-integration with Δs=0.000652 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0144 Δ=0.0144
+	100: 0.0289 Δ=0.0144
+	150: 0.0433 Δ=0.0144
+	200: 0.0578 Δ=0.0144
+	250: 0.0722 Δ=0.0144
+	300: 0.0867 Δ=0.0144
+Predictor-Euler integration converged with Δs=0.1002 (desired Δs=0.1000) after 348 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0987
+	k=01 points=  40 step_length=0.0026 Δs=0.0996
+	k=02 points=  80 step_length=0.0013 Δs=0.0995
+	k=03 points= 160 step_length=0.0006 Δs=0.0997
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+mBS integration converged (error=9.8403e-07)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100327
+Calculating energy and gradient at new geometry.
+
+                                ################
+                                # IRC STEP 009 #
+                                ################
+
+Current energy: -17.819120 au
+Did Bofill hessian update before predictor step.
+Un-weighted / mass-weighted conversion factor 3.2557
+Predictor-Euler-integration with Δs=0.000651 for up to 500 steps
+     #  |step|  d|step|
+	000: 0.0000 Δ=0.0000
+	050: 0.0145 Δ=0.0145
+	100: 0.0291 Δ=0.0145
+	150: 0.0436 Δ=0.0145
+	200: 0.0581 Δ=0.0145
+	250: 0.0727 Δ=0.0145
+	300: 0.0872 Δ=0.0145
+Predictor-Euler integration converged with Δs=0.1003 (desired Δs=0.1000) after 346 steps!
+
+Calculating energy and gradient at predictor step geometry.
+Did Bofill hessian update after predictor step.
+
+Corrector step using mBS integration
+	k=00 points=  20 step_length=0.0053 Δs=0.0994
+	k=01 points=  40 step_length=0.0026 Δs=0.0992
+	k=02 points=  80 step_length=0.0013 Δs=0.0996
+	k=03 points= 160 step_length=0.0006 Δs=0.0998
+	k=04 points= 320 step_length=0.0003 Δs=0.1000
+mBS integration converged (error=1.2057e-06)!
+Returning corrected mass-weighted coordinates from richardson[(4,4)]
+Corrected unweighted step length: 0.100068
+Calculating energy and gradient at new geometry.

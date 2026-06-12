@@ -1,0 +1,20 @@
+geom:
+ type: cart
+ fn: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0-TS.xyz
+calc:
+ type: xtb
+ pal: 1
+ mem: 4000
+ charge: 0
+ mult: 1
+irc:
+ type: eulerpc
+ forward: True
+ backward: True
+ downhill: False
+ hessian_init: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/ts_final_hessian.h5
+endopt:
+ fragments: False
+ do_hess: False
+ thresh: gau
+ max_cycles: 300

@@ -1,0 +1,2 @@
+reaction                                 R                                                            P                                                            type            barrier   
+KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0        C=CC=C.C=C                                                   C1CCC=CC1                                                    intended          6.747132

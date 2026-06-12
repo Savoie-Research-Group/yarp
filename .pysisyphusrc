@@ -1,0 +1,16 @@
+[orca]
+# ORCA needs the full path to its binary, so please provide the full path.
+#cmd=/sw/pkgs/lsa/orca/5.0.3/bin/orca
+
+[psi4]
+# As the Psi4 installation without conda is, to put it slightly, tricky it was
+# decided to allow the installation of Psi4 into a separate conda environment.
+# pysisyphus then creates a Psi4 input and sends it to the (bash)-script given below
+# that accepts/expects one argument. It is the responsibility of the scrip to activate
+# the appropriate conda environment and submit the Psi4 input. An example runpsi4.sh
+# script is given below.
+#cmd=/user/johannes/bin/runpsi4.sh
+
+[xtb]
+# Cmd to execute. Please ensure that xtb is on your $PATH.
+cmd=CONDA_ENV/bin/xtb

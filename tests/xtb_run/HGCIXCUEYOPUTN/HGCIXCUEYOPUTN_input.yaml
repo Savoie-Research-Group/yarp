@@ -1,0 +1,15 @@
+geom:
+ type: cart
+ fn: /Users/hsu205/github/classy-yarp/reaction/xtb_run/HGCIXCUEYOPUTN/HGCIXCUEYOPUTN-init.xyz
+calc:
+ type: xtb
+ pal: 1
+ mem: 4000
+ charge: 0
+ mult: 1
+opt:
+ type: rfo
+ max_cycles: 50
+ overachieve_factor: 3
+ hessian_recalc: 1
+ do_hess: True

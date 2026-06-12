@@ -1,0 +1,302 @@
+Using a factor of 1.300000 for bond detection.
+Using svd_inv_thresh=3.1600e-04 for inversions.
+Detecting primitive internals for 16 atoms.
+Excluding 0 frozen atoms from the internal coordinate setup.
+Checking 89 supplied typed primitives.
+89 primitives are valid at the current Cartesians.
+Defined primitives
+	000:        [6, 11]
+	001:        [7, 12]
+	002:         [0, 9]
+	003:         [0, 2]
+	004:        [9, 14]
+	005:         [1, 5]
+	006:         [0, 1]
+	007:         [0, 3]
+	008:        [9, 15]
+	009:         [7, 8]
+	010:        [6, 10]
+	011:         [1, 4]
+	012:         [8, 9]
+	013:         [1, 6]
+	014:         [6, 7]
+	015:        [8, 13]
+	016:      [4, 1, 5]
+	017:    [10, 6, 11]
+	018:     [8, 9, 14]
+	019:      [1, 6, 7]
+	020:      [1, 0, 9]
+	021:      [0, 1, 4]
+	022:      [1, 0, 2]
+	023:      [0, 1, 6]
+	024:      [8, 9, 0]
+	025:      [9, 0, 2]
+	026:     [1, 6, 11]
+	027:    [14, 9, 15]
+	028:     [12, 7, 6]
+	029:      [2, 0, 3]
+	030:     [13, 8, 7]
+	031:      [4, 1, 6]
+	032:     [11, 6, 7]
+	033:     [0, 9, 14]
+	034:     [9, 8, 13]
+	035:      [8, 7, 6]
+	036:     [8, 9, 15]
+	037:      [0, 1, 5]
+	038:      [5, 1, 6]
+	039:     [10, 6, 7]
+	040:     [8, 7, 12]
+	041:     [0, 9, 15]
+	042:     [1, 6, 10]
+	043:      [1, 0, 3]
+	044:      [9, 8, 7]
+	045:      [9, 0, 3]
+	046:   [4, 1, 0, 9]
+	047:  [14, 9, 8, 7]
+	048:  [14, 9, 0, 3]
+	049:  [13, 8, 7, 6]
+	050:   [4, 1, 0, 2]
+	051:   [2, 0, 1, 6]
+	052:   [3, 0, 1, 5]
+	053:  [5, 1, 6, 10]
+	054:   [7, 8, 9, 0]
+	055:  [1, 0, 9, 14]
+	056:  [0, 1, 6, 10]
+	057:  [4, 1, 6, 10]
+	058:  [13, 8, 9, 0]
+	059: [13, 8, 7, 12]
+	060:   [8, 9, 0, 2]
+	061:  [11, 6, 7, 8]
+	062:  [14, 9, 0, 2]
+	063: [10, 6, 7, 12]
+	064:   [6, 1, 0, 9]
+	065:   [5, 1, 6, 7]
+	066:   [2, 0, 1, 5]
+	067:   [0, 1, 6, 7]
+	068:   [4, 1, 6, 7]
+	069: [11, 6, 7, 12]
+	070: [14, 9, 8, 13]
+	071:  [4, 1, 6, 11]
+	072:  [3, 0, 9, 15]
+	073:   [5, 1, 0, 9]
+	074:   [1, 6, 7, 8]
+	075:   [8, 9, 0, 3]
+	076:  [7, 8, 9, 15]
+	077:   [9, 8, 7, 6]
+	078:  [2, 0, 9, 15]
+	079:   [4, 1, 0, 3]
+	080: [13, 8, 9, 15]
+	081:  [8, 7, 6, 10]
+	082:   [3, 0, 1, 6]
+	083:  [5, 1, 6, 11]
+	084:  [1, 6, 7, 12]
+	085:  [0, 1, 6, 11]
+	086:  [1, 0, 9, 15]
+	087:   [1, 0, 9, 8]
+	088:  [9, 8, 7, 12]
+
+Condition number of B^T.B=G: 8.0008e+01
+Backtransformation 0
+Cycle 0: rms(Δcart)=2.7451e-02, rms(Δint.) = 1.92948e-04
+Cycle 1: rms(Δcart)=3.6379e-04, rms(Δint.) = 4.40868e-05
+Cycle 2: rms(Δcart)=7.6968e-06, rms(Δint.) = 4.37649e-05
+Cycle 3: rms(Δcart)=2.1038e-07, rms(Δint.) = 4.37651e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 1
+Cycle 0: rms(Δcart)=2.9993e-02, rms(Δint.) = 2.44476e-04
+Cycle 1: rms(Δcart)=4.2815e-04, rms(Δint.) = 5.10899e-05
+Cycle 2: rms(Δcart)=9.9725e-06, rms(Δint.) = 5.05037e-05
+Cycle 3: rms(Δcart)=2.9015e-07, rms(Δint.) = 5.05039e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 2
+Cycle 0: rms(Δcart)=1.1833e-02, rms(Δint.) = 4.63092e-05
+Cycle 1: rms(Δcart)=6.5017e-05, rms(Δint.) = 2.76472e-05
+Cycle 2: rms(Δcart)=5.5561e-07, rms(Δint.) = 2.76434e-05
+Internal->Cartesian transformation converged in 3 cycle(s)!
+
+Backtransformation 3
+Cycle 0: rms(Δcart)=3.4470e-03, rms(Δint.) = 4.99246e-06
+Cycle 1: rms(Δcart)=5.6183e-06, rms(Δint.) = 3.68965e-06
+Cycle 2: rms(Δcart)=1.3993e-08, rms(Δint.) = 3.68963e-06
+Internal->Cartesian transformation converged in 3 cycle(s)!
+
+Using a factor of 1.300000 for bond detection.
+Using svd_inv_thresh=3.1600e-04 for inversions.
+Detecting primitive internals for 16 atoms.
+Excluding 0 frozen atoms from the internal coordinate setup.
+Detected 2 fragments. Generating interfragment bonds.
+	Connecting 6 atom and 10 atom fragment
+	Minimum distance bond: (4, 10), 4.7006 au
+	Aux. interfrag bonds below 1.30 * min_dist:
+		(0, 8): 5.7909 au
+		(0, 9): 5.1648 au
+		(0, 10): 6.0090 au
+		(0, 14): 6.0455 au
+		(0, 15): 5.0779 au
+		(1, 6): 5.1649 au
+		(1, 7): 5.7910 au
+		(1, 10): 5.0779 au
+		(1, 11): 6.0457 au
+		(1, 15): 6.0090 au
+		(2, 9): 5.2733 au
+		(2, 14): 5.8187 au
+		(2, 15): 4.7006 au
+		(3, 8): 5.5756 au
+		(3, 9): 5.2814 au
+		(3, 14): 5.7310 au
+		(3, 15): 5.9200 au
+		(4, 6): 5.2735 au
+		(4, 11): 5.8189 au
+		(5, 6): 5.2814 au
+		(5, 7): 5.5756 au
+		(5, 10): 5.9199 au
+		(5, 11): 5.7310 au
+Checking 79 supplied typed primitives.
+79 primitives are valid at the current Cartesians.
+Defined primitives
+	000:        [6, 11]
+	001:        [7, 12]
+	002:         [0, 2]
+	003:        [9, 14]
+	004:         [1, 5]
+	005:         [0, 1]
+	006:         [0, 3]
+	007:        [9, 15]
+	008:         [7, 8]
+	009:        [6, 10]
+	010:         [1, 4]
+	011:         [8, 9]
+	012:         [6, 7]
+	013:        [8, 13]
+	014:        [4, 10]
+	015:         [4, 6]
+	016:        [1, 10]
+	017:         [5, 7]
+	018:         [3, 9]
+	019:        [0, 15]
+	020:        [5, 11]
+	021:         [1, 7]
+	022:        [2, 15]
+	023:         [0, 8]
+	024:        [3, 15]
+	025:        [0, 10]
+	026:         [5, 6]
+	027:        [1, 11]
+	028:         [3, 8]
+	029:        [0, 14]
+	030:         [1, 6]
+	031:        [2, 14]
+	032:         [0, 9]
+	033:         [2, 9]
+	034:        [4, 11]
+	035:        [5, 10]
+	036:        [1, 15]
+	037:        [3, 14]
+	038:      [4, 1, 5]
+	039:    [10, 6, 11]
+	040:     [8, 9, 14]
+	041:      [0, 1, 4]
+	042:      [1, 0, 2]
+	043:    [14, 9, 15]
+	044:     [12, 7, 6]
+	045:      [2, 0, 3]
+	046:     [13, 8, 7]
+	047:     [11, 6, 7]
+	048:     [9, 8, 13]
+	049:      [8, 7, 6]
+	050:     [8, 9, 15]
+	051:     [1, 4, 10]
+	052:      [0, 1, 5]
+	053:     [10, 6, 7]
+	054:     [8, 7, 12]
+	055:      [1, 0, 3]
+	056:     [4, 10, 6]
+	057:      [9, 8, 7]
+	058:  [14, 9, 8, 7]
+	059:  [13, 8, 7, 6]
+	060:   [4, 1, 0, 2]
+	061: [4, 10, 6, 11]
+	062:  [10, 4, 1, 5]
+	063:  [0, 1, 4, 10]
+	064:   [3, 0, 1, 5]
+	065: [13, 8, 7, 12]
+	066:  [11, 6, 7, 8]
+	067: [10, 6, 7, 12]
+	068:   [2, 0, 1, 5]
+	069: [11, 6, 7, 12]
+	070: [14, 9, 8, 13]
+	071:  [4, 10, 6, 7]
+	072:  [7, 8, 9, 15]
+	073:   [9, 8, 7, 6]
+	074:   [4, 1, 0, 3]
+	075: [13, 8, 9, 15]
+	076:  [1, 4, 10, 6]
+	077:  [8, 7, 6, 10]
+	078:  [9, 8, 7, 12]
+
+Condition number of B^T.B=G: 7.5306e+01
+Backtransformation 0
+Cycle 0: rms(Δcart)=3.5959e-02, rms(Δint.) = 2.83415e-04
+Cycle 1: rms(Δcart)=2.3044e-04, rms(Δint.) = 6.39678e-05
+Cycle 2: rms(Δcart)=2.4971e-06, rms(Δint.) = 6.39254e-05
+Cycle 3: rms(Δcart)=2.9103e-08, rms(Δint.) = 6.39255e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 1
+Cycle 0: rms(Δcart)=3.3610e-02, rms(Δint.) = 2.21580e-04
+Cycle 1: rms(Δcart)=1.8629e-04, rms(Δint.) = 5.40800e-05
+Cycle 2: rms(Δcart)=2.4708e-06, rms(Δint.) = 5.40375e-05
+Cycle 3: rms(Δcart)=4.0807e-08, rms(Δint.) = 5.40375e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 2
+Cycle 0: rms(Δcart)=3.4100e-02, rms(Δint.) = 2.23537e-04
+Cycle 1: rms(Δcart)=1.9893e-04, rms(Δint.) = 4.21920e-05
+Cycle 2: rms(Δcart)=3.1377e-06, rms(Δint.) = 4.21167e-05
+Cycle 3: rms(Δcart)=4.7625e-08, rms(Δint.) = 4.21168e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 3
+Cycle 0: rms(Δcart)=4.8481e-02, rms(Δint.) = 3.97113e-04
+Cycle 1: rms(Δcart)=3.4415e-04, rms(Δint.) = 6.86148e-05
+Cycle 2: rms(Δcart)=6.5807e-06, rms(Δint.) = 6.83976e-05
+Cycle 3: rms(Δcart)=1.3186e-07, rms(Δint.) = 6.83978e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 4
+Cycle 0: rms(Δcart)=4.4333e-02, rms(Δint.) = 3.11255e-04
+Cycle 1: rms(Δcart)=2.6729e-04, rms(Δint.) = 5.52103e-05
+Cycle 2: rms(Δcart)=4.3223e-06, rms(Δint.) = 5.50963e-05
+Cycle 3: rms(Δcart)=7.8927e-08, rms(Δint.) = 5.50964e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 5
+Cycle 0: rms(Δcart)=4.1098e-02, rms(Δint.) = 2.53478e-04
+Cycle 1: rms(Δcart)=2.1282e-04, rms(Δint.) = 4.96812e-05
+Cycle 2: rms(Δcart)=2.9765e-06, rms(Δint.) = 4.96214e-05
+Cycle 3: rms(Δcart)=4.9862e-08, rms(Δint.) = 4.96214e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 6
+Cycle 0: rms(Δcart)=3.7584e-02, rms(Δint.) = 2.10997e-04
+Cycle 1: rms(Δcart)=1.8123e-04, rms(Δint.) = 4.27015e-05
+Cycle 2: rms(Δcart)=2.4133e-06, rms(Δint.) = 4.26553e-05
+Cycle 3: rms(Δcart)=3.6099e-08, rms(Δint.) = 4.26553e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 7
+Cycle 0: rms(Δcart)=3.2417e-02, rms(Δint.) = 1.76710e-04
+Cycle 1: rms(Δcart)=1.6594e-04, rms(Δint.) = 3.32517e-05
+Cycle 2: rms(Δcart)=2.2416e-06, rms(Δint.) = 3.31999e-05
+Cycle 3: rms(Δcart)=2.9290e-08, rms(Δint.) = 3.31999e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+
+Backtransformation 8
+Cycle 0: rms(Δcart)=2.7942e-02, rms(Δint.) = 1.84929e-04
+Cycle 1: rms(Δcart)=1.8122e-04, rms(Δint.) = 6.30454e-05
+Cycle 2: rms(Δcart)=2.4784e-06, rms(Δint.) = 6.30130e-05
+Cycle 3: rms(Δcart)=2.9582e-08, rms(Δint.) = 6.30130e-05
+Internal->Cartesian transformation converged in 4 cycle(s)!
+

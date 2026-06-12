@@ -17,14 +17,14 @@ sys.path.insert(0, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
 
-project = "YARP<sup>again</sup>"
-copyright = f'{datetime.date.today().year}, SRG'
-copyright = '2025, Savoie Research Group'
+project = 'Y.A.R.P.'
+copyright = f'{datetime.date.today().year}, Johannes Steinmetzer'
+copyright = '2023, Savoie Research Group'
 author = 'Savoie Research Group'
 
 # The full version, including alpha/beta/rc tags
-release = '0.4.0'
-#release = version('yarp_again')
+#release = '0.0.1'
+release = version('yarp')
 # for example take major/minor
 version = release
 
@@ -34,28 +34,16 @@ version = release
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'autoapi.extension',
     'sphinx_rtd_theme',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'sphinx.ext.autodoc',
+    'sphinx_autodoc_typehints',
     'sphinx.ext.autosummary',
     'sphinx.ext.autosectionlabel',
+    'myst_parser',
 ]
-
-
-# Point autoapi to the yarp source
-autoapi_type = 'python'
-#autoapi_dirs = ['../yarp', '../test']  # path from docs/source/
-import os
-
-autoapi_dirs = [os.path.abspath(os.path.join(os.path.dirname(__file__), '../../yarp'))]
-
-autoapi_add_toctree_entry = True
-autoapi_keep_files = True  # Optional: lets you inspect the generated .rst
-
-
 
 # Napoleon settings
 napoleon_google_docstring = True
@@ -94,24 +82,13 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-html_css_files = ['custom.css']
 
 # -- Extension configuration -------------------------------------------------
 
 autosummary_generate = True
 autodoc_default_flags = ['members', ]
-add_module_names = False  # hide full dotted names in function headers
-
-
 
 typehints_defaults = "comma"
 
 napoleon_google_docstring = False
 napoleon_include_init_with_doc = True
-
-rst_prolog = """
-.. |autoapi-title| replace:: YARP Internal Module Reference
-"""
-
-autoapi_python_class_content = "both"  # include both class docstring and __init__ doc
-autoapi_member_order = "groupwise"     # groups functions, classes, etc.

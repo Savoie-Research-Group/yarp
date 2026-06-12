@@ -1,0 +1,93 @@
+                           d8b                            888
+                           Y8P                            888
+                                                          888
+88888b.  888  888 .d8888b  888 .d8888b  888  888 88888b.  88888b.  888  888 .d8888b
+888 "88b 888  888 88K      888 88K      888  888 888 "88b 888 "88b 888  888 88K
+888  888 888  888 "Y8888b. 888 "Y8888b. 888  888 888  888 888  888 888  888 "Y8888b.
+888 d88P Y88b 888      X88 888      X88 Y88b 888 888 d88P 888  888 Y88b 888      X88
+88888P"   "Y88888  88888P' 888  88888P'  "Y88888 88888P"  888  888  "Y88888  88888P'
+888           888                            888 888
+888      Y8b d88P                       Y8b d88P 888
+888       "Y88P"                         "Y88P"  888                            
+
+Version 0.7.6.post2 (Python 3.8.15, NumPy 1.24.3, SciPy 1.10.1)
+Executed at Thu Sep 12 02:13:44 2024 on 'hsu205sinch2019.lan'
+Platform: macOS-10.16-x86_64-i386-64bit
+Interpreter: /Users/hsu205/miniconda3/envs/yarp/bin/python
+Current working directory: /Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1
+
+If pysisyphus benefitted your research please cite:
+
+	https://doi.org/10.1002/qua.26390
+
+Good luck!
+
+{'calc': {'charge': 0, 'mem': 4000, 'mult': 1, 'pal': 1, 'type': 'xtb'},
+ 'geom': {'coord_kwargs': {},
+          'fn': '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1-TSguess.xyz',
+          'type': 'cart'},
+ 'tsopt': {'T': 298.15,
+           'do_hess': True,
+           'dump': True,
+           'h5_group_name': 'tsopt',
+           'hessian_recalc': 1,
+           'max_cycles': 50,
+           'overachieve_factor': 5,
+           'p': 101325,
+           'prefix': 'ts',
+           'thresh': 'gau',
+           'type': 'rsprfo'}}
+
+Read 1 geometry.
+                          ###########################
+                          # RUNNING TS-OPTIMIZATION #
+                          ###########################
+
+     Input geometry: Geometry(C6_H10, 16 atoms)
+  Coordinate system: cart
+         Calculator: XTB calculator
+             Charge: 0
+       Multiplicity: 1
+          Optimizer: rsprfo
+
+
+If not specified otherwise, all quantities are given in au.
+
+Convergence thresholds, (overachieved when):
+	max(|force|) <= 0.000450, (0.000090) E_h a_0⁻¹
+	  rms(force) <= 0.000300, (0.000060) E_h a_0⁻¹
+	 max(|step|) <= 0.001800 a_0
+	   rms(step) <= 0.001200 a_0
+
+Spent 0.4 s preparing the first cycle.
+       cycle    Δ(energy) max(|force|)   rms(force)  max(|step|)    rms(step)      s/cycle
+           0          nan     0.002221     0.000834     0.109136     0.043301         0.05
+           1    -0.000995     0.001002     0.000321     0.089582     0.034161         0.49
+           2    -0.000216     0.000285     0.000123     0.006736     0.002419         0.49
+           3    -0.000001     0.000002     0.000001     0.000079     0.000036         0.53
+       Converged!
+
+Final summary:
+        	max(forces,cartesian): 0.000002 hartree/bohr
+        	rms(forces,cartesian): 0.000001 hartree/bohr
+        	energy: -17.81225938 hartree
+       Wrote final, hopefully optimized, geometry to 'ts_final_geometry.xyz'
+Copied '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/ts_final_geometry.xyz' to 'ts_opt.xyz'.
+
+                         +---------------------------+
+                         | HESSIAN AT FINAL GEOMETRY |
+                         +---------------------------+
+
+... started Hessian calculation
+... calculation took 0.00 min
+... mass-weighing cartesian hessian
+... doing Eckart-projection
+
+First 10 eigenvalues [-0.0059  0.0005  0.0011  0.0024  0.0048  0.0051  0.0068  0.0118  0.013
+  0.0158]
+Imaginary frequencies: [-393.53] cm⁻¹
+Wrote Hessian data HD5 file 'ts_final_hessian.h5'.
+Wrote imaginary mode with ṽ=   -393.53 cm⁻¹ to 'ts_imaginary_mode_000.trj'
+
+
+pysisyphus run took 0:00:02 h.

@@ -1,0 +1,181 @@
+Counter 001, Using reparametrization tolerance of 0.0455
+Counter 001, Current string length=4.329804
+Counter 001, Calculator doesn't support 'get/set_chkfiles()'
+Counter 001, Created new image; inserted it before index 1.
+Counter 001, Current string length=4.329804
+Counter 001, Calculator doesn't support 'get/set_chkfiles()'
+Counter 001, Created new image; inserted it before index 2.
+Counter 001, Zeroed forces on fixed first image.
+Counter 001, Zeroed forces on fixed last image.
+Counter 002, Checking frontier node convergence, threshold=0.050000
+Counter 002, 	node 01: rms(perp_forces)=0.011302, converged
+Counter 002, Current string length=4.345359
+Counter 002, Calculator doesn't support 'get/set_chkfiles()'
+Counter 002, Created new image; inserted it before index 2.
+Counter 002, Added new left frontier node.
+Counter 002, 	node 03: rms(perp_forces)=0.000000, converged
+Counter 002, Current string length=4.345359
+Counter 002, Calculator doesn't support 'get/set_chkfiles()'
+Counter 002, Created new image; inserted it before index 3.
+Counter 002, Added new right frontier node.
+Counter 002, New image indices: [2, 3]
+Counter 002, Current string size is 3+3=6. There are still 5 nodes to be grown.
+Counter 002, Desired param density: [0.  0.1 0.2 0.8 0.9 1. ]
+Counter 002, Current string length=4.345359
+Counter 002, Zeroed forces on fixed first image.
+Counter 002, Zeroed forces on fixed last image.
+Counter 003, Checking frontier node convergence, threshold=0.050000
+Counter 003, 	node 02: rms(perp_forces)=0.007222, converged
+Counter 003, Current string length=4.366762
+Counter 003, Calculator doesn't support 'get/set_chkfiles()'
+Counter 003, Created new image; inserted it before index 3.
+Counter 003, Added new left frontier node.
+Counter 003, 	node 04: rms(perp_forces)=0.007756, converged
+Counter 003, Current string length=4.366762
+Counter 003, Calculator doesn't support 'get/set_chkfiles()'
+Counter 003, Created new image; inserted it before index 4.
+Counter 003, Added new right frontier node.
+Counter 003, New image indices: [3, 4]
+Counter 003, Current string size is 4+4=8. There are still 3 nodes to be grown.
+Counter 003, Desired param density: [0.  0.1 0.2 0.3 0.7 0.8 0.9 1. ]
+Counter 003, Current string length=4.366762
+Counter 003, Zeroed forces on fixed first image.
+Counter 003, Zeroed forces on fixed last image.
+Counter 004, Checking frontier node convergence, threshold=0.050000
+Counter 004, 	node 03: rms(perp_forces)=0.008740, converged
+Counter 004, Current string length=4.398097
+Counter 004, Calculator doesn't support 'get/set_chkfiles()'
+Counter 004, Created new image; inserted it before index 4.
+Counter 004, Added new left frontier node.
+Counter 004, 	node 05: rms(perp_forces)=0.009478, converged
+Counter 004, Current string length=4.398097
+Counter 004, Calculator doesn't support 'get/set_chkfiles()'
+Counter 004, Created new image; inserted it before index 5.
+Counter 004, Added new right frontier node.
+Counter 004, New image indices: [4, 5]
+Counter 004, Current string size is 5+5=10. There are still 1 nodes to be grown.
+Counter 004, Desired param density: [0.  0.1 0.2 0.3 0.4 0.6 0.7 0.8 0.9 1. ]
+Counter 004, Current string length=4.398097
+Counter 004, Zeroed forces on fixed first image.
+Counter 004, Zeroed forces on fixed last image.
+Counter 005, Checking frontier node convergence, threshold=0.050000
+Counter 005, 	node 04: rms(perp_forces)=0.007990, converged
+Counter 005, Current string length=4.431998
+Counter 005, Calculator doesn't support 'get/set_chkfiles()'
+Counter 005, Created new image; inserted it before index 5.
+Counter 005, Added new left frontier node.
+Counter 005, New image indices: [5]
+Counter 005, String is fully grown.
+Counter 005, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 005, Current string length=4.431998
+Counter 005, Zeroed forces on fixed first image.
+Counter 005, Zeroed forces on fixed last image.
+Counter 006, String is fully grown.
+Counter 006, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 006, Current string length=4.466561
+Counter 006, Starting to climb in next iteration.
+Counter 006, Zeroed forces on fixed first image.
+Counter 006, Zeroed forces on fixed last image.
+Counter 007, Climbing with image 5, E = -17.796938 au, norm(forces)=0.030443
+Counter 007, String is fully grown.
+Counter 007, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 007, Current string length=4.767853
+Counter 007, Skipped reparametrization of climbing image with index 5
+Counter 007, Zeroed forces on fixed first image.
+Counter 007, Zeroed forces on fixed last image.
+Counter 008, Returning fixed climbing index.
+Counter 008, Climbing with image 5, E = -17.801592 au, norm(forces)=0.034289
+Counter 008, String is fully grown.
+Counter 008, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 008, Current string length=4.872526
+Counter 008, Returning fixed climbing index.
+Counter 008, Skipped reparametrization of climbing image with index 5
+Counter 008, Zeroed forces on fixed first image.
+Counter 008, Zeroed forces on fixed last image.
+Counter 009, Returning fixed climbing index.
+Counter 009, Climbing with image 5, E = -17.803527 au, norm(forces)=0.024232
+Counter 009, String is fully grown.
+Counter 009, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 009, Current string length=4.981512
+Counter 009, Returning fixed climbing index.
+Counter 009, Skipped reparametrization of climbing image with index 5
+Counter 009, Zeroed forces on fixed first image.
+Counter 009, Zeroed forces on fixed last image.
+Counter 010, Returning fixed climbing index.
+Counter 010, Climbing with image 5, E = -17.805616 au, norm(forces)=0.019557
+Counter 010, String is fully grown.
+Counter 010, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 010, Current string length=5.053724
+Counter 010, Returning fixed climbing index.
+Counter 010, Skipped reparametrization of climbing image with index 5
+Counter 010, Zeroed forces on fixed first image.
+Counter 010, Zeroed forces on fixed last image.
+Counter 011, Returning fixed climbing index.
+Counter 011, Climbing with image 5, E = -17.807175 au, norm(forces)=0.017005
+Counter 011, String is fully grown.
+Counter 011, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 011, Current string length=5.107894
+Counter 011, Returning fixed climbing index.
+Counter 011, Skipped reparametrization of climbing image with index 5
+Counter 011, Zeroed forces on fixed first image.
+Counter 011, Zeroed forces on fixed last image.
+Counter 012, Returning fixed climbing index.
+Counter 012, Climbing with image 5, E = -17.808365 au, norm(forces)=0.013964
+Counter 012, String is fully grown.
+Counter 012, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 012, Current string length=5.143221
+Counter 012, Returning fixed climbing index.
+Counter 012, Skipped reparametrization of climbing image with index 5
+Counter 012, Zeroed forces on fixed first image.
+Counter 012, Zeroed forces on fixed last image.
+Counter 013, Returning fixed climbing index.
+Counter 013, Climbing with image 5, E = -17.809234 au, norm(forces)=0.011790
+Counter 013, String is fully grown.
+Counter 013, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 013, Current string length=5.168450
+Counter 013, Returning fixed climbing index.
+Counter 013, Skipped reparametrization of climbing image with index 5
+Counter 013, Zeroed forces on fixed first image.
+Counter 013, Zeroed forces on fixed last image.
+Counter 014, Returning fixed climbing index.
+Counter 014, Climbing with image 5, E = -17.809868 au, norm(forces)=0.010051
+Counter 014, String is fully grown.
+Counter 014, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 014, Current string length=5.185238
+Counter 014, Returning fixed climbing index.
+Counter 014, Skipped reparametrization of climbing image with index 5
+Counter 014, Zeroed forces on fixed first image.
+Counter 014, Zeroed forces on fixed last image.
+Counter 015, Returning fixed climbing index.
+Counter 015, Climbing with image 5, E = -17.810321 au, norm(forces)=0.008585
+Counter 015, String is fully grown.
+Counter 015, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 015, Current string length=5.197926
+Counter 015, Returning fixed climbing index.
+Counter 015, Skipped reparametrization of climbing image with index 5
+Counter 015, Zeroed forces on fixed first image.
+Counter 015, Zeroed forces on fixed last image.
+Counter 016, Returning fixed climbing index.
+Counter 016, Climbing with image 5, E = -17.810642 au, norm(forces)=0.007419
+Counter 016, String is fully grown.
+Counter 016, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 016, Current string length=5.208296
+Counter 016, Returning fixed climbing index.
+Counter 016, Skipped reparametrization of climbing image with index 5
+Counter 016, Zeroed forces on fixed first image.
+Counter 016, Zeroed forces on fixed last image.
+Counter 017, Returning fixed climbing index.
+Counter 017, Climbing with image 5, E = -17.810872 au, norm(forces)=0.006496
+Counter 017, String is fully grown.
+Counter 017, Desired param density: [0.  0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1. ]
+Counter 017, Current string length=5.219046
+Counter 017, Returning fixed climbing index.
+Counter 017, Skipped reparametrization of climbing image with index 5
+Counter 017, Zeroed forces on fixed first image.
+Counter 017, Zeroed forces on fixed last image.
+Counter 018, Returning fixed climbing index.
+Counter 018, Climbing with image 5, E = -17.811045 au, norm(forces)=0.005755
+Counter 018, Splining HEI
+Counter 018, 	Coordinate differences: [0.         0.10000329 0.20001399 0.30002039 0.40002161 0.53341086
+ 0.60004548 0.70005881 0.80004238 0.90001292 1.        ]
+Counter 018, Found splined HEI at x=0.5331

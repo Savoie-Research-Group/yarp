@@ -1,0 +1,20 @@
+#!/bin/bash                                                                                     
+#
+#SBATCH --job-name=classy-yarp
+#SBATCH --output=runyarp.1.out
+#SBATCH --error=runyarp.1.err
+#SBATCH -A standby
+#SBATCH --nodes=1
+#SBATCH --mem 5GB
+#SBATCH -n 1
+#SBATCH --time 4:00:00
+
+# activate a correct anaconda environment
+source ~/anaconda3/bin/activate
+conda activate /depot/bsavoie/apps/anaconda3/envs/yarp/
+module load intel-mkl
+module load openmpi
+
+python main_dft.py parameters.yaml
+
+wait

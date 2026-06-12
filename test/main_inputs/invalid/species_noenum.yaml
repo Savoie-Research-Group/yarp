@@ -1,8 +1,0 @@
-initialize:
-  output: tmp.pkl
-  initial_structure:
-    source: OCC=O
-    type: smiles
-    mode: species
-  job_manager:
-    scheduler: local

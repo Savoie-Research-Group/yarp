@@ -1,0 +1,251 @@
+Initial trust radius: 0.500000
+Chosen initial (model) Hessian is incompatible with current coord_type: cart!
+Using unit Hessian
+48 degrees of freedom.
+                                 #############
+                                 # CYCLE 000 #
+                                 #############
+    Energy:   -17.876103 au
+norm(grad):     0.240462 au / bohr (rad)
+ rms(grad):     0.034708 au / bohr (rad)
+Found 0 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.74986743e-01
+	eigenvalue_min=-5.48168495e-02
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.74986743e-01
+	eigenvalue_min=-5.48168495e-02
+norm(step)=0.227965 au (rad)
+
+                                 #############
+                                 # CYCLE 001 #
+                                 #############
+    Energy:   -17.907991 au
+norm(grad):     0.079820 au / bohr (rad)
+ rms(grad):     0.011521 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -2.7408e-02 au
+	Actual change: -3.1888e-02 au
+	Coefficient: 116.34%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_1.h5'
+Recalculated exact Hessian in cycle 1.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.02667219e-01
+	eigenvalue_min=-1.97552569e-02
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.158233.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.89616743e-01
+	eigenvalue_min=-1.82260762e-02
+Proposed RFO step with norm 0.5134 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: -0.006344
+Positive definite Hessian: False
+Hard case: False
+norm(step)=0.504494 au (rad)
+
+                                 #############
+                                 # CYCLE 002 #
+                                 #############
+    Energy:   -17.920129 au
+norm(grad):     0.013308 au / bohr (rad)
+ rms(grad):     0.001921 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -9.8571e-03 au
+	Actual change: -1.2137e-02 au
+	Coefficient: 123.13%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_2.h5'
+Recalculated exact Hessian in cycle 2.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=6.72108376e-01
+	eigenvalue_min=-6.36666824e-03
+Proposed RFO step with norm 1.1017 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: -0.001525
+Positive definite Hessian: False
+Hard case: False
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.261301.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-6.75345357e-01
+	eigenvalue_min=-7.01794038e-03
+Proposed RFO step with norm 1.0920 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: -0.001525
+Positive definite Hessian: False
+Hard case: False
+norm(step)=0.604115 au (rad)
+
+                                 #############
+                                 # CYCLE 003 #
+                                 #############
+    Energy:   -17.923623 au
+norm(grad):     0.010493 au / bohr (rad)
+ rms(grad):     0.001514 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -2.7318e-03 au
+	Actual change: -3.4946e-03 au
+	Coefficient: 127.92%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_3.h5'
+Recalculated exact Hessian in cycle 3.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-7.48589733e-01
+	eigenvalue_min=-5.23041633e-03
+Proposed RFO step with norm 0.8857 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000018
+Positive definite Hessian: True
+Hard case: False
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.817232.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-7.65968978e-01
+	eigenvalue_min=-6.06715566e-03
+Proposed RFO step with norm 0.8393 is outside trust radius Δ=0.5000. 
+Smallest eigenvalue: 0.000018
+Positive definite Hessian: True
+Hard case: False
+norm(step)=0.975094 au (rad)
+
+                                 #############
+                                 # CYCLE 004 #
+                                 #############
+    Energy:   -17.927852 au
+norm(grad):     0.023920 au / bohr (rad)
+ rms(grad):     0.003453 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -2.5623e-03 au
+	Actual change: -4.2290e-03 au
+	Coefficient: 165.05%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_4.h5'
+Recalculated exact Hessian in cycle 4.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-8.97281838e-01
+	eigenvalue_min=-3.83230511e-03
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.183328.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.13040882e-01
+	eigenvalue_min=-3.92524714e-03
+norm(step)=0.615981 au (rad)
+
+                                 #############
+                                 # CYCLE 005 #
+                                 #############
+    Energy:   -17.930653 au
+norm(grad):     0.009367 au / bohr (rad)
+ rms(grad):     0.001352 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -1.8524e-03 au
+	Actual change: -2.8002e-03 au
+	Coefficient: 151.17%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_5.h5'
+Recalculated exact Hessian in cycle 5.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.27822578e-01
+	eigenvalue_min=-1.16857781e-03
+GDIIS didn't succeed.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.27822578e-01
+	eigenvalue_min=-1.16857781e-03
+norm(step)=0.402040 au (rad)
+
+                                 #############
+                                 # CYCLE 006 #
+                                 #############
+    Energy:   -17.931372 au
+norm(grad):     0.003137 au / bohr (rad)
+ rms(grad):     0.000453 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -5.8429e-04 au
+	Actual change: -7.1908e-04 au
+	Coefficient: 123.07%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_6.h5'
+Recalculated exact Hessian in cycle 6.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.87174657e-01
+	eigenvalue_min=-1.25687720e-04
+rms(force) is overachieved
+GDIIS didn't succeed.
+Did quartic interpolation with x=1.390395.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=-9.97466020e-01
+	eigenvalue_min=-1.42148003e-05
+norm(step)=0.164914 au (rad)
+rms(force) is overachieved
+
+                                 #############
+                                 # CYCLE 007 #
+                                 #############
+    Energy:   -17.931435 au
+norm(grad):     0.001697 au / bohr (rad)
+ rms(grad):     0.000245 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -6.0771e-05 au
+	Actual change: -6.2932e-05 au
+	Coefficient: 103.56%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/xtb_run/HGCIXCUEYOPUTN/hess_calc_cyc_7.h5'
+Recalculated exact Hessian in cycle 7.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+RS algorithm did not produce a desired step length in 0 micro cycles. Trying RFO with α=1.0.
+	diagonalized augmented Hessian
+	nu_min=9.99922967e-01
+	eigenvalue_min=-8.44710800e-06
+max(force) is overachieved
+rms(force) is overachieved
+Force convergence overachieved!
+Convergence achieved! Skipping inter/extrapolation.
+norm(step)=0.012413 au (rad)
+max(force) is overachieved
+rms(force) is overachieved
+Force convergence overachieved!
+Successful invocations:
+	     GEDIIS: 0
+	      GDIIS: 0
+	Line Search: 5
+

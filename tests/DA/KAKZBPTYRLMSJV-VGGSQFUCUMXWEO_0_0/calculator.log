@@ -1,0 +1,393 @@
+24-09-12 02:13:55 - 11476.54 MB memory available, 4000.00 MB requested.
+24-09-12 02:13:55 - irc_000, cycle 000: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 000: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_000_vdecs7h8 on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 000: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 000: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 000: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_000_vdecs7h8
+24-09-12 02:13:55 - irc_000, cycle 001: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 001: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_001_nizb7pef on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 001: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 001: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 001: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_001_nizb7pef
+24-09-12 02:13:55 - irc_000, cycle 002: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 002: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_002_1zaj2huz on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 002: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 002: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 002: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_002_1zaj2huz
+24-09-12 02:13:55 - irc_000, cycle 003: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 003: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_003_m6ukgl06 on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 003: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 003: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 003: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_003_m6ukgl06
+24-09-12 02:13:55 - irc_000, cycle 004: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 004: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_004_7_71otdz on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 004: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 004: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 004: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_004_7_71otdz
+24-09-12 02:13:55 - irc_000, cycle 005: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 005: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_005_i7hzx04q on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 005: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 005: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 005: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_005_i7hzx04q
+24-09-12 02:13:55 - irc_000, cycle 006: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 006: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_006__dx9m7xs on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 006: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 006: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 006: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_006__dx9m7xs
+24-09-12 02:13:55 - irc_000, cycle 007: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:55 - irc_000, cycle 007: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_007_26trw480 on hsu205sinch2019.lan
+24-09-12 02:13:55 - irc_000, cycle 007: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:55 - irc_000, cycle 007: Skip setting of 'json' file.
+24-09-12 02:13:55 - irc_000, cycle 007: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_007_26trw480
+24-09-12 02:13:56 - irc_000, cycle 008: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 008: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_008_rsqrffns on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 008: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 008: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 008: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_008_rsqrffns
+24-09-12 02:13:56 - irc_000, cycle 009: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 009: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_009_bn29hyeb on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 009: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 009: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 009: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_009_bn29hyeb
+24-09-12 02:13:56 - irc_000, cycle 010: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 010: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_010_s__xry0n on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 010: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 010: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 010: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_010_s__xry0n
+24-09-12 02:13:56 - irc_000, cycle 011: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 011: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_011_z4pu3ykg on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 011: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 011: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 011: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_011_z4pu3ykg
+24-09-12 02:13:56 - irc_000, cycle 012: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 012: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_012_eqlemfx8 on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 012: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 012: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 012: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_012_eqlemfx8
+24-09-12 02:13:56 - irc_000, cycle 013: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 013: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_013_u0_rh_9x on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 013: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 013: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 013: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_013_u0_rh_9x
+24-09-12 02:13:56 - irc_000, cycle 014: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 014: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_014_7xiysxrz on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 014: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:56 - irc_000, cycle 014: Skip setting of 'json' file.
+24-09-12 02:13:56 - irc_000, cycle 014: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_014_7xiysxrz
+24-09-12 02:13:56 - irc_000, cycle 015: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:56 - irc_000, cycle 015: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_015_rkjef635 on hsu205sinch2019.lan
+24-09-12 02:13:56 - irc_000, cycle 015: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 015: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 015: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_015_rkjef635
+24-09-12 02:13:57 - irc_000, cycle 016: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 016: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_016_nsw9x850 on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 016: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 016: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 016: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_016_nsw9x850
+24-09-12 02:13:57 - irc_000, cycle 017: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 017: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_017_wanwguhn on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 017: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 017: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 017: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_017_wanwguhn
+24-09-12 02:13:57 - irc_000, cycle 018: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 018: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_018_ru2f30f7 on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 018: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 018: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 018: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_018_ru2f30f7
+24-09-12 02:13:57 - irc_000, cycle 019: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 019: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_019_rfwsy_kz on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 019: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 019: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 019: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_019_rfwsy_kz
+24-09-12 02:13:57 - irc_000, cycle 020: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 020: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_020_i_1097by on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 020: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 020: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 020: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_020_i_1097by
+24-09-12 02:13:57 - irc_000, cycle 021: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 021: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_021_7niz8aek on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 021: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 021: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 021: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_021_7niz8aek
+24-09-12 02:13:57 - irc_000, cycle 022: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:57 - irc_000, cycle 022: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_022_wvvcm5tc on hsu205sinch2019.lan
+24-09-12 02:13:57 - irc_000, cycle 022: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:57 - irc_000, cycle 022: Skip setting of 'json' file.
+24-09-12 02:13:57 - irc_000, cycle 022: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_022_wvvcm5tc
+24-09-12 02:13:58 - irc_000, cycle 023: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 023: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_023_jpmuzr5n on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 023: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 023: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 023: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_023_jpmuzr5n
+24-09-12 02:13:58 - irc_000, cycle 024: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 024: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_024_kvf55g47 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 024: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 024: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 024: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_024_kvf55g47
+24-09-12 02:13:58 - irc_000, cycle 025: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 025: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_025_syetu141 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 025: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 025: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 025: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_025_syetu141
+24-09-12 02:13:58 - irc_000, cycle 026: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 026: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_026_hrhndn4p on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 026: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 026: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 026: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_026_hrhndn4p
+24-09-12 02:13:58 - irc_000, cycle 027: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 027: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_027_s9yxura2 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 027: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 027: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 027: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_027_s9yxura2
+24-09-12 02:13:58 - irc_000, cycle 028: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 028: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_028_s6b5vpp8 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 028: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 028: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 028: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_028_s6b5vpp8
+24-09-12 02:13:58 - irc_000, cycle 029: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 029: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_029_gx9pzqtu on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 029: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 029: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 029: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_029_gx9pzqtu
+24-09-12 02:13:58 - irc_000, cycle 030: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 030: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_030_dyoimjd_ on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 030: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 030: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 030: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_030_dyoimjd_
+24-09-12 02:13:58 - irc_000, cycle 031: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 031: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_031_o69qw8j6 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 031: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 031: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 031: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_031_o69qw8j6
+24-09-12 02:13:58 - irc_000, cycle 032: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 032: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_032_nqjo6l08 on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 032: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 032: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 032: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_032_nqjo6l08
+24-09-12 02:13:58 - irc_000, cycle 033: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:58 - irc_000, cycle 033: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_033_hfpvu19k on hsu205sinch2019.lan
+24-09-12 02:13:58 - irc_000, cycle 033: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:58 - irc_000, cycle 033: Skip setting of 'json' file.
+24-09-12 02:13:58 - irc_000, cycle 033: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_033_hfpvu19k
+24-09-12 02:13:59 - irc_000, cycle 034: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 034: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_034_6oyeitxv on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 034: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 034: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 034: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_034_6oyeitxv
+24-09-12 02:13:59 - irc_000, cycle 035: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 035: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_035_3rjoue7x on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 035: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 035: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 035: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_035_3rjoue7x
+24-09-12 02:13:59 - irc_000, cycle 036: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 036: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_036_u6uofhxj on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 036: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 036: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 036: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_036_u6uofhxj
+24-09-12 02:13:59 - irc_000, cycle 037: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 037: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_037_b5j7aixl on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 037: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 037: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 037: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_037_b5j7aixl
+24-09-12 02:13:59 - irc_000, cycle 038: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 038: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_038_bcwxyjk2 on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 038: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 038: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 038: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_038_bcwxyjk2
+24-09-12 02:13:59 - irc_000, cycle 039: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 039: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_039_xole8h2z on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 039: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 039: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 039: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_039_xole8h2z
+24-09-12 02:13:59 - irc_000, cycle 040: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 040: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_040_v5rjrkku on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 040: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 040: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 040: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_040_v5rjrkku
+24-09-12 02:13:59 - irc_000, cycle 041: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 041: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_041_p4ks9iln on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 041: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 041: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 041: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_041_p4ks9iln
+24-09-12 02:13:59 - irc_000, cycle 042: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 042: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_042_h_x_t3pd on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 042: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 042: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 042: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_042_h_x_t3pd
+24-09-12 02:13:59 - irc_000, cycle 043: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:13:59 - irc_000, cycle 043: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_043_rxn76p16 on hsu205sinch2019.lan
+24-09-12 02:13:59 - irc_000, cycle 043: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:13:59 - irc_000, cycle 043: Skip setting of 'json' file.
+24-09-12 02:13:59 - irc_000, cycle 043: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_043_rxn76p16
+24-09-12 02:14:00 - irc_000, cycle 044: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 044: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_044_h7o3m2lk on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 044: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 044: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 044: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_044_h7o3m2lk
+24-09-12 02:14:00 - irc_000, cycle 045: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 045: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_045_ffjwp6_t on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 045: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 045: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 045: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_045_ffjwp6_t
+24-09-12 02:14:00 - irc_000, cycle 046: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 046: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_046__lf3snke on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 046: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 046: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 046: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_046__lf3snke
+24-09-12 02:14:00 - irc_000, cycle 047: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 047: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_047_1jgz2uq5 on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 047: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 047: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 047: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_047_1jgz2uq5
+24-09-12 02:14:00 - irc_000, cycle 048: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 048: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_048_bpjx27v1 on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 048: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 048: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 048: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_048_bpjx27v1
+24-09-12 02:14:00 - irc_000, cycle 049: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 049: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_049_lpmm81pz on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 049: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 049: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 049: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_049_lpmm81pz
+24-09-12 02:14:00 - irc_000, cycle 050: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 050: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_050_x_l3tsw7 on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 050: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 050: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 050: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_050_x_l3tsw7
+24-09-12 02:14:00 - irc_000, cycle 051: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 051: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_051_rq6fm4gx on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 051: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:00 - irc_000, cycle 051: Skip setting of 'json' file.
+24-09-12 02:14:00 - irc_000, cycle 051: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_051_rq6fm4gx
+24-09-12 02:14:00 - irc_000, cycle 052: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:00 - irc_000, cycle 052: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_052_85e2qwaw on hsu205sinch2019.lan
+24-09-12 02:14:00 - irc_000, cycle 052: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 052: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 052: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_052_85e2qwaw
+24-09-12 02:14:01 - irc_000, cycle 053: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 053: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_053_0awmpfu_ on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 053: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 053: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 053: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_053_0awmpfu_
+24-09-12 02:14:01 - irc_000, cycle 054: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 054: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_054_o9l_adch on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 054: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 054: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 054: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_054_o9l_adch
+24-09-12 02:14:01 - irc_000, cycle 055: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 055: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_055_j8m902j9 on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 055: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 055: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 055: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_055_j8m902j9
+24-09-12 02:14:01 - irc_000, cycle 056: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 056: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_056_lzps0_80 on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 056: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 056: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 056: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_056_lzps0_80
+24-09-12 02:14:01 - irc_000, cycle 057: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 057: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_057_hxm6zkz2 on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 057: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 057: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 057: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_057_hxm6zkz2
+24-09-12 02:14:01 - irc_000, cycle 058: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 058: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_058_uboko9mo on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 058: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 058: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 058: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_058_uboko9mo
+24-09-12 02:14:01 - irc_000, cycle 059: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 059: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_059_5hpr72wa on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 059: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 059: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 059: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_059_5hpr72wa
+24-09-12 02:14:01 - irc_000, cycle 060: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 060: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_060_c3gc0o_k on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 060: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 060: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 060: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_060_c3gc0o_k
+24-09-12 02:14:01 - irc_000, cycle 061: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:01 - irc_000, cycle 061: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_061_c3m9uj3q on hsu205sinch2019.lan
+24-09-12 02:14:01 - irc_000, cycle 061: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:01 - irc_000, cycle 061: Skip setting of 'json' file.
+24-09-12 02:14:01 - irc_000, cycle 061: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_061_c3m9uj3q
+24-09-12 02:14:02 - irc_000, cycle 062: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - irc_000, cycle 062: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_062_cu6_yui4 on hsu205sinch2019.lan
+24-09-12 02:14:02 - irc_000, cycle 062: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - irc_000, cycle 062: Skip setting of 'json' file.
+24-09-12 02:14:02 - irc_000, cycle 062: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/irc_000_062_cu6_yui4
+24-09-12 02:14:02 - 11464.80 MB memory available, 4000.00 MB requested.
+24-09-12 02:14:02 - forward_end_001, cycle 000: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - forward_end_001, cycle 000: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_000_s65iesk2 on hsu205sinch2019.lan
+24-09-12 02:14:02 - forward_end_001, cycle 000: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - forward_end_001, cycle 000: Skip setting of 'json' file.
+24-09-12 02:14:02 - forward_end_001, cycle 000: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_000_s65iesk2
+24-09-12 02:14:02 - forward_end_001, cycle 001: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - forward_end_001, cycle 001: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_001_kswruc4g on hsu205sinch2019.lan
+24-09-12 02:14:02 - forward_end_001, cycle 001: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - forward_end_001, cycle 001: Skip setting of 'json' file.
+24-09-12 02:14:02 - forward_end_001, cycle 001: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_001_kswruc4g
+24-09-12 02:14:02 - forward_end_001, cycle 002: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - forward_end_001, cycle 002: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_002_a56vfr9f on hsu205sinch2019.lan
+24-09-12 02:14:02 - forward_end_001, cycle 002: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - forward_end_001, cycle 002: Skip setting of 'json' file.
+24-09-12 02:14:02 - forward_end_001, cycle 002: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_002_a56vfr9f
+24-09-12 02:14:02 - forward_end_001, cycle 003: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - forward_end_001, cycle 003: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_003_vkd6p39y on hsu205sinch2019.lan
+24-09-12 02:14:02 - forward_end_001, cycle 003: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - forward_end_001, cycle 003: Skip setting of 'json' file.
+24-09-12 02:14:02 - forward_end_001, cycle 003: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_003_vkd6p39y
+24-09-12 02:14:02 - forward_end_001, cycle 004: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - forward_end_001, cycle 004: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_004_sx2jxrta on hsu205sinch2019.lan
+24-09-12 02:14:02 - forward_end_001, cycle 004: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - forward_end_001, cycle 004: Skip setting of 'json' file.
+24-09-12 02:14:02 - forward_end_001, cycle 004: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/forward_end_001_004_sx2jxrta
+24-09-12 02:14:02 - 11509.97 MB memory available, 4000.00 MB requested.
+24-09-12 02:14:02 - backward_end_002, cycle 000: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 000: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_000__y63lhvu on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 000: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 000: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 000: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_000__y63lhvu
+24-09-12 02:14:02 - backward_end_002, cycle 001: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 001: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_001_6n_0o3xc on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 001: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 001: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 001: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_001_6n_0o3xc
+24-09-12 02:14:02 - backward_end_002, cycle 002: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 002: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_002_h_p9twqo on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 002: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 002: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 002: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_002_h_p9twqo
+24-09-12 02:14:02 - backward_end_002, cycle 003: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 003: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_003_29nv2k19 on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 003: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 003: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 003: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_003_29nv2k19
+24-09-12 02:14:02 - backward_end_002, cycle 004: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 004: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_004_hvec5tuv on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 004: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 004: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 004: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_004_hvec5tuv
+24-09-12 02:14:02 - backward_end_002, cycle 005: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 005: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_005_3d_7g1mr on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 005: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:02 - backward_end_002, cycle 005: Skip setting of 'json' file.
+24-09-12 02:14:02 - backward_end_002, cycle 005: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_005_3d_7g1mr
+24-09-12 02:14:02 - backward_end_002, cycle 006: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:02 - backward_end_002, cycle 006: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_006_0i0e_qd0 on hsu205sinch2019.lan
+24-09-12 02:14:02 - backward_end_002, cycle 006: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:03 - backward_end_002, cycle 006: Skip setting of 'json' file.
+24-09-12 02:14:03 - backward_end_002, cycle 006: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_006_0i0e_qd0
+24-09-12 02:14:03 - backward_end_002, cycle 007: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:03 - backward_end_002, cycle 007: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_007_m4ba0qq5 on hsu205sinch2019.lan
+24-09-12 02:14:03 - backward_end_002, cycle 007: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:03 - backward_end_002, cycle 007: Skip setting of 'json' file.
+24-09-12 02:14:03 - backward_end_002, cycle 007: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_007_m4ba0qq5
+24-09-12 02:14:03 - backward_end_002, cycle 008: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:03 - backward_end_002, cycle 008: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_008_fjxuag3d on hsu205sinch2019.lan
+24-09-12 02:14:03 - backward_end_002, cycle 008: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:03 - backward_end_002, cycle 008: Skip setting of 'json' file.
+24-09-12 02:14:03 - backward_end_002, cycle 008: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_008_fjxuag3d
+24-09-12 02:14:03 - backward_end_002, cycle 009: Executing xtb ['--input', 'xcontrol', '--chrg', '0', '--uhf', '0', '--acc', '1.0', '--gfn', '2', '--grad']
+24-09-12 02:14:03 - backward_end_002, cycle 009: Running in /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_009_toi5e9a9 on hsu205sinch2019.lan
+24-09-12 02:14:03 - backward_end_002, cycle 009: Created symlink in '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_0/qm_calcs/cur_out'
+24-09-12 02:14:03 - backward_end_002, cycle 009: Skip setting of 'json' file.
+24-09-12 02:14:03 - backward_end_002, cycle 009: Cleaned /var/folders/88/k8nfmv_d7kbf4knw4ctxf_w40000gq/T/backward_end_002_009_toi5e9a9

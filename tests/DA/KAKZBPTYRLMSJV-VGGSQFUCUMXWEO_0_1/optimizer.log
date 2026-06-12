@@ -1,0 +1,231 @@
+Created optimizer with prefix ts_
+Initial trust radius: 0.300000
+No reference Hessian provided.
+Using calculated exact Hessian
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/ts_hess_calc_cyc_0.h5'
+Initial Hessian has 1 negative eigenvalue(s).
+	[-0.068215]
+Determining initial TS mode to follow uphill.
+Used root=0 to select inital TS mode.
+Using root 00 with eigenvalue -0.068215 as TS mode.
+
+48 degrees of freedom.
+                                 #############
+                                 # CYCLE 000 #
+                                 #############
+    Energy:   -17.811047 au
+norm(grad):     0.005780 au / bohr (rad)
+ rms(grad):     0.000834 au / bohr (rad)
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+Hessian has 1 negative eigenvalue(s).
+	[-0.068215]
+Overlaps of previous TS mode with current imaginary mode(s):
+	00: 1.000000
+Highest overlap: 1.000000, mode 0
+Maximizing along TS mode 0.
+RS-PRFO micro cycle 00, alpha=1.000000
+	diagonalized augmented Hessian
+	nu_max=-9.99849450e-01
+	eigenvalue_max=2.05504037e-05
+	diagonalized augmented Hessian
+	nu_min=9.17960155e-01
+	eigenvalue_min=-2.00380280e-03
+norm(step_max)=0.017354
+norm(step_min)=0.432124
+norm(step_max)/norm(step_min)=4.02%
+norm(step)=0.432472
+RS-PRFO micro cycle 01, alpha=2.632023
+	diagonalized augmented Hessian
+	nu_max=-9.99849598e-01
+	eigenvalue_max=2.05403158e-05
+	diagonalized augmented Hessian
+	nu_min=-9.45617965e-01
+	eigenvalue_min=-1.65480334e-03
+norm(step_max)=0.017346
+norm(step_min)=0.343986
+norm(step_max)/norm(step_min)=5.04%
+norm(step)=0.344423
+RS-PRFO micro cycle 02, alpha=3.838557
+	diagonalized augmented Hessian
+	nu_max=-9.99849707e-01
+	eigenvalue_max=2.05328708e-05
+	diagonalized augmented Hessian
+	nu_min=-9.55872310e-01
+	eigenvalue_min=-1.50470134e-03
+norm(step_max)=0.017339
+norm(step_min)=0.307345
+norm(step_max)/norm(step_min)=5.64%
+norm(step)=0.307834
+RS-PRFO micro cycle 03, alpha=4.150420
+	diagonalized augmented Hessian
+	nu_max=-9.99849735e-01
+	eigenvalue_max=2.05309481e-05
+	diagonalized augmented Hessian
+	nu_min=9.57873425e-01
+	eigenvalue_min=-1.47342287e-03
+norm(step_max)=0.017338
+norm(step_min)=0.299821
+norm(step_max)/norm(step_min)=5.78%
+norm(step)=0.300322
+RS-PRFO micro cycle 04, alpha=4.164359
+	diagonalized augmented Hessian
+	nu_max=-9.99849736e-01
+	eigenvalue_max=2.05308622e-05
+	diagonalized augmented Hessian
+	nu_min=9.57958231e-01
+	eigenvalue_min=-1.47208056e-03
+norm(step_max)=0.017338
+norm(step_min)=0.299499
+norm(step_max)/norm(step_min)=5.79%
+norm(step)=0.300001
+RS-PRFO micro cycle 05, alpha=4.164385
+	diagonalized augmented Hessian
+	nu_max=-9.99849736e-01
+	eigenvalue_max=2.05308620e-05
+	diagonalized augmented Hessian
+	nu_min=9.57958385e-01
+	eigenvalue_min=-1.47207812e-03
+norm(step_max)=0.017338
+norm(step_min)=0.299499
+norm(step_max)/norm(step_min)=5.79%
+norm(step)=0.300000
+RS-PRFO micro cycle 06, alpha=4.164385
+	diagonalized augmented Hessian
+	nu_max=-9.99849736e-01
+	eigenvalue_max=2.05308620e-05
+	diagonalized augmented Hessian
+	nu_min=9.57958385e-01
+	eigenvalue_min=-1.47207812e-03
+norm(step_max)=0.017338
+norm(step_min)=0.299499
+norm(step_max)/norm(step_min)=5.79%
+norm(step)=0.300000
+Restricted step satisfies trust radius of 0.300000
+Micro-cycles converged in cycle 06 with alpha=4.164385!
+norm(step)=0.300000
+
+norm(step)=0.300000 au (rad)
+
+                                 #############
+                                 # CYCLE 001 #
+                                 #############
+    Energy:   -17.812042 au
+norm(grad):     0.002225 au / bohr (rad)
+ rms(grad):     0.000321 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.300000
+	Predicted change: -9.1808e-04 au
+	Actual change: -9.9498e-04 au
+	Coefficient: 108.38%
+	Increasing trust radius.
+	Updated trust radius: 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/ts_hess_calc_cyc_1.h5'
+Recalculated exact Hessian in cycle 1.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+Hessian has 1 negative eigenvalue(s).
+	[-0.061641]
+Overlaps of previous TS mode with current imaginary mode(s):
+	00: 0.999086
+Highest overlap: 0.999086, mode 0
+Maximizing along TS mode 0.
+RS-PRFO micro cycle 00, alpha=1.000000
+	diagonalized augmented Hessian
+	nu_max=-9.99994354e-01
+	eigenvalue_max=6.96056753e-07
+	diagonalized augmented Hessian
+	nu_min=9.73122479e-01
+	eigenvalue_min=-4.10023247e-04
+norm(step_max)=0.003360
+norm(step_min)=0.236649
+norm(step_max)/norm(step_min)=1.42%
+norm(step)=0.236673
+Restricted step satisfies trust radius of 0.500000
+Micro-cycles converged in cycle 00 with alpha=1.000000!
+norm(step)=0.236673
+
+norm(step)=0.236673 au (rad)
+
+                                 #############
+                                 # CYCLE 002 #
+                                 #############
+    Energy:   -17.812258 au
+norm(grad):     0.000849 au / bohr (rad)
+ rms(grad):     0.000123 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -2.0468e-04 au
+	Actual change: -2.1631e-04 au
+	Coefficient: 105.68%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/ts_hess_calc_cyc_2.h5'
+Recalculated exact Hessian in cycle 2.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+Hessian has 1 negative eigenvalue(s).
+	[-0.059406]
+Overlaps of previous TS mode with current imaginary mode(s):
+	00: 0.999194
+Highest overlap: 0.999194, mode 0
+Maximizing along TS mode 0.
+RS-PRFO micro cycle 00, alpha=1.000000
+	diagonalized augmented Hessian
+	nu_max=-9.99994998e-01
+	eigenvalue_max=5.94260713e-07
+	diagonalized augmented Hessian
+	nu_min=-9.99864560e-01
+	eigenvalue_min=-3.30446758e-06
+norm(step_max)=0.003163
+norm(step_min)=0.016460
+norm(step_max)/norm(step_min)=19.21%
+norm(step)=0.016761
+Restricted step satisfies trust radius of 0.500000
+Micro-cycles converged in cycle 00 with alpha=1.000000!
+norm(step)=0.016761
+
+norm(step)=0.016761 au (rad)
+
+                                 #############
+                                 # CYCLE 003 #
+                                 #############
+    Energy:   -17.812259 au
+norm(grad):     0.000005 au / bohr (rad)
+ rms(grad):     0.000001 au / bohr (rad)
+Trust radius update
+	Current trust radius: 0.500000
+	Predicted change: -1.3552e-06 au
+	Actual change: -1.3626e-06 au
+	Coefficient: 100.55%
+	Keeping current trust radius at 0.500000
+Recalculation of Hessian in 0 cycle(s).
+Requested Hessian recalculation.
+Wrote calculated cartesian Hessian to '/Users/hsu205/github/classy-yarp/reaction/DA/KAKZBPTYRLMSJV-VGGSQFUCUMXWEO_0_1/ts_hess_calc_cyc_3.h5'
+Recalculated exact Hessian in cycle 3.
+Found 6 small eigenvalues in Hessian. Removed corresponding eigenvalues and eigenvectors.
+Hessian has 1 negative eigenvalue(s).
+	[-0.06007]
+Overlaps of previous TS mode with current imaginary mode(s):
+	00: 0.999991
+Highest overlap: 0.999991, mode 0
+Maximizing along TS mode 0.
+RS-PRFO micro cycle 00, alpha=1.000000
+	diagonalized augmented Hessian
+	nu_max=-1.00000000e+00
+	eigenvalue_max=7.43205666e-12
+	diagonalized augmented Hessian
+	nu_min=-9.99999970e-01
+	eigenvalue_min=-2.27857974e-10
+norm(step_max)=0.000011
+norm(step_min)=0.000246
+norm(step_max)/norm(step_min)=4.52%
+norm(step)=0.000247
+Restricted step satisfies trust radius of 0.500000
+Micro-cycles converged in cycle 00 with alpha=1.000000!
+norm(step)=0.000247
+
+norm(step)=0.000247 au (rad)
+max(force) is overachieved
+rms(force) is overachieved
+Force convergence overachieved!

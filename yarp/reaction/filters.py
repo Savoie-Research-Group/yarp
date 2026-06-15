@@ -58,7 +58,7 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
                 raw_rxns=clean_rxns, target_yp=netconfig.target_product,
                 dist=netconfig.distance_metric, mode=netconfig.mode,
                 k_nodes=netconfig.n_nodes, tolerance=netconfig.tie_window,
-                verbose=verbose
+                prior_explored=r_set, separate_prods=separate_prods, verbose=verbose
             )
     else:
         for rxn in clean_rxns.values():
@@ -103,7 +103,10 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
         
     return unique_candidates
         
-def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_nodes=1, tolerance=0.0, cap='moderate',verbose=False):
+def apply_target_blinders(raw_rxns, target_yp,
+                          dist='soergel', mode='beam',
+                          k_nodes=1, tolerance=0.0, cap='moderate',
+                          prior_explored={}, separate_prods=False, verbose=False):
     """
     Parameters:
     -----------
@@ -130,6 +133,13 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         Protocol for distance cap framework. If 'moderate', all delta distances >= 0.0 will be kept.
         If 'aggressive', only positive delta distances will be kept as enumeration candidates.
 
+    prior_explored : set
+        Set of yarpecule hashes for species which have been previously explored off of during
+        prior round(s) of product enumeration
+
+    separate_prods : bool
+        Control whether enumeration candidates are separated into individual species or not
+
     Returns:
     --------
     candidates : list of yarpecule objects
@@ -149,11 +159,25 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         # Compute distances for each reaction product
         mol2dist = dict()
         mol_set = set()
+        mols = []
         for rxn in raw_rxns.values():
             mol = rxn.product.graph
             if mol.hash in mol_set: continue # Throw away all duplicate candidates
-            mol_set.add(mol.hash)
-            mol2dist[mol.hash] = compute_min_distance(mol, target_dist_smi, metric=dist)
+
+            # Throw away all previously explored off of candidates
+            if separate_prods:
+                mol = separate_molecules(mol)
+            else:
+                mol = [mol]
+            for m in mol:
+                if m.hash in prior_explored:
+                    m.get_smiles()
+                    if verbose:
+                        print(f"  + SKIPPED! {m.canon_smi} has already been explored off of as a reactant!")
+                    continue
+                mols.append(m)
+                mol_set.add(m.hash)
+                mol2dist[m.hash] = compute_min_distance(m, target_dist_smi, metric=dist)
 
         # Sort all hashes by distance (lowest to highest)
         sorted_hashes = sorted(mol2dist, key=mol2dist.get)
@@ -179,8 +203,7 @@ def apply_target_blinders(raw_rxns, target_yp, dist='soergel', mode='beam', k_no
         if verbose:
             print(f"  + Identified {len(top_k_mol_hashes)} candidates within window {tolerance} of top {k_nodes}")
 
-        for rxn in raw_rxns.values():
-            mol = rxn.product.graph
+        for mol in mols:
             if mol.hash in top_k_mol_hashes:
                 if verbose:
                     print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")

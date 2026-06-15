@@ -25,6 +25,7 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
     if verbose:
         print(f" - Reading in {len(rxns)} total reactions")
 
+    # Filter #1 (optional): Throw away all reactions above property threshold
     if prop_filter is not None and verbose:
         print(f" - Barrier filtering selected!")
         print(f"   Reactions with {prop_filter.source} {prop_filter.type} above {prop_filter.threshold} kcal/mol will be excluded from enumeration.")
@@ -32,9 +33,8 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
         print(" - No barrier filtering will be performed prior to enumeration")
 
     r_set = set()
-    clean_rxns = dict()
+    tmp_rxn = dict()
     for count_r, rxn in enumerate(rxns.values()):
-        # Throw away all reactions above dG barrier (optionally)
         if prop_filter is not None:
             rxn_prop_dict = getattr(rxn, prop_filter.type, None)
             if rxn_prop_dict is not None:
@@ -44,74 +44,82 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
                         print(f"  + Excluding {rxn.hash} ({prop_filter.type} = {prop}) from enumeration")
                     continue
 
-        clean_rxns[count_r] = rxn
-
         # Get a set of all (remaining) reactant yarpecule hashes
         r_set.add(rxn.reactant.hash)
+        tmp_rxn[count_r] = rxn
 
-    candidates = []
-    if netconfig is not None:
-        if netconfig.target_product is not None: # ERM: To-do this is fragile!
-            if verbose:
-                print(f" - Constrained network exploration mode selected!")
-            candidates = apply_target_blinders(
-                raw_rxns=clean_rxns, target_yp=netconfig.target_product,
-                dist=netconfig.distance_metric, mode=netconfig.mode,
-                k_nodes=netconfig.n_nodes, tolerance=netconfig.tie_window,
-                prior_explored=r_set, separate_prods=separate_prods, verbose=verbose
-            )
-    else:
-        for rxn in clean_rxns.values():
-            candidates.append(rxn.product.graph)
+    # Filter #2 (always): Throw away all previously explored reactions
+    clean_rxns = dict()
+    for count_r, rxn in enumerate(tmp_rxn.values()):
+        prod = rxn.product.graph
+        if prod.hash in r_set:
+            if verbose: print(f"   + SKIPPING! {prod.canon_smi} has already been explored off of as a reactant!")
+            continue
+        clean_rxns[count_r] = rxn
 
+    # Filter #4 (optional): separate multi-molecule product candidates (unimolecular enumeration)
+    # TJB NOTE: Apply the existing product-separation behavior without interpreting
+    # reactive atom maps here. The important design point is that filtering
+    # decides which molecular graphs become enumeration candidates; it does
+    # not decide whether a candidate has the requested reactive atoms. That
+    # check happens later in enumerate_products, after any split fragment has
+    # its final local atom indexing.
     if separate_prods and verbose:
         print(f" - Performing product separation on all reactions prior to enumeration")
     elif verbose:
         print(" - No product separation will be performed prior to enumeration")
 
+    candidates = []
+    source2cand = dict()
     p_set = set()
-    unique_candidates = []
-    for mol in candidates:
-
-        # Apply the existing product-separation behavior without interpreting
-        # reactive atom maps here. The important design point is that filtering
-        # decides which molecular graphs become enumeration candidates; it does
-        # not decide whether a candidate has the requested reactive atoms. That
-        # check happens later in enumerate_products, after any split fragment has
-        # its final local atom indexing.
+    for rxn in clean_rxns.values():
+        mol = rxn.product.graph
         if separate_prods:
             prod = separate_molecules(mol)
         else:
             prod = [mol]
-
-        # Get a list of all (remaining) product yarpecules
+        source2cand[rxn.hash] = prod
         for p in prod:
-            if p.hash in r_set:
-                p.get_smiles()
-                if verbose:
-                    print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
-                continue
             if p.hash in p_set: continue # Throw away all duplicate candidates
-
+            if p.hash in r_set:
+                print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
+                continue # Second pass to avoid re-exploring (filter #2)
             p_set.add(p.hash)
-            p.get_inchi()
-            p.get_smiles()
-            unique_candidates.append(p)
+            candidates.append(p)
+
+    # Filter #4 (optional): Apply product blinders to narrow down candidates
+    if netconfig is not None:
+        if netconfig.target_product is not None: # ERM: To-do this is fragile!
+            if verbose: print(f" - Constrained network exploration mode selected!")
+            candidates = apply_product_blinders(
+                raw_candidates=candidates, target_yp=netconfig.target_product,
+                dist=netconfig.distance_metric, mode=netconfig.mode,
+                k_nodes=netconfig.n_nodes, tolerance=netconfig.tie_window,
+                verbose=verbose
+            )
+
+            # Mark which rxns were selected via product blinders
+            final_cand_set = set()
+            for mol in candidates:
+                final_cand_set.add(mol.hash)
+            
+            for rxn_hash, cand_list in source2cand.items():
+                for cand in cand_list:
+                    if cand.hash in final_cand_set:
+                        rxns[str(rxn_hash)].network_meta["prod_blind_selected"] = True
 
     if verbose:
-        print(f" - {len(unique_candidates)} unique products identified for enumeration")
-        
-    return unique_candidates
-        
-def apply_target_blinders(raw_rxns, target_yp,
-                          dist='soergel', mode='beam',
-                          k_nodes=1, tolerance=0.0, cap='moderate',
-                          prior_explored={}, separate_prods=False, verbose=False):
+        print(f" - {len(candidates)} unique products identified for enumeration") 
+    return candidates
+
+def apply_product_blinders(raw_candidates, target_yp,
+                           dist='soergel', mode='beam',
+                          k_nodes=1, tolerance=0.0, verbose=False):
     """
     Parameters:
     -----------
-    raw_rxns : dictionary of reaction objects
-        Possible reactions to perform network exploration via product enumeration
+    raw_candidates : list of yarpecule objects
+        Possible species to perform network exploration via product enumeration
 
     target_yp : yarpecule
         The "end-goal" (product side) molecule of interest to network exploration
@@ -129,17 +137,6 @@ def apply_target_blinders(raw_rxns, target_yp,
     tolerance : float
         Tolerance window for distance tie-breakers in beam search mode
 
-    cap : str
-        Protocol for distance cap framework. If 'moderate', all delta distances >= 0.0 will be kept.
-        If 'aggressive', only positive delta distances will be kept as enumeration candidates.
-
-    prior_explored : set
-        Set of yarpecule hashes for species which have been previously explored off of during
-        prior round(s) of product enumeration
-
-    separate_prods : bool
-        Control whether enumeration candidates are separated into individual species or not
-
     Returns:
     --------
     candidates : list of yarpecule objects
@@ -156,28 +153,13 @@ def apply_target_blinders(raw_rxns, target_yp,
             print(f"    Target species: {target_yp.canon_smi}")
             print(f"    Distance metric: {dist}")
 
-        # Compute distances for each reaction product
+        # Compute distances for each input candidate
         mol2dist = dict()
         mol_set = set()
-        mols = []
-        for rxn in raw_rxns.values():
-            mol = rxn.product.graph
+        for mol in raw_candidates:
             if mol.hash in mol_set: continue # Throw away all duplicate candidates
-
-            # Throw away all previously explored off of candidates
-            if separate_prods:
-                mol = separate_molecules(mol)
-            else:
-                mol = [mol]
-            for m in mol:
-                if m.hash in prior_explored:
-                    m.get_smiles()
-                    if verbose:
-                        print(f"  + SKIPPED! {m.canon_smi} has already been explored off of as a reactant!")
-                    continue
-                mols.append(m)
-                mol_set.add(m.hash)
-                mol2dist[m.hash] = compute_min_distance(m, target_dist_smi, metric=dist)
+            mol_set.add(mol.hash)
+            mol2dist[mol.hash] = compute_min_distance(mol, target_dist_smi, metric=dist)
 
         # Sort all hashes by distance (lowest to highest)
         sorted_hashes = sorted(mol2dist, key=mol2dist.get)
@@ -203,42 +185,17 @@ def apply_target_blinders(raw_rxns, target_yp,
         if verbose:
             print(f"  + Identified {len(top_k_mol_hashes)} candidates within window {tolerance} of top {k_nodes}")
 
-        for mol in mols:
+        for mol in raw_candidates:
             if mol.hash in top_k_mol_hashes:
-                if verbose:
-                    print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
+                if verbose: print(f"  + Selecting {mol.canon_smi} for enumeration (distance = {mol2dist[mol.hash]})")
                 candidates.append(mol)
             else:
-                if verbose:
-                    print(f"  + SKIPPED! {rxn.id} == {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
-
-    elif mode == 'capped':
-        if verbose:
-            print(f"  + Selecting enumeration candidates via distance capping strategy")
-            print(f"    Target species: {target_yp.canon_smi}")
-            print(f"    Distance metric: {dist}")
-        for rxn in raw_rxns.values():
-            r_dist = compute_min_distance(rxn.reactant.graph, target_dist_smi, metric=dist)
-            p_dist = compute_min_distance(rxn.product.graph, target_dist_smi, metric=dist)
-            diff = r_dist - p_dist
-            if cap == 'moderate':
-                if diff >= 0.0:
-                    if verbose:
-                        print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
-                    candidates.append(rxn.product.graph)
-            elif cap == 'aggressive':
-                if diff > 0.0:
-                    if verbose:
-                        print(f"  + Selecting {rxn.id} == {rxn.reactant.graph.canon_smi} -> {rxn.product.graph.canon_smi} for enumeration (delta_dist = {diff})")
-                    candidates.append(rxn.product.graph)
-            else:
-                raise RuntimeError(f"Cutoff {cap} for capped exploration is not recognized/implemented!")
+                if verbose: print(f"  + SKIPPED! {mol.canon_smi} (distance = {mol2dist[mol.hash]})")
     else:
         raise RuntimeError(f"Network exploration mode {mode} is not recognized/implemented!")
     if verbose:
-        print(f"  + Selected {len(candidates)} out of {len(raw_rxns)} potential candidates")
+        print(f"  + Selected {len(candidates)} out of {len(raw_candidates)} potential candidates")
     return candidates
-
 
 def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False,verbose=False):
     """

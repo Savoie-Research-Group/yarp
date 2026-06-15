@@ -5,7 +5,7 @@ initialize:
   initial_structure:
     source: "O=CCCOO"
     type: smiles
-    mode: reaction
+    mode: species
 
   job_manager:
     scheduler: condor

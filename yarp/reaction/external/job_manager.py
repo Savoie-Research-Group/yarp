@@ -46,6 +46,16 @@ class SGEJobManager(BaseJobManager):
             return False
         
 class CondorJobManager(BaseJobManager):
+    """
+    HTCondor backend for shared-filesystem installations.
+
+    The generated submit description references the executable and log paths
+    using absolute paths. Therefore, these paths must be visible from both the
+    submit node and the execute node.
+
+    This backend does not implement HTCondor file transfer, OSDF/Pelican data
+    delivery, or OSG worker-scratch orchestration.
+    """
     def __init__(self, job_config=None):
         self.job_config = job_config
 
@@ -103,13 +113,16 @@ class CondorJobManager(BaseJobManager):
         return submit_path
 
 def get_job_manager(scheduler_type: str, job_config=None) -> BaseJobManager:
-    if scheduler_type.lower() == "slurm":
+    """Return a job manager for the specified scheduler type."""
+    scheduler_type = scheduler_type.lower()
+
+    if scheduler_type == "slurm":
         return SlurmJobManager()
-    elif scheduler_type.lower() == "sge":
+    elif scheduler_type == "sge":
         return SGEJobManager()
-    elif scheduler_type.lower() == "local":
-            return LocalJobManager()
-    elif scheduler_type.lower() == "condor":
+    elif scheduler_type == "local":
+        return LocalJobManager()
+    elif scheduler_type == "condor":
         return CondorJobManager(job_config)
     else:
         raise ValueError(f"Unsupported scheduler: {scheduler_type}")

@@ -33,11 +33,47 @@ Take a look at the `license`_ or open an `issue`_.
 .. _license: https://github.com/Savoie-Research-Group/yarp/blob/master/LICENSE.md
 .. _issue: https://github.com/Savoie-Research-Group/yarp/issues
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Licensing
+
+   LICENSE
+   
+   
+=======
 
 --
 =======
 .. toctree::
    :maxdepth: 2
+
+--
+------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Core Modules (yarp/yarp/)
+
+   constants.py <yarp.constants>
+   enum.py <yarp.enum>
+   find_lewis.py <yarp.find_lewis>
+   hashes.py <yarp.hashes>
+   input_parsers.py <yarp.input_parsers>
+   misc.py <yarp.misc>
+   properties.py <yarp.properties>
+   sieve.py <yarp.sieve>
+   smiles.py <yarp.smiles>
+   taffi_functions.py <yarp.taffi_functions>
+   yarpecule.py <yarp.yarpecule>
+
+
+--
+---------------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Index
+
+   yarp
+=======
    :caption: Package Documentation
 
    README

@@ -183,3 +183,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+#temp ignore docs
+docs/

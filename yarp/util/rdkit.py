@@ -9,9 +9,127 @@ import warnings
 BOND_MAP = {
     1: rdchem.BondType.SINGLE,
     2: rdchem.BondType.DOUBLE,
-    3: rdchem.BondType.TRIPLE
+    3: rdchem.BondType.TRIPLE,
+    4: rdchem.BondType.QUADRUPLE,
+    5: rdchem.BondType.QUINTUPLE,
+    6: rdchem.BondType.HEXTUPLE,
 }
 # TODO: How to handle dative bonds for organometallics?
+
+
+def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, sanitize=True):
+    """
+    Convert yarpecule graph data into an RDKit mol object.
+
+    Parameters:
+    -----------
+    elements : list
+        List of element symbols (length N).
+
+    adj : ndarray (N x N)
+        Adjacency matrix with 1 for connected atoms and 0 for non-connected atoms.
+
+    bond_orders : ndarray (N x N)
+        Bond order / bond-electron matrix for the molecule.
+
+    atom_info : dict, optional
+        Optional atom metadata dictionary. If present and atom maps are available,
+        map labels are attached to output atoms.
+
+    sanitize : bool, default=True
+        Whether RDKit sanitization should be applied prior to return.
+    """
+    N = len(elements)
+    assert adj.shape == (N, N)
+    assert bond_orders.shape == (N, N)
+
+    elements = [el.upper() for el in elements]
+    formal_charges = np.zeros(N, dtype=int)
+    num_rad = np.diag(bond_orders) % 2 == 1
+
+    # Use Lewis-derived formal charges when available (imported lazily to avoid
+    # importing yarpecule internals at module import time).
+    try:
+        from yarp.yarpecule.lewis.bem_score import return_formals
+        formal_charges = np.array(return_formals(bond_orders, [el.lower() for el in elements]), dtype=int)
+    except Exception:
+        formal_charges = np.zeros(N, dtype=int)
+
+    rw = Chem.RWMol()
+    for idx, el in enumerate(elements):
+        atom = Chem.Atom(el)
+        atom.SetNoImplicit(True)
+        atom.SetNumExplicitHs(0)
+        atom.SetFormalCharge(int(formal_charges[idx]))
+        atom.SetNumRadicalElectrons(int(num_rad[idx]))
+        if atom_info is not None and idx in atom_info:
+            record = atom_info[idx]
+            if record.get("atom_map") is not None:
+                atom.SetProp("molAtomMapNumber", str(record["atom_map"]))
+            stereo = record.get("stereo", {}).get("atom")
+            if stereo == "@":
+                atom.SetChiralTag(rdchem.ChiralType.CHI_TETRAHEDRAL_CW)
+            elif stereo == "@@":
+                atom.SetChiralTag(rdchem.ChiralType.CHI_TETRAHEDRAL_CCW)
+        rw.AddAtom(atom)
+
+    for i in range(N):
+        for j in range(i + 1, N):
+            if adj[i, j]:
+                bo = int(round(float(bond_orders[i, j])))
+                if bo == 0:
+                    bo = 1
+                btype = BOND_MAP.get(bo)
+                if btype is None:
+                    raise ValueError(f"Unknown bond order value at {i},{j}: {bond_orders[i, j]}")
+                rw.AddBond(i, j, btype)
+
+    mol = rw.GetMol()
+    for atom in mol.GetAtoms():
+        atom.UpdatePropertyCache(strict=False)
+    if sanitize:
+        try:
+            Chem.SanitizeMol(mol)
+        except Exception as e:
+            warnings.warn(f"Sanitization failed: {e}")
+
+    return mol
+
+
+def freeze_implicit_hydrogens(mol, elements, adj, only_charged=True):
+    """
+    Prevent RDKit from introducing implicit hydrogens not present in yarpecule.
+
+    Parameters:
+    -----------
+    mol : RDKit Mol
+        Molecule to update in place.
+    elements : list
+        Yarpecule element labels in atom-index order.
+    adj : ndarray
+        Yarpecule adjacency matrix.
+    only_charged : bool, default=True
+        If True, only charged atoms are modified.
+    """
+    h_neighbors = {
+        i for i in range(len(elements))
+        if any(adj[i, j] and elements[j].lower() == "h" for j in range(len(elements)))
+    }
+
+    for idx, atom in enumerate(mol.GetAtoms()):
+        if idx >= len(elements):
+            continue
+        if elements[idx].lower() == "h":
+            continue
+        if idx in h_neighbors:
+            continue
+        if only_charged and atom.GetFormalCharge() == 0:
+            continue
+        atom.SetNoImplicit(True)
+        atom.SetNumExplicitHs(0)
+        atom.UpdatePropertyCache(strict=False)
+
+    return mol
 
 def graph_to_rdmol(elements, adj, bond_orders, sanitize=True):
     """
@@ -38,43 +156,4 @@ def graph_to_rdmol(elements, adj, bond_orders, sanitize=True):
     --------
     mol : RDKit mol object
     """
-    N = len(elements)
-    assert adj.shape == (N, N)
-    assert bond_orders.shape == (N, N)
-
-    # Make elements uppercase
-    elements = [el.upper() for el in elements]
-
-    # Count up hydrogens and unpaired electrons
-    num_h = elements.count("H")
-    num_rad = np.diag(bond_orders) % 2 == 1
-
-    rw = Chem.RWMol()
-    # add atoms
-    for el in elements:
-        a = Chem.Atom(el)
-        rw.AddAtom(a)
-
-    # add bonds (only i < j to avoid duplicates)
-    for i in range(N):
-        for j in range(i+1, N):
-            if adj[i, j]:
-                bo = bond_orders[i, j]
-                # map to RDKit bond type
-                btype = BOND_MAP.get(bo)
-                if btype is None:
-                    # allow integerish strings
-                    try:
-                        btype = BOND_MAP.get(float(bo))
-                    except Exception:
-                        raise ValueError(f"Unknown bond order value at {i},{j}: {bo}")
-                rw.AddBond(i, j, btype)
-
-    mol = rw.GetMol()  # immutable Mol copy
-    if sanitize:
-        try:
-            Chem.SanitizeMol(mol)
-        except Exception as e:
-            warnings.warn(f"Sanitization failed: {e}")
-
-    return mol
+    return yarpecule_to_rdmol(elements, adj, bond_orders, sanitize=sanitize)

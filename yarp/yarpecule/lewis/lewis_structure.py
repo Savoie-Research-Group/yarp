@@ -4,12 +4,13 @@ Definition of lewis structure object class
 import sys
 import itertools
 import numpy as np
-from rdkit.Chem import BondType, MolFromSmiles, rdchem, Atom, AllChem, Draw
+from rdkit.Chem import BondType, AllChem, Draw
 from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
-from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
+from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol
+from yarp.util.rdkit import yarpecule_to_rdmol
 from yarp.yarpecule.lewis.bem_score import bmat_score, bmat_unique, adjust_metals, return_n_e_accept, return_n_e_donate, return_formals
 from yarp.yarpecule.lewis.find_lewis import gen_init, gen_all_lstructs
 from yarp.yarpecule.hashes import bmat_hash
@@ -369,33 +370,7 @@ class lewis_struct:
         # loop over bond_mats, create an rdkit mol for each, then plot on a grid with the scores
         mols = []
         for count_i, i in enumerate(self._bond_mats):
-            # throwaway molecule
-            mol = MolFromSmiles("C")
-            mol = rdchem.RWMol(mol)
-            mol.RemoveAtom(0)
-            # add atoms
-            [mol.AddAtom(Atom(el_to_an[_])) for _ in self._elements]
-            # add bonds
-            for count_j, j in enumerate(self._adj_mat):
-                for count_k, k in enumerate(j):
-                    if count_k < count_j:
-                        if k == 0:
-                            continue
-                        else:
-                            mol.AddBond(
-                                count_j, count_k, self._bond_to_type[i[count_j, count_k]])
-                    else:
-                        break
-
-            # set explicit H-atoms and formals
-            fc = return_formals(i, [_.lower() for _ in self._elements])
-            for count_j, j in enumerate(i):
-                atom = mol.GetAtomWithIdx(count_j)
-                mol.GetAtomWithIdx(count_j).SetNumExplicitHs(0)
-                mol.GetAtomWithIdx(count_j).SetFormalCharge(int(fc[count_j]))
-                mol.GetAtomWithIdx(count_j).SetNumRadicalElectrons(
-                    int(j[count_j] % 2))
-                mol.GetAtomWithIdx(count_j).UpdatePropertyCache()
+            mol = yarpecule_to_rdmol(self._elements, self._adj_mat, i, sanitize=False)
 
             # generate coordinates
             AllChem.Compute2DCoords(mol)

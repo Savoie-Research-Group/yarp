@@ -15,6 +15,7 @@ from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
 from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
+from yarp.util.rdkit import freeze_implicit_hydrogens
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 # Package-level warning suppression is configured in yarp/__init__.py.
@@ -411,7 +412,9 @@ class yarpecule:
         # ERM Note: RDKit has an annoying "Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D."
         # which triggers whenever you initialize from a .mol file for various and sundry reasons.
         # I have decided it is not worth my time to continue troubleshooting how to avoid this.
-        mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
+        mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
+        freeze_implicit_hydrogens(mol1, self.elements, self.adj_mat)
+        mol1 = Chem.RemoveHs(mol1)
         if verbose:
             print("RDKit mol dump before mapping:")
             for line in Chem.MolToMolBlock(mol1).splitlines():
@@ -423,6 +426,7 @@ class yarpecule:
 
         # Use RDKit to get atom-mapped SMILES string
         mol2 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
+        freeze_implicit_hydrogens(mol2, self.elements, self.adj_mat)
         atoms = mol2.GetNumAtoms()
         for idx in range(atoms):
             mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(self._atom_info[idx]["atom_map"]))

@@ -40,19 +40,26 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, sanitize=True
         Whether RDKit sanitization should be applied prior to return.
     """
     N = len(elements)
-    assert adj.shape == (N, N)
-    assert bond_orders.shape == (N, N)
+    if adj.shape != (N, N):
+        raise ValueError(f"adj shape {adj.shape} does not match ({N}, {N})")
+    if bond_orders.shape != (N, N):
+        raise ValueError(f"bond_orders shape {bond_orders.shape} does not match ({N}, {N})")
 
-    elements = [el.upper() for el in elements]
+    element_lower = [el.lower() for el in elements]
+    elements = [el.upper() for el in element_lower]
     formal_charges = np.zeros(N, dtype=int)
-    num_rad = np.diag(bond_orders) % 2 == 1
+    is_radical = np.diag(bond_orders) % 2 == 1
 
     # Use Lewis-derived formal charges when available (imported lazily to avoid
     # importing yarpecule internals at module import time).
     try:
         from yarp.yarpecule.lewis.bem_score import return_formals
-        formal_charges = np.array(return_formals(bond_orders, [el.lower() for el in elements]), dtype=int)
-    except Exception:
+        formal_charges = np.array(return_formals(bond_orders, element_lower), dtype=int)
+    except (ImportError, AttributeError, TypeError, ValueError) as exc:
+        warnings.warn(
+            "Unable to infer formal charges from bond matrix; defaulting to zeros. "
+            f"Error: {type(exc).__name__}: {exc}"
+        )
         formal_charges = np.zeros(N, dtype=int)
 
     rw = Chem.RWMol()
@@ -61,7 +68,7 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, sanitize=True
         atom.SetNoImplicit(True)
         atom.SetNumExplicitHs(0)
         atom.SetFormalCharge(int(formal_charges[idx]))
-        atom.SetNumRadicalElectrons(int(num_rad[idx]))
+        atom.SetNumRadicalElectrons(int(is_radical[idx]))
         if atom_info is not None and idx in atom_info:
             record = atom_info[idx]
             if record.get("atom_map") is not None:
@@ -76,8 +83,11 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, sanitize=True
     for i in range(N):
         for j in range(i + 1, N):
             if adj[i, j]:
-                bo = int(round(float(bond_orders[i, j])))
+                bo = int(round(bond_orders[i, j]))
                 if bo == 0:
+                    warnings.warn(
+                        f"Connected atom pair ({i}, {j}) has zero bond order; falling back to single bond."
+                    )
                     bo = 1
                 btype = BOND_MAP.get(bo)
                 if btype is None:
@@ -90,8 +100,10 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, sanitize=True
     if sanitize:
         try:
             Chem.SanitizeMol(mol)
-        except Exception as e:
-            warnings.warn(f"Sanitization failed: {e}")
+        except (rdchem.KekulizeException, rdchem.AtomValenceException, ValueError, RuntimeError) as e:
+            warnings.warn(
+                f"Sanitization failed for elements {''.join(elements)}: {type(e).__name__}: {e}"
+            )
 
     return mol
 

@@ -4,7 +4,7 @@ Definition of lewis structure object class
 import sys
 import itertools
 import numpy as np
-from rdkit.Chem import BondType, AllChem, Draw
+from rdkit.Chem import AllChem, Draw
 from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
@@ -97,9 +97,6 @@ class lewis_struct:
         self._bo_dict = None
 
         self._get_properties(adj_mat, elements)
-
-        self._bond_to_type = {0: BondType.DATIVE, 1: BondType.SINGLE, 2: BondType.DOUBLE,
-                              3: BondType.TRIPLE, 4: BondType.QUADRUPLE, 5: BondType.QUINTUPLE, 6: BondType.HEXTUPLE}
 
     ###############
     # Properties  #

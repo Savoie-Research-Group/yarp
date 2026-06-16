@@ -5,13 +5,12 @@ initialize:
   initial_structure:
     source: "O=CCCOO"
     type: smiles
-    mode: reaction
+    mode: species
 
   job_manager:
     scheduler: condor
     container: apptainer
     sif_location: /path/to/yarp/containers
-    module_container: "module load apptainer"
     max_active_jobs: 50
     job_name: yarp_condor
     log_dir: condor_logs
@@ -19,6 +18,11 @@ initialize:
     getenv: true
     notification: Never
     condor_universe: vanilla
+
+enumeration:
+  mode: concerted
+  n_break: 2
+  n_form: 2
 
 stages:
   - ll_path

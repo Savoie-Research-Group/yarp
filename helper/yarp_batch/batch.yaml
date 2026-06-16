@@ -1,0 +1,13 @@
+smiles_csv: smiles.csv
+template_config: config.template.yaml
+output_dir: runs
+batch_size: 25
+start_batch: 1
+config_name: input.yaml
+status_name: STATUS.json
+reaction_output_name: auto
+init_log_name: yarp_init.out
+progress_log_name: prog.out
+batch_log_name: yarp_batch.out
+yarp_init: yarp-init
+yarp_progress: yarp-progress

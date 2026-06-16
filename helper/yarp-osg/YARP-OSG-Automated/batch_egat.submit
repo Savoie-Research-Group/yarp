@@ -1,0 +1,24 @@
+# Template submit file for YARP EGAT OSG jobs.
+# The controller writes a configured copy to workdir/.yarp_osg/batch_egat.submit.
+
+universe = vanilla
+container_image = osdf:///configure/egat.sif
+
+initialdir = $(task_dir)
+executable = run_egat_osg.sh
+arguments = $(task_id) $(attempt)
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = run_egat_osg.sh, forward_in.csv, reverse_in.csv, egat_command.txt
+transfer_output_files = forward_out.csv, reverse_out.csv, forward.log, forward.err, reverse.log, reverse.err, task_result.json
+
+request_cpus = 8
+request_memory = 8000 MB
+request_disk = 2048 MB
+
+output = logs/$(Cluster)_$(Process).out
+error = logs/$(Cluster)_$(Process).err
+log = logs/$(Cluster)_$(Process).log
+
+queue task_id, task_dir, attempt from $(input_list)

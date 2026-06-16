@@ -1,0 +1,184 @@
+initialize:
+  verbose: false
+  output: YARP_RXNS.pkl
+  status: STATUS.json
+  initial_structure:
+    source: SMILES_SET_BY_YARP_INIT_BATCH
+    type: smiles
+    mode: species
+  job_manager:
+    scheduler: sge
+    queue: long
+    account: null
+    container: apptainer
+    sif_location: /users/tburton2/Repos/yarp/containers
+    max_active_jobs: 100
+  enumeration:
+    mode: concerted
+    n_break: 2
+    n_form: 2
+    post_enum_filters:
+      lewis_score: 0.0
+      formal_charge: 2.0
+      ring_filter: false
+
+stages:
+  - ll_path
+  - ll_refine
+  - hl_refine
+  # Add hl2_refine here when you want the more expensive ORCA refinement.
+
+ll_path:
+  method: init_rxn_path
+  conf_gen:
+    charge: 0
+    n_unpaired_electrons: 0
+    software: crest
+    lot: gfn2
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "24:00:00"
+  ts_guess:
+    software: pysisyphus
+    gsm_lot: xtb
+    n_conf: 3
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "24:00:00"
+    joint_opt: dual
+    bias_lot: uff
+    charge: 0
+    multiplicity: 1
+
+ll_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: pysisyphus
+    lot: xtb
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "24:00:00"
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "24:00:00"
+    hessian_recalc: 3
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: pysisyphus
+    lot: xtb
+    conv_thresh: gau
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "24:00:00"
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+
+hl_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    product:
+      label: rp_opt
+      lot: xtb
+      software: pysisyphus
+    transition_state:
+      label: ts_opt
+      lot: xtb
+      software: pysisyphus
+  rp_opt:
+    software: orca
+    lot: wb97x-d3/def2-svp
+    n_cpus: 8
+    mem_per_cpu: 4000
+    max_runtime: "48:00:00"
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: orca
+    lot: wb97x-d3/def2-svp
+    conv_thresh: gau
+    n_cpus: 8
+    mem_per_cpu: 4000
+    max_runtime: "48:00:00"
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: orca
+    lot: wb97x-d3/def2-svp
+    conv_thresh: gau
+    n_cpus: 8
+    mem_per_cpu: 4000
+    max_runtime: "48:00:00"
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1
+
+hl2_refine:
+  method: refine_rxn_path
+  initial_geom:
+    reactant:
+      label: rp_opt
+      lot: wb97x-d3/def2-svp
+      software: orca
+    product:
+      label: rp_opt
+      lot: wb97x-d3/def2-svp
+      software: orca
+    transition_state:
+      label: ts_opt
+      lot: wb97x-d3/def2-svp
+      software: orca
+  rp_opt:
+    software: orca
+    lot: wb97x-d3/def2-tzvp
+    n_cpus: 16
+    mem_per_cpu: 4000
+    max_runtime: "96:00:00"
+    charge: 0
+    multiplicity: 1
+  ts_opt:
+    software: orca
+    lot: wb97x-d3/def2-tzvp
+    conv_thresh: gau
+    n_cpus: 16
+    mem_per_cpu: 4000
+    max_runtime: "96:00:00"
+    charge: 0
+    multiplicity: 1
+  irc_val:
+    software: orca
+    lot: wb97x-d3/def2-tzvp
+    conv_thresh: gau
+    n_cpus: 16
+    mem_per_cpu: 4000
+    max_runtime: "96:00:00"
+    max_cycles: 100
+    charge: 0
+    multiplicity: 1

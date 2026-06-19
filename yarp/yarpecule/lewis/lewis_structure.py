@@ -9,7 +9,7 @@ from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
-from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
+from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an, el_metals
 from yarp.yarpecule.lewis.bem_score import bmat_score, bmat_unique, adjust_metals, return_n_e_accept, return_n_e_donate, return_formals
 from yarp.yarpecule.lewis.find_lewis import gen_init, gen_all_lstructs
 from yarp.yarpecule.hashes import bmat_hash
@@ -304,11 +304,25 @@ class lewis_struct:
                                                            min_score=min(scores), ind=len(bond_mats)-1,
                                                            N_score=100, N_max=10000, min_opt=False, min_win=0.5)
 
-        # Collect all discovered BEMs
-        for i, bem in enumerate(seed_bond_mats):
-            if bmat_hash(bem) not in hashes:
-                bond_mats.append(bem)
-                scores.append(seed_scores[i])
+        # Patch F (2026-06-19 ZL): conditional seed-BEM re-pool. For purely
+        # organic systems (no transition metals), the re-pool is restored —
+        # it carries pass-1 seed BEMs into the final ranking, which the
+        # mats_thresh trim then narrows down correctly (organic test suite
+        # relies on this: ester, diazomethane, benzothiazole).
+        #
+        # For transition-metal systems, the re-pool is DISABLED — pass-1
+        # seeds (without aromaticity weighting) often correspond to
+        # non-aromatic ligand configurations that adjust_metals dative-izes
+        # via Z-bonds, producing impossible/high oxidation states. Disabling
+        # the re-pool for TM systems eliminates 38/55 of the divergence vs
+        # the old patched YARP on a 144-archive stratified TM sample.
+        has_tm = any(el in el_metals for el in elements)
+        if not has_tm:
+            # Collect all discovered BEMs (organic-only)
+            for i, bem in enumerate(seed_bond_mats):
+                if bmat_hash(bem) not in hashes:
+                    bond_mats.append(bem)
+                    scores.append(seed_scores[i])
 
         # Calculate final scores (radical term is now turned on!)
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)

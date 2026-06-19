@@ -290,19 +290,21 @@ class lewis_struct:
         hashes = set([bmat_hash(seed_bond_mats[0])])
 
         # Next round of BEM searching
-        # Patch B (2026-06-12 ZL): switch from greedy descent (min_opt=True)
-        # to exploratory search (min_opt=False, min_win=0.5) to match the
-        # old-YARP patched behavior (GH commit fed9385). The 2nd-pass greedy
-        # descent gets stuck on high-OS local minima for TM-containing
-        # species; min_win=0.5 lets the search jump up to 0.5 above the
-        # current best and find lower-score (chemically sensible) BEMs.
+        # Patch B reverted (2026-06-19 ZL): the bisection-vs-GH-commit-fed9385
+        # initially carried over the exploratory search params (min_opt=False,
+        # min_win=0.5) from old patched YARP. On a 144-archive TM stratified
+        # sample, isolating B (`only-B` branch) showed it had a net-NEGATIVE
+        # effect: 1 archive fixed, 3 introduced as new diffs vs slim. It also
+        # breaks 3 organic pytest cases (test_diazomethane_xyz, test_ester_xyz,
+        # test_benzothiazole_smi). Reverting to greedy descent (min_opt=True)
+        # matches new-YARP-master and removes both regressions.
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
                                                            hashes, elements, reactive,
                                                            self._rings, ring_atoms, bridgeheads,
                                                            # set according to local_opt flag
                                                            seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
-                                                           N_score=100, N_max=10000, min_opt=False, min_win=0.5)
+                                                           N_score=100, N_max=10000, min_opt=True)
 
         # Patch F (2026-06-19 ZL): conditional seed-BEM re-pool. For purely
         # organic systems (no transition metals), the re-pool is restored —

@@ -7,7 +7,9 @@ from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_expand_oc
 
 
 def bmat_score(bond_mat, elements, rings,
-               w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=-0.01,
+               # Patch w_rad (2026-06-19 ZL): default reverted to +0.1 to match
+               # old patched YARP. See lewis_structure.py for rationale.
+               w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=0.1,
                factor=0.0, verbose=False):
     """
     Score function used to rank candidate Lewis Structures during and after the exploration. The `find_lewis()` algorithm uses a few 

@@ -696,6 +696,38 @@ Neither value is physically meaningful — gold-hydride clusters are
 delocalized polyhedral bonding where per-atom OS isn't a well-defined
 quantity. But the new value (+1) is *less absurd* than the old (+9).
 
+### 9.4.5 Figure: regenerated dial-plot and per-metal histogram comparison
+
+Three figures saved alongside this doc:
+
+- `tm_os_dials_OLD.png` — full-circle radial dial-plot reproduction of the
+  published Figure 2, built from the deduped subset of the slim CSV. This is
+  the apples-to-apples reproduction of what fed the manuscript figure.
+- `tm_os_dials_NEW.png` — same dial-plot, built from the FINAL CSV. At
+  this resolution the OLD and NEW look essentially identical to the eye,
+  consistent with the +0.3 % over-max delta.
+- `tm_os_compare_OLD_vs_NEW.png` — paired bar chart per metal showing
+  OLD (navy) and NEW (gold) atom counts in each OS bin, with the
+  chemically-impossible region (OS > group max) shaded pink. This is
+  the most informative visualization for spotting actual differences.
+
+Observations from the bar-chart panel:
+
+- Most metals (Sc, Ti, V, Cr, Mn, Fe, Co, Ni, Mo, Ru, Rh, Pd, Ir, Pt,
+  W, Re, Os, Hf, Ta) — OLD and NEW bars overlap so closely you have
+  to squint to tell them apart.
+- Cu: visibly lower NEW bar in the OS=4 bin (the over-max region).
+- Ag, Au: visibly lower NEW bars across the high-OS tail — the −29 %
+  and −43 % wins are clear at the bin level.
+- Zr, Ti: small downward shift in NEW for the higher-OS bins.
+- Almost no metal shows NEW bars taller than OLD by more than ~5 %
+  in any single bin.
+
+The figure also confirms the spot-check narrative: corpus-wide OS
+distributions are nearly unchanged between OLD and NEW, with the
+patches improving the heavy-noble-metal tails and being neutral
+elsewhere.
+
 ### 9.5 Bottom line on spot-check
 
 - **Residual disagreement is benign noise, not a bug pattern.** 94 % of

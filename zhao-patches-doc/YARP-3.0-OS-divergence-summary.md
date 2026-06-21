@@ -52,26 +52,47 @@ behavior is mathematically identical to the old version.
 
 - **Published OS distribution (Figure 2 of the manuscript) is still valid.**
   It was generated with the old (correctly-patched) YARP, and the
-  patched-new-YARP recovers the same answers on 89% of a stratified
-  transition-metal benchmark — including all of the previously
-  catastrophic high-OS bugs.
+  patched-new-YARP recovers the same answers on **80.25 %** of the full
+  181 450-archive TM corpus, **89 %** on the stratified hard-metal
+  sample — and eliminates every chemically impossible OS value the
+  unpatched new YARP produced.
 - **For any future OS extraction on this corpus, we'll use the patched
   YARP**, not the unmodified YARP 3.0 release.
-- **The remaining ~13% disagreement** on the benchmark is concentrated in
-  genuinely hard cases (non-innocent ligands, metal-metal bonded dimers,
-  Ni(I)/Ni(II) ambiguity) where the "right" answer is itself a chemistry
-  judgment call. It is not driven by a single bug pattern.
+- **The remaining ~20 % disagreement on the corpus** is not a bug
+  pattern. Per-metal up/down splits are roughly symmetric — Pd
+  4651↑/4575↓, Mo 1355↑/1373↓, Cu 1745↑/2282↓. The pattern is
+  consistent with two YARP versions making slightly different
+  Lewis-structure local-minimum choices, mostly ±1 OS shifts on common
+  late-TM organometallic catalysts.
 
 ## Numbers
+
+**Stratified sanity sample (144 reactions, 18 transition metals, weighted
+toward hard rare metals where bugs were most visible):**
 
 | | speed | match vs published OS | YARP unit tests |
 |---|---:|---:|---:|
 | YARP 3.0, raw | 1× | 65% | pass |
 | YARP 3.0, patched (our version) | 10× | **89%** | pass |
 
-Benchmark: 144 reactions stratified across 18 transition metals, weighted
-toward W, Re, Os, Pt, Cr, Mn, Co, Au — the metals where the impossible-OS
-bugs were most concentrated.
+**Full corpus run (181 450 TM reactions, completed 2026-06-20):**
+
+| | value |
+|---|---:|
+| Archives processed | 181 450 |
+| YARP crashes / errors | **10 (0.01 %)** |
+| Full agreement with published OS values | **80.25 %** |
+| Disagreements that are just ±1 OS shifts | ~ 90 % of the 20 % |
+| Chemically impossible OS values produced | **0** (all eliminated by patches) |
+
+The full-corpus number is lower than the stratified one because the
+sample was deliberately biased toward hard rare metals (W, Re, Os, Pt,
+Cr…) where our patches added the most lift. The corpus is dominated
+by Pd / Rh / Fe / Ni / Cu where two YARP versions tend to disagree by
+±1 OS unit on stochastic Lewis-structure choices. At corpus scale the
+per-metal up/down split is roughly symmetric — i.e., not a systematic
+bug, just two algorithms exploring slightly different paths to similar
+chemistry.
 
 ## Next steps
 

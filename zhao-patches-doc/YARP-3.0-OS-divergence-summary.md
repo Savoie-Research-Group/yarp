@@ -56,13 +56,15 @@ behavior is mathematically identical to the old version.
   181 450-archive TM corpus, **89 %** on the stratified hard-metal
   sample — and eliminates every chemically impossible OS value the
   unpatched new YARP produced.
-- **The patched new YARP is actually MORE chemically conservative than
-  the old patched YARP that fed the published figure.** It reports
-  **78 % fewer atom-level OS values that exceed the group maximum**
-  (Pd(V), Rh(VII), Fe(VII), Cu(IV), etc.) — biggest reductions on
-  Pd (−76 %), Rh (−87 %), Ag (−94 %), Au (−97 %). Regenerating the
-  dial-plot from the new CSV would *improve* its tail bins, not
-  degrade them.
+- **On chemically-impossible OS counts at corpus scale, the new stack
+  is about even with the old patched YARP.** It eliminates the
+  catastrophic single-archive failures (Pt(VII), Cr(VI), Cp-Ir(V),
+  Co(VII)) but the overall count of atoms above group-max changes by
+  only +0.3 % (11 477 → 11 515). Real wins on heavy noble metals:
+  Au −43 %, Ag −29 %. Other late-TM metals see small symmetric
+  shifts in either direction. Dial-plot regeneration is expected to
+  look similar to the published version, with slight improvements
+  in the Au / Ag tails.
 - **For any future OS extraction on this corpus, we'll use the patched
   YARP**, not the unmodified YARP 3.0 release.
 - **The remaining ~20 % disagreement on the corpus** is not a bug
@@ -89,7 +91,9 @@ toward hard rare metals where bugs were most visible):**
 | YARP crashes / errors | **10 (0.01 %)** |
 | Full agreement with published OS values | **80.25 %** |
 | Disagreements that are just ±1 or ±2 OS shifts | **94 %** of the 20 % |
-| Chemically impossible OS values produced | **78 % fewer than the old YARP** (53 980 → 11 515 atom-level cases) |
+| Chemically impossible OS atoms (atom-level) | OLD 11 477 → NEW 11 515 (essentially flat) |
+| Reduction on heavy-noble-metal tails | Au −43 %, Ag −29 % |
+| Catastrophic single-archive bugs (Pt(VII), Cr(VI), Cp-Ir(V)) | **all eliminated** |
 
 The full-corpus number is lower than the stratified one because the
 sample was deliberately biased toward hard rare metals (W, Re, Os, Pt,

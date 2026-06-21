@@ -42,11 +42,15 @@ Key conclusions:
   numbers; only 10 raise exceptions (down from thousands on raw new YARP).
 - **The chemically impossible OS bugs are gone.** Pt(VII) / Cr(0)→Cr(VI) /
   Ir(V) on Cp-Ir / Co(VII), all eliminated in the FINAL stack.
-- **At corpus scale, the new stack reports 78 % FEWER chemically impossible
-  OS atoms than the old patched YARP did.** The old slim CSV had 53 980
-  atom-level OS values exceeding the group maximum (Pd(V), Rh(VII),
-  Fe(VII), Cu(IV) and similar). The new FINAL CSV has only 11 515 —
-  major drops on every late-TM offender (see § 9.1).
+- **At corpus scale, on chemically-impossible OS counts, the new stack is
+  about even with the old patched YARP** (+38 atoms over-group-max, +0.3 %).
+  Real wins on Au (−43 %), Ag (−29 %), Cu (−5 %); slight increases on
+  Pd, Co, Ni, Rh. The 78 % reduction quoted in earlier drafts of this
+  doc was a measurement artifact (full slim CSV at 462k rows vs deduped
+  FINAL at 181k); on an apples-to-apples deduped basis the metric is
+  basically a wash. What we eliminated is the *catastrophic* over-max
+  failure mode (Cp-Cr → Cr(VI), Pt(0) → Pt(VII), etc.) shown on the
+  stratified sample, not corpus-wide impossible-OS counts. See § 9.1.
 - **The residual ~20 % corpus-wide disagreement is not a bug pattern.**
   94 % of disagreements are ±1 or ±2 OS units (Lewis-choice noise).
   Per-metal up/down splits are roughly symmetric: Pd 4651↑/4575↓,
@@ -584,40 +588,52 @@ atom-level OS values exceed the maximum group oxidation state for that
 element (the standard chemistry constraint, e.g. Pd cannot exceed +4,
 Fe cannot exceed +6, Cu cannot exceed +3 under classical Lewis rules)?
 
-| Metal | slim CSV (old YARP) | FINAL CSV (new+patches) | Δ |
-|---|---:|---:|---:|
-| Pd (group max 4) | 10 118 | 2 520 | **−7 598** |
-| Rh (group max 6) | 8 881 | 1 115 | **−7 766** |
-| Fe (group max 6) | 9 935 | 2 583 | **−7 352** |
-| Cu (group max 3) | 5 554 | 1 404 | **−4 150** |
-| Co (group max 5) | 4 325 | 1 198 | −3 127 |
-| Ni (group max 4) | 3 962 | 1 188 | −2 774 |
-| Ag (group max 3) | 3 789 | 212 | −3 577 |
-| Au (group max 5) | 3 215 | 91 | −3 124 |
-| Ir (group max 6) | 2 061 | 642 | −1 419 |
-| Zn (group max 2) | 1 529 | 376 | −1 153 |
-| Cd (group max 2) | 246 | 90 | −156 |
-| Pt (group max 6) | 199 | 69 | −130 |
-| Hg (group max 2) | 166 | 27 | −139 |
-| **total** | **53 980** | **11 515** | **−42 465 (−78.7 %)** |
+The honest, apples-to-apples comparison restricts both CSVs to the same
+181 450-archive deduplicated set (`Scripts/v2/os_test_new_yarp/dedup_tm_picks.txt`)
+and sums atom-level OS counts across reactant + product:
 
-At the archive level, of the disagreements where one CSV has an
-over-max OS:
+| Metal | OLD slim | NEW FINAL | Δ | direction |
+|---|---:|---:|---:|---|
+| Fe (group max 6) | 2 581 | 2 583 | +2 | flat |
+| Pd (group max 4) | 2 483 | 2 520 | +37 | slight up |
+| Cu (group max 3) | 1 474 | 1 404 | −70 | down |
+| Ni (group max 4) | 1 139 | 1 188 | +49 | slight up |
+| Co (group max 5) | 1 133 | 1 198 | +65 | slight up |
+| Rh (group max 6) | 985 | 1 115 | +130 | up |
+| Ir (group max 6) | 645 | 642 | −3 | flat |
+| Zn (group max 2) | 390 | 376 | −14 | flat |
+| Ag (group max 3) | 300 | 212 | **−88 (−29 %)** | **down** |
+| Au (group max 5) | 161 | 91 | **−70 (−43 %)** | **down** |
+| Cd (group max 2) | 94 | 90 | −4 | flat |
+| Pt (group max 6) | 65 | 69 | +4 | flat |
+| Hg (group max 2) | 27 | 27 | 0 | flat |
+| **total** | **11 477** | **11 515** | **+38 (+0.3 %)** | **flat** |
+
+At the archive level (atoms restricted to apples-to-apples):
 
 | Type | count | meaning |
 |---|---:|---|
-| over-max in BOTH csvs | 10 349 | corpus-wide oddities; not bug-related (likely cluster chemistry or unusual coordination) |
+| over-max in BOTH csvs | ~10 349 | corpus-wide oddities; not bug-related (likely cluster chemistry or unusual coordination geometries) |
 | over-max in slim only | 1 124 | NEW FIX — patched stack corrected an old impossible OS |
 | over-max in new only | 1 162 | true regressions in our stack |
-| net change in over-max | +38 | essentially zero at the 60k-diff scale |
+| **net change in over-max** | **+38** | essentially zero at the 11k-over-max scale |
 
-**Interpretation.** Bulk reduction at the metal-by-metal level is
-dramatic (Pd −76 %, Rh −87 %, Fe −74 %, Cu −75 %, Ag −94 %, Au −97 %).
-True archive-level regressions (1 162) and fixes (1 124) almost balance
-out. The patched new YARP is strictly more chemically conservative than
-the old patched YARP about reporting impossible OS values. Whatever
-dial-plot is generated from the new FINAL CSV should have noticeably
-cleaner tails in the bin ≥ group-max region for every late-TM metal.
+**Interpretation.** At corpus scale on chemically-impossible OS counts,
+the patched-new-YARP stack is **about even** with the old patched YARP.
+Real wins on the heavy noble metals (Au −43 %, Ag −29 %), modest losses
+on Pd/Rh/Co/Ni (+37 to +130 each). These changes nearly cancel.
+
+This is a more sober reading than an earlier draft of this doc that
+quoted a 78 % reduction; that figure compared the full 462k-row slim CSV
+(with all charge/mult variants) against the 181k-row FINAL CSV and was
+an apples-to-oranges artifact.
+
+What the patches *do* eliminate is the **catastrophic high-OS failure
+mode** visible on the stratified sample — Cp-Cr → Cr(VI) on neutral
+trimers, Pt(0) → Pt(VII), Cp-Ir → Ir(V). These hand-picked TM bugs
+were producing one or two impossible OS values *per archive* on
+specific molecule classes, which is a different and more harmful
+failure than the uniform-distribution over-max baseline rate.
 
 ### 9.2 Per-atom OS shift magnitude distribution
 
@@ -682,10 +698,17 @@ quantity. But the new value (+1) is *less absurd* than the old (+9).
 
 ### 9.5 Bottom line on spot-check
 
-- **Residual disagreement is benign noise, not a bug pattern.**
-- **At corpus scale, the patched new YARP is strictly more chemically
-  conservative** about impossible OS values than the old patched YARP
-  that produced the published dial-plot.
-- **Dial-plot regeneration from the new FINAL CSV is expected to *improve*
-  the published plot, not degrade it**, especially in the over-group-max
-  tail bins of Pd, Rh, Fe, Cu, Ag, Au.
+- **Residual disagreement is benign noise, not a bug pattern.** 94 % of
+  per-atom diffs are |Δ| ≤ 2.
+- **At corpus scale, on chemically-impossible OS counts, the patched
+  new YARP is about even** with the old patched YARP (+38 atoms,
+  +0.3 %). The catastrophic per-archive failures we fixed don't show
+  up in the corpus-wide over-max histogram because the underlying
+  per-corpus baseline rate (~6 % of late-TM atoms) dominates any
+  single-archive correction.
+- **The Au and Ag tails *do* shrink visibly** (−43 % and −29 %) — these
+  are the metals where our patches matter most in a corpus average.
+- **Dial-plot regeneration from the new FINAL CSV is expected to look
+  similar to the published plot** for most metals, with cleaner tails
+  for Au and Ag. The catastrophic single-archive bugs (Pt(VII),
+  Cr(VI)) are no longer present.

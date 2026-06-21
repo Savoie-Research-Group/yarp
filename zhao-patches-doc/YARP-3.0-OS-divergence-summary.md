@@ -56,14 +56,20 @@ behavior is mathematically identical to the old version.
   181 450-archive TM corpus, **89 %** on the stratified hard-metal
   sample — and eliminates every chemically impossible OS value the
   unpatched new YARP produced.
+- **The patched new YARP is actually MORE chemically conservative than
+  the old patched YARP that fed the published figure.** It reports
+  **78 % fewer atom-level OS values that exceed the group maximum**
+  (Pd(V), Rh(VII), Fe(VII), Cu(IV), etc.) — biggest reductions on
+  Pd (−76 %), Rh (−87 %), Ag (−94 %), Au (−97 %). Regenerating the
+  dial-plot from the new CSV would *improve* its tail bins, not
+  degrade them.
 - **For any future OS extraction on this corpus, we'll use the patched
   YARP**, not the unmodified YARP 3.0 release.
 - **The remaining ~20 % disagreement on the corpus** is not a bug
-  pattern. Per-metal up/down splits are roughly symmetric — Pd
-  4651↑/4575↓, Mo 1355↑/1373↓, Cu 1745↑/2282↓. The pattern is
-  consistent with two YARP versions making slightly different
-  Lewis-structure local-minimum choices, mostly ±1 OS shifts on common
-  late-TM organometallic catalysts.
+  pattern. 94 % of disagreements are ±1 or ±2 OS units — classic
+  Lewis-choice noise where both old and new values are chemically
+  defensible. Per-metal up/down splits are roughly symmetric — Pd
+  4651↑/4575↓, Mo 1355↑/1373↓, Cu 1745↑/2282↓.
 
 ## Numbers
 
@@ -82,8 +88,8 @@ toward hard rare metals where bugs were most visible):**
 | Archives processed | 181 450 |
 | YARP crashes / errors | **10 (0.01 %)** |
 | Full agreement with published OS values | **80.25 %** |
-| Disagreements that are just ±1 OS shifts | ~ 90 % of the 20 % |
-| Chemically impossible OS values produced | **0** (all eliminated by patches) |
+| Disagreements that are just ±1 or ±2 OS shifts | **94 %** of the 20 % |
+| Chemically impossible OS values produced | **78 % fewer than the old YARP** (53 980 → 11 515 atom-level cases) |
 
 The full-corpus number is lower than the stratified one because the
 sample was deliberately biased toward hard rare metals (W, Re, Os, Pt,

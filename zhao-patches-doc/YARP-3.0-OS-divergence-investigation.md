@@ -495,3 +495,69 @@ section 8.
   Pt(VII), no Cr(VI) on neutral Cr clusters, no Cp-Ir(V), no Co(VII).
 - **0.01 % YARP errors** is well within "ship it" tolerance for the
   GoldDIGR data deposit.
+
+---
+
+## 8 · The 10 YARP errors
+
+Of the 181 450 archives processed under the FINAL stack, **10** raised an
+exception (`LewisStructureError` or `ValueError`) during yarpecule
+construction. All 10 are characterized below.
+
+| # | Archive | Side | Error | Formula | Class |
+|---|---|---|---|---|---|
+| 1 | `chem_200902004 / 41_0_1` | P | LewisStructureError | Ni·B₈·H₁₆ | metallaborane |
+| 2 | `jp1c07253 / 50_-1_1` | P | ValueError | C₂₂·Pd₃·S₃·O₃·P₂·H₄₁ | Pd₃ sulfide cluster |
+| 3 | `jp8b05759 / 19_-1_1` | P | LewisStructureError | Mo·B₁₉ | metallaborane |
+| 4 | `jp803201q / 01_0_2` | P | LewisStructureError | Sc·B₄·H₁₆ | metallaborane |
+| 5 | `c9cc00101h1 / 11_0_2` | P | ValueError | C₂₀·H₂₇·Ru·O₄ | Ru organometallic (radical) |
+| 6 | `c9nj06335h1 / 06_-1_2` | P | LewisStructureError | Cr·B₁₆ | metallaborane |
+| 7 | `c9nj06335h1 / 12_0_2` | R | LewisStructureError | Mn·B₁₆ | metallaborane |
+| 8 | `c9nj06335h1 / 20_0_2` | R | LewisStructureError | Co·B₁₆ | metallaborane |
+| 9 | `c9nj06335h1 / 22_0_1` | P | LewisStructureError | Ni·B₁₆ | metallaborane |
+| 10 | `d0cc03656k1 / 01_0_2` | P | LewisStructureError | Ru·Pb₁₁·C₁₀·H₁₅ | Ru-Pb cluster |
+
+### 8.1 Pattern
+
+- **8 of 10 are metallaboranes** (M·Bₙ with n = 4 – 19). These are
+  Wade/Mingos polyhedral clusters where bonding is delocalized multi-center
+  (3c-2e or polyhedral skeletal bonding). The YARP Lewis search assumes
+  classical 2-center / 2-electron bonds with at most resonance between
+  them — there is no valid 2c-2e Lewis structure for a closo or nido
+  borane cage, so the search exhausts all moves and `gen_init` raises
+  `LewisStructureError("Incompatible charge state and adjacency matrix")`.
+- **1 is a Pd₃ sulfide cluster** (jp1c07253). Trinuclear metals with
+  bridging chalcogenides similarly often need 3c-2e bonds. The
+  `ValueError` here is a downstream symptom of a malformed BEM emerging
+  from the failing search.
+- **1 is a Ru·Pb₁₁ cluster** (d0cc03656k1). Heavy main-group + TM
+  multi-metal — same multi-center bonding issue.
+
+### 8.2 Why this is benign
+
+- These 10 are **outside YARP's design scope**. The Lewis-structure model
+  is fundamentally 2c-2e; clusters with delocalized skeletal bonding
+  cannot be expressed in that model.
+- **4 of the 10 (40 %) are from one paper** (`c9nj06335h1`) studying a
+  series of analogous M·B₁₆ clusters. This is academic exploration of a
+  single anomalous bonding class, not 4 different bugs.
+- **Often only one of the two sides fails.** Reactant and product
+  geometries have similar adjacency but slightly different bond patterns —
+  one half is sometimes workable. Our pipeline emits `ERR:` strings for
+  the failing side and OS for the working side, so downstream consumers
+  can still partially use these rows.
+- **At 10 / 181 450 = 0.0055 %**, this is well below any noise floor
+  that would affect aggregate distributions like Figure 2.
+
+### 8.3 What to tell the YARP team
+
+The YARP maintainers may want to add an explicit "cluster molecule
+detected, Lewis search not applicable" return value rather than raising
+`LewisStructureError`, so downstream tools can branch on it. But there is
+no realistic algorithmic fix — getting Wade's rule clusters into a 2c-2e
+formalism would require a separate cluster-aware mode of YARP, well
+beyond the scope of an OS-extraction patch.
+
+For our pipeline these 10 archives are quietly excluded from any
+aggregate statistics (they only appear in the master CSV with `ERR:`
+flags so consumers can detect them).

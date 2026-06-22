@@ -78,12 +78,12 @@ class network:
             for r in rxn.reactant.species:
                 reactant_label = f'Sp_{r.hash}'
                 crn.add_node(reactant_label, type='species', smi=r.canon_smi)
-                crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, -1000), weight=1)
+                crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, -1000), weiner=1)
 
             for p in rxn.product.species:
                 product_label = f'Sp_{p.hash}'
                 crn.add_node(product_label, type='species', smi=p.canon_smi)
-                crn.add_edge(rxn_label, product_label, dG=0, weight=0)
+                crn.add_edge(rxn_label, product_label, dG=0, weiner=0)
 
         return crn
 
@@ -117,7 +117,7 @@ class network:
         # Only count reaction nodes as "steps" along the path
         dist = sum(1 for s in path if "Rx_" in s)
 
-        return dist
+        return float(dist)
 
     def calc_eff_branching(self, start, end, tolerance=1e-1, max_iter=100):
         if not isinstance(start, yarpecule) or not isinstance(end, yarpecule):
@@ -191,7 +191,11 @@ class network:
             raise RuntimeError("Requested start and end nodes must be single molecules")
 
         d = self.calc_min_dist(start=start, end=end)
-        return 1 / d
+
+        if d == 0.0:
+            return float('inf')
+        else:
+            return 1 / d
 
     def calc_wiener_index(self):
         """
@@ -202,7 +206,7 @@ class network:
             Reactant species -> reaction nodes are weighted with 1
             Reaction nodes -> product species are weighted with 0
         """
-        return nx.wiener_index(G=self.crn, weight='weight')
+        return nx.wiener_index(G=self.crn, weight='weiner')
 
     def get_simple_paths(self, start, end, cutoff=None, verbose=False):
         """

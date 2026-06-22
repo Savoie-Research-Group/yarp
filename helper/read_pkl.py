@@ -203,7 +203,7 @@ def _add_options(parser):
                         help="Include all forward and reverse barrier columns; equivalent to -fr.")
     parser.add_argument("-a", "--all", action="store_true",
                         help="Include all forward, reverse, and reaction dG columns; equivalent to -frg.")
-    parser.add_argument("-n", "--network-meta", action="store_true",
+    parser.add_argument("-n", "--meta", action="store_true",
                             help="Include a column with keys from rxn.network_meta.")
 
 def cli():

@@ -82,7 +82,7 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
         for p in prod:
             if p.hash in p_set: continue # Throw away all duplicate candidates
             if p.hash in r_set:
-                print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
+                if verbose: print(f"   + SKIPPING! {p.canon_smi} has already been explored off of as a reactant!")
                 continue # Second pass to avoid re-exploring (filter #2)
             p_set.add(p.hash)
             candidates.append(p)

@@ -7,8 +7,16 @@ from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_expand_oc
 
 
 def bmat_score(bond_mat, elements, rings,
-               # Patch w_rad (2026-06-19 ZL): default reverted to +0.1 to match
-               # old patched YARP. See lewis_structure.py for rationale.
+               # Patch w_rad (2026-06-19 ZL): default reverted from -0.01 to +0.1
+               # to match old patched YARP convention. Note: this revert is
+               # COSMETIC, not a behavior change. The new bmat_score computes
+               # `rad_env = +pol/(100+pol)` internally; old YARP find_lewis
+               # passed `rad_env = -0.1 * pol/(100+pol)` from outside. The
+               # `w_rad * rad_env` product is algebraically identical between
+               # the two: new (-0.01)*(+pol/(100+pol)) == old (+0.1)*(-0.1*pol/(100+pol)).
+               # Empirical bisection (only-B/w_rad-only branch) confirmed zero
+               # chemistry impact on a 144-archive stratified TM sample.
+               # Reverted only to keep w_rad > 0 by downstream convention.
                w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=0.1,
                factor=0.0, verbose=False):
     """

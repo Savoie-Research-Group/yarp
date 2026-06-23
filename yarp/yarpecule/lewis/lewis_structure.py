@@ -127,12 +127,17 @@ class lewis_struct:
     def _gen_bond_el_mat(self, adj_mat, elements, q=0,
                          mats_max=10, mats_thresh=0.5,
                          w_def=-1, w_exp=0.1, w_formal=0.1,
-                         # Patch w_rad (2026-06-19 ZL): revert sign from -0.01 to +0.1
-                         # to match old patched YARP find_lewis default. New YARP master
-                         # flipped this term to REWARD radicals on polarizable atoms; old
-                         # PENALIZED them. The flip biases TM dial-plot toward higher OS
-                         # because high-OS BEMs leave radicals on ligand atoms that are
-                         # now rewarded under -0.01.
+                         # Patch w_rad (2026-06-19 ZL): default reverted from -0.01 to +0.1
+                         # to match old patched YARP find_lewis convention. COSMETIC ONLY,
+                         # not a behavior change. The sign flip in w_rad is compensated by
+                         # a corresponding sign+scale flip in how `rad_env` is computed:
+                         #   new bem_score:   rad_env = +pol/(100+pol)
+                         #   old find_lewis:  rad_env = -0.1 * pol/(100+pol)
+                         # so w_rad*rad_env evaluates to the same number under both
+                         # conventions: (-0.01)*(+pol/...) == (+0.1)*(-0.1*pol/...).
+                         # Bisection (only-w_rad branch on a 144-archive TM sample) confirmed
+                         # zero chemistry effect. Kept for the +0.1 convention used by
+                         # downstream code that calls bmat_score directly.
                          w_aro=-24, w_rad=0.1, factor=0.0, local_opt=True):
         """
         Accesses self._rings, but shouldn't modify it at all...

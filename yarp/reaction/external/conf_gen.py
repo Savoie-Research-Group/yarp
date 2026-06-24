@@ -47,7 +47,11 @@ class CrestConfCalculator(ConfTask):
                 f.write("#!/bin/bash\n")
                 self.write_scheduler_headers(f)
                 f.write(f"cd {self.scratch_dir}\n")
-                # Pipe output to a log file so it doesn't flood the local terminal
+                if self.config.seed is not None:
+                    # Pin xTB's internal OpenMP threads to match CREST's -T setting so
+                    # geometry optimizations are also single-threaded and reproducible.
+                    f.write(f"export OMP_NUM_THREADS={self.config.n_cpus}\n")
+                    f.write(f"export MKL_NUM_THREADS={self.config.n_cpus}\n")
                 f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
         except PermissionError:
             raise PermissionError(
@@ -137,6 +141,9 @@ class CrestConfCalculator(ConfTask):
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"
+
+        if self.config.seed is not None:
+            cmd += f" --seed {self.config.seed}"
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!

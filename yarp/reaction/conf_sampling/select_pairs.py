@@ -17,12 +17,8 @@ def select_gsm_pairs(rxn, config):
     """
     Orchestrates Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
     """
-#    r_confs = list(rxn.reactant.conformers.values())
-#    p_confs = list(rxn.product.conformers.values())
-
-
-    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"]    # SHQK : The original raw input geometry of the reactant/product should not be included for pair selection once conf_sampling is performed. In case NO conformer sampling is requested (currently this is not an option, the default is to perform conf_sampling for both reacatnt and product), a condition can be added later to keep "initial_geom" because that will be the only option to perform "select_gsm_pairs" with. 
-    p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]    # SHQK : The original raw input geometry of the reactant/product should not be included for pair selection once conf_sampling is performed. In case NO conformer sampling is requested (currently this is not an option, the default is to perform conf_sampling for both reacatnt and product), a condition can be added later to keep "initial_geom" because that will be the only option to perform "select_gsm_pairs" with.
+    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"] 
+    p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]
 
     # --- STEP A: Apply Joint Optimization (Biasing) ---
     lot = config.bias_lot
@@ -37,14 +33,10 @@ def select_gsm_pairs(rxn, config):
     if mode in ['dual', 'p_only']:
         biased_r = [ob_joint_optimize(c, rxn.product.paired_bem, lot) for c in p_confs]
 
-
-    # --- STEP B: Cross-Product Evaluation & Tournament ---
-    # ERM: We'll see... this is probably an unacceptable bottleneck...
-
     # Default to "conformation-poor" model, unless an excess of conformers is present
     n_conf = config.n_conf
     total_conf = len(r_confs) + len(p_confs)
-    verbose = getattr(config, "verbose", True)
+    verbose = getattr(config, "verbose", False)
     if verbose:
         print("Total number of reactant + product conformers generated = ", total_conf)
 
@@ -62,21 +54,19 @@ def select_gsm_pairs(rxn, config):
     # Truncate both the original and biased lists when the conformer pool is too large compared to the number of rxn conformers requested
     limit = n_conf * 5
     if len(r_confs) > limit:
-        r_confs = r_confs[:limit]    # SHQK : It is important to truncate the original conformer list as well to avoid list indexing error arising due to 1:1 matching in the M+N algorithm
+        r_confs = r_confs[:limit]    
         biased_p = biased_p[:limit]
     if len(p_confs) > limit:
-        p_confs = p_confs[:limit]    # SHQK : It is important to truncate the original conformer list as well to avoid list indexing error arising due to 1:1 matching in the M+N algorithm
+        p_confs = p_confs[:limit]    
         biased_r = biased_r[:limit]
 
 
-    # --- STEP C: Cross-Product Evaluation & Tournament ---
-    # SHQK : Replacing the M*N evaluation loop with a 1:1 (M+N) index-matching approach in the following. The previous M*N approach was not only an inefficient bottleneck, but also incorrectly implemented
+    # --- STEP B: Reactant-Product Pair Evaluation & Tournament ---
     approved_pairs = []
     approved_indicators = []
     dropped_pairs = 0
 
     for ind, r_c in enumerate(r_confs):
-#        for p_c in biased_p:
          
             # 1. Unaligned Evaluation
             ind_unaligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=biased_p[ind].geo)
@@ -103,14 +93,12 @@ def select_gsm_pairs(rxn, config):
                 approved_pairs.append({
                     "r_conf": r_c,
                     "p_conf": best_p,
-                    "score": best_prob[0][1]    # SHQK : Or best_prob[0][0]??. [0][1] is correct in this case, as later the pairs are stored in descending order (reverse=True).
+                    "score": best_prob[0][1]
                 })
-            else:   # SHQK : Debugging..... 
+            else:
                 dropped_pairs += 1
-
 ####################################################################
     for ind, p_c in enumerate(p_confs):
-#        for p_c in biased_p:
 
             # 1. Unaligned Evaluation
             ind_unaligned = return_indicator(E=r_c.elements, RG=p_c.geo, PG=biased_r[ind].geo)
@@ -139,10 +127,10 @@ def select_gsm_pairs(rxn, config):
                     "p_conf": p_c,
                     "score": best_prob[0][1]
                 })
-            else:    # SHQK : Debugging.....
+            else:
                 dropped_pairs += 1
 
-    # --- STEP D: Sort and Select Top N ---
+    # --- STEP C: Sort and Select Top N ---
     # Sort descending by probability of success
     approved_pairs.sort(key=lambda x: x["score"], reverse=True)
 

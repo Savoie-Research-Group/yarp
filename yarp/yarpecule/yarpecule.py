@@ -412,6 +412,9 @@ class yarpecule:
         # which triggers whenever you initialize from a .mol file for various and sundry reasons.
         # I have decided it is not worth my time to continue troubleshooting how to avoid this.
         mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
+        if mol1 is None:
+            os.remove(tmp_file)
+            return
         if verbose:
             print("RDKit mol dump before mapping:")
             for line in Chem.MolToMolBlock(mol1).splitlines():
@@ -423,6 +426,9 @@ class yarpecule:
 
         # Use RDKit to get atom-mapped SMILES string
         mol2 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
+        if mol2 is None:
+            os.remove(tmp_file)
+            return
         atoms = mol2.GetNumAtoms()
         for idx in range(atoms):
             mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(self._atom_info[idx]["atom_map"]))

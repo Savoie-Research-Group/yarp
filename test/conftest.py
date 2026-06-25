@@ -248,6 +248,12 @@ def khp_d1():
     file = str(Path(__file__).parent / "pickles" / "3hp_heavy_b2f2_d1.pkl")
     return pickle.load(open(file, 'rb'))
 
+@pytest.fixture
+def khp2pp22_soergel_beam2_cyc3():
+    """Returns a dictionary object of the reactions contained in khp2pp22 (depth 3) pickle file."""
+    file = str(Path(__file__).parent / "pickles" / "khp2pp22_soergel_beam2_cyc3.pkl")
+    return pickle.load(open(file, 'rb'))   
+
 # Molecule files
 @pytest.fixture
 def ethene_xyz():

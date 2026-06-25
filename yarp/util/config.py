@@ -1,6 +1,6 @@
 
 import os
-from datetime import datetime
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from pathlib import Path
@@ -8,12 +8,14 @@ from pathlib import Path
 from yarp.yarpecule.yarpecule import yarpecule
 
 def is_valid_time_format(time_str):
-    try:
-        # %H = 24-hour hour, %M = minute, %S = second
-        datetime.strptime(time_str, "%H:%M:%S")
-        return True
-    except ValueError:
+    if not isinstance(time_str, str):
         return False
+
+    match = re.fullmatch(r"(\d+):([0-5]\d):([0-5]\d)", time_str)
+    if not match:
+        return False
+
+    return int(match.group(1)) >= 0
 
 # --- CONFIGURATION OBJECTS ---
 # These classes act as simple containers for user provided settings.
@@ -83,6 +85,12 @@ class JobManagerConfig:
     queue: Optional[str] = None
     job_name: str = "yarp"
     account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
+    #condor specific
+    request_disk: Optional[str] = None
+    log_dir: Optional[str] = "./logs"
+    getenv: bool = True
+    notification: Optional[str] = None
+    condor_universe: Optional[str] = "vanilla"
 
     def __post_init__(self):
         # Normalize inputs for easier checking
@@ -104,8 +112,8 @@ class JobManagerConfig:
             self.sif_location = str(base_repo_path / "containers")
 
         # Sanity Checks
-        if self.scheduler not in ["local", "sge", "slurm"]:
-            raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', and 'slurm'")
+        if self.scheduler not in ["local", "sge", "slurm", "condor"]:
+            raise ValueError(f"Invalid 'scheduler' entered: '{self.scheduler}'. Valid options are 'local', 'sge', 'slurm', and 'condor'")
         if self.container not in ["apptainer", "docker", 'singularity']:
             raise ValueError(f"Invalid 'container' entered: '{self.container}'. Valid options are 'apptainer', 'singularity', and 'docker'")
         if self.scheduler in ["sge", "slurm"] and not self.queue:
@@ -115,7 +123,7 @@ class JobManagerConfig:
             raise ValueError("Please provide an integer value to 'max_active_jobs'")
         if self.sif_location and not isinstance(self.sif_location, str):
             raise ValueError("Please provide a valid string value to 'sif_location'")
-        if self.module_container and not isinstance(self.sif_location, str):
+        if self.module_container and not isinstance(self.module_container, str):
             raise ValueError("Please provide a valid string value to 'module_container'")
 
 @dataclass

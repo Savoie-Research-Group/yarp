@@ -1,0 +1,15 @@
+Well folks, looks like we have 10 reactions on our hands
++-------------------------------------------------+----------+------------+--------------+----------+
+|                   Reaction ID                   | Reactant |  Product   | EGAT barrier | Max Flux |
++-------------------------------------------------+----------+------------+--------------+----------+
+|        XSASRUDTFFBDDK_to_PLXVTJBBUQBDRQ         | O=CCCOO  |  OOCC1CO1  |    88.352    |    0     |
+|        XSASRUDTFFBDDK_to_LZBZEBHQVXRLLN         | O=CCCOO  |  C=COCOO   |    84.314    |    0     |
+| XSASRUDTFFBDDK_to_WGCNASOHLSPBMP-WSFSSNUMVMOOMR | O=CCCOO  | C=O.O=CCO  |    72.105    |    0     |
+|        XSASRUDTFFBDDK_to_MQZTXKZTLDDYNK         | O=CCCOO  |  O=CCOCO   |    64.475    |    0     |
+| XSASRUDTFFBDDK_to_SCKXCAADGDQQCS-VGGSQFUCUMXWEO | O=CCCOO  | C=C.O=COO  |    57.098    |    0     |
+|        XSASRUDTFFBDDK_to_UVXJOOHEDLXZGH         | O=CCCOO  |  OOOC1CC1  |    99.137    |    0     |
+|        XSASRUDTFFBDDK_to_JQQGJTHDBODIPT         | O=CCCOO  |  OOC1CCO1  |    75.446    |    0     |
+| XSASRUDTFFBDDK_to_BDAGIHXWWSANSR-IAYPIBMASNFSPL | O=CCCOO  | C1CO1.O=CO |    70.657    |    0     |
+|        XSASRUDTFFBDDK_to_UKQJDWBNQNAJHB         | O=CCCOO  |  O=COCCO   |    73.375    |    0     |
+|        XSASRUDTFFBDDK_to_KYKDRUWGNWYQSD         | O=CCCOO  |  OC1CCOO1  |    74.036    |    0     |
++-------------------------------------------------+----------+------------+--------------+----------+

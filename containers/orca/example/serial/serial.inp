@@ -1,0 +1,5 @@
+! RKS PBE def2-TZVPD
+
+* xyzfile 0 1 ../aro_test.xyz
+
+# Never forget your bonus line!!

@@ -10,6 +10,7 @@ Options:
     -r, --reverse   Include all levels in rxn.reverse_barrier.
     -g, --dg        Include all levels in rxn.dg_rxn.
     -b, --barriers  Include forward and reverse barriers.
+    -n, --meta      Include reaction metadata labels
     -a, --all       Include forward, reverse, and reaction dG columns.
     --limit N       Print at most N reactions.
     --visualize     Write reactant/product PDFs under visuals/.
@@ -30,6 +31,13 @@ from pathlib import Path
 
 from tabulate import tabulate
 
+def _network_meta_keys(rxn):
+    meta = getattr(rxn, "network_meta", None)
+    if not meta:
+        return "none"
+    if isinstance(meta, dict):
+        return ", ".join(sorted(meta.keys()))
+    return str(meta)
 
 def _format_optional_value(value):
     """Format a numeric value for display, handling missing values as 'none'."""
@@ -147,6 +155,8 @@ def main(args):
         headers.insert(0, "Reaction Hash")
     for direction, _, label, key in columns:
         headers.append(f"{key} {direction} {label}")
+    if args.network_meta:
+        headers.append("network_meta_keys")
 
     data = []
     for rxn in selected_rxns:
@@ -159,6 +169,8 @@ def main(args):
 
         for _, attr, _, key in columns:
             row.append(_format_optional_value(_reaction_value(rxn, attr, key)))
+        if args.network_meta:
+            row.append(_network_meta_keys(rxn))
         data.append(row)
 
         if args.visualize:
@@ -191,7 +203,8 @@ def _add_options(parser):
                         help="Include all forward and reverse barrier columns; equivalent to -fr.")
     parser.add_argument("-a", "--all", action="store_true",
                         help="Include all forward, reverse, and reaction dG columns; equivalent to -frg.")
-
+    parser.add_argument("-n", "--meta", action="store_true",
+                            help="Include a column with keys from rxn.network_meta.")
 
 def cli():
     parser = argparse.ArgumentParser(

@@ -137,12 +137,3 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, geo=None, san
 
     return mol
 
-
-def graph_to_rdmol(elements, adj, bond_orders, sanitize=True):
-    """
-    Backwards-compatible alias for :func:`yarpecule_to_rdmol`.
-
-    Retained so external callers/notebooks importing ``graph_to_rdmol`` keep
-    working. New code should call ``yarpecule_to_rdmol`` directly.
-    """
-    return yarpecule_to_rdmol(elements, adj, bond_orders, sanitize=sanitize)

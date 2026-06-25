@@ -1,7 +1,7 @@
 smiles_csv: smiles.csv
 template_config: config.template.yaml
 output_dir: runs
-batch_size: 25
+batch_size: 3
 start_batch: 1
 config_name: input.yaml
 status_name: STATUS.json

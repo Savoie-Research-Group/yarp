@@ -1,6 +1,6 @@
 
 import os
-from datetime import datetime
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from pathlib import Path
@@ -8,12 +8,14 @@ from pathlib import Path
 from yarp.yarpecule.yarpecule import yarpecule
 
 def is_valid_time_format(time_str):
-    try:
-        # %H = 24-hour hour, %M = minute, %S = second
-        datetime.strptime(time_str, "%H:%M:%S")
-        return True
-    except ValueError:
+    if not isinstance(time_str, str):
         return False
+
+    match = re.fullmatch(r"(\d+):([0-5]\d):([0-5]\d)", time_str)
+    if not match:
+        return False
+
+    return int(match.group(1)) >= 0
 
 # --- CONFIGURATION OBJECTS ---
 # These classes act as simple containers for user provided settings.

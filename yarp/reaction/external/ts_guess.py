@@ -36,7 +36,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if getattr(self.config, "containerize_pre_gsm", False):
-            self.image_name = "erm42/yarp:yarp_jo_opt"
+            self.image_name = "erm42/yarp:jo_opt"
         else:
             self.image_name = "erm42/yarp:pysis_xtb"
         self.n_pairs = self.config.n_conf

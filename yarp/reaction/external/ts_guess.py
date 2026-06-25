@@ -2,11 +2,14 @@ import os
 import shutil
 import fnmatch
 import pickle
+import json
+import subprocess
+from pathlib import Path
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
-from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
+from yarp.reaction.external.conformer_select import ConformerPairSelector
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -54,7 +57,11 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             return
 
         print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
-        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config, scratch_dir=self.scratch_dir / "joint_opt")
+        self.pairs_to_run = ConformerPairSelector(
+            self.rxn,
+            self.config,
+            scratch_dir=self.scratch_dir / "joint_opt",
+        ).select()
         
         # Write inputs for each pair
         for i, pair in enumerate(self.pairs_to_run):
@@ -89,7 +96,12 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
 
             if getattr(self.config, "containerize_pre_gsm", False):
-                f.write("python -m yarp.reaction.external.scripts.run_ts_guess_container /work/payload.pkl\n")
+                f.write(
+                    "python -c \""
+                    "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
+                    "PysisyphusTSGuessCalculator.run_containerized('/work/payload.pkl')"
+                    "\"\n"
+                )
             else:
                 for i in range(1, len(self.pairs_to_run) + 1):
                     f.write(f"echo '--- Running GSM pair {i} ---'\n")
@@ -239,7 +251,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     shutil.rmtree(item)
 
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
-        write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, self.config)
+        self.write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, self.config)
 
     def _get_num_runs(self) -> int:
             """
@@ -250,19 +262,94 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             run_dirs = list(self.scratch_dir.glob("gsm_run*"))
             return len(run_dirs)
 
+    @staticmethod
+    def write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, config):
+        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+        lot = config.gsm_lot.lower()
 
-def write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, config):
-    # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
-    lot = config.gsm_lot.lower()
+        with open(input_path, 'w') as f:
+            input_geo = [r_xyz_path, p_xyz_path]
+            f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
 
-    with open(input_path, 'w') as f:
-        input_geo = [r_xyz_path, p_xyz_path]
-        f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
+            # ERM: I left out the option for solvent,
+            # because what I saw in classy YARP didn't make sense to me...
+            f.write(f'calc:\n type: {lot}\n pal: {config.n_cpus}\n mem: {config.mem_per_cpu}\n charge: {config.charge}\n mult: {config.multiplicity}\n')
 
-        # ERM: I left out the option for solvent,
-        # because what I saw in classy YARP didn't make sense to me...
-        f.write(f'calc:\n type: {lot}\n pal: {config.n_cpus}\n mem: {config.mem_per_cpu}\n charge: {config.charge}\n mult: {config.multiplicity}\n')
+            f.write(f'cos:\n type: gs\n max_nodes: {config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
 
-        f.write(f'cos:\n type: gs\n max_nodes: {config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
+            f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
-        f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
+    @staticmethod
+    def _write_selected_pairs_manifest(path, pairs):
+        manifest = {
+            "n_pairs": len(pairs),
+            "pairs": [
+                {
+                    "index": ind,
+                    "score": float(pair.get("score", 0.0)),
+                    "r_conf_type": getattr(pair.get("r_conf"), "type", ""),
+                    "p_conf_type": getattr(pair.get("p_conf"), "type", ""),
+                }
+                for ind, pair in enumerate(pairs, start=1)
+            ],
+        }
+        Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    @classmethod
+    def run_containerized(cls, payload_path):
+        """
+        Container-side TS guess runner.
+
+        This keeps pre-GSM conformer selection, joint optimization, ML pair scoring,
+        and GSM execution inside the same container environment.
+        """
+        payload_path = Path(payload_path)
+        work_dir = payload_path.parent
+        pregsm_log = work_dir / "pregsm.log"
+
+        with pregsm_log.open("w", encoding="utf-8") as log:
+            log.write("Starting containerized YARP pre-GSM selection\n")
+
+            with payload_path.open("rb") as f:
+                payload = pickle.load(f)
+
+            rxn = payload["rxn"]
+            config = payload["config"]
+
+            pairs = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt").select()
+            cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs)
+            log.write(f"Selected {len(pairs)} pair(s)\n")
+
+            if not pairs:
+                raise RuntimeError("No GSM pairs selected")
+
+            any_success = False
+            for idx, pair in enumerate(pairs, start=1):
+                pair_dir = work_dir / f"gsm_run{idx}"
+                pair_dir.mkdir(parents=True, exist_ok=True)
+
+                r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
+                p_xyz_path = pair_dir / f"product_{idx}.xyz"
+                inp_path = pair_dir / f"gsm_{idx}_input.yaml"
+
+                r_xyz_path.write_text(pair["r_conf"].to_xyz_string(), encoding="utf-8")
+                p_xyz_path.write_text(pair["p_conf"].to_xyz_string(), encoding="utf-8")
+                cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
+
+                log.write(f"Running GSM pair {idx}\n")
+                with (pair_dir / f"gsm_{idx}.log").open("w", encoding="utf-8") as out:
+                    with (pair_dir / f"gsm_{idx}.err").open("w", encoding="utf-8") as err:
+                        result = subprocess.run(
+                            ["pysis", inp_path.name],
+                            cwd=pair_dir,
+                            stdout=out,
+                            stderr=err,
+                            text=True,
+                            check=False,
+                        )
+                log.write(f"GSM pair {idx} exited with code {result.returncode}\n")
+                if result.returncode == 0:
+                    any_success = True
+
+            if not any_success:
+                raise RuntimeError("All GSM runs exited nonzero")

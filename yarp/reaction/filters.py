@@ -264,12 +264,11 @@ def separate_molecules(node, verbose=False):
     """
 
     sep_mols = node.separate()
-    if len(sep_mols) > 1:
-        if verbose:
-            print(f"  + Separating {node.inchi} into {len(sep_mols)} nodes")
+    if len(sep_mols) > 1 and verbose:
+        print(f"  + Separating {node.inchi} into {len(sep_mols)} nodes")
 
-        for mol in sep_mols:
-            mol.get_inchi() # need to generate these for a newly initialized yarpecule object!
-            mol.get_smiles()
+    for mol in sep_mols:
+        mol.get_inchi() # need to generate these for a newly initialized yarpecule object!
+        mol.get_smiles()
 
     return sep_mols

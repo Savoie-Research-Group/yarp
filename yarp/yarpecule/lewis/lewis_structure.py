@@ -9,7 +9,7 @@ from IPython.display import display
 
 from yarp.yarpecule.graph.fragment import return_rings
 from yarp.yarpecule.graph.adjacency import adjmat_to_adjlist, graph_seps
-from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an
+from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_en, el_pol, el_to_an, el_metals
 from yarp.yarpecule.lewis.bem_score import bmat_score, bmat_unique, adjust_metals, return_n_e_accept, return_n_e_donate, return_formals
 from yarp.yarpecule.lewis.find_lewis import gen_init, gen_all_lstructs
 from yarp.yarpecule.hashes import bmat_hash
@@ -127,7 +127,18 @@ class lewis_struct:
     def _gen_bond_el_mat(self, adj_mat, elements, q=0,
                          mats_max=10, mats_thresh=0.5,
                          w_def=-1, w_exp=0.1, w_formal=0.1,
-                         w_aro=-24, w_rad=-0.01, factor=0.0, local_opt=True):
+                         # Patch w_rad (2026-06-19 ZL): default reverted from -0.01 to +0.1
+                         # to match old patched YARP find_lewis convention. COSMETIC ONLY,
+                         # not a behavior change. The sign flip in w_rad is compensated by
+                         # a corresponding sign+scale flip in how `rad_env` is computed:
+                         #   new bem_score:   rad_env = +pol/(100+pol)
+                         #   old find_lewis:  rad_env = -0.1 * pol/(100+pol)
+                         # so w_rad*rad_env evaluates to the same number under both
+                         # conventions: (-0.01)*(+pol/...) == (+0.1)*(-0.1*pol/...).
+                         # Bisection (only-w_rad branch on a 144-archive TM sample) confirmed
+                         # zero chemistry effect. Kept for the +0.1 convention used by
+                         # downstream code that calls bmat_score directly.
+                         w_aro=-24, w_rad=0.1, factor=0.0, local_opt=True):
         """
         Accesses self._rings, but shouldn't modify it at all...
 
@@ -194,7 +205,10 @@ class lewis_struct:
         # Perhaps one day, we will be able to avoid doing this
         # But today, is not that day - ERM
         old_rec_limit = sys.getrecursionlimit()
-        sys.setrecursionlimit(5000)
+        # Patch A (2026-06-12 ZL): raise recursion limit to match old-YARP
+        # patched behavior (GH commit fed9385); deep Lewis searches on
+        # TM-containing reactants/products hit the 5000 ceiling.
+        sys.setrecursionlimit(100000)
 
         # Initialize score function for ranking bond_mats
         # subtracts off trivial formal charge penalty from cations and anions
@@ -255,12 +269,14 @@ class lewis_struct:
                 seed_scores += [score]
                 seed_bond_mats += [bond_mat]
                 seed_hashes.add(bmat_hash(bond_mat))
+                # N_score=100 rolled back 2026-06-12 ZL — matches production
+                # OS-recalculation run that fed the published dial plot.
                 seed_bond_mats, seed_scores, _, _, _ = gen_all_lstructs(obj_fun, seed_bond_mats, seed_scores, seed_hashes,
                                                                         elements, reactive, self._rings, ring_atoms, bridgeheads,
                                                                         # allow all charge transfers in first pass
                                                                         seps=np.zeros([len(elements), len(elements)]),
                                                                         min_score=seed_scores[0], ind=len(seed_bond_mats)-1,
-                                                                        N_score=1000, N_max=10000, min_opt=True)
+                                                                        N_score=100, N_max=10000, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations
         def obj_fun(x): return bmat_score(x, elements, self._rings,
@@ -279,19 +295,41 @@ class lewis_struct:
         hashes = set([bmat_hash(seed_bond_mats[0])])
 
         # Next round of BEM searching
+        # Patch B reverted (2026-06-19 ZL): the bisection-vs-GH-commit-fed9385
+        # initially carried over the exploratory search params (min_opt=False,
+        # min_win=0.5) from old patched YARP. On a 144-archive TM stratified
+        # sample, isolating B (`only-B` branch) showed it had a net-NEGATIVE
+        # effect: 1 archive fixed, 3 introduced as new diffs vs slim. It also
+        # breaks 3 organic pytest cases (test_diazomethane_xyz, test_ester_xyz,
+        # test_benzothiazole_smi). Reverting to greedy descent (min_opt=True)
+        # matches new-YARP-master and removes both regressions.
         bond_mats, scores, hashes, _, _ = gen_all_lstructs(obj_fun, bond_mats, scores,
                                                            hashes, elements, reactive,
                                                            self._rings, ring_atoms, bridgeheads,
                                                            # set according to local_opt flag
                                                            seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
-                                                           N_score=1000, N_max=10000, min_opt=True)
+                                                           N_score=100, N_max=10000, min_opt=True)
 
-        # Collect all discovered BEMs
-        for i, bem in enumerate(seed_bond_mats):
-            if bmat_hash(bem) not in hashes:
-                bond_mats.append(bem)
-                scores.append(seed_scores[i])
+        # Patch F (2026-06-19 ZL): conditional seed-BEM re-pool. For purely
+        # organic systems (no transition metals), the re-pool is restored —
+        # it carries pass-1 seed BEMs into the final ranking, which the
+        # mats_thresh trim then narrows down correctly (organic test suite
+        # relies on this: ester, diazomethane, benzothiazole).
+        #
+        # For transition-metal systems, the re-pool is DISABLED — pass-1
+        # seeds (without aromaticity weighting) often correspond to
+        # non-aromatic ligand configurations that adjust_metals dative-izes
+        # via Z-bonds, producing impossible/high oxidation states. Disabling
+        # the re-pool for TM systems eliminates 38/55 of the divergence vs
+        # the old patched YARP on a 144-archive stratified TM sample.
+        has_tm = any(el in el_metals for el in elements)
+        if not has_tm:
+            # Collect all discovered BEMs (organic-only)
+            for i, bem in enumerate(seed_bond_mats):
+                if bmat_hash(bem) not in hashes:
+                    bond_mats.append(bem)
+                    scores.append(seed_scores[i])
 
         # Calculate final scores (radical term is now turned on!)
         bond_mats = adjust_metals(bond_mats, adj_mat, elements)

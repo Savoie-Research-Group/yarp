@@ -21,8 +21,11 @@ el_valence = {'h': 1, 'he': 2,
               'li': 1, 'be': 2,                                                                                                                'b': 3,  'c': 4,  'n': 5,  'o': 6,  'f': 7, 'ne': 8,
               'na': 1, 'mg': 2,                                                                                                               'al': 3, 'si': 4,  'p': 5,  's': 6, 'cl': 7, 'ar': 8,
               'k': 1, 'ca': 2, 'sc': 3, 'ti': 4,  'v': 5, 'cr': 6, 'mn': 7, 'fe': 8, 'co': 9, 'ni': 10, 'cu': 11, 'zn': 12, 'ga': 3, 'ge': 4, 'as': 5, 'se': 6, 'br': 7, 'kr': 8,
-              'rb': 1, 'sr': 2,  'y': None, 'zr': None, 'nb': None, 'mo': None, 'tc': None, 'ru': 8, 'rh': 9, 'pd': 10, 'ag': None, 'cd': None, 'in': 3, 'sn': 4, 'sb': 5, 'te': 6,  'i': 7, 'xe': 8,
-              'cs': 1, 'ba': 2, 'la': None, 'hf': None, 'ta': None,  'w': None, 're': None, 'os': None, 'ir': 9, 'pt': None, 'au': 11, 'hg': None, 'tl': 3, 'pb': 4, 'bi': 5, 'po': 6, 'at': 7, 'rn': 8}
+              # 2026-06-12 ZL: restored from old YARP — many TM entries had
+              # been replaced with None upstream, which broke valence-based
+              # OS extraction for those metals.
+              'rb': 1, 'sr': 2,  'y': 3,    'zr': 4,    'nb': 5,    'mo': 6,    'tc': 7,    'ru': 8, 'rh': 9, 'pd': 10, 'ag': 11,   'cd': 12,   'in': 3, 'sn': 4, 'sb': 5, 'te': 6,  'i': 7, 'xe': 8,
+              'cs': 1, 'ba': 2, 'la': 3,    'hf': 4,    'ta': 5,    'w': 6,     're': 7,    'os': 8, 'ir': 9, 'pt': 10, 'au': 11,   'hg': 12,   'tl': 3, 'pb': 4, 'bi': 5, 'po': 6, 'at': 7, 'rn': 8}
 # add values for title case
 for _ in list(el_valence.keys()):
     el_valence[_.title()] = el_valence[_]
@@ -32,9 +35,12 @@ for _ in list(el_valence.keys()):
 el_n_deficient = {'h': 2, 'he': 2,
                   'li': 2, 'be': 0,                                                                                                                'b': 8,  'c': 8,  'n': 8,  'o': 8,  'f': 8, 'ne': 8,
                   'na': 0, 'mg': 0,                                                                                                               'al': 8, 'si': 8,  'p': 8,  's': 8, 'cl': 8, 'ar': 8,
-                  'k': 0, 'ca': 0, 'sc': 0, 'ti': 0,  'v': 0, 'cr': 0, 'mn': 0, 'fe': 5, 'co': 6, 'ni': 1, 'cu': 0, 'zn': 10, 'ga': 8, 'ge': 8, 'as': 8, 'se': 8, 'br': 8, 'kr': 8,
-                  'rb': 0, 'sr': 0,  'y': None, 'zr': None, 'nb': None, 'mo': None, 'tc': None, 'ru': 5, 'rh': 6, 'pd': 7, 'ag': None, 'cd': None, 'in': 8, 'sn': 8, 'sb': 8, 'te': 8,  'i': 8, 'xe': 8,
-                  'cs': 0, 'ba': 0, 'la': None, 'hf': None, 'ta': None,  'w': None, 're': None, 'os': None, 'ir': 2, 'pt': None, 'au': 1, 'hg': None, 'tl': 8, 'pb': 8, 'bi': 8, 'po': 8, 'at': 8, 'rn': 8}
+                  # 2026-06-12 ZL: restored from old YARP. Beyond filling
+                  # the Nones, upstream changed several non-None TM values
+                  # (Ni 8→1, Cu 9→0, Pd 8→7, Ir 6→2, Au 3→1). Reverted those.
+                  'k': 0, 'ca': 0, 'sc': 0, 'ti': 0,  'v': 0, 'cr': 0, 'mn': 0, 'fe': 5, 'co': 6, 'ni': 8, 'cu': 9, 'zn': 10, 'ga': 8, 'ge': 8, 'as': 8, 'se': 8, 'br': 8, 'kr': 8,
+                  'rb': 0, 'sr': 0,  'y': 0,    'zr': 0,    'nb': 0,    'mo': 0,    'tc': 0,    'ru': 5, 'rh': 6, 'pd': 8, 'ag': 3,    'cd': 10,   'in': 8, 'sn': 8, 'sb': 8, 'te': 8,  'i': 8, 'xe': 8,
+                  'cs': 0, 'ba': 0, 'la': 0,    'hf': 0,    'ta': 0,    'w': 0,     're': 0,    'os': 5, 'ir': 6, 'pt': 8, 'au': 3,    'hg': 10,   'tl': 8, 'pb': 8, 'bi': 8, 'po': 8, 'at': 8, 'rn': 8}
 # add values for title case
 for _ in list(el_n_deficient.keys()):
     el_n_deficient[_.title()] = el_n_deficient[_]
@@ -45,8 +51,10 @@ el_n_expand_octet = {'h': 2, 'he': 2,
                      'li': 2, 'be': 0,                                                                                                                'b': 8,  'c': 8,  'n': 8,  'o': 8,  'f': 8, 'ne': 8,
                      'na': 0, 'mg': 0,                                                                                                               'al': 8, 'si': 8,  'p': 8,  's': 8, 'cl': 8, 'ar': 8,
                      'k': 1000, 'ca': 1000, 'sc': 1000, 'ti': 1000,  'v': 1000, 'cr': 1000, 'mn': 1000, 'fe': 1000, 'co': 1000, 'ni': 1000, 'cu': 1000, 'zn': 1000, 'ga': 8, 'ge': 8, 'as': 8, 'se': 8, 'br': 8, 'kr': 8,
-                     'rb': 0, 'sr': 0,  'y': None, 'zr': None, 'nb': None, 'mo': None, 'tc': None, 'ru': 1000, 'rh': 1000, 'pd': 1000, 'ag': None, 'cd': None, 'in': 8, 'sn': 8, 'sb': 8, 'te': 8,  'i': 8, 'xe': 8,
-                     'cs': 0, 'ba': 0, 'la': None, 'hf': None, 'ta': None,  'w': None, 're': None, 'os': None, 'ir': 1000, 'pt': None, 'au': 1000, 'hg': None, 'tl': 8, 'pb': 8, 'bi': 8, 'po': 8, 'at': 8, 'rn': 8}
+                     # 2026-06-12 ZL: restored from old YARP — None entries
+                     # filled in. All 4d/5d TMs use the 1000 sentinel as before.
+                     'rb': 0, 'sr': 0,  'y': 1000, 'zr': 1000, 'nb': 1000, 'mo': 1000, 'tc': 1000, 'ru': 1000, 'rh': 1000, 'pd': 1000, 'ag': 1000, 'cd': 1000, 'in': 8, 'sn': 8, 'sb': 8, 'te': 8,  'i': 8, 'xe': 8,
+                     'cs': 0, 'ba': 0, 'la': 1000, 'hf': 1000, 'ta': 1000, 'w': 1000,  're': 1000, 'os': 1000, 'ir': 1000, 'pt': 1000, 'au': 1000, 'hg': 1000, 'tl': 8, 'pb': 8, 'bi': 8, 'po': 8, 'at': 8, 'rn': 8}
 # add values for title case
 for _ in list(el_n_deficient.keys()):
     el_n_expand_octet[_.title()] = el_n_deficient[_]
@@ -55,9 +63,11 @@ for _ in list(el_n_deficient.keys()):
 el_expand_octet = {'h': False, 'he': False,
                    'li': False, 'be': False,                                                                                                               'b': False,  'c': False, 'n': False, 'o': False, 'f': False, 'ne': False,
                    'na': False, 'mg': False,                                                                                                               'al': True, 'si': True,  'p': True,  's': True, 'cl': True, 'ar': True,
-                   'k': False, 'ca': False, 'sc': False, 'ti': False,  'v': True, 'cr': True, 'mn': True, 'fe': True, 'co': True, 'ni': True, 'cu': True, 'zn': True, 'ga': True, 'ge': True, 'as': True, 'se': True, 'br': True, 'kr': True,
-                   'rb': False, 'sr': False,  'y': None, 'zr': None, 'nb': None, 'mo': None, 'tc': None, 'ru': True, 'rh': True, 'pd': True, 'ag': None, 'cd': None, 'in': True, 'sn': True, 'sb': True, 'te': True,  'i': True, 'xe': True,
-                   'cs': False, 'ba': False, 'la': None, 'hf': None, 'ta': None,  'w': None, 're': None, 'os': None, 'ir': True, 'pt': None, 'au': True, 'hg': None, 'tl': True, 'pb': True, 'bi': True, 'po': True, 'at': True, 'rn': True}
+                   # 2026-06-12 ZL: restored from old YARP. Also Ti reverted
+                   # from False→True (upstream changed it; we restored).
+                   'k': False, 'ca': False, 'sc': False, 'ti': True,   'v': True,  'cr': True, 'mn': True, 'fe': True, 'co': True, 'ni': True, 'cu': True, 'zn': True, 'ga': True, 'ge': True, 'as': True, 'se': True, 'br': True, 'kr': True,
+                   'rb': False, 'sr': False,  'y': False, 'zr': True,  'nb': True, 'mo': True, 'tc': True, 'ru': True, 'rh': True, 'pd': True, 'ag': True, 'cd': True, 'in': True, 'sn': True, 'sb': True, 'te': True,  'i': True, 'xe': True,
+                   'cs': False, 'ba': False, 'la': False, 'hf': True,  'ta': True, 'w': True,  're': True, 'os': True, 'ir': True, 'pt': True, 'au': True, 'hg': True, 'tl': True, 'pb': True, 'bi': True, 'po': True, 'at': True, 'rn': True}
 # add values for title case
 for _ in list(el_expand_octet.keys()):
     el_expand_octet[_.title()] = el_expand_octet[_]
@@ -76,11 +86,16 @@ for _ in list(el_en.keys()):
     el_en[_.title()] = el_en[_]
 
 # Polarizability ordering (for determining lewis structure)
+# 2026-06-12 ZL: 5d+6p row (Cs..Rn) restored from old YARP. Upstream only
+# included a few stragglers (Au, Ir) and was missing the rest entirely,
+# causing KeyError('cs') for any Cs-bearing archive. Also dropped a duplicate
+# `"rh": 66` key that survived in the new dict literal.
 el_pol = {"h": 4.5,  "he": 1.38,
           "li": 164.0, "be": 377,                                                                                                               "b": 20.5, "c": 11.3, "n": 7.4, "o": 5.3,  "f": 3.74, "ne": 2.66,
           "na": 163.0, "mg": 71.2,                                                                                                              "al": 57.8, "si": 37.3, "p": 25.0, "s": 19.4, "cl": 14.6, "ar": 11.1,
           "k": 290.0, "ca": 161.0, "sc": 97.0, "ti": 100.0, "v": 87.0, "cr": 83.0, "mn": 68.0, "fe": 62.0, "co": 55, "ni": 49, "cu": 47.0, "zn": 38.7,  "ga": 50.0, "ge": 40.0, "as": 30.0, "se": 29.0, "br": 21.0, "kr": 16.8,
-          "rb": 320.0, "sr": 197.0, "y": 162,  "zr": 112.0, "nb": 98.0, "mo": 87.0, "tc": 79.0, "ru": 72.0, "rh": 66, "pd": 26.1, "ag": 55, "cd": 46.0,  "in": 65.0, "sn": 53.0, "sb": 43.0, "te": 28.0, "i": 32.9, "xe": 27.3, "au": 36, "rh": 66, "ir": 54}
+          "rb": 320.0, "sr": 197.0, "y": 162,  "zr": 112.0, "nb": 98.0, "mo": 87.0, "tc": 79.0, "ru": 72.0, "rh": 66, "pd": 26.1, "ag": 55, "cd": 46.0,  "in": 65.0, "sn": 53.0, "sb": 43.0, "te": 28.0, "i": 32.9, "xe": 27.3,
+          "cs": 401.0, "ba": 272.0, "la": 215.0, "hf": 103.0, "ta": 74.0, "w": 68.0, "re": 62.0, "os": 57.0, "ir": 54.0, "pt": 48.0, "au": 36.0, "hg": 33.9, "tl": 50.0, "pb": 47.0, "bi": 48.0, "po": 44.0, "at": 42.0, "rn": 35.0}
 # add values for title case
 for _ in list(el_pol.keys()):
     el_pol[_.title()] = el_pol[_]
@@ -150,6 +165,10 @@ for _ in list(el_max_valence.keys()):
     el_max_valence[_.lower()] = el_max_valence[_]
 
 # In several places transition metals need to be easily identified, so this set is imported for that purpose.
+# 5d transition metals (La, Hf, Ta, W, Re, Os, Pt, Hg) added 2026-05-21 ZL —
+# without them adjust_metals() never dative-izes Cp on 5d centers, which
+# inflates the +6 oxidation-state bin in dial plots for Hf/W/Re/Os/Ir/Pt.
 el_metals = {'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-             'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'Au', 'Ir'}
+             'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+             'La', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'}
 el_metals.update({_.lower() for _ in el_metals})

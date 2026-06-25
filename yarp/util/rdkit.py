@@ -93,6 +93,9 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, geo=None, san
                 bo = int(round(bond_orders[i, j]))
                 if bo == 0:
                     # dative / metal bonds are stored with zero order; draw as single
+                    # ERM: there *is* an rdchem.BondType.DATIVE option,
+                    # but I'm not sure if that's what we want.
+                    # Should consult with Zhao down the road on this question.
                     bo = 1
                 btype = BOND_MAP.get(bo)
                 if btype is None:
@@ -137,3 +140,27 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, geo=None, san
 
     return mol
 
+def geom_from_rdmol(mol, conf_index=0):
+    """
+    Extract 3D conformer data from RDKit mol object
+
+    Parameters:
+    -----------
+    mol : RDKit mol object
+        The molecule to convert.
+
+    Returns:
+    --------
+    geo : ndarray (N x 3) or None
+        3D coordinates if a conformer is present, otherwise None.
+    """
+    geo = None
+    N = mol.GetNumAtoms()
+    if mol.GetNumConformers() > 0:
+        conf = mol.GetConformer(conf_index)
+        geo = np.zeros((N, 3), dtype=float)
+        for idx in range(N):
+            pos = conf.GetAtomPosition(idx)
+            geo[idx] = [pos.x, pos.y, pos.z]
+
+    return geo

@@ -35,17 +35,67 @@ def generate_rxns(inp):
     """
     output = None
     verbose = inp.verbose
+    source = Path(inp.init_struct.source)
 
     # Initialize reactions for product enumeration
     if inp.enum.ON:
         print("Product enumeration enabled. Enumerating products.")
-        if inp.init_struct.type == 'yarp_pickle':
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
-            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
-            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+        # Enumerating from single starting species
+        if inp.init_struct.mode == 'species':
+            if verbose:
+                print(f" - Initializing starting reactant node from {source}")
+                print(f" - Processing starting node as a single species. No pre-enumeration filters will be applied!")
+
+            output = dict()
+            reactant = yarpecule(inp.init_struct.source, mode="yarp")
+
+            raw_products = enumerate_products(
+                    r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                )
+
+            clean_products = filter_enum_products(
+                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                verbose=verbose
+            )
+
+            for prod in clean_products:
+                prod = quick_geom_opt(prod)
+                r2p = reaction(reactant, prod)
+                output[r2p.hash] = r2p
+
+        # Enumerating from reaction object(s)
+        if inp.init_struct.mode == 'reaction':
+            if verbose:
+                print(f" - Initializing starting reactant node(s) from {inp.init_struct.source}")
+                print(f" - Initial source identified as reactant(s); pre-enumeration filters will be applied!")
+
+            # 3 different modes for initializing reaction object(s)
+            og_rxns = None
+            if inp.init_struct.type == 'yarp_pickle':
+                if verbose: print(" - Processing starting node(s) as YARP generated pickle file")
+
+                og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
+                assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
+                assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+
+            elif inp.init_struct.type == 'xyz':
+                if source.is_dir():
+                    if verbose: print(f" - Processing starting node(s) as reaction xyz files in {source}")
+                    og_rxns = load_reactions_from_xyz_directory(source)
+                elif source.is_file() and source.suffix.lower() == ".xyz":
+                    if verbose: print(f" - Processing starting node(s) as reaction xyz file {source}")
+                    rxn = load_reaction_from_xyz_file(source)
+                    og_rxns = {rxn.hash: rxn}
+
+            elif inp.init_struct.type == 'smiles':
+                if verbose: print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
+                og_rxns = load_reactions_from_smiles_file(source)
+
+            else:
+                raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
             og_rxns_hash = set(og_rxns.keys())
 
@@ -86,53 +136,32 @@ def generate_rxns(inp):
                     new_rxns[r2p.hash] = r2p
             
             output = og_rxns | new_rxns
-            
-        else:
-            if verbose:
-                print(f" - Initializing starting reactant node from {inp.init_struct.source}")
-            output = dict()
-            reactant = yarpecule(inp.init_struct.source, mode="yarp")
 
-            raw_products = enumerate_products(
-                    r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
-                )
-
-            clean_products = filter_enum_products(
-                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
-                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
-                verbose=verbose
-            )
-
-            for prod in clean_products:
-                prod = quick_geom_opt(prod)
-                r2p = reaction(reactant, prod)
-                output[r2p.hash] = r2p
-
+    # Initialize reactions characterization without product enumeration
     else:
-        source = Path(inp.init_struct.source)
         print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
         print(f" - Input node source: {source}")
+
+        # 3 different modes for initializing reaction object(s)
+        output = None
         if inp.init_struct.type == 'yarp_pickle':
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose: print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
-            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
-            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+            output = pickle.load(open(inp.init_struct.source, 'rb'))
+            assert isinstance(output, dict), "Input pickle file must contain a dictionary!"
+            assert all(isinstance(v, reaction) for v in output.values()), "YARP requires a dictionary of reaction objects to continue"
 
-            output = og_rxns
-        elif source.is_dir():
-            print(f" - Processing starting node(s) as reaction xyz files in {source}")
-            output = load_reactions_from_xyz_directory(source)
+        elif inp.init_struct.type == 'xyz':
+            if source.is_dir():
+                if verbose: print(f" - Processing starting node(s) as reaction xyz files in {source}")
+                output = load_reactions_from_xyz_directory(source)
+            elif source.is_file() and source.suffix.lower() == ".xyz":
+                if verbose: print(f" - Processing starting node(s) as reaction xyz file {source}")
+                rxn = load_reaction_from_xyz_file(source)
+                output = {rxn.hash: rxn}
 
-        elif source.is_file() and source.suffix.lower() == ".xyz":
-            print(f" - Processing starting node(s) as reaction xyz file {source}")
-            rxn = load_reaction_from_xyz_file(source)
-            output = {rxn.hash: rxn}
-
-        elif source.is_file():
-            print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
+        elif inp.init_struct.type == 'smiles':
+            if verbose: print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
             output = load_reactions_from_smiles_file(source)
 
         else:

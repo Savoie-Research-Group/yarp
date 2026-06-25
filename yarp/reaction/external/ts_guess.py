@@ -1,6 +1,7 @@
 import os
 import shutil
 import fnmatch
+import pickle
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
@@ -34,7 +35,10 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
+        if getattr(self.config, "containerize_pre_gsm", False):
+            self.image_name = "erm42/yarp:yarp_jo_opt"
+        else:
+            self.image_name = "erm42/yarp:pysis_xtb"
         self.n_pairs = self.config.n_conf
         self.pairs_to_run = []
 
@@ -43,8 +47,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         Runs the Joint Opt + ML Selection, then writes the files 
         required for the Pysisyphus GSM run.
         """
+        if getattr(self.config, "containerize_pre_gsm", False):
+            payload_path = self.scratch_dir / "payload.pkl"
+            with open(payload_path, "wb") as f:
+                pickle.dump({"rxn": self.rxn, "config": self.config}, f)
+            return
+
         print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
-        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
+        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config, scratch_dir=self.scratch_dir / "joint_opt")
         
         # Write inputs for each pair
         for i, pair in enumerate(self.pairs_to_run):
@@ -77,15 +87,18 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         with open(inner_script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
-            
-            for i in range(1, len(self.pairs_to_run) + 1):
-                f.write(f"echo '--- Running GSM pair {i} ---'\n")
-                # The container mounts self.scratch_dir to /work
-                f.write(f"cd /work/gsm_run{i}\n") 
-                
-                # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
-                f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
+
+            if getattr(self.config, "containerize_pre_gsm", False):
+                f.write("python -m yarp.reaction.external.scripts.run_ts_guess_container /work/payload.pkl\n")
+            else:
+                for i in range(1, len(self.pairs_to_run) + 1):
+                    f.write(f"echo '--- Running GSM pair {i} ---'\n")
+                    # The container mounts self.scratch_dir to /work
+                    f.write(f"cd /work/gsm_run{i}\n") 
+                    
+                    # Execute pysis within the specific folder, saving logs locally
+                    f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
+                    f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
                 
         # Make executable
         inner_script_path.chmod(0o755)
@@ -226,25 +239,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     shutil.rmtree(item)
 
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
-        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
-        lot = self.config.gsm_lot.lower()
-
-        # Write the file! Yay, YAML friend!
-        with open(input_path, 'a') as f:
-            # set geom block
-            input_geo = [r_xyz_path, p_xyz_path]
-            f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
-
-            # set calc block
-            # ERM: I left out the option for solvent,
-            # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
-
-            # set cos block
-            f.write(f'cos:\n type: gs\n max_nodes: {self.config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
-
-            # set opt block
-            f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
+        write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, self.config)
 
     def _get_num_runs(self) -> int:
             """
@@ -254,3 +249,20 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             # Finds all directories matching 'gsm_run*' in the scratch folder
             run_dirs = list(self.scratch_dir.glob("gsm_run*"))
             return len(run_dirs)
+
+
+def write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, config):
+    # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+    lot = config.gsm_lot.lower()
+
+    with open(input_path, 'w') as f:
+        input_geo = [r_xyz_path, p_xyz_path]
+        f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
+
+        # ERM: I left out the option for solvent,
+        # because what I saw in classy YARP didn't make sense to me...
+        f.write(f'calc:\n type: {lot}\n pal: {config.n_cpus}\n mem: {config.mem_per_cpu}\n charge: {config.charge}\n mult: {config.multiplicity}\n')
+
+        f.write(f'cos:\n type: gs\n max_nodes: {config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
+
+        f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')

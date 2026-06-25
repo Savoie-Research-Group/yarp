@@ -10,18 +10,19 @@ from ase import Atoms
 from ase.build import minimize_rotation_and_translation
 
 from yarp.reaction.conf_sampling.joint_opt import ob_joint_optimize
+from yarp.reaction.conf_sampling.joint_opt import xtb_joint_optimize
 from yarp.reaction.conf_sampling.indicator import return_indicator
 
 
-def select_gsm_pairs(rxn, config):
+def select_gsm_pairs(rxn, config, scratch_dir=None):
     """
     Orchestrates Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
     """
+    scratch_dir = Path(scratch_dir) if scratch_dir is not None else Path.cwd() / "joint_opt"
     r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"] 
     p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]
 
     # --- STEP A: Apply Joint Optimization (Biasing) ---
-    lot = config.bias_lot
     mode = config.joint_opt.lower()
 
     biased_r = r_confs
@@ -29,9 +30,15 @@ def select_gsm_pairs(rxn, config):
     # biased_p: product geometries guided by reactant geometries
     # biased_r: reactant geometries guided by product geometries
     if mode in ['dual', 'r_only']:
-        biased_p = [ob_joint_optimize(c, rxn.reactant.paired_bem, lot) for c in r_confs]
+        biased_p = [
+            _joint_optimize(c, rxn.reactant.paired_bem, config, scratch_dir, f"r_to_p_{ind:04d}")
+            for ind, c in enumerate(r_confs)
+        ]
     if mode in ['dual', 'p_only']:
-        biased_r = [ob_joint_optimize(c, rxn.product.paired_bem, lot) for c in p_confs]
+        biased_r = [
+            _joint_optimize(c, rxn.product.paired_bem, config, scratch_dir, f"p_to_r_{ind:04d}")
+            for ind, c in enumerate(p_confs)
+        ]
 
     # Default to "conformation-poor" model, unless an excess of conformers is present
     n_conf = config.n_conf
@@ -66,69 +73,82 @@ def select_gsm_pairs(rxn, config):
     approved_indicators = []
     dropped_pairs = 0
 
-    for ind, r_c in enumerate(r_confs):
+    if mode in ['dual', 'r_only', 'off']:
+        r_loop_confs = r_confs if mode != 'off' else r_confs[:len(p_confs)]
+    else:
+        r_loop_confs = []
+
+    for ind, r_c in enumerate(r_loop_confs):
+        if ind >= len(biased_p) or biased_p[ind] is None:
+            dropped_pairs += 1
+            continue
          
-            # 1. Unaligned Evaluation
-            ind_unaligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=biased_p[ind].geo)
-            prob_unaligned = model.predict_proba(ind_unaligned)
+        # 1. Unaligned Evaluation
+        ind_unaligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=biased_p[ind].geo)
+        prob_unaligned = model.predict_proba(ind_unaligned)
 
-            # 2. Aligned Evaluation
-            aligned_biased_p = align_conformers(r_c, biased_p[ind])
-            ind_aligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=aligned_biased_p.geo)
-            prob_aligned = model.predict_proba(ind_aligned)
+        # 2. Aligned Evaluation
+        aligned_biased_p = align_conformers(r_c, biased_p[ind])
+        ind_aligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=aligned_biased_p.geo)
+        prob_aligned = model.predict_proba(ind_aligned)
 
-            # 3. The Tournament (keep the higher probability setup)
-            if prob_aligned[0][1] > prob_unaligned[0][1]:
-                best_p = aligned_biased_p
-                best_ind = ind_aligned
-                best_prob = prob_aligned
-            else:
-                best_p = biased_p[ind]
-                best_ind = ind_unaligned
-                best_prob = prob_unaligned
+        # 3. The Tournament (keep the higher probability setup)
+        if prob_aligned[0][1] > prob_unaligned[0][1]:
+            best_p = aligned_biased_p
+            best_ind = ind_aligned
+            best_prob = prob_aligned
+        else:
+            best_p = biased_p[ind]
+            best_ind = ind_unaligned
+            best_prob = prob_unaligned
 
-            # 4. Quality Control & Deduplication
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
-                approved_indicators.append(best_ind)
-                approved_pairs.append({
-                    "r_conf": r_c,
-                    "p_conf": best_p,
-                    "score": best_prob[0][1]
-                })
-            else:
-                dropped_pairs += 1
+        # 4. Quality Control & Deduplication
+        if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
+            approved_indicators.append(best_ind)
+            approved_pairs.append({
+                "r_conf": r_c,
+                "p_conf": best_p,
+                "score": best_prob[0][1]
+            })
+        else:
+            dropped_pairs += 1
 ####################################################################
-    for ind, p_c in enumerate(p_confs):
+    p_loop_confs = p_confs if mode in ['dual', 'p_only'] else []
 
-            # 1. Unaligned Evaluation
-            ind_unaligned = return_indicator(E=r_c.elements, RG=p_c.geo, PG=biased_r[ind].geo)
-            prob_unaligned = model.predict_proba(ind_unaligned)
+    for ind, p_c in enumerate(p_loop_confs):
+        if ind >= len(biased_r) or biased_r[ind] is None:
+            dropped_pairs += 1
+            continue
 
-            # 2. Aligned Evaluation
-            aligned_biased_r = align_conformers(p_c, biased_r[ind])
-            ind_aligned = return_indicator(E=r_c.elements, RG=p_c.geo, PG=aligned_biased_r.geo)
-            prob_aligned = model.predict_proba(ind_aligned)
+        # 1. Unaligned Evaluation
+        ind_unaligned = return_indicator(E=p_c.elements, RG=biased_r[ind].geo, PG=p_c.geo)
+        prob_unaligned = model.predict_proba(ind_unaligned)
 
-            # 3. The Tournament (keep the higher probability setup)
-            if prob_aligned[0][1] > prob_unaligned[0][1]:
-                best_r = aligned_biased_r
-                best_ind = ind_aligned
-                best_prob = prob_aligned
-            else:
-                best_r = biased_r[ind]
-                best_ind = ind_unaligned
-                best_prob = prob_unaligned
+        # 2. Aligned Evaluation
+        aligned_biased_r = align_conformers(p_c, biased_r[ind])
+        ind_aligned = return_indicator(E=p_c.elements, RG=aligned_biased_r.geo, PG=p_c.geo)
+        prob_aligned = model.predict_proba(ind_aligned)
 
-            # 4. Quality Control & Deduplication
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
-                approved_indicators.append(best_ind)
-                approved_pairs.append({
-                    "r_conf": best_r,
-                    "p_conf": p_c,
-                    "score": best_prob[0][1]
-                })
-            else:
-                dropped_pairs += 1
+        # 3. The Tournament (keep the higher probability setup)
+        if prob_aligned[0][1] > prob_unaligned[0][1]:
+            best_r = aligned_biased_r
+            best_ind = ind_aligned
+            best_prob = prob_aligned
+        else:
+            best_r = biased_r[ind]
+            best_ind = ind_unaligned
+            best_prob = prob_unaligned
+
+        # 4. Quality Control & Deduplication
+        if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
+            approved_indicators.append(best_ind)
+            approved_pairs.append({
+                "r_conf": best_r,
+                "p_conf": p_c,
+                "score": best_prob[0][1]
+            })
+        else:
+            dropped_pairs += 1
 
     # --- STEP C: Sort and Select Top N ---
     # Sort descending by probability of success
@@ -140,6 +160,28 @@ def select_gsm_pairs(rxn, config):
 ##############################################################################
     # Truncate to the number requested by the user
     return approved_pairs[:n_conf]
+
+
+def _joint_optimize(conf, target_bem, config, scratch_dir, label):
+    """
+    Dispatch the configured joint-optimization engine.
+    """
+    engine = getattr(config, "joint_opt_engine", "ob")
+    if engine == "xtb":
+        return xtb_joint_optimize(
+            conf,
+            target_bem,
+            Path(scratch_dir) / label,
+            lot=config.xtb_joint_lot,
+            charge=config.charge,
+            multiplicity=config.multiplicity,
+            n_cpus=config.n_cpus,
+            force_constant=config.xtb_joint_force_constant,
+            scf_iters=config.xtb_joint_scf_iters,
+            keep_files=config.xtb_joint_keep_files,
+        )
+
+    return ob_joint_optimize(conf, target_bem, config.bias_lot)
 
 
 def align_conformers(conf, biased_conf):

@@ -1,0 +1,44 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%post
+    set -eux
+    apt-get -y update
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends \
+        ca-certificates \
+        bzip2 \
+        wget \
+    ;
+    rm -rf /var/lib/apt/lists/*
+
+    mkdir -p /opt/micromamba/bin
+    wget -qO- "https://micro.mamba.pm/api/micromamba/linux-64/latest" | tar -xvj -C /opt/micromamba/bin --strip-components=1 bin/micromamba
+
+    /opt/micromamba/bin/micromamba create -y -p /opt/egat-env \
+        -c conda-forge -c pytorch -c dglteam/label/th24_cpu \
+        python=3.11 pip numpy pandas rdkit \
+        pytorch=2.4.* cpuonly dgl=2.4.* pytest
+    /opt/micromamba/bin/micromamba clean -a -y
+
+    chmod +x /opt/egat/predict_enthalpy_csv.py 2>/dev/null || true
+
+%environment
+    export LC_ALL=C
+    export PATH="/opt/micromamba/bin:${PATH}"
+    export MAMBA_ROOT_PREFIX="/opt/micromamba"
+    export PYTHONNOUSERSITE=1
+    export PYTHONPATH="/opt/egat/src:${PYTHONPATH}"
+
+%files
+    # Self-contained enthalpy-of-reaction EGAT model
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/src /opt/egat/src
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/predict_enthalpy_csv.py /opt/egat/predict_enthalpy_csv.py
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/models /opt/egat/models
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/examples /opt/egat/examples
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/tests /opt/egat/tests
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/environment.yml /opt/egat/environment.yml
+
+%runscript
+    set -e
+    exec /opt/micromamba/bin/micromamba run -p /opt/egat-env \
+        python /opt/egat/predict_enthalpy_csv.py "$@"

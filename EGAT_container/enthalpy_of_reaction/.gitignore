@@ -1,0 +1,6 @@
+# build artifacts / caches — not source
+*.sif
+__pycache__/
+*.pyc
+examples/*_out.csv
+examples/sample_out.csv

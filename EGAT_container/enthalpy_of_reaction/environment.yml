@@ -1,0 +1,15 @@
+name: egat-enthalpy
+channels:
+  - conda-forge
+  - pytorch
+  - dglteam/label/th24_cpu
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - rdkit
+  - pytorch=2.4.*
+  - cpuonly
+  - dgl=2.4.*
+  - pytest

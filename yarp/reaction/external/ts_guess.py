@@ -4,6 +4,7 @@ import fnmatch
 import pickle
 import json
 import subprocess
+import traceback
 from pathlib import Path
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
@@ -96,6 +97,9 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
 
             if getattr(self.config, "containerize_pre_gsm", False):
+                repo_root = Path(__file__).resolve().parents[3]
+                f.write(f"export PYTHONPATH={repo_root}:$PYTHONPATH\n")
+                f.write("export PYSISRC=/root/.pysisyphusrc\n")
                 f.write(
                     "python -c \""
                     "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
@@ -308,48 +312,53 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         pregsm_log = work_dir / "pregsm.log"
 
         with pregsm_log.open("w", encoding="utf-8") as log:
-            log.write("Starting containerized YARP pre-GSM selection\n")
+            try:
+                print("Starting containerized YARP pre-GSM selection", file=log, flush=True)
 
-            with payload_path.open("rb") as f:
-                payload = pickle.load(f)
+                with payload_path.open("rb") as f:
+                    payload = pickle.load(f)
 
-            rxn = payload["rxn"]
-            config = payload["config"]
+                rxn = payload["rxn"]
+                config = payload["config"]
 
-            pairs = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt").select()
-            cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs)
-            log.write(f"Selected {len(pairs)} pair(s)\n")
+                pairs = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt").select()
+                cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs)
+                print(f"Selected {len(pairs)} pair(s)", file=log, flush=True)
 
-            if not pairs:
-                raise RuntimeError("No GSM pairs selected")
+                if not pairs:
+                    raise RuntimeError("No GSM pairs selected")
 
-            any_success = False
-            for idx, pair in enumerate(pairs, start=1):
-                pair_dir = work_dir / f"gsm_run{idx}"
-                pair_dir.mkdir(parents=True, exist_ok=True)
+                any_success = False
+                for idx, pair in enumerate(pairs, start=1):
+                    pair_dir = work_dir / f"gsm_run{idx}"
+                    pair_dir.mkdir(parents=True, exist_ok=True)
 
-                r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
-                p_xyz_path = pair_dir / f"product_{idx}.xyz"
-                inp_path = pair_dir / f"gsm_{idx}_input.yaml"
+                    r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
+                    p_xyz_path = pair_dir / f"product_{idx}.xyz"
+                    inp_path = pair_dir / f"gsm_{idx}_input.yaml"
 
-                r_xyz_path.write_text(pair["r_conf"].to_xyz_string(), encoding="utf-8")
-                p_xyz_path.write_text(pair["p_conf"].to_xyz_string(), encoding="utf-8")
-                cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
+                    r_xyz_path.write_text(pair["r_conf"].to_xyz_string(), encoding="utf-8")
+                    p_xyz_path.write_text(pair["p_conf"].to_xyz_string(), encoding="utf-8")
+                    cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
 
-                log.write(f"Running GSM pair {idx}\n")
-                with (pair_dir / f"gsm_{idx}.log").open("w", encoding="utf-8") as out:
-                    with (pair_dir / f"gsm_{idx}.err").open("w", encoding="utf-8") as err:
-                        result = subprocess.run(
-                            ["pysis", inp_path.name],
-                            cwd=pair_dir,
-                            stdout=out,
-                            stderr=err,
-                            text=True,
-                            check=False,
-                        )
-                log.write(f"GSM pair {idx} exited with code {result.returncode}\n")
-                if result.returncode == 0:
-                    any_success = True
+                    print(f"Running GSM pair {idx}", file=log, flush=True)
+                    with (pair_dir / f"gsm_{idx}.log").open("w", encoding="utf-8") as out:
+                        with (pair_dir / f"gsm_{idx}.err").open("w", encoding="utf-8") as err:
+                            result = subprocess.run(
+                                ["pysis", inp_path.name],
+                                cwd=pair_dir,
+                                stdout=out,
+                                stderr=err,
+                                text=True,
+                                check=False,
+                            )
+                    print(f"GSM pair {idx} exited with code {result.returncode}", file=log, flush=True)
+                    if result.returncode == 0:
+                        any_success = True
 
-            if not any_success:
-                raise RuntimeError("All GSM runs exited nonzero")
+                if not any_success:
+                    raise RuntimeError("All GSM runs exited nonzero")
+            except Exception:
+                traceback.print_exc(file=log)
+                log.flush()
+                raise

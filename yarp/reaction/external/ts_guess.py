@@ -39,48 +39,20 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if getattr(self.config, "containerize_pre_gsm", False):
-            self.image_name = "erm42/yarp:jo_opt"
-        else:
-            self.image_name = "erm42/yarp:pysis_xtb"
+        self.image_name = "erm42/yarp:jo_opt"
         self.n_pairs = self.config.n_conf
-        self.pairs_to_run = []
 
     def generate_input(self):
         """
-        Runs the Joint Opt + ML Selection, then writes the files 
-        required for the Pysisyphus GSM run.
-        """
-        if getattr(self.config, "containerize_pre_gsm", False):
-            payload_path = self.scratch_dir / "payload.pkl"
-            with open(payload_path, "wb") as f:
-                pickle.dump({"rxn": self.rxn, "config": self.config}, f)
-            return
+        Writes the payload consumed by the container-side pre-GSM workflow.
 
-        print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
-        self.pairs_to_run = ConformerPairSelector(
-            self.rxn,
-            self.config,
-            scratch_dir=self.scratch_dir / "joint_opt",
-        ).select()
-        
-        # Write inputs for each pair
-        for i, pair in enumerate(self.pairs_to_run):
-            idx = i + 1
-            pair_dir = self.scratch_dir / f"gsm_run{idx}"
-            os.makedirs(pair_dir, exist_ok=True)
-            r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
-            p_xyz_path = pair_dir / f"product_{idx}.xyz"
-            inp_path = pair_dir / f"gsm_{idx}_input.yaml"
-            
-            # Write XYZs
-            with open(r_xyz_path, "w") as f:
-                f.write(pair["r_conf"].to_xyz_string())
-            with open(p_xyz_path, "w") as f:
-                f.write(pair["p_conf"].to_xyz_string())
-            
-            # Write a Pysisyphus input file for GSM
-            self._write_pysis_gsm_input(inp_path, f"reactant_{idx}.xyz", f"product_{idx}.xyz")
+        Conformer selection, joint optimization, ML scoring, and Pysisyphus GSM
+        execution all run inside the jo_opt container so the host YARP
+        environment does not need the ML dependency stack.
+        """
+        payload_path = self.scratch_dir / "payload.pkl"
+        with open(payload_path, "wb") as f:
+            pickle.dump({"rxn": self.rxn, "config": self.config}, f)
 
     def write_submission_script(self):
         """
@@ -96,25 +68,16 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             f.write("#!/bin/bash\n\n")
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
 
-            if getattr(self.config, "containerize_pre_gsm", False):
-                repo_root = Path(__file__).resolve().parents[3]
-                f.write(f"export PYTHONPATH={repo_root}:$PYTHONPATH\n")
-                f.write("export PYSISRC=/root/.pysisyphusrc\n")
-                f.write(
-                    "python -c \""
-                    "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
-                    "PysisyphusTSGuessCalculator.run_containerized('/work/payload.pkl')"
-                    "\"\n"
-                )
-            else:
-                for i in range(1, len(self.pairs_to_run) + 1):
-                    f.write(f"echo '--- Running GSM pair {i} ---'\n")
-                    # The container mounts self.scratch_dir to /work
-                    f.write(f"cd /work/gsm_run{i}\n") 
-                    
-                    # Execute pysis within the specific folder, saving logs locally
-                    f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
-                    f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
+            repo_root = Path(__file__).resolve().parents[3]
+            f.write(f"export PYTHONPATH={repo_root}:$PYTHONPATH\n")
+            f.write("export PYSISRC=/root/.pysisyphusrc\n")
+            f.write("export YARP_PREGSM_CONTAINER=1\n")
+            f.write(
+                "python -c \""
+                "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
+                "PysisyphusTSGuessCalculator.run_containerized('/work/payload.pkl')"
+                "\"\n"
+            )
                 
         # Make executable
         inner_script_path.chmod(0o755)
@@ -321,6 +284,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 rxn = payload["rxn"]
                 config = payload["config"]
 
+                os.environ["YARP_PREGSM_CONTAINER"] = "1"
                 pairs = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt").select()
                 cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs)
                 print(f"Selected {len(pairs)} pair(s)", file=log, flush=True)

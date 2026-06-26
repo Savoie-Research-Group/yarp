@@ -6,6 +6,7 @@ one strategy it calls while constructing candidate reactant/product pairs.
 """
 
 import copy
+import os
 import pickle
 from pathlib import Path
 
@@ -30,6 +31,13 @@ class ConformerPairSelector:
         self.dropped_pairs = 0
 
     def select(self):
+        if os.environ.get("YARP_PREGSM_CONTAINER") != "1":
+            raise RuntimeError(
+                "Conformer pair selection must run inside the jo_opt pre-GSM container. "
+                "Use the Pysisyphus TS guess workflow instead of calling ConformerPairSelector.select() "
+                "from the host YARP environment."
+            )
+
         r_confs = self._get_conformers(self.rxn.reactant)
         p_confs = self._get_conformers(self.rxn.product)
 

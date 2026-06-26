@@ -11,10 +11,10 @@ dependencies:
   - ipykernel
   - rdkit
   - openbabel
+  - numpy
   - scipy
   - pandoc
   - networkx
-  - scikit-learn=1.3.0
   - pip:
     - tabulate
     - sphinx-rtd-theme

@@ -299,7 +299,6 @@ class TSGuessConfig:
     xtb_joint_force_constant: float = 1.0
     xtb_joint_scf_iters: int = 300
     xtb_joint_keep_files: bool = False
-    containerize_pre_gsm: bool = False
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
@@ -346,8 +345,6 @@ class TSGuessConfig:
             raise ValueError("Please provide a positive integer to ts_guess: 'xtb_joint_scf_iters'")
         if not isinstance(self.xtb_joint_keep_files, bool):
             raise ValueError("Please provide a boolean value to ts_guess: 'xtb_joint_keep_files'")
-        if not isinstance(self.containerize_pre_gsm, bool):
-            raise ValueError("Please provide a boolean value to ts_guess: 'containerize_pre_gsm'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):

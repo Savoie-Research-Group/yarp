@@ -155,7 +155,7 @@ def main(args):
         headers.insert(0, "Reaction Hash")
     for direction, _, label, key in columns:
         headers.append(f"{key} {direction} {label}")
-    if args.network_meta:
+    if args.meta:
         headers.append("network_meta_keys")
 
     data = []
@@ -169,7 +169,7 @@ def main(args):
 
         for _, attr, _, key in columns:
             row.append(_format_optional_value(_reaction_value(rxn, attr, key)))
-        if args.network_meta:
+        if args.meta:
             row.append(_network_meta_keys(rxn))
         data.append(row)
 

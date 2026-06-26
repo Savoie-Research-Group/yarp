@@ -479,7 +479,6 @@ class yarpecule:
         # This should raise an error if code is modifying the
         # class attributes (which it should NOT be doing here!!!)
         E = self.elements
-        G = self.geo
         bond_mat = self.bond_mats[0]
         adj_mat = self.adj_mat
 
@@ -496,34 +495,25 @@ class yarpecule:
                 groups += [new_group]
         inchikey = []
 
-        # Generate a temporary mol file for each separated graph
-        # Then use it to get an INCHI key
-        tmp_file = ".tmp.mol"
+        # Generate INCHI key for each separated graph
         for group in groups:
             # extract subgroup information
-            N_atom = len(group)
-            geo = np.zeros([N_atom, 3])
-            for count_i, i in enumerate(group):
-                geo[count_i, :] = G[i, :]
             elements = [E[ind] for ind in group]
             bem = [bond_mat[group][:, group]]
             adj = adj_mat[group][:, group]
-            
-            # generate mol file and read in to Open Babel
-            mol_write_yp(tmp_file, elements, geo, bem[0], adj)
-            mol = next(pybel.readfile("mol", tmp_file))
-            
+
+            # generate RDKit mol object from subgroup
+            mol = yarpecule_to_rdmol(elements=elements, adj=adj, bond_orders=bem[0])
+
             try:
-                inchi = mol.write(format='inchikey').strip().split()[0]
+                inchi = Chem.inchi.MolToInchiKey(mol).strip().split()[0]
             except:
                 if verbose:
                     print("WARNING: ERROR in INCHI key generation!")
-                    print(f"  --> {mol.write(format='inchikey')}")
+                    print(f"  --> {Chem.inchi.MolToInchiKey(mol)}")
                 continue
-            
+
             inchikey += [inchi]
-            
-            os.remove(tmp_file)
 
         if len(inchikey) == 0:
             self._inchi = "ERROR"

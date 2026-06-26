@@ -2,6 +2,7 @@
 Helper functions for integration with RDKit
 """
 from rdkit import Chem
+from rdkit.Chem import AllChem
 from rdkit.Chem import rdchem
 from rdkit.Geometry import Point3D
 import numpy as np
@@ -164,3 +165,36 @@ def geom_from_rdmol(mol, conf_index=0):
             geo[idx] = [pos.x, pos.y, pos.z]
 
     return geo
+
+def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
+    '''
+    Perform low-level level geometry optimization of yarpecule geometry
+    via RDKit mol object.
+
+    Parameters:
+    ----------
+    ypcule : yarpecule object
+        molecule to be optimized
+
+    lot : string
+        Level of theory used for quick optimization
+        ERM: mmff94 has a tendency to reform the reactant geometry
+        when used to generate initial geom of products post product enumeration
+
+    Returns:
+    --------
+    opt_geom : nd array (N x 3)
+        optimized geometry
+    '''
+
+    rdmol = yarpecule_to_rdmol(elements=ypcule.elements, adj=ypcule.adj_mat, bond_orders=ypcule.bond_mats[0],
+                               atom_info=ypcule._atom_info, geo=ypcule.geo)
+
+    if lot == "uff":
+        opt = AllChem.UFFOptimizeMolecule(rdmol, maxIters=maxiter, ignoreInterfragInteractions=False)
+    elif lot == "mmff94":
+        opt = AllChem.MMFFOptimizeMolecule(rdmol, maxIters=maxiter, ignoreInterfragInteractions=False)
+
+    opt_geom = geom_from_rdmol(rdmol)
+
+    return opt_geom

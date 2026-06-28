@@ -8,7 +8,7 @@ def obabel_ff_opt(molecule, lot="uff", maxiter=500):
     '''
     Perform low-level level geometry optimization on yarpecule using openbabel.
 
-    Parameters:
+    Parameters
     ----------
     molecule : yarpecule object
         molecule to be optimized 
@@ -16,10 +16,21 @@ def obabel_ff_opt(molecule, lot="uff", maxiter=500):
     lot : string
         Level of theory used for quick optimization
 
+    maxiter : int
+        Maximum number of optimization steps
+        
+
     Returns
     -------
     opt_geom : nd array (N x 3)
         optimized geometry
+
+    Notes
+    -----
+    Supported force fields (`lot`):
+        - 'uff' : Universal Force Field, general-purpose, works for most elements
+        - 'mmff94' : Merck Molecular Force Field, better for organics
+        - 'ghemical' : simpler/faster, less accurate
     '''
 
     # Write yarpecule object to a temporary mol file

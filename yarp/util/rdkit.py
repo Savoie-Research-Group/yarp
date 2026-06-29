@@ -244,7 +244,10 @@ def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
         Level of theory used for quick optimization
         ERM: mmff94 has a tendency to reform the reactant geometry
         when used to generate initial geom of products post product enumeration
-
+    
+    maxiter : int
+        Maximum number of optimization steps
+    
     Returns:
     --------
     opt_geom : nd array (N x 3)

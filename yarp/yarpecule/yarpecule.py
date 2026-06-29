@@ -15,6 +15,7 @@ from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
 from yarp.util.properties import el_mass
 from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
+from yarp.util.rdkit import yarpecule_to_rdmol
 from yarp.yarpecule.lewis.lewis_structure import lewis_struct
 
 # Package-level warning suppression is configured in yarp/__init__.py.
@@ -402,38 +403,31 @@ class yarpecule:
         self._canon_smi : str
         self._map_smi : str
         """
-        # Generate a temporary MOL file from yarpecule
-        tmp_file = ".tmp.mol"
-        mol_write_yp(tmp_file, self.elements, self.geo,
-                     self.bond_mats[0], self.adj_mat, atom_info=self._atom_info)
+        # Build the RDKit mol directly from yarpecule attributes via the shared
+        # conversion utility. Hydrogens are added explicitly and implicit-H
+        # perception is disabled, so RDKit cannot invent "ghost" hydrogens that
+        # are absent from the yarpecule bond-electron matrix. The geometry is
+        # passed through so stereochemistry is still perceived from 3D.
 
-        # Use RDKit to get canonical SMILES string
-        # ERM Note: RDKit has an annoying "Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D."
-        # which triggers whenever you initialize from a .mol file for various and sundry reasons.
-        # I have decided it is not worth my time to continue troubleshooting how to avoid this.
-        mol1 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=True)
+        # Use RDKit to get canonical SMILES string (heavy atoms only, no maps)
+        mol1 = yarpecule_to_rdmol(self.elements, self.adj_mat,
+                                  self.bond_mats[0], geo=self.geo)
+        mol1 = Chem.RemoveHs(mol1)
         if verbose:
             print("RDKit mol dump before mapping:")
             for line in Chem.MolToMolBlock(mol1).splitlines():
                 print(line)
-        atoms = mol1.GetNumAtoms()
-        for idx in range(atoms):
-            mol1.GetAtomWithIdx(idx).ClearProp("molAtomMapNumber")
         self._canon_smi = Chem.MolToSmiles(mol1, canonical=True)
 
-        # Use RDKit to get atom-mapped SMILES string
-        mol2 = Chem.rdmolfiles.MolFromMolFile(tmp_file, removeHs=False)
-        atoms = mol2.GetNumAtoms()
-        for idx in range(atoms):
-            mol2.GetAtomWithIdx(idx).SetProp("molAtomMapNumber", str(self._atom_info[idx]["atom_map"]))
+        # Use RDKit to get atom-mapped SMILES string (all atoms, with maps)
+        mol2 = yarpecule_to_rdmol(self.elements, self.adj_mat,
+                                  self.bond_mats[0], atom_info=self._atom_info,
+                                  geo=self.geo)
         if verbose:
             print("RDKit mol dump after mapping:")
             for line in Chem.MolToMolBlock(mol2).splitlines():
                 print(line)
         self._map_smi = Chem.MolToSmiles(mol2, canonical=True)
-
-        # Remove temporary file
-        os.remove(tmp_file)
 
     def reactive_map_smi(self, react, debug=False):
         """
@@ -485,7 +479,6 @@ class yarpecule:
         # This should raise an error if code is modifying the
         # class attributes (which it should NOT be doing here!!!)
         E = self.elements
-        G = self.geo
         bond_mat = self.bond_mats[0]
         adj_mat = self.adj_mat
 
@@ -502,34 +495,25 @@ class yarpecule:
                 groups += [new_group]
         inchikey = []
 
-        # Generate a temporary mol file for each separated graph
-        # Then use it to get an INCHI key
-        tmp_file = ".tmp.mol"
+        # Generate INCHI key for each separated graph
         for group in groups:
             # extract subgroup information
-            N_atom = len(group)
-            geo = np.zeros([N_atom, 3])
-            for count_i, i in enumerate(group):
-                geo[count_i, :] = G[i, :]
             elements = [E[ind] for ind in group]
             bem = [bond_mat[group][:, group]]
             adj = adj_mat[group][:, group]
-            
-            # generate mol file and read in to Open Babel
-            mol_write_yp(tmp_file, elements, geo, bem[0], adj)
-            mol = next(pybel.readfile("mol", tmp_file))
-            
+
+            # generate RDKit mol object from subgroup
+            mol = yarpecule_to_rdmol(elements=elements, adj=adj, bond_orders=bem[0])
+
             try:
-                inchi = mol.write(format='inchikey').strip().split()[0]
+                inchi = Chem.inchi.MolToInchiKey(mol).strip().split()[0]
             except:
                 if verbose:
                     print("WARNING: ERROR in INCHI key generation!")
-                    print(f"  --> {mol.write(format='inchikey')}")
+                    print(f"  --> {Chem.inchi.MolToInchiKey(mol)}")
                 continue
-            
+
             inchikey += [inchi]
-            
-            os.remove(tmp_file)
 
         if len(inchikey) == 0:
             self._inchi = "ERROR"

@@ -42,6 +42,20 @@ class TestSMILESFromYarpecule:
         assert mol.canon_smi == '[CH2]C'
         assert mol.map_smi == '[C:1]([C:2]([H:3])[H:7])([H:4])([H:5])[H:6]' # revist if this is the correct output - ERM
 
+    def test_no_ghost_hydrogens_in_mapped_smiles(self):
+        # Regression: charged atoms (here S+2) used to gain implicit "ghost"
+        # hydrogens during the RDKit round trip that are absent from the
+        # yarpecule bond-electron matrix. See get_smiles / yarpecule_to_rdmol.
+        mol = ypcule(
+            '[c:0]12[c:1]([H:7])[c:2]([H:8])[c:3]([H:9])[c:4]([H:10])[c:5]1[C-:12]([O-:11])[N:13]([H:6])[S+2:14]2',
+            canon=False,
+        )
+        mol.get_smiles()
+
+        assert "[SH2+2" not in mol.map_smi
+        assert "[S+2:14]" in mol.map_smi
+        assert "[SH2+2" not in mol.canon_smi
+
     def test_reactive_map_smi_display(self):
         mol = ypcule('[C:0]([O:1][H:2])([H:3])([H:4])[H:5]', canon=False)
         marked = mol.reactive_map_smi([set([0, 1])])

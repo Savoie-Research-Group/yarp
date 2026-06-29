@@ -1,11 +1,8 @@
 """
 Wrapper function to manage the generation of reaction objects during main_yarp routine
 """
-import os
-import fnmatch
 import pickle
 import numpy as np
-from openbabel import pybel
 from pathlib import Path
 
 from yarp.yarpecule.yarpecule import yarpecule
@@ -13,7 +10,9 @@ from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_react
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
-from yarp.util.write_files import mol_write_yp
+from yarp.util.rdkit import rdkit_ff_opt
+from yarp.util.obabel import obabel_ff_opt
+from yarp.yarpecule.graph.adjacency import table_generator
 
 
 def generate_rxns(inp):
@@ -35,17 +34,71 @@ def generate_rxns(inp):
     """
     output = None
     verbose = inp.verbose
+    source = Path(inp.init_struct.source)
 
     # Initialize reactions for product enumeration
     if inp.enum.ON:
         print("Product enumeration enabled. Enumerating products.")
-        if inp.init_struct.type == 'yarp_pickle':
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
-            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
-            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+        # Enumerating from single starting species
+        if inp.init_struct.mode == 'species':
+            if verbose:
+                print(f" - Initializing starting reactant node from {source}")
+                print(f" - Processing starting node as a single species. No pre-enumeration filters will be applied!")
+
+            output = dict()
+            reactant = yarpecule(inp.init_struct.source, mode="yarp")
+
+            raw_products = enumerate_products(
+                    r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                )
+
+            clean_products = filter_enum_products(
+                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
+                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
+                verbose=verbose
+            )
+
+            for prod in clean_products:
+                prod = quick_geom_opt(prod)
+                if prod is None:
+                    if verbose:
+                        print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
+                    continue
+                r2p = reaction(reactant, prod)
+                output[r2p.hash] = r2p
+
+        # Enumerating from reaction object(s)
+        if inp.init_struct.mode == 'reaction':
+            if verbose:
+                print(f" - Initializing starting reactant node(s) from {inp.init_struct.source}")
+                print(f" - Initial source identified as reactant(s); pre-enumeration filters will be applied!")
+
+            # 3 different modes for initializing reaction object(s)
+            og_rxns = None
+            if inp.init_struct.type == 'yarp_pickle':
+                if verbose: print(" - Processing starting node(s) as YARP generated pickle file")
+
+                og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
+                assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
+                assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+
+            elif inp.init_struct.type == 'xyz':
+                if source.is_dir():
+                    if verbose: print(f" - Processing starting node(s) as reaction xyz files in {source}")
+                    og_rxns = load_reactions_from_xyz_directory(source)
+                elif source.is_file() and source.suffix.lower() == ".xyz":
+                    if verbose: print(f" - Processing starting node(s) as reaction xyz file {source}")
+                    rxn = load_reaction_from_xyz_file(source)
+                    og_rxns = {rxn.hash: rxn}
+
+            elif inp.init_struct.type == 'smiles':
+                if verbose: print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
+                og_rxns = load_reactions_from_smiles_file(source)
+
+            else:
+                raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
             og_rxns_hash = set(og_rxns.keys())
 
@@ -77,6 +130,10 @@ def generate_rxns(inp):
 
                 for prod in clean_products:
                     prod = quick_geom_opt(prod)
+                    if prod is None:
+                        if verbose:
+                            print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
+                        continue
                     r2p = reaction(mol, prod)
                     p2r = reaction(mol, prod)
 
@@ -86,53 +143,32 @@ def generate_rxns(inp):
                     new_rxns[r2p.hash] = r2p
             
             output = og_rxns | new_rxns
-            
-        else:
-            if verbose:
-                print(f" - Initializing starting reactant node from {inp.init_struct.source}")
-            output = dict()
-            reactant = yarpecule(inp.init_struct.source, mode="yarp")
 
-            raw_products = enumerate_products(
-                    r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
-                )
-
-            clean_products = filter_enum_products(
-                raw_products, l_cutoff=inp.enum.post_enum_filters.lewis_score,
-                fc_cutoff=inp.enum.post_enum_filters.formal_charge, ring_filter=inp.enum.post_enum_filters.ring_filter,
-                verbose=verbose
-            )
-
-            for prod in clean_products:
-                prod = quick_geom_opt(prod)
-                r2p = reaction(reactant, prod)
-                output[r2p.hash] = r2p
-
+    # Initialize reactions characterization without product enumeration
     else:
-        source = Path(inp.init_struct.source)
         print(f"Product enumeration not enabled. Initializing reactions from input node(s).")
         print(f" - Input node source: {source}")
+
+        # 3 different modes for initializing reaction object(s)
+        output = None
         if inp.init_struct.type == 'yarp_pickle':
-            if verbose:
-                print(" - Processing starting node(s) as YARP generated pickle file")
+            if verbose: print(" - Processing starting node(s) as YARP generated pickle file")
 
-            og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
-            assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
-            assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+            output = pickle.load(open(inp.init_struct.source, 'rb'))
+            assert isinstance(output, dict), "Input pickle file must contain a dictionary!"
+            assert all(isinstance(v, reaction) for v in output.values()), "YARP requires a dictionary of reaction objects to continue"
 
-            output = og_rxns
-        elif source.is_dir():
-            print(f" - Processing starting node(s) as reaction xyz files in {source}")
-            output = load_reactions_from_xyz_directory(source)
+        elif inp.init_struct.type == 'xyz':
+            if source.is_dir():
+                if verbose: print(f" - Processing starting node(s) as reaction xyz files in {source}")
+                output = load_reactions_from_xyz_directory(source)
+            elif source.is_file() and source.suffix.lower() == ".xyz":
+                if verbose: print(f" - Processing starting node(s) as reaction xyz file {source}")
+                rxn = load_reaction_from_xyz_file(source)
+                output = {rxn.hash: rxn}
 
-        elif source.is_file() and source.suffix.lower() == ".xyz":
-            print(f" - Processing starting node(s) as reaction xyz file {source}")
-            rxn = load_reaction_from_xyz_file(source)
-            output = {rxn.hash: rxn}
-
-        elif source.is_file():
-            print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
+        elif inp.init_struct.type == 'smiles':
+            if verbose: print(f" - Processing starting node(s) as mapped reaction SMILES in {source}")
             output = load_reactions_from_smiles_file(source)
 
         else:
@@ -161,20 +197,28 @@ def quick_geom_opt(molecule, lot="uff"):
         optimized molecule
     '''
 
-    # Write yarpecule object to a temporary mol file
-    mol_file = '.tmp.mol'
-    mol_write_yp(mol_file, molecule.elements, molecule.geo,
-                 molecule.bond_mats[0], molecule.adj_mat)
+    # First, attempt to optimize with RDKit
+    rd_opt_g = rdkit_ff_opt(molecule, lot=lot)
 
-    # Use openbabel to perform geometry optimization
-    mol = next(pybel.readfile("mol", mol_file))
-    mol.localopt(forcefield=lot)
+    # Check if optimization preserved starting connectivity
+    rd_adj = table_generator(molecule.elements, rd_opt_g)
+    rd_diff = rd_adj - molecule.adj_mat
 
-    # Update yarpecule with optimized geometry coordinates
-    for count_i, i in enumerate(molecule.geo):
-        molecule.geo[count_i] = mol.atoms[count_i].coords
+    # If RDKit generated a garbage geom, try Open Babel
+    if not np.all(rd_diff == 0):
+        ob_opt_g = obabel_ff_opt(molecule, lot=lot)
 
-    # Delete temporary mol file
-    os.system("rm {}".format(mol_file))
+        # If Open Babel fails too, we return None
+        ob_adj = table_generator(molecule.elements, ob_opt_g)
+        ob_diff = ob_adj - molecule.adj_mat
+        if not np.all(ob_diff == 0):
+            return None
+        
+        # If all goes well, update geometry and return
+        molecule._geo = ob_opt_g
+        return molecule
 
-    return molecule
+    # Otherwise, if RDKit gave a valid geom, use that one
+    else:
+        molecule._geo = rd_opt_g
+        return molecule

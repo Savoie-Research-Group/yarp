@@ -134,6 +134,7 @@ class ProductBlindersConfig:
     distance_metric: str = "soergel"
     mode: str = "beam"
     n_nodes: int = 1
+    tie_window: float = 0.0
 
     def __post_init__(self):
         if not self.target_product:

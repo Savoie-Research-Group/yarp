@@ -8,7 +8,13 @@ import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
-
+from yarp.util.rdkit import (
+    adj_from_rdmol,
+    atom_info_from_rdmol,
+    el_from_rdmol,
+    geom_from_rdmol,
+    smiles_to_rdmol,
+)
 
 def xyz_parse(xyz, read_types=False, multiple=False):
     """
@@ -481,42 +487,14 @@ def xyz_from_smiles(smiles, mode="yarp"):
 
     # RDKit branch
     else:
-        m = MolFromSmiles(smiles)  # create molecule using rdkit
-        m = AddHs(m)  # make the hydrogens explicit
-        AllChem.EmbedMolecule(m, randomSeed=0xf00d)  # create a 3D geometry
-        N_atoms = len(m.GetAtoms())  # find the number of atoms
-        elements = []  # initialize list to hold element labels
-        geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
-        q = 0  # total charge on the molecule
-        atom_info = {}
+        m = smiles_to_rdmol(smiles)
+        AllChem.EmbedMolecule(m, randomSeed=0xf00d)
 
-        # loop over atoms, save their labels, positions, and total charge
-        for i in range(N_atoms):
-            atom = m.GetAtomWithIdx(i)
-            elements += [atom.GetSymbol()]
-            coord = m.GetConformer().GetAtomPosition(i)
-            geo[i] = np.array([coord.x, coord.y, coord.z])
-            q += atom.GetFormalCharge()
-            isotope = atom.GetIsotope()
-            mass = float(isotope) if isotope else el_mass[atom.GetSymbol().lower()]
-            atom_map = None
-            if atom.HasProp("molAtomMapNumber"):
-                atom_map = int(atom.GetProp("molAtomMapNumber"))
-            atom_info[i] = {
-                "atom_index": i,
-                "atom_map": atom_map,
-                "element": atom.GetSymbol().lower(),
-                "formal_charge": atom.GetFormalCharge(),
-                "mass": mass,
-                "stereo": {"atom": None, "bonds": {}},
-                "aromatic_input": atom.GetIsAromatic(),
-            }
-
-        # Generate adjacency matrix
-        adj_mat = np.zeros((N_atoms, N_atoms))
-        for i in [(_.GetBeginAtomIdx(), _.GetEndAtomIdx()) for _ in m.GetBonds()]:
-            adj_mat[i[0], i[1]] = 1
-            adj_mat[i[1], i[0]] = 1
+        elements = el_from_rdmol(m)
+        geo = geom_from_rdmol(m)
+        adj_mat = adj_from_rdmol(m)
+        atom_info = atom_info_from_rdmol(m)
+        q = int(sum(atom_info[i]["formal_charge"] for i in atom_info))
 
     return elements, geo, adj_mat, q, atom_info
 
@@ -529,22 +507,15 @@ def geo_via_rdkit(smiles, atom_info):
     identifies the correct graph but its bond-electron matrix is too crude to
     survive octet validation.
     """
-    m = MolFromSmiles(smiles)
-    if m is None:
-        raise ValueError(f"RDKit could not parse SMILES: {smiles}")
-    m = AddHs(m)
+    m = smiles_to_rdmol(smiles)
     AllChem.EmbedMolecule(m, randomSeed=0xf00d)
 
-    rdkit_elements = [atom.GetSymbol().lower() for atom in m.GetAtoms()]
+    rdkit_elements = [el.lower() for el in el_from_rdmol(m)]
     yarp_elements = [atom_info[i]["element"] for i in atom_info]
 
     yarp_maps = [atom_info[i].get("atom_map", None) for i in atom_info]
-    rdkit_maps = []
-    for atom in m.GetAtoms():
-        if atom.HasProp("molAtomMapNumber"):
-            rdkit_maps.append(int(atom.GetProp("molAtomMapNumber")))
-        else:
-            rdkit_maps.append(None)
+    rdkit_atom_info = atom_info_from_rdmol(m)
+    rdkit_maps = [rdkit_atom_info[i]["atom_map"] for i in rdkit_atom_info]
 
     if all(_ is not None for _ in yarp_maps):
         rdkit_by_map = {atom_map: idx for idx, atom_map in enumerate(rdkit_maps) if atom_map is not None}
@@ -557,9 +528,9 @@ def geo_via_rdkit(smiles, atom_info):
     else:
         raise ValueError("RDKit fallback atom order did not match the in-house parser ordering.")
 
+    rdkit_geo = geom_from_rdmol(m)
     geo = np.zeros((len(order), 3))
     for i, rdkit_idx in enumerate(order):
-        coord = m.GetConformer().GetAtomPosition(rdkit_idx)
-        geo[i] = np.array([coord.x, coord.y, coord.z])
+        geo[i] = rdkit_geo[rdkit_idx]
 
     return geo

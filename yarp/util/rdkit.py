@@ -5,8 +5,10 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import rdchem
 from rdkit.Geometry import Point3D
+from yarp.util.properties import el_mass
 import numpy as np
 import warnings
+import re
 
 BOND_MAP = {
     1: rdchem.BondType.SINGLE,
@@ -18,6 +20,68 @@ BOND_MAP = {
 }
 # TODO: How to handle dative bonds for organometallics?
 
+EXPLICIT_MAPPED_H_PATTERN = re.compile(r"\[(?:\d+)?H[^\]]*:\d+[^\]]*\]")
+
+
+def has_explicit_mapped_hydrogen(smiles):
+    return EXPLICIT_MAPPED_H_PATTERN.search(smiles) is not None
+
+
+def smiles_to_rdmol(smiles):
+    
+    """
+    Converts a SMILES string to an RDKIT Mol object. If hydrogen atoms are explicityly mapped then 
+    they are preserved. Otherwise, default RDKit behavior is used to remove hydrogens and then add them back in. 
+
+    """
+    preserve_mapped_h = has_explicit_mapped_hydrogen(smiles)
+
+    if preserve_mapped_h:
+        params = Chem.SmilesParserParams()
+        params.removeHs = False
+        mol = Chem.MolFromSmiles(smiles, params)
+    else:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            mol = Chem.AddHs(mol)
+
+    if mol is None:
+        raise ValueError(f"RDKit could not parse SMILES: {smiles}")
+
+    return mol
+
+
+def adj_from_rdmol(mol):
+    adj_mat = np.zeros((mol.GetNumAtoms(), mol.GetNumAtoms()))
+    for bond in mol.GetBonds():
+        i = bond.GetBeginAtomIdx()
+        j = bond.GetEndAtomIdx()
+        adj_mat[i, j] = adj_mat[j, i] = 1
+    return adj_mat
+
+
+def el_from_rdmol(mol):
+    return [atom.GetSymbol() for atom in mol.GetAtoms()]
+
+
+def atom_info_from_rdmol(mol):
+    atom_info = {}
+    for i, atom in enumerate(mol.GetAtoms()):
+        element = atom.GetSymbol().lower()
+        isotope = atom.GetIsotope()
+        atom_map = int(atom.GetProp("molAtomMapNumber")) if atom.HasProp("molAtomMapNumber") else None
+
+        atom_info[i] = {
+            "atom_index": i,
+            "atom_map": atom_map,
+            "element": element,
+            "formal_charge": atom.GetFormalCharge(),
+            "mass": float(isotope) if isotope else el_mass[element],
+            "stereo": {"atom": None, "bonds": {}},
+            "aromatic_input": atom.GetIsAromatic(),
+        }
+
+    return atom_info
 
 def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, geo=None, sanitize=True):
     """
@@ -180,7 +244,7 @@ def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
         Level of theory used for quick optimization
         ERM: mmff94 has a tendency to reform the reactant geometry
         when used to generate initial geom of products post product enumeration
-
+    
     maxiter : int
         Maximum number of optimization steps
     

@@ -261,6 +261,16 @@ class lewis_struct:
         seed_scores = []
         seed_hashes = set([])
 
+        # Patch C+ (2026-07-06 ZL): N_score is TM-conditional. For TM systems the
+        # published GoldDIGR dial-plot was generated with N_score=100 (the short
+        # search that fed our slim OS CSV); switching organic molecules to that
+        # same shortened search makes them stop early on the first Lewis
+        # structure found, which sometimes misses the intended non-aromatic form
+        # (see test_no_ghost_hydrogens_in_mapped_smiles regression). Organic
+        # molecules get upstream N_score=1000 to preserve upstream behavior.
+        _has_tm = any(el in el_metals for el in elements)
+        _n_score = 100 if _has_tm else 1000
+
         count = 0
         for score, bond_mat, reactive in gen_init(obj_fun, adj_mat, elements, self._rings, q):
             count += 1
@@ -268,14 +278,12 @@ class lewis_struct:
                 seed_scores += [score]
                 seed_bond_mats += [bond_mat]
                 seed_hashes.add(bmat_hash(bond_mat))
-                # N_score=100 rolled back 2026-06-12 ZL — matches production
-                # OS-recalculation run that fed the published dial plot.
                 seed_bond_mats, seed_scores, _, _, _ = gen_all_lstructs(obj_fun, seed_bond_mats, seed_scores, seed_hashes,
                                                                         elements, reactive, self._rings, ring_atoms, bridgeheads,
                                                                         # allow all charge transfers in first pass
                                                                         seps=np.zeros([len(elements), len(elements)]),
                                                                         min_score=seed_scores[0], ind=len(seed_bond_mats)-1,
-                                                                        N_score=100, N_max=10000, min_opt=True)
+                                                                        N_score=_n_score, N_max=10000, min_opt=True)
 
         # Update objective function to include (anti)aromaticity considerations
         def obj_fun(x): return bmat_score(x, elements, self._rings,
@@ -308,7 +316,8 @@ class lewis_struct:
                                                            # set according to local_opt flag
                                                            seps,
                                                            min_score=min(scores), ind=len(bond_mats)-1,
-                                                           N_score=100, N_max=10000, min_opt=True)
+                                                           # N_score TM-conditional (see Patch C+ above)
+                                                           N_score=_n_score, N_max=10000, min_opt=True)
 
         # Patch F (2026-06-19 ZL): conditional seed-BEM re-pool. For purely
         # organic systems (no transition metals), the re-pool is restored —
@@ -322,8 +331,7 @@ class lewis_struct:
         # via Z-bonds, producing impossible/high oxidation states. Disabling
         # the re-pool for TM systems eliminates 38/55 of the divergence vs
         # the old patched YARP on a 144-archive stratified TM sample.
-        has_tm = any(el in el_metals for el in elements)
-        if not has_tm:
+        if not _has_tm:
             # Collect all discovered BEMs (organic-only)
             for i, bem in enumerate(seed_bond_mats):
                 if bmat_hash(bem) not in hashes:

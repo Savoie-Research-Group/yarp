@@ -2,6 +2,8 @@
 debug/*
 .vscode
 containers/*.sif
+containers/*/*.def
+containers/*.tar
 containers/orca/*.tar.*
 containers/orca/example
 **/SCRATCH

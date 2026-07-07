@@ -101,6 +101,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
         with open(submit_script_path, "w") as f:
             f.write("#!/bin/bash\n")
             self.write_scheduler_headers(f)
+            self.write_thread_env(f)
             f.write(f"{prefix} bash /work/run_pysis_inner.sh\n")
             
         submit_script_path.chmod(0o755)

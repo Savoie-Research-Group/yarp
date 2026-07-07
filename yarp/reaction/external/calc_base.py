@@ -175,6 +175,43 @@ class AsyncYarpCalculator:
 
         # If 'local', we don't need scheduler headers!
 
+    @staticmethod
+    def thread_env(cpus):
+        """Return environment variables that bind threaded libraries to a task."""
+        cpus = max(1, int(cpus))
+        blas_threads = 1
+        return {
+            "OMP_NUM_THREADS": f"{cpus},{blas_threads}",
+            "OMP_THREAD_LIMIT": str(cpus),
+            "OMP_MAX_ACTIVE_LEVELS": "1",
+            "OMP_NESTED": "FALSE",
+            "OMP_DYNAMIC": "FALSE",
+            "OMP_STACKSIZE": "512M",
+            "OMP_PROC_BIND": "close",
+            "OMP_PLACES": "cores",
+            "OPENBLAS_NUM_THREADS": str(blas_threads),
+            "GOTO_NUM_THREADS": str(blas_threads),
+            "MKL_NUM_THREADS": str(blas_threads),
+            "MKL_DYNAMIC": "FALSE",
+            "BLIS_NUM_THREADS": str(blas_threads),
+            "NUMEXPR_NUM_THREADS": str(blas_threads),
+            "VECLIB_MAXIMUM_THREADS": str(blas_threads),
+        }
+
+    def write_thread_env(self, f):
+        """Limit threaded libraries to the resources requested for this task."""
+        env = self.thread_env(getattr(self.config, "n_cpus", 1))
+        f.write("ulimit -s unlimited || true\n")
+        for key, value in env.items():
+            f.write(f"export {key}={value}\n")
+        # Apptainer/Singularity launched with -e only forwards explicitly
+        # prefixed variables into the container.
+        for key, value in env.items():
+            f.write(f"export APPTAINERENV_{key}={value}\n")
+        for key, value in env.items():
+            f.write(f"export SINGULARITYENV_{key}={value}\n")
+        f.write("\n")
+
     # --- Pre-flight Check (Overridden by Task classes) ---
     def has_prerequisites(self) -> bool:
         return True
@@ -201,4 +238,3 @@ class AsyncYarpCalculator:
         # Default behavior: nuke the whole folder
         if self.scratch_dir and self.scratch_dir.exists():
             shutil.rmtree(self.scratch_dir)
-

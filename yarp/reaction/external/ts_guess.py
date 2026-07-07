@@ -5,6 +5,8 @@ import pickle
 import json
 import subprocess
 import traceback
+import signal
+import time
 from pathlib import Path
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
@@ -66,12 +68,17 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         
         with open(inner_script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
+            f.write("set -u\n")
+            f.write("trap 'ec=$?; echo \"Inner GSM wrapper exiting with code ${ec}\"' EXIT\n")
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
 
             repo_root = Path(__file__).resolve().parents[3]
-            f.write(f"export PYTHONPATH={repo_root}:$PYTHONPATH\n")
+            f.write(f"export PYTHONPATH={repo_root}${{PYTHONPATH:+:$PYTHONPATH}}\n")
             f.write("export PYSISRC=/root/.pysisyphusrc\n")
             f.write("export YARP_PREGSM_CONTAINER=1\n")
+            f.write("ulimit -s unlimited || true\n")
+            for key, value in self.thread_env(self.config.n_cpus).items():
+                f.write(f"export {key}={value}\n")
             f.write(
                 "python -c \""
                 "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
@@ -93,8 +100,15 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         with open(submit_script_path, "w") as f:
             f.write("#!/bin/bash\n")
             self.write_scheduler_headers(f)
+            self.write_thread_env(f)
             # Launch the container and tell it to run the inner script
-            f.write(f"{prefix} bash /work/run_pysis_inner.sh\n")
+            f.write(f"cd {self.scratch_dir}\n")
+            f.write("echo \"$(date) starting containerized GSM wrapper\" > container_lifecycle.log\n")
+            f.write(
+                "trap 'ec=$?; echo \"$(date) submit_gsm.sh exiting with code ${ec}\" "
+                ">> container_lifecycle.log' EXIT\n"
+            )
+            f.write(f"{prefix} bash /work/run_pysis_inner.sh > container.out 2> container.err\n")
             
         submit_script_path.chmod(0o755)
         
@@ -107,6 +121,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         """
         num_runs = self._get_num_runs()
         if num_runs == 0:
+            self._print_container_log_tail()
             return False # No runs found at all!
 
         one_successful = False
@@ -134,7 +149,24 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             one_successful = True
             
         # We only care if at least one succeeded
+        if not one_successful:
+            self._print_container_log_tail()
         return one_successful
+
+    def _print_container_log_tail(self):
+        for name in ("container.err", "container.out", "pregsm.log"):
+            path = self.scratch_dir / name
+            if not path.exists():
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception:
+                continue
+            if not lines:
+                continue
+            print(f"     [TS Guess] Last lines of {name}:")
+            for line in lines[-20:]:
+                print(f"       {line}")
 
     def scrape_data(self) -> bool:
         """
@@ -262,6 +294,62 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         }
         Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
+    @staticmethod
+    def _runtime_to_seconds(runtime):
+        try:
+            hours, minutes, seconds = [int(_) for _ in str(runtime).split(":")]
+        except Exception:
+            return 3600
+        return hours * 3600 + minutes * 60 + seconds
+
+    @classmethod
+    def _pair_timeout_seconds(cls, config, n_pairs):
+        total = cls._runtime_to_seconds(getattr(config, "max_runtime", "01:00:00"))
+        n_pairs = max(1, int(n_pairs))
+        # Keep scheduler tear-down time available for logging and later pairs.
+        return max(60, int(total * 0.8 / n_pairs))
+
+    @staticmethod
+    def _run_pysis(pair_dir, inp_name, out_path, err_path, timeout_s, log):
+        start = time.time()
+        with out_path.open("w", encoding="utf-8") as out:
+            with err_path.open("w", encoding="utf-8") as err:
+                proc = subprocess.Popen(
+                    ["pysis", inp_name],
+                    cwd=pair_dir,
+                    stdout=out,
+                    stderr=err,
+                    text=True,
+                    start_new_session=True,
+                )
+                try:
+                    returncode = proc.wait(timeout=timeout_s)
+                    elapsed = time.time() - start
+                    print(
+                        f"GSM pair in {pair_dir.name} exited with code {returncode} "
+                        f"after {elapsed:.1f} s",
+                        file=log,
+                        flush=True,
+                    )
+                    return returncode == 0
+                except subprocess.TimeoutExpired:
+                    elapsed = time.time() - start
+                    print(
+                        f"GSM pair in {pair_dir.name} exceeded {timeout_s} s "
+                        f"after {elapsed:.1f} s; terminating and trying next pair.",
+                        file=log,
+                        flush=True,
+                    )
+                    try:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                        proc.wait(timeout=30)
+                    except Exception:
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except Exception:
+                            pass
+                    return False
+
     @classmethod
     def run_containerized(cls, payload_path):
         """
@@ -275,6 +363,27 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         pregsm_log = work_dir / "pregsm.log"
 
         with pregsm_log.open("w", encoding="utf-8") as log:
+            def log_signal(signum, _frame):
+                print(f"Received signal {signum}; aborting GSM wrapper", file=log, flush=True)
+                raise RuntimeError(f"Received signal {signum}")
+
+            handled_signals = [
+                signal.SIGTERM,
+                signal.SIGINT,
+                signal.SIGHUP,
+            ]
+            for optional_signal in ("SIGUSR1", "SIGUSR2"):
+                if hasattr(signal, optional_signal):
+                    handled_signals.append(getattr(signal, optional_signal))
+
+            previous_handlers = {}
+            for sig in handled_signals:
+                try:
+                    previous_handlers[sig] = signal.getsignal(sig)
+                    signal.signal(sig, log_signal)
+                except (OSError, RuntimeError, ValueError):
+                    pass
+
             try:
                 print("Starting containerized YARP pre-GSM selection", file=log, flush=True)
 
@@ -293,6 +402,12 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     raise RuntimeError("No GSM pairs selected")
 
                 any_success = False
+                timeout_s = cls._pair_timeout_seconds(config, len(pairs))
+                print(
+                    f"Using per-GSM-pair timeout of {timeout_s} s",
+                    file=log,
+                    flush=True,
+                )
                 for idx, pair in enumerate(pairs, start=1):
                     pair_dir = work_dir / f"gsm_run{idx}"
                     pair_dir.mkdir(parents=True, exist_ok=True)
@@ -306,18 +421,15 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
 
                     print(f"Running GSM pair {idx}", file=log, flush=True)
-                    with (pair_dir / f"gsm_{idx}.log").open("w", encoding="utf-8") as out:
-                        with (pair_dir / f"gsm_{idx}.err").open("w", encoding="utf-8") as err:
-                            result = subprocess.run(
-                                ["pysis", inp_path.name],
-                                cwd=pair_dir,
-                                stdout=out,
-                                stderr=err,
-                                text=True,
-                                check=False,
-                            )
-                    print(f"GSM pair {idx} exited with code {result.returncode}", file=log, flush=True)
-                    if result.returncode == 0:
+                    ok = cls._run_pysis(
+                        pair_dir,
+                        inp_path.name,
+                        pair_dir / f"gsm_{idx}.log",
+                        pair_dir / f"gsm_{idx}.err",
+                        timeout_s,
+                        log,
+                    )
+                    if ok:
                         any_success = True
 
                 if not any_success:
@@ -326,3 +438,9 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 traceback.print_exc(file=log)
                 log.flush()
                 raise
+            finally:
+                for sig, previous_handler in previous_handlers.items():
+                    try:
+                        signal.signal(sig, previous_handler)
+                    except (OSError, RuntimeError, ValueError):
+                        pass

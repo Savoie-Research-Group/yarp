@@ -4,6 +4,7 @@ Consider moving this to util if anything outside of yarpecule needs to access it
 """
 from pathlib import Path
 
+import re
 import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
@@ -15,6 +16,42 @@ from yarp.util.rdkit import (
     geom_from_rdmol,
     smiles_to_rdmol,
 )
+
+
+ATOM_MAP_PATTERN = re.compile(r":\d+(?=[^\]]*\])")
+EXPLICIT_H_PATTERN = re.compile(r"\[(?:\d+)?H[^\]]*\]")
+
+
+def strip_atom_maps(smiles):
+    return ATOM_MAP_PATTERN.sub("", smiles)
+
+
+def has_explicit_hydrogen_atom(smiles):
+    return EXPLICIT_H_PATTERN.search(smiles) is not None
+
+
+def prepare_partial_mapped_smiles(smiles):
+    """
+    If the SMILES is partially mapped, return an unmapped working SMILES plus
+    the original per-atom input maps in original token order.
+
+    Fully mapped and fully unmapped SMILES are left alone.
+    """
+    _, _, original_atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+
+    original_maps = [
+        original_atom_info[i].get("atom_map")
+        for i in original_atom_info
+    ]
+
+    has_any_map = any(m is not None for m in original_maps)
+    has_all_maps = all(m is not None for m in original_maps)
+
+    if not has_any_map or has_all_maps:
+        return smiles, None, False
+
+    unmapped_smiles = strip_atom_maps(smiles)
+    return unmapped_smiles, original_atom_info, True
 
 def xyz_parse(xyz, read_types=False, multiple=False):
     """
@@ -420,8 +457,23 @@ def xyz_from_smiles(smiles, mode="yarp"):
         # Parse basics
         # NOTE: bemat is used to generate geometry via RDKit, but not returned for
         # downstream use in yarpecule - ERM
-        adj_mat, bemat, atom_info = smiles2adjmat(smiles)
+        
+        parse_smiles, original_atom_info, partial_mapped_input = prepare_partial_mapped_smiles(smiles)
+
+        adj_mat, bemat, atom_info = smiles2adjmat(parse_smiles)
+
+        if partial_mapped_input:
+            if len(original_atom_info) != len(atom_info):
+                raise ValueError(
+            "Partial-map handling failed: original and unmapped SMILES produced "
+            "different atom counts."
+        )
+
+            for i in atom_info:
+                atom_info[i]["input_atom_map"] = original_atom_info[i].get("atom_map")
+
         elements = [atom_info[i]["element"] for i in atom_info]
+
         fc = [int(atom_info[i]["formal_charge"]) for i in atom_info]
         q = int(sum(fc))
 
@@ -441,7 +493,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
                     "WARNING: yarp aromatic SMILES geometry fallback used RDKit "
                     f"for {smiles} after octet validation failed at atoms {violations}."
                 )
-                geo = geo_via_rdkit(smiles, atom_info)
+                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),)
                 return elements, geo, adj_mat, q, atom_info
             raise OctetError(violations)
 
@@ -498,7 +550,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
 
     return elements, geo, adj_mat, q, atom_info
 
-def geo_via_rdkit(smiles, atom_info):
+def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     """
     Generate a geometry with RDKit and align it to the atom ordering used by
     the in-house SMILES parser.
@@ -507,7 +559,7 @@ def geo_via_rdkit(smiles, atom_info):
     identifies the correct graph but its bond-electron matrix is too crude to
     survive octet validation.
     """
-    m = smiles_to_rdmol(smiles)
+    m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
     AllChem.EmbedMolecule(m, randomSeed=0xf00d)
 
     rdkit_elements = [el.lower() for el in el_from_rdmol(m)]

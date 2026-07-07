@@ -27,19 +27,20 @@ def has_explicit_mapped_hydrogen(smiles):
     return EXPLICIT_MAPPED_H_PATTERN.search(smiles) is not None
 
 
-def smiles_to_rdmol(smiles):
+def smiles_to_rdmol(smiles, preserve_explicit_h=False):
     
     """
     Converts a SMILES string to an RDKIT Mol object. If hydrogen atoms are explicityly mapped then 
     they are preserved. Otherwise, default RDKit behavior is used to remove hydrogens and then add them back in. 
 
     """
-    preserve_mapped_h = has_explicit_mapped_hydrogen(smiles)
+    preserve_h = preserve_explicit_h or has_explicit_mapped_hydrogen(smiles)
 
-    if preserve_mapped_h:
+    if preserve_h:
         params = Chem.SmilesParserParams()
         params.removeHs = False
         mol = Chem.MolFromSmiles(smiles, params)
+
     else:
         mol = Chem.MolFromSmiles(smiles)
         if mol is not None:

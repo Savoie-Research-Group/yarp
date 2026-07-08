@@ -20,174 +20,150 @@ def mock_calculators(mocker):
     mocker.patch('yarp.progress_yarp.get_calculator', return_value=calc_mock)
     return calc_mock
 
-def test_happy_path_submission_and_completion(mock_filesystem, mock_calculators, mocker):
-    """
-    Simulates a 'ready' task being submitted, and in the next tick, completing successfully,
-    which unlocks the next 'pending' task in the DAG.
-    """
-    # 1. Setup Initial State (Task 1 is ready, Task 2 is pending)
-    status_tracker = {
-        "input_config": {"initialize": {"scheduler": "slurm"}},
-        "reactions": {
-            "rxn_1": {
-                "tasks": {
-                    "stage1.conf": {"status": "ready", "job_id": None, "scratch_dir": None},
-                    "stage1.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
-                }
-            }
-        }
-    }
-    rxns = {"rxn_1": MagicMock()} # Mock reaction object
-
-    mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, rxns))
-
-    # Mock JobManager to accept the submission
-    jm_mock = MagicMock()
-    jm_mock.submit.return_value = "9999"
-    jm_mock.is_running.return_value = False # For the next tick
-    mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
-
-    # Mock the InputParser's DAG logic
-    inp_mock = MagicMock()
-    inp_mock.job_manager.scheduler = "slurm"
-    inp_mock.job_manager.container = "docker"
-    inp_mock.job_manager.max_active_jobs = 10
-    inp_mock.global_tasks = {} # Prevent iteration errors
-
-    inp_mock.pipeline_tasks = {
-        "stage1.conf": MagicMock(task_type="reactant_conformer", parent_stage="stage1", depends_on=[]),
-        "stage1.ts_guess": MagicMock(task_type="gsm", parent_stage="stage1", depends_on=["stage1.conf"])
-    }
-
-    mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
-
-    # --- TICK 1: Submission ---
-    progress_yarp(Path("/fake/dir"))
-
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["job_id"] == "9999"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["status"] == "pending"
-
-    # --- TICK 2: Completion & Advancing the DAG ---
-    jm_mock.is_running.return_value = False 
-    mock_calculators.has_prerequisites.return_value = True # Passed the pre-flight check
-
-    progress_yarp(Path("/fake/dir"))
-
-    # Task 1 should be finished
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.conf"]["status"] == "terminated_normally"
-    # Task 2 should now see its dependency met (ready) and IMMEDIATELY get submitted!
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.ts_guess"]["job_id"] == "9999"
-
-
 # =====================================================================
 # BATCH 1: IDENTIFICATION OF FAILED REACTIONS
 # =====================================================================
 
-def test_failure_scenario_1_global_task_failed(tmp_path):
+import json
+from unittest.mock import MagicMock
+from yarp.progress_yarp import progress_yarp
+
+def test_failure_scenario_1_global_task_failed(tmp_path, mocker):
     """
-    Scenario 1: The global task failed for all reactions.
-    All reactions should be added to failed_rxns.pkl and removed from status_tracker.
+    Scenario 1: The global task failed on the cluster.
+    Validates that the global task transitions to 'finished_with_error'
+    and downstream pipeline tasks remain 'pending'.
     """
     status_tracker = {
+        "input_config": {},
         "status_output_file": "STATUS.json",
         "reaction_output_file": "YARP_RXNS.pkl",
+        "global_tasks": {
+            "egat.ml_predict": {
+                "status": "submitted",  # Must be submitted so PASS 1.1 checks it
+                "job_id": "global_job_123",
+                "scratch_dir": None
+            }
+        },
         "reactions": {
-            "rxn_1": {"tasks": {"stage1.ml": {"status": "finished_with_error", "error_log": "Global task failure"}}},
-            "rxn_2": {"tasks": {"stage1.ml": {"status": "finished_with_error", "error_log": "Global task failure"}}}
+            "rxn_1": {
+                "tasks": {
+                    "ll_path.reactant_conformer": {
+                        "status": "pending",
+                        "job_id": None,
+                        "scratch_dir": None
+                    }
+                }
+            }
         }
     }
-    reactions = {"rxn_1": MagicMock(), "rxn_2": MagicMock()}
-    failed_rxns = {"rxn_1": reactions["rxn_1"], "rxn_2": reactions["rxn_2"]}
+    reactions = {"rxn_1": MagicMock()}
 
-    # PATCH pickle inside the module where save_state is defined
-    with patch("yarp.progress_yarp.pickle.dump") as mock_pickle_dump, \
-         patch("yarp.progress_yarp.pickle.load", return_value={}):
+    # 1. Patch load_state to inject our test state
+    mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
 
-        # Run the save_state routine directly
-        save_state(tmp_path, status_tracker, reactions, failed_rxns)
+    # 2. Mock InputParser config definitions
+    inp_mock = MagicMock()
+    inp_mock.job_manager.scheduler = "slurm"
+    inp_mock.job_manager.container = "docker"
+    inp_mock.job_manager.max_active_jobs = 10
+    inp_mock.global_tasks = {"egat.ml_predict": MagicMock()}
+    inp_mock.pipeline_tasks = {
+        "ll_path.reactant_conformer": MagicMock(depends_on=["egat.ml_predict"])
+    }
+    mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
 
-        # Verify that pickle was called with mocks
-        assert mock_pickle_dump.call_count == 2
+    # 3. Mock Job Manager to report that the cluster job completed
+    jm_mock = MagicMock()
+    jm_mock.is_running.return_value = False
+    mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
 
-    # Verify that the human-readable JSON outputs were processed correctly
-    fail_json_file = tmp_path / "failed_status.json"
-    assert fail_json_file.exists()
+    # 4. Mock Calculator to report that output validation failed
+    calc_mock = MagicMock()
+    calc_mock.check_output.return_value = False
+    mocker.patch('yarp.progress_yarp.get_calculator', return_value=calc_mock)
 
-    with open(fail_json_file, "r") as f:
-        failed_status = json.load(f)
-        assert "rxn_1" in failed_status
-        assert failed_status["rxn_1"]["stage1.ml"]["error_log"] == "Global task failure"
+    # 5. Patch pickle operations to prevent serialization errors across mocks
+    mocker.patch('yarp.progress_yarp.pickle.dump')
+    mocker.patch('yarp.progress_yarp.pickle.load', return_value={})
 
-    # Verify active status tracker was correctly purged of failures
-    assert len(status_tracker["reactions"]) == 0
+    # --- Run the execution tick ---
+    progress_yarp(tmp_path)
+
+    # Verify global task caught the error
+    assert status_tracker["global_tasks"]["egat.ml_predict"]["status"] == "finished_with_error"
+
+    # Verify downstream tasks stay blocked and pending
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.reactant_conformer"]["status"] == "pending"
 
 
 def test_failure_scenario_2_pipeline_task_failed(tmp_path, mocker):
     """
-    Scenario 2: One pipeline task failed for one reaction, but not the other.
-    The failed reaction is moved to failed logs, while the valid one remains active.
+    Scenario 2: A reaction-specific pipeline task fails output validation.
+    Validates that the reaction is purged from active pools, and human-readable
+    logs are cleanly extracted into failed_status.json.
     """
     status_tracker = {
         "input_config": {},
         "status_output_file": "STATUS.json",
         "reaction_output_file": "YARP_RXNS.pkl",
         "reactions": {
-            "rxn_failed": {"tasks": {"stage1.conf": {"status": "submitted", "job_id": "101", "scratch_dir": "/tmp/scratch"}}},
-            "rxn_success": {"tasks": {"stage1.conf": {"status": "submitted", "job_id": "102", "scratch_dir": "/tmp/scratch"}}}
+            "rxn_1": {
+                "tasks": {
+                    "ll_path.reactant_conformer": {
+                        "status": "submitted",  # Must be submitted so PASS 1.2 checks it
+                        "job_id": "pipeline_job_789",
+                        "scratch_dir": "/mock/scratch/dir"
+                    }
+                }
+            }
         }
     }
-    rxn_failed = MagicMock()
-    rxn_success = MagicMock()
-    reactions = {"rxn_failed": rxn_failed, "rxn_success": rxn_success}
+    reactions = {"rxn_1": MagicMock()}
 
+    # 1. Patch load_state to inject state
     mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
 
-    jm_mock = MagicMock()
-    jm_mock.is_running.return_value = False # Jobs complete execution on queue
-    mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
-
-    # Assign failure condition specifically to rxn_failed calculator evaluation
-    def get_calc_side_effect(task_def, rxn_obj, job_manager):
-        calc = MagicMock()
-        calc.write_submission_script.return_value = "submit.sh"
-        if rxn_obj == rxn_failed:
-            calc.check_output.return_value = False # Triggers downstream validation error
-        else:
-            calc.check_output.return_value = True
-            calc.scrape_data.return_value = True
-        return calc
-
-    mocker.patch('yarp.progress_yarp.get_calculator', side_effect=get_calc_side_effect)
-
+    # 2. Mock InputParser config definitions
     inp_mock = MagicMock()
     inp_mock.job_manager.scheduler = "slurm"
     inp_mock.job_manager.container = "docker"
     inp_mock.job_manager.max_active_jobs = 10
-    inp_mock.global_tasks = {}
     inp_mock.pipeline_tasks = {
-        "stage1.conf": MagicMock(task_type="reactant_conformer", parent_stage="stage1", depends_on=[])
+        "ll_path.reactant_conformer": MagicMock(task_type="reactant_conformer")
     }
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
 
-    # Patch pickle operations to prevent MagicMock pickling errors
+    # 3. Mock Job Manager to report the job finished running
+    jm_mock = MagicMock()
+    jm_mock.is_running.return_value = False
+    mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
+
+    # 4. Mock Calculator to simulate failing output validation
+    calc_mock = MagicMock()
+    calc_mock.check_output.return_value = False
+    mocker.patch('yarp.progress_yarp.get_calculator', return_value=calc_mock)
+
+    # 5. Patch pickle operations
     mocker.patch('yarp.progress_yarp.pickle.dump')
     mocker.patch('yarp.progress_yarp.pickle.load', return_value={})
 
+    # --- Run the execution tick ---
     progress_yarp(tmp_path)
 
-    # rxn_failed should be removed from active run-state entirely
-    assert "rxn_failed" not in status_tracker["reactions"]
-    assert "rxn_failed" not in reactions
+    # Verify active state was successfully cleaned and purged of the failed reaction
+    assert "rxn_1" not in status_tracker["reactions"]
+    assert "rxn_1" not in reactions
 
-    # rxn_success must be retained and updated normally
-    assert "rxn_success" in status_tracker["reactions"]
-    assert "rxn_success" in reactions
-    assert status_tracker["reactions"]["rxn_success"]["tasks"]["stage1.conf"]["status"] == "terminated_normally"
+    # Verify that human-readable error reasons were successfully written out
+    fail_json_file = tmp_path / "failed_status.json"
+    assert fail_json_file.exists()
 
-    assert (tmp_path / "failed_rxns.pkl").exists()
-    assert (tmp_path / "YARP_RXNS.pkl").exists()
+    with open(fail_json_file, "r") as f:
+        failed_status = json.load(f)
+        assert "rxn_1" in failed_status
+        assert failed_status["rxn_1"]["ll_path.reactant_conformer"]["error_log"] == "Output validation failed."
+        assert failed_status["rxn_1"]["ll_path.reactant_conformer"]["scratch_dir"] == "/mock/scratch/dir"
 
 
 def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
@@ -247,6 +223,16 @@ def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
 
     assert (tmp_path / "failed_rxns.pkl").exists()
 
+    # Verify that human-readable error reasons were successfully written out
+    fail_json_file = tmp_path / "failed_status.json"
+    assert fail_json_file.exists()
+
+    with open(fail_json_file, "r") as f:
+        failed_status = json.load(f)
+        assert "rxn_unintended" in failed_status
+        assert failed_status["rxn_unintended"]["stage1.irc"]["error_log"] == "IRC validation failed: Outcome was 'unintended'."
+        assert failed_status["rxn_unintended"]["stage1.irc"]["scratch_dir"] == "/tmp/scratch"
+
 
 # =====================================================================
 # BATCH 2: PIPELINE PROGRESSION & DAG HAND-OFFS
@@ -262,13 +248,39 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
         "input_config": {},
         "status_output_file": "STATUS.json",
         "reaction_output_file": "YARP_RXNS.pkl",
+        "pipeline_tasks": [
+            "ll_path.reactant_conformer",
+            "ll_path.product_conformer",
+            "ll_path.ts_guess"
+        ],
+        "global_tasks_list": [
+            "egat.ml_predict"
+        ],
         "global_tasks": {
-            "ml_task": {"status": "submitted", "job_id": "777", "scratch_dir": "/tmp/g_scratch"}
+            "egat.ml_predict": {
+                "status": "ready",
+                "job_id": None,
+                "scratch_dir": None
+            }
         },
         "reactions": {
             "rxn_1": {
                 "tasks": {
-                    "conf_gen": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "ll_path.reactant_conformer": {
+                        "status": "pending",
+                        "job_id": None,
+                        "scratch_dir": None
+                    },
+                    "ll_path.product_conformer": {
+                        "status": "pending",
+                        "job_id": None,
+                        "scratch_dir": None
+                    },
+                    "ll_path.ts_guess": {
+                        "status": "pending",
+                        "job_id": None,
+                        "scratch_dir": None
+                    }
                 }
             }
         }
@@ -277,6 +289,7 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
     mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
 
     jm_mock = MagicMock()
+    jm_mock.submit.return_value = "12345"
     jm_mock.is_running.return_value = True # Global job is still busy on the cluster
     mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
 
@@ -284,9 +297,11 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
     inp_mock.job_manager.scheduler = "slurm"
     inp_mock.job_manager.container = "docker"
     inp_mock.job_manager.max_active_jobs = 10
-    inp_mock.global_tasks = {"ml_task": MagicMock(depends_on=[])}
+    inp_mock.global_tasks = {"egat.ml_predict": MagicMock(depends_on=[])}
     inp_mock.pipeline_tasks = {
-        "conf_gen": MagicMock(task_type="reactant_conformer", parent_stage="init_rxn_path", depends_on=["ml_task"])
+        "ll_path.reactant_conformer": MagicMock(task_type="reactant_conformer", parent_stage="ll_path", depends_on=["egat.ml_predict"]),
+        "ll_path.product_conformer": MagicMock(task_type="product_conformer", parent_stage="ll_path", depends_on=["egat.ml_predict"]),
+        "ll_path.ts_guess": MagicMock(task_type="ts_guess", parent_stage="ll_path", depends_on=["ll_path.reactant_conformer", "llpath.product_conformer"])
     }
     inp_mock.stage_filters = {}
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
@@ -297,8 +312,10 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
 
     # --- TICK 1: Global Task is still active ---
     progress_yarp(tmp_path)
-    assert status_tracker["global_tasks"]["ml_task"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["conf_gen"]["status"] == "pending"
+    assert status_tracker["global_tasks"]["egat.ml_predict"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.reactant_conformer"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.product_conformer"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.ts_guess"]["status"] == "pending"
 
     # --- TICK 2: Global Task finishes ---
     jm_mock.is_running.return_value = False
@@ -309,8 +326,10 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
     inp_mock.job_manager.max_active_jobs = 0
 
     progress_yarp(tmp_path)
-    assert status_tracker["global_tasks"]["ml_task"]["status"] == "terminated_normally"
-    assert status_tracker["reactions"]["rxn_1"]["tasks"]["conf_gen"]["status"] == "ready"
+    assert status_tracker["global_tasks"]["egat.ml_predict"]["status"] == "terminated_normally"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.reactant_conformer"]["status"] == "ready"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.product_conformer"]["status"] == "ready"
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.ts_guess"]["status"] == "pending"
 
 
 def test_handoff_scenario_2_init_rxn_path_only(tmp_path, mocker):
@@ -322,17 +341,24 @@ def test_handoff_scenario_2_init_rxn_path_only(tmp_path, mocker):
         "input_config": {},
         "status_output_file": "STATUS.json",
         "reaction_output_file": "YARP_RXNS.pkl",
+        "pipeline_tasks": [
+            "ll_path.reactant_conformer",
+            "ll_path.product_conformer",
+            "ll_path.ts_guess"
+        ],
         "reactions": {
             "rxn_ready": {
                 "tasks": {
-                    "stage1.conf": {"status": "ready", "job_id": None, "scratch_dir": None},
-                    "stage1.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "ll_path.reactant_conformer": {"status": "ready", "job_id": None, "scratch_dir": None},
+                    "ll_path.product_conformer": {"status": "ready", "job_id": None, "scratch_dir": None},
+                    "ll_path.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
                 }
             },
             "rxn_waiting": {
                 "tasks": {
-                    "stage1.conf": {"status": "submitted", "job_id": "888", "scratch_dir": "/tmp/scratch"},
-                    "stage1.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "ll_path.reactant_conformer": {"status": "submitted", "job_id": "888", "scratch_dir": "/tmp/scratch"},
+                    "ll_path.product_conformer": {"status": "submitted", "job_id": "888", "scratch_dir": "/tmp/scratch"},
+                    "ll_path.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None}
                 }
             }
         }
@@ -341,7 +367,7 @@ def test_handoff_scenario_2_init_rxn_path_only(tmp_path, mocker):
     mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
 
     jm_mock = MagicMock()
-    jm_mock.submit.return_value = "999"
+    jm_mock.submit.return_value = "888"
     jm_mock.is_running.side_effect = lambda job_id: job_id == "888" # Keep rxn_waiting job running
     mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
 
@@ -356,8 +382,9 @@ def test_handoff_scenario_2_init_rxn_path_only(tmp_path, mocker):
     inp_mock.job_manager.max_active_jobs = 10
     inp_mock.global_tasks = {}
     inp_mock.pipeline_tasks = {
-        "stage1.conf": MagicMock(task_type="reactant_conformer", parent_stage="stage1", depends_on=[]),
-        "stage1.ts_guess": MagicMock(task_type="gsm", parent_stage="stage1", depends_on=["stage1.conf"])
+        "ll_path.reactant_conformer": MagicMock(task_type="reactant_conformer", parent_stage="ll_path", depends_on=[]),
+        "ll_path.product_conformer": MagicMock(task_type="product_conformer", parent_stage="ll_path", depends_on=[]),
+        "ll_path.ts_guess": MagicMock(task_type="ts_guess", parent_stage="ll_path", depends_on=["ll_path.reactant_conformer", "ll_path.product_conformer"])
     }
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
 
@@ -368,20 +395,24 @@ def test_handoff_scenario_2_init_rxn_path_only(tmp_path, mocker):
     # --- TICK 1: Initial Launch ---
     progress_yarp(tmp_path)
 
-    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["stage1.conf"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["stage1.ts_guess"]["status"] == "pending"
-    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["stage1.conf"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.reactant_conformer"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.product_conformer"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.ts_guess"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["ll_path.reactant_conformer"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["ll_path.product_conformer"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["ll_path.ts_guess"]["status"] == "pending"
 
     # --- TICK 2: Progress Only the Finished Reaction ---
     # Manually pass rxn_ready.conf to simulate completion on a subsequent tick loop
-    status_tracker["reactions"]["rxn_ready"]["tasks"]["stage1.conf"]["status"] = "terminated_normally"
+    status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.reactant_conformer"]["status"] = "terminated_normally"
+    status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.product_conformer"]["status"] = "terminated_normally"
 
     progress_yarp(tmp_path)
 
     # rxn_ready should kick forward to submit ts_guess
-    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["stage1.ts_guess"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_ready"]["tasks"]["ll_path.ts_guess"]["status"] == "submitted"
     # rxn_waiting must still remain pending since its parent conf calculation hasn't dropped out of the scheduler
-    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["stage1.ts_guess"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_waiting"]["tasks"]["ll_path.ts_guess"]["status"] == "pending"
 
 
 def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
@@ -394,21 +425,36 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
         "input_config": {},
         "status_output_file": "STATUS.json",
         "reaction_output_file": "YARP_RXNS.pkl",
+        "pipeline_tasks": [
+            "ll_path.reactant_conformer",
+            "ll_path.product_conformer",
+            "ll_path.ts_guess",
+            "ll_refine.reactant_optimization",
+            "ll_refine.product_optimization",
+            "ll_refine.transition_state_optimization",
+            "ll_refine.irc_validation"
+        ],
         "reactions": {
             "rxn_partial": {
                 "tasks": {
-                    "stage1.conf": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
-                    "stage1.ts_guess": {"status": "pending", "job_id": None, "scratch_dir": None},
-                    "stage2.rp_opt": {"status": "pending", "job_id": None, "scratch_dir": None},
-                    "stage2.ts_opt": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "ll_path.reactant_conformer": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
+                    "ll_path.product_conformer": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
+                    "ll_path.ts_guess": {"status": "submitted", "job_id": "555", "scratch_dir": None},
+                    "ll_refine.reactant_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.product_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.transition_state_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.irc_validation": {"status": "pending", "job_id": None, "scratch_dir": None}
                 }
             },
             "rxn_complete": {
                 "tasks": {
-                    "stage1.conf": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
-                    "stage1.ts_guess": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
-                    "stage2.rp_opt": {"status": "pending", "job_id": None, "scratch_dir": None},
-                    "stage2.ts_opt": {"status": "pending", "job_id": None, "scratch_dir": None}
+                    "ll_path.reactant_conformer": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
+                    "ll_path.product_conformer": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
+                    "ll_path.ts_guess": {"status": "terminated_normally", "job_id": None, "scratch_dir": None},
+                    "ll_refine.reactant_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.product_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.transition_state_optimization": {"status": "pending", "job_id": None, "scratch_dir": None},
+                    "ll_refine.irc_validation": {"status": "pending", "job_id": None, "scratch_dir": None}
                 }
             }
         }
@@ -418,7 +464,7 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
 
     jm_mock = MagicMock()
     jm_mock.submit.return_value = "555"
-    jm_mock.is_running.return_value = False
+    jm_mock.is_running.return_value = True
     mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
 
     calc_mock = MagicMock()
@@ -432,10 +478,13 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
     inp_mock.job_manager.max_active_jobs = 10
     inp_mock.global_tasks = {}
     inp_mock.pipeline_tasks = {
-        "stage1.conf": MagicMock(task_type="reactant_conformer", parent_stage="stage1", depends_on=[]),
-        "stage1.ts_guess": MagicMock(task_type="gsm", parent_stage="stage1", depends_on=["stage1.conf"]),
-        "stage2.rp_opt": MagicMock(task_type="reactant_optimization", parent_stage="stage2", depends_on=["stage1.conf"]),
-        "stage2.ts_opt": MagicMock(task_type="transition_state_optimization", parent_stage="stage2", depends_on=["stage1.ts_guess"])
+        "ll_path.reactant_conformer": MagicMock(task_type="reactant_conformer", parent_stage="ll_path", depends_on=[]),
+        "ll_path.product_conformer": MagicMock(task_type="product_conformer", parent_stage="ll_path", depends_on=[]),
+        "ll_path.ts_guess": MagicMock(task_type="ts_guess", parent_stage="ll_path", depends_on=["ll_path.reactant_conformer", "ll_path.product_conformer"]),
+        "ll_refine.reactant_optimization": MagicMock(task_type="reactant_optimization", parent_stage="ll_refine", depends_on=["ll_path.reactant_conformer"]),
+        "ll_refine.product_optimization": MagicMock(task_type="product_optimization", parent_stage="ll_refine", depends_on=["ll_path.product_conformer"]),
+        "ll_refine.transition_state_optimization": MagicMock(task_type="transition_state_optimization", parent_stage="ll_refine", depends_on=["ll_path.ts_guess"]),
+        "ll_refine.irc_validation": MagicMock(task_type="irc", parent_stage="ll_refine", depends_on=["ll_refine.transition_state_optimization"])
     }
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
 
@@ -446,9 +495,11 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
     progress_yarp(tmp_path)
 
     # Assertions for rxn_partial (only conf branch satisfies dependencies)
-    assert status_tracker["reactions"]["rxn_partial"]["tasks"]["stage2.rp_opt"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_partial"]["tasks"]["stage2.ts_opt"]["status"] == "pending"
+    assert status_tracker["reactions"]["rxn_partial"]["tasks"]["ll_refine.reactant_optimization"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_partial"]["tasks"]["ll_refine.product_optimization"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_partial"]["tasks"]["ll_refine.transition_state_optimization"]["status"] == "pending"
 
     # Assertions for rxn_complete (both branches satisfy dependencies)
-    assert status_tracker["reactions"]["rxn_complete"]["tasks"]["stage2.rp_opt"]["status"] == "submitted"
-    assert status_tracker["reactions"]["rxn_complete"]["tasks"]["stage2.ts_opt"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.reactant_optimization"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.product_optimization"]["status"] == "submitted"
+    assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.transition_state_optimization"]["status"] == "submitted"

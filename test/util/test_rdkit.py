@@ -4,7 +4,16 @@ import yarp as yp
 from yarp.reaction.enum import enumerate_products
 from yarp.yarpecule.graph.adjacency import table_generator
 
-from yarp.util.rdkit import yarpecule_to_rdmol, geom_from_rdmol, rdkit_ff_opt
+from yarp.util.rdkit import (
+    yarpecule_to_rdmol,
+    geom_from_rdmol,
+    rdkit_ff_opt,
+    smiles_to_rdmol,
+    adj_from_rdmol,
+    el_from_rdmol,
+)
+from yarp.yarpecule.atom_mapping import canon_order
+from yarp.util.properties import el_mass
 
 class TestGeom:
     def test_preserved_geom(self):
@@ -68,3 +77,35 @@ class TestFFOpt:
         diff = opt_adj - target_product.adj_mat
         assert not np.all(diff == 0)
 
+class TestRDKitSMILESHelpers:
+    def test_mapped_aromatic_adjacency_matches_unmapped(self):
+        mapped_smiles = "[n:0]1([H:7])[n:4][c:1]([O:3][H:6])[c:2]([H:8])[n:5]1"
+        unmapped_smiles = "Oc1cn[nH]n1"
+
+        mapped_mol = smiles_to_rdmol(mapped_smiles)
+        unmapped_mol = smiles_to_rdmol(unmapped_smiles)
+
+        mapped_elements = [el.lower() for el in el_from_rdmol(mapped_mol)]
+        unmapped_elements = [el.lower() for el in el_from_rdmol(unmapped_mol)]
+
+        mapped_adj = adj_from_rdmol(mapped_mol)
+        unmapped_adj = adj_from_rdmol(unmapped_mol)
+
+        mapped_masses = np.array([el_mass[el] for el in mapped_elements])
+        unmapped_masses = np.array([el_mass[el] for el in unmapped_elements])
+
+        mapped_elements, mapped_adj, _ = canon_order(
+            mapped_elements,
+            mapped_adj,
+            masses=mapped_masses,
+            return_index=False,
+        )
+        unmapped_elements, unmapped_adj, _ = canon_order(
+            unmapped_elements,
+            unmapped_adj,
+            masses=unmapped_masses,
+            return_index=False,
+        )
+
+        assert mapped_elements == unmapped_elements
+        assert np.array_equal(mapped_adj, unmapped_adj)

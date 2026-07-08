@@ -46,7 +46,11 @@ RUN python -c "import importlib.metadata as md; assert md.version('scikit-learn'
 
 WORKDIR /opt/yarp
 COPY . /opt/yarp
+COPY containers/model_artifacts/jo_opt/*.sav /tmp/yarp_conf_models/
 RUN pip install --no-cache-dir -e .
+RUN cp /tmp/yarp_conf_models/*.sav /opt/yarp/yarp/reaction/conf_sampling/ && \
+    test -s /opt/yarp/yarp/reaction/conf_sampling/poor_model.sav && \
+    test -s /opt/yarp/yarp/reaction/conf_sampling/rich_model.sav
 
 RUN echo "[xtb]" > /root/.pysisyphusrc && \
     echo "cmd=xtb" >> /root/.pysisyphusrc

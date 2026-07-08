@@ -1,5 +1,4 @@
 import os
-import re
 import shutil
 import fnmatch
 import pickle
@@ -14,34 +13,6 @@ from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.conformer_select import ConformerPairSelector
-
-_GSM_HEI_BARRIER_RE = re.compile(r"\(E_hei-E_0\)=\s*([-\d.]+)\s*kJ/mol")
-_GSM_EARLY_STOP_MSG = "too similar. Stopping optimization!"
-
-
-def _parse_gsm_quality(log_text: str):
-    """
-    Checks a GSM log for signs the string relaxation stalled before finding
-    the true reaction path, rather than genuinely converging onto it.
-
-    Pysisyphus aborts a chain-of-states optimization early (writing a splined
-    HEI regardless) if two adjacent string images become too similar. This
-    is meant to catch collapsed images, but on some reactant/product pairings
-    it fires long before the string reaches the true, low-barrier path,
-    leaving a "TS guess" seeded from an unresolved, much-higher-barrier
-    string. Disabling/loosening the check does not fix this: the string
-    still converges (by its own force-based criteria) onto the same wrong
-    plateau, just after grinding longer, so the pairing itself is at fault.
-    The final (E_hei-E_0) barrier estimate is a useful continuous
-    confidence signal even when this flag is False, since some pairings
-    converge "cleanly" onto a similarly bad, high-barrier plateau.
-
-    Returns (early_stop: bool, hei_barrier_kjmol: float | None).
-    """
-    early_stop = _GSM_EARLY_STOP_MSG in log_text
-    matches = _GSM_HEI_BARRIER_RE.findall(log_text)
-    hei_barrier_kjmol = float(matches[-1]) if matches else None
-    return early_stop, hei_barrier_kjmol
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -70,85 +41,50 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:jo_opt"
         self.n_pairs = self.config.n_conf
 
     def generate_input(self):
         """
-        Writes the payload consumed by the container-side pre-GSM workflow.
+        Writes the payload consumed by the submitted pre-GSM workflow.
 
-        Conformer selection, joint optimization, ML scoring, and Pysisyphus GSM
-        execution all run inside the jo_opt container so the host YARP
-        environment does not need the ML dependency stack.
+        Conformer selection, joint optimization, and Pysisyphus GSM execution
+        run in the submitted host environment. Only the sklearn model
+        probability calculation is delegated to the scorer container.
         """
         payload_path = self.scratch_dir / "payload.pkl"
         with open(payload_path, "wb") as f:
-            pickle.dump({"rxn": self.rxn, "config": self.config}, f)
+            pickle.dump(
+                {
+                    "rxn": self.rxn,
+                    "config": self.config,
+                    "job_manager": self.job_manager,
+                },
+                f,
+            )
 
     def write_submission_script(self):
         """
-        Creates a sequential runner script for inside the container, 
-        and a host submission script to launch the container.
+        Creates a scheduler script that runs host-side pre-GSM and GSM.
         """
-        # ---------------------------------------------------------
-        # 1. The INNER Script (Runs inside the Docker container)
-        # ---------------------------------------------------------
-        inner_script_path = self.scratch_dir / "run_pysis_inner.sh"
-        
-        with open(inner_script_path, "w") as f:
-            f.write("#!/bin/bash\n\n")
-            f.write(f"export OMP_NUM_THREADS={self.config.n_cpus}\n")
-            f.write(f"export MKL_NUM_THREADS={self.config.n_cpus}\n\n")
-            f.write("set -u\n")
-            f.write("trap 'ec=$?; echo \"Inner GSM wrapper exiting with code ${ec}\"' EXIT\n")
-            f.write("echo 'Starting YARP serial GSM execution...'\n\n")
-
-            f.write("export PYSISRC=/root/.pysisyphusrc\n")
-            f.write("export YARP_PREGSM_CONTAINER=1\n")
-            f.write("ulimit -s unlimited || true\n")
-            for key, value in self.thread_env(self.config.n_cpus).items():
-                f.write(f"export {key}={value}\n")
-            f.write(
-                "python - <<'PY'\n"
-                "from pathlib import Path\n"
-                "import yarp.reaction.external.ts_guess as ts_guess\n"
-                "import yarp.reaction.conf_sampling.indicator as indicator\n"
-                "print(f'Container ts_guess module: {Path(ts_guess.__file__).resolve()}', flush=True)\n"
-                "model_dir = Path(indicator.__file__).resolve().parent\n"
-                "print(f'Container conf_sampling dir: {model_dir}', flush=True)\n"
-                "print(f'Container selector models: {[p.name for p in model_dir.glob(\"*.sav\")]}', flush=True)\n"
-                "PY\n"
-            )
-            f.write(
-                "python -c \""
-                "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
-                "PysisyphusTSGuessCalculator.run_containerized('/work/payload.pkl')"
-                "\"\n"
-            )
-                
-        # Make executable
-        inner_script_path.chmod(0o755)
-
-        # ---------------------------------------------------------
-        # 2. The OUTER Script (Runs on the Host / Job Manager)
-        # ---------------------------------------------------------
         submit_script_path = self.scratch_dir / "submit_gsm.sh"
-        
-        # Pulls the docker prefix (e.g., 'docker run --rm -v /scratch:/work -u UID:GID yarp_pysisyphus')
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
-        
+
         with open(submit_script_path, "w") as f:
             f.write("#!/bin/bash\n")
             self.write_scheduler_headers(f)
             self.write_thread_env(f)
-            # Launch the container and tell it to run the inner script
+            f.write("set -euo pipefail\n")
             f.write(f"cd {self.scratch_dir}\n")
-            f.write("echo \"$(date) starting containerized GSM wrapper\" > container_lifecycle.log\n")
+            f.write("echo \"$(date) starting host GSM wrapper\" > gsm_lifecycle.log\n")
             f.write(
                 "trap 'ec=$?; echo \"$(date) submit_gsm.sh exiting with code ${ec}\" "
-                ">> container_lifecycle.log' EXIT\n"
+                ">> gsm_lifecycle.log' EXIT\n"
             )
-            f.write(f"{prefix} bash /work/run_pysis_inner.sh > container.out 2> container.err\n")
+            f.write(
+                "python -c \""
+                "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
+                f"PysisyphusTSGuessCalculator.run_host('{self.scratch_dir / 'payload.pkl'}')"
+                "\" > container.out 2> container.err\n"
+            )
             
         submit_script_path.chmod(0o755)
         
@@ -184,14 +120,6 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
                 print(f"     ! Run {i} failed: Did not find successful termination message in log. Try increasing mem_per_cpu for tasks using 'pysisyphus'.")
                 continue
-
-            # 3. Path-quality check (does not fail the run - splined HEI is written
-            # either way - but flags results seeded from an unresolved GSM string)
-            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
-            if early_stop:
-                barrier_str = f"{hei_barrier_kjmol:.1f} kJ/mol" if hei_barrier_kjmol is not None else "unknown"
-                print(f"     ! Run {i} warning: GSM string images collapsed before converging "
-                      f"(stalled barrier estimate {barrier_str}). TS guess may not represent the true reaction path.")
 
             # If it passes all checks, at least one run succeeded!
             one_successful = True
@@ -233,25 +161,20 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
                 continue
             with open(log_file, "r") as f:
-                log_text = f.read()
-            if "Wrote splined HEI" not in log_text:
-                continue
+                if "Wrote splined HEI" not in f.read():
+                    continue
             # ---------------------------------------------------------
-
-            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
 
             # Parse and store the splined TS guess
             ts_elements, ts_geo = xyz_parse(xyz_file, multiple=False)
-
+            
             ts_conf = conformer()
             ts_conf.elements = ts_elements
             ts_conf.geo = ts_geo
             ts_conf.lot = self.config.gsm_lot
             ts_conf.software = self.config.software
             ts_conf.type = f"ts_guess_{i}_{ts_conf.lot}_{ts_conf.software}"
-            ts_conf.properties["gsm_early_stop"] = early_stop
-            ts_conf.properties["gsm_hei_barrier_kjmol"] = hei_barrier_kjmol
-
+            
             # Store in the reaction object's TS dictionary
             self.rxn.ts_geom[ts_conf.type] = ts_conf
 
@@ -341,6 +264,11 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     "score": float(pair.get("score", 0.0)),
                     "r_conf_type": getattr(pair.get("r_conf"), "type", ""),
                     "p_conf_type": getattr(pair.get("p_conf"), "type", ""),
+                    "source": pair.get("source"),
+                    "source_index": pair.get("source_index"),
+                    "selection_direction": pair.get("selection_direction"),
+                    "r_graph_diffs": pair.get("r_graph_diffs"),
+                    "p_graph_diffs": pair.get("p_graph_diffs"),
                 }
                 for ind, pair in enumerate(pairs, start=1)
             ],
@@ -435,12 +363,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     time.sleep(min(5, max(0.1, deadline - now)))
 
     @classmethod
-    def run_containerized(cls, payload_path):
+    def run_host(cls, payload_path):
         """
-        Container-side TS guess runner.
+        Host-side TS guess runner.
 
-        This keeps pre-GSM conformer selection, joint optimization, ML pair scoring,
-        and GSM execution inside the same container environment.
+        The sklearn model probability calculation is delegated to the scorer
+        container by ``ConformerPairSelector``. Everything else stays in the
+        submitted host job so Python code changes do not require rebuilding the
+        scorer image.
         """
         payload_path = Path(payload_path)
         work_dir = payload_path.parent
@@ -469,17 +399,23 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     pass
 
             try:
-                print("Starting containerized YARP pre-GSM selection", file=log, flush=True)
+                print("Starting host YARP pre-GSM selection", file=log, flush=True)
 
                 with payload_path.open("rb") as f:
                     payload = pickle.load(f)
 
                 rxn = payload["rxn"]
                 config = payload["config"]
+                job_manager = payload["job_manager"]
 
-                os.environ["YARP_PREGSM_CONTAINER"] = "1"
                 os.environ["YARP_DEBUG_PREGSM"] = "1"
-                selector = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt", log=log)
+                selector = ConformerPairSelector(
+                    rxn,
+                    config,
+                    scratch_dir=work_dir / "joint_opt",
+                    log=log,
+                    job_manager=job_manager,
+                )
                 pairs = selector.select()
                 cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs, selector)
                 print(f"Selected {len(pairs)} pair(s)", file=log, flush=True)

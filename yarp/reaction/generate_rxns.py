@@ -1,11 +1,8 @@
 """
 Wrapper function to manage the generation of reaction objects during main_yarp routine
 """
-import os
-import fnmatch
 import pickle
 import numpy as np
-from openbabel import pybel
 from pathlib import Path
 
 from yarp.yarpecule.yarpecule import yarpecule
@@ -13,7 +10,9 @@ from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_react
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
-from yarp.util.write_files import mol_write_yp
+from yarp.util.rdkit import rdkit_ff_opt
+from yarp.util.obabel import obabel_ff_opt
+from yarp.yarpecule.graph.adjacency import table_generator
 
 
 def generate_rxns(inp):
@@ -63,6 +62,10 @@ def generate_rxns(inp):
 
             for prod in clean_products:
                 prod = quick_geom_opt(prod)
+                if prod is None:
+                    if verbose:
+                        print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
+                    continue
                 r2p = reaction(reactant, prod)
                 output[r2p.hash] = r2p
 
@@ -127,6 +130,10 @@ def generate_rxns(inp):
 
                 for prod in clean_products:
                     prod = quick_geom_opt(prod)
+                    if prod is None:
+                        if verbose:
+                            print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
+                        continue
                     r2p = reaction(mol, prod)
                     p2r = reaction(mol, prod)
 
@@ -190,20 +197,28 @@ def quick_geom_opt(molecule, lot="uff"):
         optimized molecule
     '''
 
-    # Write yarpecule object to a temporary mol file
-    mol_file = '.tmp.mol'
-    mol_write_yp(mol_file, molecule.elements, molecule.geo,
-                 molecule.bond_mats[0], molecule.adj_mat)
+    # First, attempt to optimize with RDKit
+    rd_opt_g = rdkit_ff_opt(molecule, lot=lot)
 
-    # Use openbabel to perform geometry optimization
-    mol = next(pybel.readfile("mol", mol_file))
-    mol.localopt(forcefield=lot)
+    # Check if optimization preserved starting connectivity
+    rd_adj = table_generator(molecule.elements, rd_opt_g)
+    rd_diff = rd_adj - molecule.adj_mat
 
-    # Update yarpecule with optimized geometry coordinates
-    for count_i, i in enumerate(molecule.geo):
-        molecule.geo[count_i] = mol.atoms[count_i].coords
+    # If RDKit generated a garbage geom, try Open Babel
+    if not np.all(rd_diff == 0):
+        ob_opt_g = obabel_ff_opt(molecule, lot=lot)
 
-    # Delete temporary mol file
-    os.system("rm {}".format(mol_file))
+        # If Open Babel fails too, we return None
+        ob_adj = table_generator(molecule.elements, ob_opt_g)
+        ob_diff = ob_adj - molecule.adj_mat
+        if not np.all(ob_diff == 0):
+            return None
+        
+        # If all goes well, update geometry and return
+        molecule._geo = ob_opt_g
+        return molecule
 
-    return molecule
+    # Otherwise, if RDKit gave a valid geom, use that one
+    else:
+        molecule._geo = rd_opt_g
+        return molecule

@@ -3,6 +3,8 @@ debug/*
 .vscode
 containers/*.sif
 containers/*/*.def
+!containers/jo_opt/jo_opt.def
+!containers/model_scorer/model_scorer.def
 containers/*.tar
 containers/orca/*.tar.*
 containers/orca/example
@@ -185,6 +187,7 @@ cython_debug/
 
 # Local conformer-pair selection model artifacts
 yarp/reaction/conf_sampling/*.sav
+containers/model_artifacts/jo_opt/*.sav
 
 # PyPI configuration file
 .pypirc

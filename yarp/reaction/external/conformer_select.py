@@ -6,9 +6,7 @@ one strategy it calls while constructing candidate reactant/product pairs.
 """
 
 import copy
-import hashlib
 import os
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -17,17 +15,20 @@ from ase.build import minimize_rotation_and_translation
 
 from yarp.reaction.conf_sampling.indicator import return_indicator
 from yarp.reaction.external.joint_opt import make_joint_optimization_engine
+from yarp.reaction.external.model_scorer import ContainerModelScorer
+from yarp.yarpecule.graph.adjacency import table_generator
 
 
 class ConformerPairSelector:
     """Select reactant/product conformer pairs for GSM."""
 
-    def __init__(self, rxn, config, scratch_dir=None, log=None):
+    def __init__(self, rxn, config, scratch_dir=None, log=None, job_manager=None):
         self.rxn = rxn
         self.config = config
         self.scratch_dir = Path(scratch_dir) if scratch_dir is not None else Path.cwd() / "joint_opt"
         self.mode = config.joint_opt.lower()
         self.joint_optimizer = make_joint_optimization_engine(config, self.scratch_dir)
+        self.job_manager = job_manager
         self.verbose = (
             getattr(config, "verbose", False)
             or os.environ.get("YARP_DEBUG_PREGSM") == "1"
@@ -38,13 +39,6 @@ class ConformerPairSelector:
         self.model_sha256 = None
 
     def select(self):
-        if os.environ.get("YARP_PREGSM_CONTAINER") != "1":
-            raise RuntimeError(
-                "Conformer pair selection must run inside the jo_opt pre-GSM container. "
-                "Use the Pysisyphus TS guess workflow instead of calling ConformerPairSelector.select() "
-                "from the host YARP environment."
-            )
-
         self._log(
             "starting selection "
             f"mode={self.mode} engine={getattr(self.config, 'joint_opt_engine', '')} "
@@ -58,7 +52,7 @@ class ConformerPairSelector:
             f"reactant_types={self._conf_types(r_confs)} product_types={self._conf_types(p_confs)}"
         )
         biased_r, biased_p = self._generate_biased_endpoints(r_confs, p_confs)
-        model = self._load_model(r_confs, p_confs)
+        scorer = self._build_scorer(r_confs, p_confs)
 
         r_confs, p_confs, biased_r, biased_p = self._truncate_conformer_pool(
             r_confs,
@@ -74,8 +68,10 @@ class ConformerPairSelector:
         approved_pairs = []
         approved_indicators = []
 
-        self._score_reactant_seeded_pairs(r_confs, biased_p, model, approved_pairs, approved_indicators)
-        self._score_product_seeded_pairs(p_confs, biased_r, model, approved_pairs, approved_indicators)
+        self._score_reactant_seeded_pairs(r_confs, biased_p, scorer, approved_pairs, approved_indicators)
+        self._score_product_seeded_pairs(p_confs, biased_r, scorer, approved_pairs, approved_indicators)
+        self.model_path = scorer.model_path
+        self.model_sha256 = scorer.model_sha256
 
         approved_pairs.sort(key=lambda x: x["score"], reverse=True)
 
@@ -125,39 +121,24 @@ class ConformerPairSelector:
         )
         return biased_r, biased_p
 
-    def _load_model(self, r_confs, p_confs):
+    def _build_scorer(self, r_confs, p_confs):
         n_conf = self.config.n_conf
         total_conf = len(r_confs) + len(p_confs)
 
         self._log(f"total reactant+product conformers={total_conf}")
 
-        model_dir = Path(__file__).resolve().parents[1] / "conf_sampling"
         if total_conf / n_conf > 3.0:
-            model_path = model_dir / "rich_model.sav"
+            model_name = "rich_model"
         else:
-            model_path = model_dir / "poor_model.sav"
+            model_name = "poor_model"
 
-        if not model_path.exists():
-            raise FileNotFoundError(
-                "Conformer-pair selection model is missing. "
-                f"Expected {model_path}. Rebuild the jo_opt container with the required model artifacts."
-            )
-
-        self.model_path = str(model_path)
-        self.model_sha256 = self._sha256(model_path)
-        self._log(
-            f"model={model_path.stem} path={model_path} sha256={self.model_sha256}"
+        self._log(f"model={model_name} scorer_container={ContainerModelScorer.image_name}")
+        return ContainerModelScorer(
+            self.job_manager,
+            self.scratch_dir / "model_scorer",
+            model_name,
+            log=self.log,
         )
-        with open(model_path, "rb") as f:
-            return pickle.load(f)
-
-    @staticmethod
-    def _sha256(path):
-        digest = hashlib.sha256()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return digest.hexdigest()
 
     def _truncate_conformer_pool(self, r_confs, p_confs, biased_r, biased_p):
         limit = self.config.n_conf * 5
@@ -169,67 +150,101 @@ class ConformerPairSelector:
             biased_r = biased_r[:limit]
         return r_confs, p_confs, biased_r, biased_p
 
-    def _score_reactant_seeded_pairs(self, r_confs, biased_p, model, approved_pairs, approved_indicators):
+    def _score_reactant_seeded_pairs(self, r_confs, biased_p, scorer, approved_pairs, approved_indicators):
         if self.mode in ["dual", "r_only", "off"]:
             r_loop_confs = r_confs if self.mode != "off" else r_confs[:len(biased_p)]
         else:
             r_loop_confs = []
 
+        candidates = []
         for ind, r_c in enumerate(r_loop_confs):
             if ind >= len(biased_p) or biased_p[ind] is None:
                 self.dropped_pairs += 1
                 continue
 
-            best_p, best_ind, best_prob = self._score_pair(
+            candidates.append(self._build_pair_candidate(
+                source_index=ind,
                 fixed_conf=r_c,
                 biased_conf=biased_p[ind],
                 indicator_elements=r_c.elements,
                 reactant_geo=r_c.geo,
                 product_geo=biased_p[ind].geo,
-                model=model,
-            )
+            ))
 
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
+        probabilities = self._score_candidates(candidates, scorer)
+        for candidate, candidate_probs in zip(candidates, probabilities):
+            best_p, best_ind, best_prob = self._select_scored_pair(candidate, candidate_probs)
+            r_c = candidate["fixed_conf"]
+            ind = candidate["source_index"]
+
+            if best_prob[1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
                 approved_indicators.append(best_ind)
                 approved_pairs.append({
                     "r_conf": r_c,
                     "p_conf": best_p,
-                    "score": best_prob[0][1],
+                    "score": best_prob[1],
+                    "source": "reactant_seeded",
+                    "source_index": ind,
+                    "selection_direction": "reactant_fixed_product_biased",
+                    "r_graph_diffs": self._graph_diffs(r_c),
+                    "p_graph_diffs": self._graph_diffs(best_p),
                 })
             else:
                 self.dropped_pairs += 1
 
-    def _score_product_seeded_pairs(self, p_confs, biased_r, model, approved_pairs, approved_indicators):
+    def _score_product_seeded_pairs(self, p_confs, biased_r, scorer, approved_pairs, approved_indicators):
         p_loop_confs = p_confs if self.mode in ["dual", "p_only"] else []
 
+        candidates = []
         for ind, p_c in enumerate(p_loop_confs):
             if ind >= len(biased_r) or biased_r[ind] is None:
                 self.dropped_pairs += 1
                 continue
 
-            best_r, best_ind, best_prob = self._score_pair(
+            candidates.append(self._build_pair_candidate(
+                source_index=ind,
                 fixed_conf=p_c,
                 biased_conf=biased_r[ind],
                 indicator_elements=p_c.elements,
                 reactant_geo=biased_r[ind].geo,
                 product_geo=p_c.geo,
-                model=model,
-            )
+            ))
 
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
+        probabilities = self._score_candidates(candidates, scorer)
+        for candidate, candidate_probs in zip(candidates, probabilities):
+            best_r, best_ind, best_prob = self._select_scored_pair(candidate, candidate_probs)
+            p_c = candidate["fixed_conf"]
+            ind = candidate["source_index"]
+
+            if best_prob[1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
                 approved_indicators.append(best_ind)
                 approved_pairs.append({
                     "r_conf": best_r,
                     "p_conf": p_c,
-                    "score": best_prob[0][1],
+                    "score": best_prob[1],
+                    "source": "product_seeded",
+                    "source_index": ind,
+                    "selection_direction": "product_fixed_reactant_biased",
+                    "r_graph_diffs": self._graph_diffs(best_r),
+                    "p_graph_diffs": self._graph_diffs(p_c),
                 })
             else:
                 self.dropped_pairs += 1
 
+    def _graph_diffs(self, conf):
+        """Return graph differences to the intended reactant and product states."""
+        try:
+            adj_mat = table_generator(conf.elements, conf.geo)
+            return {
+                "reactant": int(np.abs(adj_mat - self.rxn.reactant.graph.adj_mat).sum()),
+                "product": int(np.abs(adj_mat - self.rxn.product.graph.adj_mat).sum()),
+            }
+        except Exception as exc:
+            return {"error": str(exc)}
+
     @staticmethod
-    def _score_pair(fixed_conf, biased_conf, indicator_elements, reactant_geo, product_geo, model):
+    def _build_pair_candidate(source_index, fixed_conf, biased_conf, indicator_elements, reactant_geo, product_geo):
         ind_unaligned = return_indicator(E=indicator_elements, RG=reactant_geo, PG=product_geo)
-        prob_unaligned = model.predict_proba(ind_unaligned)
 
         aligned_biased = align_conformers(fixed_conf, biased_conf)
         if reactant_geo is biased_conf.geo:
@@ -240,11 +255,32 @@ class ConformerPairSelector:
             aligned_product_geo = aligned_biased.geo
 
         ind_aligned = return_indicator(E=indicator_elements, RG=aligned_reactant_geo, PG=aligned_product_geo)
-        prob_aligned = model.predict_proba(ind_aligned)
+        return {
+            "source_index": source_index,
+            "fixed_conf": fixed_conf,
+            "biased_conf": biased_conf,
+            "aligned_biased": aligned_biased,
+            "ind_unaligned": ind_unaligned,
+            "ind_aligned": ind_aligned,
+        }
 
-        if prob_aligned[0][1] > prob_unaligned[0][1]:
-            return aligned_biased, ind_aligned, prob_aligned
-        return biased_conf, ind_unaligned, prob_unaligned
+    @staticmethod
+    def _score_candidates(candidates, scorer):
+        if not candidates:
+            return []
+        indicators = []
+        for candidate in candidates:
+            indicators.extend([candidate["ind_unaligned"], candidate["ind_aligned"]])
+        scored_rows = scorer.predict_proba(indicators)
+        return [scored_rows[i:i + 2] for i in range(0, len(scored_rows), 2)]
+
+    @staticmethod
+    def _select_scored_pair(candidate, candidate_probs):
+        prob_unaligned, prob_aligned = candidate_probs
+
+        if prob_aligned[1] > prob_unaligned[1]:
+            return candidate["aligned_biased"], candidate["ind_aligned"], prob_aligned
+        return candidate["biased_conf"], candidate["ind_unaligned"], prob_unaligned
 
 
 def align_conformers(conf, biased_conf):

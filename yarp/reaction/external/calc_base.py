@@ -23,7 +23,7 @@ class AsyncYarpCalculator:
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False) -> str:
+    def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False, env_vars: dict = None) -> str:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
@@ -31,6 +31,9 @@ class AsyncYarpCalculator:
 
         apptainer_run: If True, use ``apptainer run`` (OCI ENTRYPOINT/CMD, like ``docker run``).
         If False, use ``apptainer exec`` (requires an explicit executable before flags).
+
+        env_vars: Optional dict of environment variables to inject into the container
+        (e.g. {"OMP_NUM_THREADS": 4}). Passed via -e for Docker and --env for Apptainer.
         """
         if self.job_manager.container == "docker":
             # 1. Check if the image exists locally.
@@ -46,7 +49,10 @@ class AsyncYarpCalculator:
                 print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
                 subprocess.run(["docker", "pull", "--platform", "linux/amd64", image_name], check=True)
 
-            return f"docker run --platform linux/amd64 --rm -v {work_dir}:/work -w /work {image_name}"
+            env_flags = ""
+            if env_vars:
+                env_flags = " ".join(f"-e {k}={v}" for k, v in env_vars.items()) + " "
+            return f"docker run --platform linux/amd64 --rm {env_flags}-v {work_dir}:/work -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
@@ -95,8 +101,11 @@ class AsyncYarpCalculator:
                         )
                     raise RuntimeError(msg) from None
 
+            env_flags = ""
+            if env_vars:
+                env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"apptainer {verb} -e --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"apptainer {verb} -e {env_flags}--bind {work_dir}:/work --pwd /work {sif_path}"
 
         elif self.job_manager.container == "singularity":
             # Sanitize the image name so it works as a safe, flat filename
@@ -130,8 +139,11 @@ class AsyncYarpCalculator:
                     check=True,
                 )
 
+            env_flags = ""
+            if env_vars:
+                env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"singularity {verb} -e --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"singularity {verb} -e {env_flags}--bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")

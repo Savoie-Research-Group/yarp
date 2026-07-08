@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import fnmatch
 
@@ -6,6 +7,34 @@ from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
+
+_GSM_HEI_BARRIER_RE = re.compile(r"\(E_hei-E_0\)=\s*([-\d.]+)\s*kJ/mol")
+_GSM_EARLY_STOP_MSG = "too similar. Stopping optimization!"
+
+
+def _parse_gsm_quality(log_text: str):
+    """
+    Checks a GSM log for signs the string relaxation stalled before finding
+    the true reaction path, rather than genuinely converging onto it.
+
+    Pysisyphus aborts a chain-of-states optimization early (writing a splined
+    HEI regardless) if two adjacent string images become too similar. This
+    is meant to catch collapsed images, but on some reactant/product pairings
+    it fires long before the string reaches the true, low-barrier path,
+    leaving a "TS guess" seeded from an unresolved, much-higher-barrier
+    string. Disabling/loosening the check does not fix this: the string
+    still converges (by its own force-based criteria) onto the same wrong
+    plateau, just after grinding longer, so the pairing itself is at fault.
+    The final (E_hei-E_0) barrier estimate is a useful continuous
+    confidence signal even when this flag is False, since some pairings
+    converge "cleanly" onto a similarly bad, high-barrier plateau.
+
+    Returns (early_stop: bool, hei_barrier_kjmol: float | None).
+    """
+    early_stop = _GSM_EARLY_STOP_MSG in log_text
+    matches = _GSM_HEI_BARRIER_RE.findall(log_text)
+    hei_barrier_kjmol = float(matches[-1]) if matches else None
+    return early_stop, hei_barrier_kjmol
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -76,6 +105,8 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         
         with open(inner_script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
+            f.write(f"export OMP_NUM_THREADS={self.config.n_cpus}\n")
+            f.write(f"export MKL_NUM_THREADS={self.config.n_cpus}\n\n")
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
             
             for i in range(1, len(self.pairs_to_run) + 1):
@@ -138,6 +169,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 print(f"     ! Run {i} failed: Did not find successful termination message in log. Try increasing mem_per_cpu for tasks using 'pysisyphus'.")
                 continue
 
+            # 3. Path-quality check (does not fail the run - splined HEI is written
+            # either way - but flags results seeded from an unresolved GSM string)
+            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
+            if early_stop:
+                barrier_str = f"{hei_barrier_kjmol:.1f} kJ/mol" if hei_barrier_kjmol is not None else "unknown"
+                print(f"     ! Run {i} warning: GSM string images collapsed before converging "
+                      f"(stalled barrier estimate {barrier_str}). TS guess may not represent the true reaction path.")
+
             # If it passes all checks, at least one run succeeded!
             one_successful = True
             
@@ -161,20 +200,25 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
                 continue
             with open(log_file, "r") as f:
-                if "Wrote splined HEI" not in f.read():
-                    continue
+                log_text = f.read()
+            if "Wrote splined HEI" not in log_text:
+                continue
             # ---------------------------------------------------------
+
+            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
 
             # Parse and store the splined TS guess
             ts_elements, ts_geo = xyz_parse(xyz_file, multiple=False)
-            
+
             ts_conf = conformer()
             ts_conf.elements = ts_elements
             ts_conf.geo = ts_geo
             ts_conf.lot = self.config.gsm_lot
             ts_conf.software = self.config.software
             ts_conf.type = f"ts_guess_{i}_{ts_conf.lot}_{ts_conf.software}"
-            
+            ts_conf.properties["gsm_early_stop"] = early_stop
+            ts_conf.properties["gsm_hei_barrier_kjmol"] = hei_barrier_kjmol
+
             # Store in the reaction object's TS dictionary
             self.rxn.ts_geom[ts_conf.type] = ts_conf
 

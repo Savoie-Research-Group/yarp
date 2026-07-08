@@ -183,6 +183,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Local conformer-pair selection model artifacts
+yarp/reaction/conf_sampling/*.sav
+
 # PyPI configuration file
 .pypirc
 zhao-patches-doc/

@@ -72,13 +72,22 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             f.write("trap 'ec=$?; echo \"Inner GSM wrapper exiting with code ${ec}\"' EXIT\n")
             f.write("echo 'Starting YARP serial GSM execution...'\n\n")
 
-            repo_root = Path(__file__).resolve().parents[3]
-            f.write(f"export PYTHONPATH={repo_root}${{PYTHONPATH:+:$PYTHONPATH}}\n")
             f.write("export PYSISRC=/root/.pysisyphusrc\n")
             f.write("export YARP_PREGSM_CONTAINER=1\n")
             f.write("ulimit -s unlimited || true\n")
             for key, value in self.thread_env(self.config.n_cpus).items():
                 f.write(f"export {key}={value}\n")
+            f.write(
+                "python - <<'PY'\n"
+                "from pathlib import Path\n"
+                "import yarp.reaction.external.ts_guess as ts_guess\n"
+                "import yarp.reaction.conf_sampling.indicator as indicator\n"
+                "print(f'Container ts_guess module: {Path(ts_guess.__file__).resolve()}', flush=True)\n"
+                "model_dir = Path(indicator.__file__).resolve().parent\n"
+                "print(f'Container conf_sampling dir: {model_dir}', flush=True)\n"
+                "print(f'Container selector models: {[p.name for p in model_dir.glob(\"*.sav\")]}', flush=True)\n"
+                "PY\n"
+            )
             f.write(
                 "python -c \""
                 "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
@@ -279,7 +288,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
 
     @staticmethod
-    def _write_selected_pairs_manifest(path, pairs):
+    def _write_selected_pairs_manifest(path, pairs, selector=None):
         manifest = {
             "n_pairs": len(pairs),
             "pairs": [
@@ -292,6 +301,15 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 for ind, pair in enumerate(pairs, start=1)
             ],
         }
+        if selector is not None:
+            manifest["selector"] = {
+                "joint_opt": selector.mode,
+                "joint_opt_engine": getattr(selector.config, "joint_opt_engine", ""),
+                "n_conf": selector.config.n_conf,
+                "model_path": selector.model_path,
+                "model_sha256": selector.model_sha256,
+                "dropped_pairs": selector.dropped_pairs,
+            }
         Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
     @staticmethod
@@ -322,33 +340,55 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     text=True,
                     start_new_session=True,
                 )
-                try:
-                    returncode = proc.wait(timeout=timeout_s)
-                    elapsed = time.time() - start
-                    print(
-                        f"GSM pair in {pair_dir.name} exited with code {returncode} "
-                        f"after {elapsed:.1f} s",
-                        file=log,
-                        flush=True,
-                    )
-                    return returncode == 0
-                except subprocess.TimeoutExpired:
-                    elapsed = time.time() - start
-                    print(
-                        f"GSM pair in {pair_dir.name} exceeded {timeout_s} s "
-                        f"after {elapsed:.1f} s; terminating and trying next pair.",
-                        file=log,
-                        flush=True,
-                    )
-                    try:
-                        os.killpg(proc.pid, signal.SIGTERM)
-                        proc.wait(timeout=30)
-                    except Exception:
+                print(
+                    f"GSM pair in {pair_dir.name} started with pid {proc.pid}; "
+                    f"timeout={timeout_s} s",
+                    file=log,
+                    flush=True,
+                )
+                deadline = start + timeout_s
+                next_heartbeat = start + 60
+                while True:
+                    returncode = proc.poll()
+                    if returncode is not None:
+                        elapsed = time.time() - start
+                        print(
+                            f"GSM pair in {pair_dir.name} exited with code {returncode} "
+                            f"after {elapsed:.1f} s",
+                            file=log,
+                            flush=True,
+                        )
+                        return returncode == 0
+
+                    now = time.time()
+                    if now >= deadline:
+                        elapsed = now - start
+                        print(
+                            f"GSM pair in {pair_dir.name} exceeded {timeout_s} s "
+                            f"after {elapsed:.1f} s; terminating and trying next pair.",
+                            file=log,
+                            flush=True,
+                        )
                         try:
-                            os.killpg(proc.pid, signal.SIGKILL)
+                            os.killpg(proc.pid, signal.SIGTERM)
+                            proc.wait(timeout=30)
                         except Exception:
-                            pass
-                    return False
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except Exception:
+                                pass
+                        return False
+
+                    if now >= next_heartbeat:
+                        elapsed = now - start
+                        print(
+                            f"GSM pair in {pair_dir.name} still running after {elapsed:.1f} s",
+                            file=log,
+                            flush=True,
+                        )
+                        next_heartbeat += 60
+
+                    time.sleep(min(5, max(0.1, deadline - now)))
 
     @classmethod
     def run_containerized(cls, payload_path):
@@ -394,8 +434,10 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 config = payload["config"]
 
                 os.environ["YARP_PREGSM_CONTAINER"] = "1"
-                pairs = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt").select()
-                cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs)
+                os.environ["YARP_DEBUG_PREGSM"] = "1"
+                selector = ConformerPairSelector(rxn, config, scratch_dir=work_dir / "joint_opt", log=log)
+                pairs = selector.select()
+                cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs, selector)
                 print(f"Selected {len(pairs)} pair(s)", file=log, flush=True)
 
                 if not pairs:
@@ -420,7 +462,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     p_xyz_path.write_text(pair["p_conf"].to_xyz_string(), encoding="utf-8")
                     cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
 
-                    print(f"Running GSM pair {idx}", file=log, flush=True)
+                    print(
+                        f"Running GSM pair {idx}: "
+                        f"score={float(pair.get('score', 0.0)):.6f} "
+                        f"r_conf={getattr(pair.get('r_conf'), 'type', '')} "
+                        f"p_conf={getattr(pair.get('p_conf'), 'type', '')}",
+                        file=log,
+                        flush=True,
+                    )
                     ok = cls._run_pysis(
                         pair_dir,
                         inp_path.name,

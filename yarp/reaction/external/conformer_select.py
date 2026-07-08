@@ -6,6 +6,7 @@ one strategy it calls while constructing candidate reactant/product pairs.
 """
 
 import copy
+import hashlib
 import os
 import pickle
 from pathlib import Path
@@ -21,14 +22,20 @@ from yarp.reaction.external.joint_opt import make_joint_optimization_engine
 class ConformerPairSelector:
     """Select reactant/product conformer pairs for GSM."""
 
-    def __init__(self, rxn, config, scratch_dir=None):
+    def __init__(self, rxn, config, scratch_dir=None, log=None):
         self.rxn = rxn
         self.config = config
         self.scratch_dir = Path(scratch_dir) if scratch_dir is not None else Path.cwd() / "joint_opt"
         self.mode = config.joint_opt.lower()
         self.joint_optimizer = make_joint_optimization_engine(config, self.scratch_dir)
-        self.verbose = getattr(config, "verbose", False)
+        self.verbose = (
+            getattr(config, "verbose", False)
+            or os.environ.get("YARP_DEBUG_PREGSM") == "1"
+        )
+        self.log = log
         self.dropped_pairs = 0
+        self.model_path = None
+        self.model_sha256 = None
 
     def select(self):
         if os.environ.get("YARP_PREGSM_CONTAINER") != "1":
@@ -38,9 +45,18 @@ class ConformerPairSelector:
                 "from the host YARP environment."
             )
 
+        self._log(
+            "starting selection "
+            f"mode={self.mode} engine={getattr(self.config, 'joint_opt_engine', '')} "
+            f"n_conf={self.config.n_conf} scratch={self.scratch_dir}"
+        )
+
         r_confs = self._get_conformers(self.rxn.reactant)
         p_confs = self._get_conformers(self.rxn.product)
-
+        self._log(
+            f"input conformers reactant={len(r_confs)} product={len(p_confs)} "
+            f"reactant_types={self._conf_types(r_confs)} product_types={self._conf_types(p_confs)}"
+        )
         biased_r, biased_p = self._generate_biased_endpoints(r_confs, p_confs)
         model = self._load_model(r_confs, p_confs)
 
@@ -49,6 +65,10 @@ class ConformerPairSelector:
             p_confs,
             biased_r,
             biased_p,
+        )
+        self._log(
+            f"post-truncation conformers reactant={len(r_confs)} product={len(p_confs)} "
+            f"biased_reactant={len(biased_r)} biased_product={len(biased_p)}"
         )
 
         approved_pairs = []
@@ -59,15 +79,27 @@ class ConformerPairSelector:
 
         approved_pairs.sort(key=lambda x: x["score"], reverse=True)
 
-        if self.verbose:
-            print("Number of approved pairs = ", len(approved_pairs))
-            print("Number of dropped pairs = ", self.dropped_pairs)
+        self._log(f"approved_pairs={len(approved_pairs)} dropped_pairs={self.dropped_pairs}")
+        for ind, pair in enumerate(approved_pairs[:self.config.n_conf], start=1):
+            self._log(
+                f"selected_pair={ind} score={float(pair.get('score', 0.0)):.6f} "
+                f"r_conf={getattr(pair.get('r_conf'), 'type', '')} "
+                f"p_conf={getattr(pair.get('p_conf'), 'type', '')}"
+            )
 
         return approved_pairs[:self.config.n_conf]
+
+    def _log(self, message):
+        if self.verbose:
+            print(f"[ConformerPairSelector] {message}", file=self.log, flush=True)
 
     @staticmethod
     def _get_conformers(state):
         return [conf for key, conf in state.conformers.items() if key != "initial_geom"]
+
+    @staticmethod
+    def _conf_types(confs):
+        return [getattr(conf, "type", "") for conf in confs]
 
     def _generate_biased_endpoints(self, r_confs, p_confs):
         biased_r = r_confs
@@ -86,14 +118,18 @@ class ConformerPairSelector:
                 for ind, c in enumerate(p_confs)
             ]
 
+        self._log(
+            "biased endpoints "
+            f"reactant_none={sum(_ is None for _ in biased_r)} "
+            f"product_none={sum(_ is None for _ in biased_p)}"
+        )
         return biased_r, biased_p
 
     def _load_model(self, r_confs, p_confs):
         n_conf = self.config.n_conf
         total_conf = len(r_confs) + len(p_confs)
 
-        if self.verbose:
-            print("Total number of reactant + product conformers generated = ", total_conf)
+        self._log(f"total reactant+product conformers={total_conf}")
 
         model_dir = Path(__file__).resolve().parents[1] / "conf_sampling"
         if total_conf / n_conf > 3.0:
@@ -101,11 +137,27 @@ class ConformerPairSelector:
         else:
             model_path = model_dir / "poor_model.sav"
 
-        if self.verbose:
-            print(f"{model_path.stem} is chosen to generate aligned reaction conformers")
+        if not model_path.exists():
+            raise FileNotFoundError(
+                "Conformer-pair selection model is missing. "
+                f"Expected {model_path}. Rebuild the jo_opt container with the required model artifacts."
+            )
 
+        self.model_path = str(model_path)
+        self.model_sha256 = self._sha256(model_path)
+        self._log(
+            f"model={model_path.stem} path={model_path} sha256={self.model_sha256}"
+        )
         with open(model_path, "rb") as f:
             return pickle.load(f)
+
+    @staticmethod
+    def _sha256(path):
+        digest = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def _truncate_conformer_pool(self, r_confs, p_confs, biased_r, biased_p):
         limit = self.config.n_conf * 5

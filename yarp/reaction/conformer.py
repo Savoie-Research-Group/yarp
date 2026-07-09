@@ -2,7 +2,7 @@
 Definition of the conformer object class.
 """
 import numpy as np
-from yarp.util.write_files import xyz_generate_string
+from yarp.util.write_files import xyz_generate_string, xyz_write
 
 class conformer:
     """
@@ -109,3 +109,15 @@ class conformer:
             return xyz_generate_string(elements=self.elements, geo=self.geo)
         else:
             return None
+
+    def export_geometry(self, filename):
+        """
+        Export the conformer's geometry to an xyz file.
+        This shouldn't ever change any of the attributes of the conformer.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the file to export the geometry to.
+        """
+        xyz_write(filename, self.elements, self.geo, comment=self.type)

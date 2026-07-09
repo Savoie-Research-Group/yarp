@@ -9,7 +9,7 @@ from yarp.util.properties import el_valence, el_metals, el_expand_octet, el_mass
 from yarp.yarpecule.atom_mapping import canon_order
 
 
-def smiles2adjmat(smiles, verbose=False):
+def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     """
     In-house Savoie group SMILES parser. Written in python and transparent to debug. The main motivation
     was to consistently handle protonation of radicals and atoms with formal charges. The usual SMILES
@@ -364,7 +364,8 @@ def smiles2adjmat(smiles, verbose=False):
         dupes = sorted({m for m in provided_maps if provided_maps.count(m) > 1})
         raise ValueError(f"Duplicate atom-map indices in input SMILES: {dupes}")
 
-    adjmat, atom_info = reorder_by_mappings(adjmat, atom_info)
+    if reorder_mapped:
+        adjmat, atom_info = reorder_by_mappings(adjmat, atom_info)
 
     bond_electron_mat = adjmat.copy()
     for i in atom_info:

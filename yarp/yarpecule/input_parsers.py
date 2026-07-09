@@ -4,11 +4,54 @@ Consider moving this to util if anything outside of yarpecule needs to access it
 """
 from pathlib import Path
 
+import re
 import numpy as np
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
+from yarp.util.rdkit import (
+    adj_from_rdmol,
+    atom_info_from_rdmol,
+    el_from_rdmol,
+    geom_from_rdmol,
+    smiles_to_rdmol,
+)
 
+
+ATOM_MAP_PATTERN = re.compile(r":\d+(?=[^\]]*\])")
+EXPLICIT_H_PATTERN = re.compile(r"\[(?:\d+)?H[^\]]*\]")
+
+
+def strip_atom_maps(smiles):
+    return ATOM_MAP_PATTERN.sub("", smiles)
+
+
+def has_explicit_hydrogen_atom(smiles):
+    return EXPLICIT_H_PATTERN.search(smiles) is not None
+
+
+def prepare_partial_mapped_smiles(smiles):
+    """
+    If the SMILES is partially mapped, return an unmapped working SMILES plus
+    the original per-atom input maps in original token order.
+
+    Fully mapped and fully unmapped SMILES are left alone.
+    """
+    _, _, original_atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+
+    original_maps = [
+        original_atom_info[i].get("atom_map")
+        for i in original_atom_info
+    ]
+
+    has_any_map = any(m is not None for m in original_maps)
+    has_all_maps = all(m is not None for m in original_maps)
+
+    if not has_any_map or has_all_maps:
+        return smiles, None, False
+
+    unmapped_smiles = strip_atom_maps(smiles)
+    return unmapped_smiles, original_atom_info, True
 
 def xyz_parse(xyz, read_types=False, multiple=False):
     """
@@ -414,8 +457,23 @@ def xyz_from_smiles(smiles, mode="yarp"):
         # Parse basics
         # NOTE: bemat is used to generate geometry via RDKit, but not returned for
         # downstream use in yarpecule - ERM
-        adj_mat, bemat, atom_info = smiles2adjmat(smiles)
+        
+        parse_smiles, original_atom_info, partial_mapped_input = prepare_partial_mapped_smiles(smiles)
+
+        adj_mat, bemat, atom_info = smiles2adjmat(parse_smiles)
+
+        if partial_mapped_input:
+            if len(original_atom_info) != len(atom_info):
+                raise ValueError(
+            "Partial-map handling failed: original and unmapped SMILES produced "
+            "different atom counts."
+        )
+
+            for i in atom_info:
+                atom_info[i]["input_atom_map"] = original_atom_info[i].get("atom_map")
+
         elements = [atom_info[i]["element"] for i in atom_info]
+
         fc = [int(atom_info[i]["formal_charge"]) for i in atom_info]
         q = int(sum(fc))
 
@@ -435,7 +493,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
                     "WARNING: yarp aromatic SMILES geometry fallback used RDKit "
                     f"for {smiles} after octet validation failed at atoms {violations}."
                 )
-                geo = geo_via_rdkit(smiles, atom_info)
+                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),)
                 return elements, geo, adj_mat, q, atom_info
             raise OctetError(violations)
 
@@ -481,46 +539,18 @@ def xyz_from_smiles(smiles, mode="yarp"):
 
     # RDKit branch
     else:
-        m = MolFromSmiles(smiles)  # create molecule using rdkit
-        m = AddHs(m)  # make the hydrogens explicit
-        AllChem.EmbedMolecule(m, randomSeed=0xf00d)  # create a 3D geometry
-        N_atoms = len(m.GetAtoms())  # find the number of atoms
-        elements = []  # initialize list to hold element labels
-        geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
-        q = 0  # total charge on the molecule
-        atom_info = {}
+        m = smiles_to_rdmol(smiles)
+        AllChem.EmbedMolecule(m, randomSeed=0xf00d)
 
-        # loop over atoms, save their labels, positions, and total charge
-        for i in range(N_atoms):
-            atom = m.GetAtomWithIdx(i)
-            elements += [atom.GetSymbol()]
-            coord = m.GetConformer().GetAtomPosition(i)
-            geo[i] = np.array([coord.x, coord.y, coord.z])
-            q += atom.GetFormalCharge()
-            isotope = atom.GetIsotope()
-            mass = float(isotope) if isotope else el_mass[atom.GetSymbol().lower()]
-            atom_map = None
-            if atom.HasProp("molAtomMapNumber"):
-                atom_map = int(atom.GetProp("molAtomMapNumber"))
-            atom_info[i] = {
-                "atom_index": i,
-                "atom_map": atom_map,
-                "element": atom.GetSymbol().lower(),
-                "formal_charge": atom.GetFormalCharge(),
-                "mass": mass,
-                "stereo": {"atom": None, "bonds": {}},
-                "aromatic_input": atom.GetIsAromatic(),
-            }
-
-        # Generate adjacency matrix
-        adj_mat = np.zeros((N_atoms, N_atoms))
-        for i in [(_.GetBeginAtomIdx(), _.GetEndAtomIdx()) for _ in m.GetBonds()]:
-            adj_mat[i[0], i[1]] = 1
-            adj_mat[i[1], i[0]] = 1
+        elements = el_from_rdmol(m)
+        geo = geom_from_rdmol(m)
+        adj_mat = adj_from_rdmol(m)
+        atom_info = atom_info_from_rdmol(m)
+        q = int(sum(atom_info[i]["formal_charge"] for i in atom_info))
 
     return elements, geo, adj_mat, q, atom_info
 
-def geo_via_rdkit(smiles, atom_info):
+def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     """
     Generate a geometry with RDKit and align it to the atom ordering used by
     the in-house SMILES parser.
@@ -529,22 +559,15 @@ def geo_via_rdkit(smiles, atom_info):
     identifies the correct graph but its bond-electron matrix is too crude to
     survive octet validation.
     """
-    m = MolFromSmiles(smiles)
-    if m is None:
-        raise ValueError(f"RDKit could not parse SMILES: {smiles}")
-    m = AddHs(m)
+    m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
     AllChem.EmbedMolecule(m, randomSeed=0xf00d)
 
-    rdkit_elements = [atom.GetSymbol().lower() for atom in m.GetAtoms()]
+    rdkit_elements = [el.lower() for el in el_from_rdmol(m)]
     yarp_elements = [atom_info[i]["element"] for i in atom_info]
 
     yarp_maps = [atom_info[i].get("atom_map", None) for i in atom_info]
-    rdkit_maps = []
-    for atom in m.GetAtoms():
-        if atom.HasProp("molAtomMapNumber"):
-            rdkit_maps.append(int(atom.GetProp("molAtomMapNumber")))
-        else:
-            rdkit_maps.append(None)
+    rdkit_atom_info = atom_info_from_rdmol(m)
+    rdkit_maps = [rdkit_atom_info[i]["atom_map"] for i in rdkit_atom_info]
 
     if all(_ is not None for _ in yarp_maps):
         rdkit_by_map = {atom_map: idx for idx, atom_map in enumerate(rdkit_maps) if atom_map is not None}
@@ -557,9 +580,9 @@ def geo_via_rdkit(smiles, atom_info):
     else:
         raise ValueError("RDKit fallback atom order did not match the in-house parser ordering.")
 
+    rdkit_geo = geom_from_rdmol(m)
     geo = np.zeros((len(order), 3))
     for i, rdkit_idx in enumerate(order):
-        coord = m.GetConformer().GetAtomPosition(rdkit_idx)
-        geo[i] = np.array([coord.x, coord.y, coord.z])
+        geo[i] = rdkit_geo[rdkit_idx]
 
     return geo

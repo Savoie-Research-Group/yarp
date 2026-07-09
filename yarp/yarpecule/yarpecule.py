@@ -303,6 +303,7 @@ class yarpecule:
             normalized_atom_info[i] = {
                 "atom_index": i,
                 "atom_map": record.get("atom_map", None),
+                "input_atom_map": record.get("input_atom_map", None),
                 "element": self._elements[i],
                 "formal_charge": record.get("formal_charge", None),
                 "mass": record.get("mass", el_mass[self._elements[i]]),

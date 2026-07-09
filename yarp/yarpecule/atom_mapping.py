@@ -203,3 +203,19 @@ def graph_seps(adj_mat_0):
         adj_mat = np.dot(adj_mat, adj_mat_0)
 
     return seps
+
+def original_to_yarp_map(ypcule):
+    """
+    Return {input_atom_map: yarp_atom_map} for atoms that had maps in the
+    user-provided partial-map SMILES.
+    """
+    out = {}
+
+    for i, info in ypcule._atom_info.items():
+        input_map = info.get("input_atom_map")
+        yarp_map = info.get("atom_map")
+
+        if input_map is not None:
+            out[input_map] = yarp_map
+
+    return out

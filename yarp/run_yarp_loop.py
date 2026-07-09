@@ -1,3 +1,4 @@
+import sys
 import time
 import subprocess
 import argparse
@@ -13,12 +14,10 @@ def main():
 
     end_time = datetime.now() + timedelta(minutes=args.duration)
 
-    # Check if the directory exists; throw a runtime error if it doesn't
     work_dir = Path(args.working_dir).resolve()
     if not work_dir.is_dir():
         raise RuntimeError(f"Error: The working directory '{work_dir}' does not exist. Please set it up before running this script.")
 
-    # Resolve path to progress_yarp.py
     script_location = Path(__file__).parent.resolve()
     target_script = script_location / "progress_yarp.py"
 
@@ -26,20 +25,28 @@ def main():
     execute_counter = 0
 
     # Open the output file, and record initial message
-    output_file = work_dir / f"yarp_loop.out"
+    output_file = work_dir / "yarp_loop.out"
     with open(output_file, "a") as out_f:
         out_f.write(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}\n")
 
     while True:
         execute_counter += 1
-        # Route stdout AND stderr from yarp-progress to output file
         with open(output_file, "a") as out_f:
-            subprocess.run(
-                ["python", str(target_script), str(work_dir)], 
+            result = subprocess.run(
+                ["python", str(target_script), str(work_dir)],
                 stdout=out_f,
-                stderr=subprocess.STDOUT 
+                stderr=subprocess.STDOUT,
+                check=False,
             )
-            out_f.write(f"[{datetime.now()}] Run {execute_counter} of yarp_progress has been executed...\n---*****---\n")
+            out_f.write(f"[{datetime.now()}] Run {execute_counter} of yarp_progress has been executed...\n")
+
+            if result.returncode != 0:
+                out_f.write(
+                    f"[{datetime.now()}] progress_yarp.py failed with exit code {result.returncode}; exiting loop.\n"
+                )
+                sys.exit(result.returncode)
+
+            out_f.write("---*****---\n")
 
         # Stop if the log contains a shutdown marker
         stop_marker = "No active or pending tasks remain; YARP has reached a quiescent state."

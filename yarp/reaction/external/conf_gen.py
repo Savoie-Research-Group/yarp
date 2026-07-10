@@ -46,7 +46,19 @@ class CrestConfCalculator(ConfTask):
             with open(script_path, "w") as f:
                 f.write("#!/bin/bash\n")
                 self.write_scheduler_headers(f)
+                self.write_thread_env(f)
                 f.write(f"cd {self.scratch_dir}\n")
+                f.write("{\n")
+                f.write("  echo '===== CREST job diagnostics ====='\n")
+                f.write("  hostname\n")
+                f.write("  date\n")
+                f.write("  echo \"JOB_ID=${JOB_ID:-NA}\"\n")
+                f.write("  echo \"NSLOTS=${NSLOTS:-NA}\"\n")
+                f.write("  echo \"SGE_BINDING=${SGE_BINDING:-NA}\"\n")
+                f.write("  echo 'ulimit -a:'\n")
+                f.write("  ulimit -a\n")
+                f.write("  env | egrep '^(OMP|MKL|OPENBLAS|GOTO|BLIS|NUMEXPR|VECLIB|GOMP|APPTAINERENV|SINGULARITYENV)_' | sort\n")
+                f.write("} > crest_env.log 2>&1\n")
                 # Pipe output to a log file so it doesn't flood the local terminal
                 f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
         except PermissionError:
@@ -122,7 +134,7 @@ class CrestConfCalculator(ConfTask):
 
     def cleanup(self):
         """Delete CREST intermediate files, keeping conformer data and logs."""
-        keep = {"crest_conformers.xyz", "cre_members", "crest.energies", "crest_run.log", self.xyz_file, "run_crest_cmd.sh"}    # SHQK : Keeping cre_members helps readily get the total number of generated conformers. Please keep it.
+        keep = {"crest_conformers.xyz", "cre_members", "crest.energies", "crest_run.log", "crest_env.log", self.xyz_file, "run_crest_cmd.sh"}    # SHQK : Keeping cre_members helps readily get the total number of generated conformers. Please keep it.
         for item in self.scratch_dir.iterdir():
             if item.name not in keep:
                 if item.is_file():

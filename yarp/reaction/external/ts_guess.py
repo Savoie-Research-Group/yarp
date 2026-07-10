@@ -1,11 +1,18 @@
 import os
 import shutil
 import fnmatch
+import pickle
+import json
+import subprocess
+import traceback
+import signal
+import time
+from pathlib import Path
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
-from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
+from yarp.reaction.external.conformer_select import ConformerPairSelector
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -34,75 +41,50 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
         self.n_pairs = self.config.n_conf
-        self.pairs_to_run = []
 
     def generate_input(self):
         """
-        Runs the Joint Opt + ML Selection, then writes the files 
-        required for the Pysisyphus GSM run.
+        Writes the payload consumed by the submitted pre-GSM workflow.
+
+        Conformer selection, joint optimization, and Pysisyphus GSM execution
+        run in the submitted host environment. Only the sklearn model
+        probability calculation is delegated to the scorer container.
         """
-        print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
-        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
-        
-        # Write inputs for each pair
-        for i, pair in enumerate(self.pairs_to_run):
-            idx = i + 1
-            pair_dir = self.scratch_dir / f"gsm_run{idx}"
-            os.makedirs(pair_dir, exist_ok=True)
-            r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
-            p_xyz_path = pair_dir / f"product_{idx}.xyz"
-            inp_path = pair_dir / f"gsm_{idx}_input.yaml"
-            
-            # Write XYZs
-            with open(r_xyz_path, "w") as f:
-                f.write(pair["r_conf"].to_xyz_string())
-            with open(p_xyz_path, "w") as f:
-                f.write(pair["p_conf"].to_xyz_string())
-            
-            # Write a Pysisyphus input file for GSM
-            self._write_pysis_gsm_input(inp_path, f"reactant_{idx}.xyz", f"product_{idx}.xyz")
+        payload_path = self.scratch_dir / "payload.pkl"
+        with open(payload_path, "wb") as f:
+            pickle.dump(
+                {
+                    "rxn": self.rxn,
+                    "config": self.config,
+                    "job_manager": self.job_manager,
+                },
+                f,
+            )
 
     def write_submission_script(self):
         """
-        Creates a sequential runner script for inside the container, 
-        and a host submission script to launch the container.
+        Creates a scheduler script that runs host-side pre-GSM and GSM.
         """
-        # ---------------------------------------------------------
-        # 1. The INNER Script (Runs inside the Docker container)
-        # ---------------------------------------------------------
-        inner_script_path = self.scratch_dir / "run_pysis_inner.sh"
-        
-        with open(inner_script_path, "w") as f:
-            f.write("#!/bin/bash\n\n")
-            f.write("echo 'Starting YARP serial GSM execution...'\n\n")
-            
-            for i in range(1, len(self.pairs_to_run) + 1):
-                f.write(f"echo '--- Running GSM pair {i} ---'\n")
-                # The container mounts self.scratch_dir to /work
-                f.write(f"cd /work/gsm_run{i}\n") 
-                
-                # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
-                f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
-                
-        # Make executable
-        inner_script_path.chmod(0o755)
-
-        # ---------------------------------------------------------
-        # 2. The OUTER Script (Runs on the Host / Job Manager)
-        # ---------------------------------------------------------
         submit_script_path = self.scratch_dir / "submit_gsm.sh"
-        
-        # Pulls the docker prefix (e.g., 'docker run --rm -v /scratch:/work -u UID:GID yarp_pysisyphus')
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir))
-        
+
         with open(submit_script_path, "w") as f:
             f.write("#!/bin/bash\n")
             self.write_scheduler_headers(f)
-            # Launch the container and tell it to run the inner script
-            f.write(f"{prefix} bash /work/run_pysis_inner.sh\n")
+            self.write_thread_env(f)
+            f.write("set -euo pipefail\n")
+            f.write(f"cd {self.scratch_dir}\n")
+            f.write("echo \"$(date) starting host GSM wrapper\" > gsm_lifecycle.log\n")
+            f.write(
+                "trap 'ec=$?; echo \"$(date) submit_gsm.sh exiting with code ${ec}\" "
+                ">> gsm_lifecycle.log' EXIT\n"
+            )
+            f.write(
+                "python -c \""
+                "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
+                f"PysisyphusTSGuessCalculator.run_host('{self.scratch_dir / 'payload.pkl'}')"
+                "\" > container.out 2> container.err\n"
+            )
             
         submit_script_path.chmod(0o755)
         
@@ -115,6 +97,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         """
         num_runs = self._get_num_runs()
         if num_runs == 0:
+            self._print_container_log_tail()
             return False # No runs found at all!
 
         one_successful = False
@@ -142,7 +125,24 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             one_successful = True
             
         # We only care if at least one succeeded
+        if not one_successful:
+            self._print_container_log_tail()
         return one_successful
+
+    def _print_container_log_tail(self):
+        for name in ("container.err", "container.out", "pregsm.log"):
+            path = self.scratch_dir / name
+            if not path.exists():
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception:
+                continue
+            if not lines:
+                continue
+            print(f"     [TS Guess] Last lines of {name}:")
+            for line in lines[-20:]:
+                print(f"       {line}")
 
     def scrape_data(self) -> bool:
         """
@@ -226,25 +226,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                     shutil.rmtree(item)
 
     def _write_pysis_gsm_input(self, input_path, r_xyz_path, p_xyz_path):
-        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
-        lot = self.config.gsm_lot.lower()
-
-        # Write the file! Yay, YAML friend!
-        with open(input_path, 'a') as f:
-            # set geom block
-            input_geo = [r_xyz_path, p_xyz_path]
-            f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
-
-            # set calc block
-            # ERM: I left out the option for solvent,
-            # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
-
-            # set cos block
-            f.write(f'cos:\n type: gs\n max_nodes: {self.config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
-
-            # set opt block
-            f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
+        self.write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, self.config)
 
     def _get_num_runs(self) -> int:
             """
@@ -254,3 +236,240 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             # Finds all directories matching 'gsm_run*' in the scratch folder
             run_dirs = list(self.scratch_dir.glob("gsm_run*"))
             return len(run_dirs)
+
+    @staticmethod
+    def write_pysis_gsm_input(input_path, r_xyz_path, p_xyz_path, config):
+        # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
+        lot = config.gsm_lot.lower()
+
+        with open(input_path, 'w') as f:
+            input_geo = [r_xyz_path, p_xyz_path]
+            f.write(f'geom:\n type: cart\n fn: {input_geo}\n')
+
+            # ERM: I left out the option for solvent,
+            # because what I saw in classy YARP didn't make sense to me...
+            f.write(f'calc:\n type: {lot}\n pal: {config.n_cpus}\n mem: {config.mem_per_cpu}\n charge: {config.charge}\n mult: {config.multiplicity}\n')
+
+            f.write(f'cos:\n type: gs\n max_nodes: {config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')
+
+            f.write(f'opt:\n type: string\n stop_in_when_full: -1\n align: True\n scale_step: global\n')
+
+    @staticmethod
+    def _write_selected_pairs_manifest(path, pairs, selector=None):
+        manifest = {
+            "n_pairs": len(pairs),
+            "pairs": [
+                {
+                    "index": ind,
+                    "score": float(pair.get("score", 0.0)),
+                    "r_conf_type": getattr(pair.get("r_conf"), "type", ""),
+                    "p_conf_type": getattr(pair.get("p_conf"), "type", ""),
+                    "source": pair.get("source"),
+                    "source_index": pair.get("source_index"),
+                    "selection_direction": pair.get("selection_direction"),
+                    "r_graph_diffs": pair.get("r_graph_diffs"),
+                    "p_graph_diffs": pair.get("p_graph_diffs"),
+                }
+                for ind, pair in enumerate(pairs, start=1)
+            ],
+        }
+        if selector is not None:
+            manifest["selector"] = {
+                "joint_opt": selector.mode,
+                "joint_opt_engine": getattr(selector.config, "joint_opt_engine", ""),
+                "n_conf": selector.config.n_conf,
+                "model_path": selector.model_path,
+                "model_sha256": selector.model_sha256,
+                "dropped_pairs": selector.dropped_pairs,
+            }
+        Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    @staticmethod
+    def _runtime_to_seconds(runtime):
+        try:
+            hours, minutes, seconds = [int(_) for _ in str(runtime).split(":")]
+        except Exception:
+            return 3600
+        return hours * 3600 + minutes * 60 + seconds
+
+    @classmethod
+    def _pair_timeout_seconds(cls, config, n_pairs):
+        total = cls._runtime_to_seconds(getattr(config, "max_runtime", "01:00:00"))
+        n_pairs = max(1, int(n_pairs))
+        # Keep scheduler tear-down time available for logging and later pairs.
+        return max(60, int(total * 0.8 / n_pairs))
+
+    @staticmethod
+    def _run_pysis(pair_dir, inp_name, out_path, err_path, timeout_s, log):
+        start = time.time()
+        with out_path.open("w", encoding="utf-8") as out:
+            with err_path.open("w", encoding="utf-8") as err:
+                proc = subprocess.Popen(
+                    ["pysis", inp_name],
+                    cwd=pair_dir,
+                    stdout=out,
+                    stderr=err,
+                    text=True,
+                    start_new_session=True,
+                )
+                print(
+                    f"GSM pair in {pair_dir.name} started with pid {proc.pid}; "
+                    f"timeout={timeout_s} s",
+                    file=log,
+                    flush=True,
+                )
+                deadline = start + timeout_s
+                next_heartbeat = start + 60
+                while True:
+                    returncode = proc.poll()
+                    if returncode is not None:
+                        elapsed = time.time() - start
+                        print(
+                            f"GSM pair in {pair_dir.name} exited with code {returncode} "
+                            f"after {elapsed:.1f} s",
+                            file=log,
+                            flush=True,
+                        )
+                        return returncode == 0
+
+                    now = time.time()
+                    if now >= deadline:
+                        elapsed = now - start
+                        print(
+                            f"GSM pair in {pair_dir.name} exceeded {timeout_s} s "
+                            f"after {elapsed:.1f} s; terminating and trying next pair.",
+                            file=log,
+                            flush=True,
+                        )
+                        try:
+                            os.killpg(proc.pid, signal.SIGTERM)
+                            proc.wait(timeout=30)
+                        except Exception:
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except Exception:
+                                pass
+                        return False
+
+                    if now >= next_heartbeat:
+                        elapsed = now - start
+                        print(
+                            f"GSM pair in {pair_dir.name} still running after {elapsed:.1f} s",
+                            file=log,
+                            flush=True,
+                        )
+                        next_heartbeat += 60
+
+                    time.sleep(min(5, max(0.1, deadline - now)))
+
+    @classmethod
+    def run_host(cls, payload_path):
+        """
+        Host-side TS guess runner.
+
+        The sklearn model probability calculation is delegated to the scorer
+        container by ``ConformerPairSelector``. Everything else stays in the
+        submitted host job so Python code changes do not require rebuilding the
+        scorer image.
+        """
+        payload_path = Path(payload_path)
+        work_dir = payload_path.parent
+        pregsm_log = work_dir / "pregsm.log"
+
+        with pregsm_log.open("w", encoding="utf-8") as log:
+            def log_signal(signum, _frame):
+                print(f"Received signal {signum}; aborting GSM wrapper", file=log, flush=True)
+                raise RuntimeError(f"Received signal {signum}")
+
+            handled_signals = [
+                signal.SIGTERM,
+                signal.SIGINT,
+                signal.SIGHUP,
+            ]
+            for optional_signal in ("SIGUSR1", "SIGUSR2"):
+                if hasattr(signal, optional_signal):
+                    handled_signals.append(getattr(signal, optional_signal))
+
+            previous_handlers = {}
+            for sig in handled_signals:
+                try:
+                    previous_handlers[sig] = signal.getsignal(sig)
+                    signal.signal(sig, log_signal)
+                except (OSError, RuntimeError, ValueError):
+                    pass
+
+            try:
+                print("Starting host YARP pre-GSM selection", file=log, flush=True)
+
+                with payload_path.open("rb") as f:
+                    payload = pickle.load(f)
+
+                rxn = payload["rxn"]
+                config = payload["config"]
+                job_manager = payload["job_manager"]
+
+                os.environ["YARP_DEBUG_PREGSM"] = "1"
+                selector = ConformerPairSelector(
+                    rxn,
+                    config,
+                    scratch_dir=work_dir / "joint_opt",
+                    log=log,
+                    job_manager=job_manager,
+                )
+                pairs = selector.select()
+                cls._write_selected_pairs_manifest(work_dir / "selected_pairs.json", pairs, selector)
+                print(f"Selected {len(pairs)} pair(s)", file=log, flush=True)
+
+                if not pairs:
+                    raise RuntimeError("No GSM pairs selected")
+
+                any_success = False
+                timeout_s = cls._pair_timeout_seconds(config, len(pairs))
+                print(
+                    f"Using per-GSM-pair timeout of {timeout_s} s",
+                    file=log,
+                    flush=True,
+                )
+                for idx, pair in enumerate(pairs, start=1):
+                    pair_dir = work_dir / f"gsm_run{idx}"
+                    pair_dir.mkdir(parents=True, exist_ok=True)
+
+                    r_xyz_path = pair_dir / f"reactant_{idx}.xyz"
+                    p_xyz_path = pair_dir / f"product_{idx}.xyz"
+                    inp_path = pair_dir / f"gsm_{idx}_input.yaml"
+
+                    r_xyz_path.write_text(pair["r_conf"].to_xyz_string(), encoding="utf-8")
+                    p_xyz_path.write_text(pair["p_conf"].to_xyz_string(), encoding="utf-8")
+                    cls.write_pysis_gsm_input(inp_path, r_xyz_path.name, p_xyz_path.name, config)
+
+                    print(
+                        f"Running GSM pair {idx}: "
+                        f"score={float(pair.get('score', 0.0)):.6f} "
+                        f"r_conf={getattr(pair.get('r_conf'), 'type', '')} "
+                        f"p_conf={getattr(pair.get('p_conf'), 'type', '')}",
+                        file=log,
+                        flush=True,
+                    )
+                    ok = cls._run_pysis(
+                        pair_dir,
+                        inp_path.name,
+                        pair_dir / f"gsm_{idx}.log",
+                        pair_dir / f"gsm_{idx}.err",
+                        timeout_s,
+                        log,
+                    )
+                    if ok:
+                        any_success = True
+
+                if not any_success:
+                    raise RuntimeError("All GSM runs exited nonzero")
+            except Exception:
+                traceback.print_exc(file=log)
+                log.flush()
+                raise
+            finally:
+                for sig, previous_handler in previous_handlers.items():
+                    try:
+                        signal.signal(sig, previous_handler)
+                    except (OSError, RuntimeError, ValueError):
+                        pass

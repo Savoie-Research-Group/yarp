@@ -18,7 +18,7 @@ class MinOptTask(AsyncYarpCalculator):
             source = self.config.initial_geom.reactant
         elif self.task_def.task_type == "product_optimization":
             node = self.rxn.product
-            source = self.config.initial_geom.reactant
+            source = self.config.initial_geom.product
         else:
             raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
 
@@ -88,6 +88,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n")
             self.write_scheduler_headers(f)
+            self.write_thread_env(f)
             f.write(f"cd {self.scratch_dir}\n")
             f.write(f"{full_command}\n")
 

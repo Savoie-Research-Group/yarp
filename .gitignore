@@ -2,6 +2,9 @@
 debug/*
 .vscode
 containers/*.sif
+containers/*/*.def
+!containers/model_scorer/model_scorer.def
+containers/*.tar
 containers/orca/*.tar.*
 containers/orca/example
 **/SCRATCH
@@ -180,6 +183,10 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+
+# Local conformer-pair selection model artifacts
+yarp/reaction/conf_sampling/*.sav
+containers/model_artifacts/**/*.sav
 
 # PyPI configuration file
 .pypirc

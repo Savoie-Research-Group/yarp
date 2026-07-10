@@ -294,12 +294,22 @@ class TSGuessConfig:
     max_gsm_nodes: int = 30
     bias_lot: str = "uff"
     joint_opt: str = "dual"
+    joint_opt_engine: str = "ob"
+    xtb_joint_lot: str = "gfn2"
+    xtb_joint_force_constant: float = 1.0
+    xtb_joint_scf_iters: int = 300
+    xtb_joint_keep_files: bool = False
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
 
     def __post_init__(self):
+        if self.joint_opt_engine is not None:
+            self.joint_opt_engine = self.joint_opt_engine.lower()
+        if self.xtb_joint_lot is not None:
+            self.xtb_joint_lot = self.xtb_joint_lot.lower()
+
         if self.charge == None:
             raise ValueError("Missing required key! Please provide 'charge' in ts_guess block!")
         if self.multiplicity == None:
@@ -315,11 +325,26 @@ class TSGuessConfig:
             raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
         if self.joint_opt not in ['dual', 'r_only', 'p_only', 'off']:
             raise ValueError(f"Invalid 'joint_opt' entry: '{self.joint_opt}' Valid options are: 'dual', 'r_only', 'p_only', 'off'")
+        if self.joint_opt_engine not in ['ob', 'xtb']:
+            raise ValueError(f"Invalid 'joint_opt_engine' entry: '{self.joint_opt_engine}' Valid options are: 'ob', 'xtb'")
+        if self.xtb_joint_lot not in ['gfn2', 'gfn1', 'gfnff']:
+            raise ValueError(f"Invalid 'xtb_joint_lot' entry: '{self.xtb_joint_lot}' Valid options are: 'gfn2', 'gfn1', 'gfnff'")
 
         if not isinstance(self.n_conf, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_conf'")
         if not isinstance(self.max_gsm_nodes, int):
             raise ValueError("Please provide an integer value to ts_guess: 'max_gsm_nodes'")
+        if not isinstance(self.xtb_joint_force_constant, (int, float)):
+            raise ValueError("Please provide a numeric value to ts_guess: 'xtb_joint_force_constant'")
+        self.xtb_joint_force_constant = float(self.xtb_joint_force_constant)
+        if self.xtb_joint_force_constant <= 0.0:
+            raise ValueError("Please provide a positive value to ts_guess: 'xtb_joint_force_constant'")
+        if not isinstance(self.xtb_joint_scf_iters, int):
+            raise ValueError("Please provide an integer value to ts_guess: 'xtb_joint_scf_iters'")
+        if self.xtb_joint_scf_iters <= 0:
+            raise ValueError("Please provide a positive integer to ts_guess: 'xtb_joint_scf_iters'")
+        if not isinstance(self.xtb_joint_keep_files, bool):
+            raise ValueError("Please provide a boolean value to ts_guess: 'xtb_joint_keep_files'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):

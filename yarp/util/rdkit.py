@@ -266,3 +266,44 @@ def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
     opt_geom = geom_from_rdmol(rdmol)
 
     return opt_geom
+
+def rdkit_joint_opt(conformer, target_bem, target_adj, lot="uff", maxiter=200):
+    '''
+    Attempt to bias conformer geometry toward a target bond-electron matrix
+    (BEM) using RDKit.
+
+    Parameters:
+    ----------
+    conformer : conformer object
+        conformer whose geometry is biased toward target_bem
+
+    target_bem : nd array (N x N)
+        target bond-electron matrix to bias the geometry toward
+
+    target_adj : nd array (N x N)
+        adjacency matrix derived from target_bem
+
+    lot : string
+        Level of theory used for optimization
+
+    maxiter : int
+        Maximum number of optimization steps
+
+    Returns:
+    --------
+    opt_geom : nd array (N x 3) or None
+        optimized geometry, or None if RDKit could not build/optimize a mol
+        from the imposed (possibly non-physical, mid-reaction) target bonding
+    '''
+    try:
+        rdmol = yarpecule_to_rdmol(elements=conformer.elements, adj=target_adj,
+                                    bond_orders=target_bem, geo=conformer.geo)
+
+        if lot == "uff":
+            AllChem.UFFOptimizeMolecule(rdmol, maxIters=maxiter, ignoreInterfragInteractions=False)
+        elif lot == "mmff94":
+            AllChem.MMFFOptimizeMolecule(rdmol, maxIters=maxiter, ignoreInterfragInteractions=False)
+
+        return geom_from_rdmol(rdmol)
+    except (ValueError, RuntimeError):
+        return None

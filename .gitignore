@@ -4,6 +4,7 @@ debug/*
 containers/*.sif
 containers/*/*.def
 !containers/model_scorer/model_scorer.def
+!containers/joint_opt/joint_opt.def
 containers/*.tar
 containers/orca/*.tar.*
 containers/orca/example

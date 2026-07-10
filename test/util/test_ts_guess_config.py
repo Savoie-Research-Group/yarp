@@ -13,6 +13,7 @@ def test_ts_guess_config_defaults_to_openbabel_joint_opt():
     )
 
     assert cfg.joint_opt_engine == "ob"
+    assert cfg.joint_opt_image == "erm42/yarp:joint_opt"
     assert cfg.xtb_joint_lot == "gfn2"
 
 

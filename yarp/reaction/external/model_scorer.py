@@ -98,10 +98,10 @@ def get_container_prefix(job_manager, image_name, work_dir, *, apptainer_run=Fal
         )
         if not check_cmd.stdout.strip():
             subprocess.run(["docker", "pull", "--platform", "linux/amd64", image_name], check=True)
-            return (
-                "docker run --platform linux/amd64 --rm "
-                f"-v {shlex.quote(work_dir)}:/work -w /work {shlex.quote(image_name)}"
-            )
+        return (
+            "docker run --platform linux/amd64 --rm "
+            f"-v {shlex.quote(work_dir)}:/work -w /work {shlex.quote(image_name)}"
+        )
 
     if runner in {"apptainer", "singularity"}:
         sanitized = image_name.replace("/", "_").replace(":", "_")

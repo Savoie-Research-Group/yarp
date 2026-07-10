@@ -9,7 +9,7 @@ from pathlib import Path
 from ase import Atoms
 from ase.build import minimize_rotation_and_translation
 
-from yarp.reaction.conf_sampling.joint_opt import ob_joint_optimize
+from yarp.reaction.conf_sampling.joint_opt import joint_optimize
 from yarp.reaction.conf_sampling.indicator import return_indicator
 
 
@@ -30,14 +30,14 @@ def select_gsm_pairs(rxn, config):
     # biased_p: product geometries guided by reactant geometries
     # biased_r: reactant geometries guided by product geometries
     #
-    # ob_joint_optimize returns None when neither optimizer can produce a
+    # joint_optimize returns None when neither optimizer can produce a
     # geometry consistent with the target BEM (mirrors quick_geom_opt in
     # generate_rxns.py); such conformers are dropped, keeping r_confs/p_confs
     # aligned with their biased counterparts.
     if mode in ['dual', 'r_only']:
         kept_r_confs, biased_p = [], []
         for c in r_confs:
-            b = ob_joint_optimize(c, rxn.reactant.paired_bem, lot)
+            b = joint_optimize(c, rxn.reactant.paired_bem, lot)
             if b is None:
                 if verbose:
                     print(f"  + SKIPPED! Unable to bias reactant conformer toward product BEM")
@@ -48,7 +48,7 @@ def select_gsm_pairs(rxn, config):
     if mode in ['dual', 'p_only']:
         kept_p_confs, biased_r = [], []
         for c in p_confs:
-            b = ob_joint_optimize(c, rxn.product.paired_bem, lot)
+            b = joint_optimize(c, rxn.product.paired_bem, lot)
             if b is None:
                 if verbose:
                     print(f"  + SKIPPED! Unable to bias product conformer toward reactant BEM")

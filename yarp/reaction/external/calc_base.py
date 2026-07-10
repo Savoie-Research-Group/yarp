@@ -52,7 +52,7 @@ class AsyncYarpCalculator:
             env_flags = ""
             if env_vars:
                 env_flags = " ".join(f"-e {k}={v}" for k, v in env_vars.items()) + " "
-            return f"docker run --platform linux/amd64 --rm {env_flags}-v {work_dir}:/work -w /work {image_name}"
+            return f"docker run --platform linux/amd64 --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
@@ -105,7 +105,7 @@ class AsyncYarpCalculator:
             if env_vars:
                 env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"apptainer {verb} -e {env_flags}--bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"apptainer {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
 
         elif self.job_manager.container == "singularity":
             # Sanitize the image name so it works as a safe, flat filename
@@ -143,7 +143,7 @@ class AsyncYarpCalculator:
             if env_vars:
                 env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"singularity {verb} -e {env_flags}--bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"singularity {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")

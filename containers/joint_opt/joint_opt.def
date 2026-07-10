@@ -1,0 +1,41 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%files
+    containers/joint_opt/joint_opt.py /opt/yarp_joint_opt/joint_opt.py
+
+%environment
+    export CONDA_DIR=/opt/conda
+    export CONDA_DEFAULT_ENV=joint_opt
+    export PATH="/opt/conda/envs/joint_opt/bin:/opt/conda/bin:${PATH}"
+    export OMP_MAX_ACTIVE_LEVELS=1
+    export OPENBLAS_NUM_THREADS=1
+    export MKL_NUM_THREADS=1
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export CONDA_DIR=/opt/conda
+    export PATH="${CONDA_DIR}/bin:${PATH}"
+
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates wget
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p "${CONDA_DIR}"
+    rm /tmp/miniforge.sh
+
+    mamba create -n joint_opt -c conda-forge -y \
+        python=3.10 \
+        numpy \
+        openbabel \
+        xtb
+    mamba clean -afy
+
+    export PATH="${CONDA_DIR}/envs/joint_opt/bin:${PATH}"
+    python -c "from openbabel import openbabel as ob; assert ob.OBForceField.FindForceField('uff') is not None"
+    xtb --version
+
+%runscript
+    exec /bin/bash "$@"

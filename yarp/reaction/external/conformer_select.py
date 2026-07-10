@@ -27,8 +27,13 @@ class ConformerPairSelector:
         self.config = config
         self.scratch_dir = Path(scratch_dir) if scratch_dir is not None else Path.cwd() / "joint_opt"
         self.mode = config.joint_opt.lower()
-        self.joint_optimizer = make_joint_optimization_engine(config, self.scratch_dir)
         self.job_manager = job_manager
+        self.joint_optimizer = make_joint_optimization_engine(
+            config,
+            self.scratch_dir,
+            job_manager,
+            log=log,
+        )
         self.verbose = (
             getattr(config, "verbose", False)
             or os.environ.get("YARP_DEBUG_PREGSM") == "1"
@@ -104,15 +109,17 @@ class ConformerPairSelector:
         # biased_p: product geometries guided by reactant geometries
         # biased_r: reactant geometries guided by product geometries
         if self.mode in ["dual", "r_only"]:
-            biased_p = [
-                self.joint_optimizer.optimize(c, self.rxn.reactant.paired_bem, f"r_to_p_{ind:04d}")
-                for ind, c in enumerate(r_confs)
-            ]
+            biased_p = self.joint_optimizer.optimize_many(
+                r_confs,
+                self.rxn.reactant.paired_bem,
+                [f"r_to_p_{ind:04d}" for ind in range(len(r_confs))],
+            )
         if self.mode in ["dual", "p_only"]:
-            biased_r = [
-                self.joint_optimizer.optimize(c, self.rxn.product.paired_bem, f"p_to_r_{ind:04d}")
-                for ind, c in enumerate(p_confs)
-            ]
+            biased_r = self.joint_optimizer.optimize_many(
+                p_confs,
+                self.rxn.product.paired_bem,
+                [f"p_to_r_{ind:04d}" for ind in range(len(p_confs))],
+            )
 
         self._log(
             "biased endpoints "

@@ -295,6 +295,7 @@ class TSGuessConfig:
     bias_lot: str = "uff"
     joint_opt: str = "dual"
     joint_opt_engine: str = "ob"
+    joint_opt_image: str = "erm42/yarp:joint_opt"
     xtb_joint_lot: str = "gfn2"
     xtb_joint_force_constant: float = 1.0
     xtb_joint_scf_iters: int = 300
@@ -327,6 +328,8 @@ class TSGuessConfig:
             raise ValueError(f"Invalid 'joint_opt' entry: '{self.joint_opt}' Valid options are: 'dual', 'r_only', 'p_only', 'off'")
         if self.joint_opt_engine not in ['ob', 'xtb']:
             raise ValueError(f"Invalid 'joint_opt_engine' entry: '{self.joint_opt_engine}' Valid options are: 'ob', 'xtb'")
+        if not isinstance(self.joint_opt_image, str) or not self.joint_opt_image.strip():
+            raise ValueError("Please provide a non-empty string value to ts_guess: 'joint_opt_image'")
         if self.xtb_joint_lot not in ['gfn2', 'gfn1', 'gfnff']:
             raise ValueError(f"Invalid 'xtb_joint_lot' entry: '{self.xtb_joint_lot}' Valid options are: 'gfn2', 'gfn1', 'gfnff'")
 

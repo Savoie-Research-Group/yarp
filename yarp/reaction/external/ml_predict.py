@@ -89,17 +89,26 @@ class EgatMLPredict(MLPredictTask):
             rev_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
             reverse_smiles_to_hash[rev_smiles] = rxn_hash
 
+        def parse_barrier(row):
+            value = (row.get("activation_barrier") or "").strip()
+            if not value:
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
         forward_out_csv = self.scratch_dir / "forward_out.csv"
         with open(forward_out_csv, "r") as f:
             reader = csv.DictReader(f)
 
             for row in reader:
                 rxn_smiles = row["reaction_smiles"]
-                barrier = float(row["activation_barrier"])
+                barrier = parse_barrier(row)
+                if barrier is None:
+                    continue
 
-                # Retrieve the original reaction hash
                 rxn_hash = forward_smiles_to_hash.get(rxn_smiles)
-
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.barrier[self.config.model] = barrier
@@ -110,15 +119,19 @@ class EgatMLPredict(MLPredictTask):
 
             for row in reader:
                 rxn_smiles = row["reaction_smiles"]
-                barrier = float(row["activation_barrier"])
+                barrier = parse_barrier(row)
+                if barrier is None:
+                    continue
 
-                # Retrieve the original reaction hash
                 rxn_hash = reverse_smiles_to_hash.get(rxn_smiles)
-
                 if rxn_hash:
                     rxn = self.reactions[rxn_hash]
                     rxn.reverse_barrier[self.config.model] = barrier
-                    f_barrier = rxn.barrier[self.config.model]
+
+                    f_barrier = rxn.barrier.get(self.config.model)
+                    if f_barrier is None:
+                        continue
+
                     dg_rxn = barrier - f_barrier
                     rxn.dg_rxn[self.config.model] = dg_rxn
 

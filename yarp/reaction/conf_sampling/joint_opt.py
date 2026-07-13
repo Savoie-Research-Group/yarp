@@ -1,29 +1,57 @@
 import copy
+import os
 import numpy as np
-from openbabel import openbabel as ob
-from yarp.util.write_files import mol_write_yp
+from openbabel import pybel
+from rdkit.Chem import AllChem
 
-def ob_joint_optimize(conformer, target_bem, ff_name="uff"):
+from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.util.rdkit import rdkit_joint_opt
+from yarp.util.obabel import obabel_joint_opt
+
+
+def joint_optimize(conformer, target_bem, lot="uff"):
     """
-    Applies constraints based on the target BEM and runs an OpenBabel FF optimization.
-    Returns a NEW conformer object with the biased geometry.
+    Biases a conformer's geometry toward a target BEM via low-level force
+    field optimization. Returns a NEW conformer object with the biased
+    geometry, or None if no optimizer could produce a geometry consistent
+    with the target BEM's connectivity.
+
+    Mirrors the RDKit-first / Open Babel fallback pattern used by
+    yarp.reaction.generate_rxns.quick_geom_opt: RDKit is tried first, and its
+    result is only kept if the resulting geometry's connectivity matches
+    target_bem; otherwise Open Babel is tried as a fallback, and if that also
+    fails to reproduce the target connectivity, None is returned so the
+    caller can skip the pair.
     """
-    obMol = build_ob_mol(conformer.elements, conformer.geo, target_bem)
-    ff = ob.OBForceField.FindForceField(ff_name) or ob.OBForceField.FindForceField("uff")
-    if ff is None:
-        raise RuntimeError(f"OpenBabel force field not found: {ff_name} or uff")
+    target_adj = bondmat_to_adjmat(target_bem)
 
-    if not ff.Setup(obMol):
-        ff = ob.OBForceField.FindForceField("uff")
-        if ff is None or not ff.Setup(obMol):
-            raise RuntimeError("Failed to set up OpenBabel force field for joint optimization")
+    # First, attempt to bias the geometry with RDKit
+    rd_opt_g = rdkit_joint_opt(conformer, target_bem, target_adj, lot=lot)
 
-    ff.ConjugateGradients(500)
-    ff.GetCoordinates(obMol)
+    # Check if optimization reproduced the target connectivity
+    if rd_opt_g is not None:
+        rd_adj = table_generator(conformer.elements, rd_opt_g)
+        rd_diff = rd_adj - target_adj
+    if rd_opt_g is None or not np.all(rd_diff == 0):
+        # If RDKit generated a garbage geom (or failed outright), try Open Babel
+        ob_opt_g = obabel_joint_opt(conformer, target_bem, target_adj, lot=lot)
+
+        # If Open Babel fails too, we return None
+        if ob_opt_g is None:
+            return None
+        ob_adj = table_generator(conformer.elements, ob_opt_g)
+        ob_diff = ob_adj - target_adj
+        if not np.all(ob_diff == 0):
+            return None
+
+        opt_geo = ob_opt_g
+
+    # Otherwise, if RDKit gave a valid geom, use that one
+    else:
+        opt_geo = rd_opt_g
 
     biased_conf = copy.deepcopy(conformer)
-    biased_conf.geo = np.array([[obMol.GetAtom(i).GetX(), obMol.GetAtom(i).GetY(), obMol.GetAtom(i).GetZ()]
-                                for i in range(1, obMol.NumAtoms() + 1)])
+    biased_conf.geo = opt_geo
     biased_conf.type = f"biased_{conformer.type}"
 
     return biased_conf
@@ -38,28 +66,3 @@ def bondmat_to_adjmat(bond_mat):
             if count_i == count_j:
                 adj_mat[count_i][count_i] = 0.0
     return adj_mat
-
-
-def build_ob_mol(elements, coords, bond_mat):
-    """
-    Builds an OBMol object using explicit BEM bonding info.
-    """
-    adj_mat = bondmat_to_adjmat(bond_mat)
-    obMol = ob.OBMol()
-    conv = ob.OBConversion()
-    conv.SetInFormat("mol")
-
-    import os
-    import tempfile
-
-    tmp_file = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".mol", delete=False) as tmp:
-            tmp_file = tmp.name
-        mol_write_yp(tmp_file, elements, coords, bond_mat, adj_mat)
-        conv.ReadFile(obMol, tmp_file)
-    finally:
-        if tmp_file is not None:
-            os.unlink(tmp_file)
-
-    return obMol

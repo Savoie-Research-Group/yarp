@@ -74,9 +74,11 @@ class PysisyphusTSOptCalculator(TSOptTask):
         # 1. The INNER Script (Runs inside the Docker container)
         # ---------------------------------------------------------
         inner_script_path = self.scratch_dir / "run_pysis_inner.sh"
-        
+
         with open(inner_script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
+            f.write(f"export OMP_NUM_THREADS={self.config.n_cpus}\n")
+            f.write(f"export MKL_NUM_THREADS={self.config.n_cpus}\n\n")
             f.write("echo 'Starting YARP serial TSOPT execution...'\n\n")
             
             for i in range(1, self._get_num_runs() + 1):

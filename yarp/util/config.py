@@ -255,7 +255,7 @@ class ConformerConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
-
+    seed: Optional[int] = 42
 
     def __post_init__(self):
         if self.charge == None:

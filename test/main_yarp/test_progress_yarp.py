@@ -301,7 +301,7 @@ def test_handoff_scenario_1_global_to_pipeline(tmp_path, mock_calculators, mocke
     inp_mock.pipeline_tasks = {
         "ll_path.reactant_conformer": MagicMock(task_type="reactant_conformer", parent_stage="ll_path", depends_on=["egat.ml_predict"]),
         "ll_path.product_conformer": MagicMock(task_type="product_conformer", parent_stage="ll_path", depends_on=["egat.ml_predict"]),
-        "ll_path.ts_guess": MagicMock(task_type="ts_guess", parent_stage="ll_path", depends_on=["ll_path.reactant_conformer", "llpath.product_conformer"])
+        "ll_path.ts_guess": MagicMock(task_type="ts_guess", parent_stage="ll_path", depends_on=["ll_path.reactant_conformer", "ll_path.product_conformer"])
     }
     inp_mock.stage_filters = {}
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)

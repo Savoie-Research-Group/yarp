@@ -61,12 +61,13 @@ def generate_rxns(inp):
             )
 
             for prod in clean_products:
-                prod = quick_geom_opt(prod)
-                if prod is None:
+                opt_prod = quick_geom_opt(prod)
+                if opt_prod is None:
+                    prod.get_smiles()
                     if verbose:
                         print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
                     continue
-                r2p = reaction(reactant, prod)
+                r2p = reaction(reactant, opt_prod)
                 output[r2p.hash] = r2p
 
         # Enumerating from reaction object(s)
@@ -129,13 +130,14 @@ def generate_rxns(inp):
                 )
 
                 for prod in clean_products:
-                    prod = quick_geom_opt(prod)
-                    if prod is None:
+                    opt_prod = quick_geom_opt(prod)
+                    if opt_prod is None:
+                        prod.get_smiles()
                         if verbose:
                             print(f"  + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
                         continue
-                    r2p = reaction(mol, prod)
-                    p2r = reaction(mol, prod)
+                    r2p = reaction(mol, opt_prod)
+                    p2r = reaction(mol, opt_prod)
 
                     # Skip reactions already discovered (forward/reverse)
                     if r2p.hash in og_rxns_hash or p2r.hash in og_rxns_hash:

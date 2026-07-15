@@ -1,0 +1,99 @@
+initialize:
+  output: YARP_RXNS.pkl
+  status: STATUS.json
+
+  initial_structure:
+    source: "O=CCCOO"
+    type: smiles
+    mode: species
+
+  job_manager:
+    scheduler: condor
+    container: apptainer
+    sif_location: /path/to/yarp/containers
+    max_active_jobs: 50
+    job_name: yarp_condor
+    log_dir: condor_logs
+    request_disk: 8GB
+    getenv: true
+    notification: Never
+    condor_universe: vanilla
+
+enumeration:
+  mode: concerted
+  n_break: 2
+  n_form: 2
+
+stages:
+  - ll_path
+  - ll_refine
+
+ll_path:
+  method: init_rxn_path
+
+  conf_gen:
+    software: crest
+    lot: gfn2
+    charge: 0
+    n_unpaired_electrons: 0
+    energy_window: 6.0
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "02:00:00"
+
+  ts_guess:
+    software: pysisyphus
+    gsm_lot: xtb
+    charge: 0
+    multiplicity: 1
+    n_conf: 1
+    max_gsm_nodes: 30
+    bias_lot: uff
+    joint_opt: dual
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "04:00:00"
+
+ll_refine:
+  method: refine_rxn_path
+
+  initial_geom:
+    reactant:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    product:
+      label: conf_gen
+      lot: gfn2
+      software: crest
+    transition_state:
+      label: ts_guess
+      lot: xtb
+      software: pysisyphus
+
+  rp_opt:
+    software: pysisyphus
+    lot: xtb
+    charge: 0
+    multiplicity: 1
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "02:00:00"
+
+  ts_opt:
+    software: pysisyphus
+    lot: xtb
+    charge: 0
+    multiplicity: 1
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "04:00:00"
+
+  irc_val:
+    software: pysisyphus
+    lot: xtb
+    charge: 0
+    multiplicity: 1
+    n_cpus: 4
+    mem_per_cpu: 4000
+    max_runtime: "04:00:00"

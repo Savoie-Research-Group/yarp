@@ -185,6 +185,7 @@ class AsyncYarpCalculator:
             if self.job_manager.module_container:
                 f.write(f"{self.job_manager.module_container}\n\n")
 
+        # if 'condor', we don't need scheduler headers!
         # If 'local', we don't need scheduler headers!
 
     # --- Pre-flight Check (Overridden by Task classes) ---

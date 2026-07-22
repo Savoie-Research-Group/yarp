@@ -23,7 +23,7 @@ copyright = '2025, Savoie Research Group'
 author = 'Savoie Research Group'
 
 # The full version, including alpha/beta/rc tags
-release = '0.4.0'
+release = '3.0.1'
 #release = version('yarp_again')
 # for example take major/minor
 version = release

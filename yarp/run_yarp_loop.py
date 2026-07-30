@@ -33,7 +33,7 @@ def main():
         execute_counter += 1
         with open(output_file, "a") as out_f:
             result = subprocess.run(
-                ["python", str(target_script), str(work_dir)],
+                [sys.executable, "-u", str(target_script), str(work_dir)],
                 stdout=out_f,
                 stderr=subprocess.STDOUT,
                 check=False,

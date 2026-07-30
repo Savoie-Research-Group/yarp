@@ -14,6 +14,7 @@ from typing import NamedTuple
 import numpy as np
 
 from yarp.reaction.external.model_scorer import get_container_prefix
+from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.util.properties import el_radii
 
@@ -81,6 +82,8 @@ class ContainerJointOptimizationEngine(JointOptimizationEngine):
         """Optimize a conformer batch in one container process."""
         if len(conformers) != len(labels):
             raise ValueError("Each joint-optimization conformer must have exactly one label")
+        if len(set(labels)) != len(labels):
+            raise ValueError("Joint-optimization labels must be unique within a batch")
         if not conformers:
             return []
 
@@ -127,6 +130,8 @@ class ContainerJointOptimizationEngine(JointOptimizationEngine):
             raise RuntimeError(f"Joint-optimization container did not write {output_path}")
 
         output = json.loads(output_path.read_text(encoding="utf-8"))
+        if output.get("protocol_version") != 1:
+            raise RuntimeError(f"Joint-optimization container used an unsupported protocol in {output_path}")
         returned = output.get("results")
         if not isinstance(returned, list):
             raise RuntimeError(f"Joint-optimization container wrote an invalid result to {output_path}")
@@ -152,7 +157,10 @@ class ContainerJointOptimizationEngine(JointOptimizationEngine):
                 self._log(f"{label} did not converge: {item.get('error', 'unknown error')}")
                 optimized.append(None)
                 continue
-            optimized.append(self._make_biased_conformer(conformer, item, label))
+            biased = self._make_biased_conformer(conformer, item, target_bem, label)
+            if biased is None:
+                self._log(f"{label} produced geometry inconsistent with the target connectivity")
+            optimized.append(biased)
         return optimized
 
     def _make_job(self, conformer, target_bem, label):
@@ -196,7 +204,7 @@ class ContainerJointOptimizationEngine(JointOptimizationEngine):
             raise ValueError(f"Unsupported joint optimization engine: {self.engine}")
         return job
 
-    def _make_biased_conformer(self, conformer, result, label):
+    def _make_biased_conformer(self, conformer, result, target_bem, label):
         geometry = np.asarray(result.get("geo"), dtype=float)
         expected_shape = np.asarray(conformer.geo).shape
         if geometry.shape != expected_shape:
@@ -204,6 +212,14 @@ class ContainerJointOptimizationEngine(JointOptimizationEngine):
                 f"Joint-optimization result for {label} has geometry shape {geometry.shape}; "
                 f"expected {expected_shape}."
             )
+        if not np.all(np.isfinite(geometry)):
+            raise RuntimeError(f"Joint-optimization result for {label} contains non-finite coordinates.")
+
+        target_adjacency = (np.asarray(target_bem) != 0).astype(int)
+        np.fill_diagonal(target_adjacency, 0)
+        perceived_adjacency = table_generator(conformer.elements, geometry)
+        if not np.array_equal(perceived_adjacency, target_adjacency):
+            return None
 
         biased = copy.deepcopy(conformer)
         biased.geo = geometry

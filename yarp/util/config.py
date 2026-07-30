@@ -92,7 +92,7 @@ class JobManagerConfig:
             self.container = self.container.lower()
 
         # Get the proper location of apptainer containers
-        if self.container == "apptainer" and not self.sif_location:
+        if self.container in ["apptainer", "singularity"] and not self.sif_location:
             # Dynamically resolve the path relative to this file
             # __file__       == base_git_repo/yarp/util/input.py
             # .resolve()     == converts to absolute path resolving any symlinks
@@ -296,6 +296,7 @@ class TSGuessConfig:
     joint_opt: str = "dual"
     joint_opt_engine: str = "ob"
     joint_opt_image: str = "erm42/yarp:joint_opt"
+    pysis_image: str = "erm42/yarp:pysis_xtb"
     xtb_joint_lot: str = "gfn2"
     xtb_joint_force_constant: float = 1.0
     xtb_joint_scf_iters: int = 300
@@ -330,13 +331,19 @@ class TSGuessConfig:
             raise ValueError(f"Invalid 'joint_opt_engine' entry: '{self.joint_opt_engine}' Valid options are: 'ob', 'xtb'")
         if not isinstance(self.joint_opt_image, str) or not self.joint_opt_image.strip():
             raise ValueError("Please provide a non-empty string value to ts_guess: 'joint_opt_image'")
+        if not isinstance(self.pysis_image, str) or not self.pysis_image.strip():
+            raise ValueError("Please provide a non-empty string value to ts_guess: 'pysis_image'")
         if self.xtb_joint_lot not in ['gfn2', 'gfn1', 'gfnff']:
             raise ValueError(f"Invalid 'xtb_joint_lot' entry: '{self.xtb_joint_lot}' Valid options are: 'gfn2', 'gfn1', 'gfnff'")
 
         if not isinstance(self.n_conf, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_conf'")
+        if self.n_conf <= 0:
+            raise ValueError("Please provide a positive integer to ts_guess: 'n_conf'")
         if not isinstance(self.max_gsm_nodes, int):
             raise ValueError("Please provide an integer value to ts_guess: 'max_gsm_nodes'")
+        if self.max_gsm_nodes <= 0:
+            raise ValueError("Please provide a positive integer to ts_guess: 'max_gsm_nodes'")
         if not isinstance(self.xtb_joint_force_constant, (int, float)):
             raise ValueError("Please provide a numeric value to ts_guess: 'xtb_joint_force_constant'")
         self.xtb_joint_force_constant = float(self.xtb_joint_force_constant)
@@ -350,8 +357,12 @@ class TSGuessConfig:
             raise ValueError("Please provide a boolean value to ts_guess: 'xtb_joint_keep_files'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_cpus'")
+        if self.n_cpus <= 0:
+            raise ValueError("Please provide a positive integer to ts_guess: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
             raise ValueError("Please provide an integer value (in MB) to ts_guess: 'mem_per_cpu'")
+        if self.mem_per_cpu <= 0:
+            raise ValueError("Please provide a positive integer to ts_guess: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
 

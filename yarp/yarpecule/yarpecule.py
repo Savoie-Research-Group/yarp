@@ -4,8 +4,9 @@ Definition of yarpecule object class
 import os
 import re
 import numpy as np
-from openbabel import pybel
 from rdkit import Chem
+from openbabel import pybel
+
 
 from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_from_smiles
 from yarp.yarpecule.graph.adjacency import table_generator, graph_seps

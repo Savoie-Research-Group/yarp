@@ -89,14 +89,17 @@ def _write_xyz(path, elements, geometry):
 
 def _write_xcontrol(path, constraints, force_constant):
     with path.open("w", encoding="utf-8") as handle:
+        handle.write("$constrain\n")
+        handle.write(f"force constant={float(force_constant)}\n")
         for constraint in constraints:
             atom_i = int(constraint["atom_i"])
             atom_j = int(constraint["atom_j"])
             distance = float(constraint["distance"])
-            handle.write("$constrain\n")
-            handle.write(f"force constant={float(force_constant)}\n")
             handle.write(f"distance: {atom_i}, {atom_j}, {distance:.4f}\n")
-            handle.write("$\n\n")
+        handle.write("$end\n")
+        handle.write("$opt\n")
+        handle.write("engine=inertial\n")
+        handle.write("$end\n")
 
 
 def _xtb_lot_flags(lot):
@@ -118,11 +121,17 @@ def _read_xyz(path, expected_elements):
     if atom_count != len(expected_elements) or len(lines) < atom_count + 2:
         raise ValueError(f"Unexpected xyz output shape in {path}")
     geometry = []
-    for line in lines[2:atom_count + 2]:
+    for expected_element, line in zip(expected_elements, lines[2:atom_count + 2]):
         fields = line.split()
         if len(fields) < 4:
             raise ValueError(f"Malformed xyz line in {path}: {line!r}")
+        if fields[0].lower() != str(expected_element).lower():
+            raise ValueError(
+                f"Unexpected element order in {path}: expected {expected_element}, got {fields[0]}"
+            )
         geometry.append([float(fields[1]), float(fields[2]), float(fields[3])])
+    if not np.all(np.isfinite(geometry)):
+        raise ValueError(f"Non-finite coordinates in {path}")
     return geometry
 
 
@@ -163,11 +172,15 @@ def _xtb_optimize(elements, geometry, constraints, options, job_dir):
         None,
     )
     combined_output = "\n".join((result.stdout or "", result.stderr or ""))
-    if result.returncode != 0 or "GEOMETRY OPTIMIZATION CONVERGED" not in combined_output or output_xyz is None:
+    converged = (
+        "GEOMETRY OPTIMIZATION CONVERGED" in combined_output
+        or (job_dir / f".{namespace}.xtboptok").exists()
+    )
+    if result.returncode != 0 or not converged or output_xyz is None:
         detail = f"xTB exited with code {result.returncode}"
         if output_xyz is None:
             detail += "; optimized geometry was not written"
-        if "GEOMETRY OPTIMIZATION CONVERGED" not in combined_output:
+        if not converged:
             detail += "; optimization did not converge"
         raise RuntimeError(detail)
     return _read_xyz(output_xyz, elements)
@@ -187,6 +200,7 @@ def _run_job(job, jobs_dir):
     job_dir = jobs_dir / _safe_dirname(label)
     job_dir.mkdir(parents=True, exist_ok=True)
 
+    success = False
     try:
         if engine == "ob":
             optimized = _ob_optimize(elements, geometry, target_bem, formal_charges, radical_atoms, options)
@@ -195,10 +209,11 @@ def _run_job(job, jobs_dir):
         else:
             raise ValueError(f"Unsupported joint optimization engine: {engine}")
         result = {"label": label, "success": True, "geo": optimized}
+        success = True
     except Exception as exc:
         result = {"label": label, "success": False, "error": f"{type(exc).__name__}: {exc}"}
 
-    if not options.get("keep_files", False):
+    if success and not options.get("keep_files", False):
         shutil.rmtree(job_dir, ignore_errors=True)
     return result
 

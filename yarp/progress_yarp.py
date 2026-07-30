@@ -97,11 +97,11 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
     with open(work_dir / rxn_file, "wb") as f:
         pickle.dump(reactions, f)
 
-def progress_yarp(work_dir: Path, debug: bool = False):
+def progress_yarp(work_dir: Path):
     """
     Primary logic flow for managing
     """
-    print(f"Processing YARP progress in {work_dir}...", flush=True)
+    print(f"Processing YARP progress in {work_dir}...")
 
     # Load the state
     status_tracker, reactions = load_state(work_dir)
@@ -116,13 +116,13 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
     job_manager = get_job_manager(scheduler)
 
-    print(f"Jobs will be run using '{scheduler}' scheduler and '{container_runner}' containers.", flush=True)
-    print(f"Max active jobs allowed: {max_active_jobs}", flush=True)
+    print(f"Jobs will be run using '{scheduler}' scheduler and '{container_runner}' containers.")
+    print(f"Max active jobs allowed: {max_active_jobs}")
 
     # =================================================================
     # PASS 0.1: Synchronize Conformers Across Identical Species
     # =================================================================
-    print("Synchronizing conformer data across identical chemical species...", flush=True)
+    print("Synchronizing conformer data across identical chemical species...")
     species_conformer_pool = {}
 
     # 0.1.A Pool all conformers from all reactions using the unique hash
@@ -143,7 +143,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
     # =================================================================
     # PASS 0.2: Fast-Forward Previously Characterized Reactions
     # =================================================================
-    print("Performing pre-flight checks to skip already characterized reactions...", flush=True)
+    print("Performing pre-flight checks to skip already characterized reactions...")
 
     # --- PRE-COMPUTATION: Build the Reverse Dependency Graph ---
     # Find out which downstream tasks require a given upstream task
@@ -217,7 +217,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                 # Execute the fast-forward!
                 if already_done:
                     meta["status"] = "terminated_normally"
-                    print(f"   * [{rxn_hash}] \tTask '{task_id}' ({desired_key}) already characterized/synced. Fast-forwarding...", flush=True)
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' ({desired_key}) already characterized/synced. Fast-forwarding...")
 
     # 0.2.B. Fast-Forward Global Tasks
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
@@ -235,7 +235,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
                 if all_completed and len(status_tracker["reactions"]) > 0:
                      g_meta["status"] = "terminated_normally"
-                     print(f" * Global Task '{g_task_id}' (Model: {model}) already completed for all reactions. Fast-forwarding...", flush=True)
+                     print(f" * Global Task '{g_task_id}' (Model: {model}) already completed for all reactions. Fast-forwarding...")
 
     # =================================================================
     # PASS 1: Check Status of Submitted Jobs & Tally Active Jobs
@@ -275,7 +275,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
             if not job_manager.is_running(g_meta["job_id"]):
                 if calc.check_output():
-                    print(f" * Global Task '{g_task_id}' finished successfully!", flush=True)
+                    print(f" * Global Task '{g_task_id}' finished successfully!")
                     g_meta["status"] = "terminated_normally"
                     calc.scrape_data()
                     calc.cleanup()
@@ -302,16 +302,16 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
                 if job_manager.is_running(meta["job_id"]):
                     # Job is still going, add it to our tally!
-                    print(f"   * [{rxn_hash}] \tTask '{task_id}' is still running. Come back later...", flush=True)
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' is still running. Come back later...")
                     active_jobs += 1
                 else:
                     # Job finished! Time to process it.
-                    print(f"   * [{rxn_hash}] \tTask '{task_id}' finished running. Checking output...", flush=True)
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' finished running. Checking output...")
                     if calc.check_output():
                         if calc.scrape_data():
                             calc.cleanup()
                             meta["status"] = "terminated_normally"
-                            print(f"   * [{rxn_hash}] \tTask '{task_id}' completed successfully.", flush=True)
+                            print(f"   * [{rxn_hash}] \tTask '{task_id}' completed successfully.")
 
                             # --- Evaluate IRC Outcome ---
                             if task_def.task_type == "irc_validation":
@@ -329,17 +329,17 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                                     if rxn_hash not in failed_rxns:
                                         failed_rxns[rxn_hash] = rxn_obj
 
-                                    print(f"   * [{rxn_hash}] \tReaction failed IRC validation (Outcome: '{outcome}'). Routing to failed_rxns.", flush=True)
+                                    print(f"   * [{rxn_hash}] \tReaction failed IRC validation (Outcome: '{outcome}'). Routing to failed_rxns.")
                         else:
                             meta["status"] = "finished_with_error"
                             meta["error_log"] = "Data scraping failed."
                             failed_rxns[rxn_hash] = rxn_obj
-                            print(f"   * [{rxn_hash}] \tTask '{task_id}' failed during data scraping.", flush=True)
+                            print(f"   * [{rxn_hash}] \tTask '{task_id}' failed during data scraping.")
                     else:
                         meta["status"] = "finished_with_error"
                         meta["error_log"] = "Output validation failed."
                         failed_rxns[rxn_hash] = rxn_obj
-                        print(f"   * [{rxn_hash}] \tTask '{task_id}' failed output validation.", flush=True)
+                        print(f"   * [{rxn_hash}] \tTask '{task_id}' failed output validation.")
  
     # =================================================================
     # PASS 2: Update Pending Tasks to Ready
@@ -385,7 +385,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                                 # Prevent printing the error twice (once for reactant, once for product)
                                 if rxn_hash not in failed_rxns:
                                     failed_rxns[rxn_hash] = rxn_obj
-                                    print(f"   * [{rxn_hash}] \tFiltered out! {stage_filter.type} ({val:.2f}) > {stage_filter.threshold}", flush=True)
+                                    print(f"   * [{rxn_hash}] \tFiltered out! {stage_filter.type} ({val:.2f}) > {stage_filter.threshold}")
 
                                 continue # Skip setting this task to 'ready'
                         else:
@@ -395,17 +395,17 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
                             if rxn_hash not in failed_rxns:
                                 failed_rxns[rxn_hash] = rxn_obj
-                                print(f"   * [{rxn_hash}] \tPipeline aborted: Missing ML property '{stage_filter.type}' from '{stage_filter.source}'.", flush=True)
+                                print(f"   * [{rxn_hash}] \tPipeline aborted: Missing ML property '{stage_filter.type}' from '{stage_filter.source}'.")
 
                             continue # Skip setting this task to 'ready'
 
                     meta["status"] = "ready"
-                    print(f"   * [{rxn_hash}] \tTask '{task_id}' prerequisites met. Marked as READY.", flush=True)
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' prerequisites met. Marked as READY.")
 
     # =================================================================
     # PASS 3: Submit New Jobs (Respecting the Limit)
     # =================================================================
-    print(f"Current active jobs: {active_jobs} / {max_active_jobs}", flush=True)
+    print(f"Current active jobs: {active_jobs} / {max_active_jobs}")
 
     # Check for idle state: no active jobs and no remaining pending/ready tasks
     pending_or_ready = False
@@ -421,7 +421,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                 break
 
     if active_jobs == 0 and not pending_or_ready:
-        print("No active or pending tasks remain; YARP has reached a quiescent state.", flush=True)
+        print("No active or pending tasks remain; YARP has reached a quiescent state.")
 
     # =================================================================
     # PASS 3.1: Submit New GLOBAL Jobs
@@ -429,7 +429,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
     for g_task_id, g_meta in status_tracker.get("global_tasks", {}).items():
         # Global limit check
         if active_jobs >= max_active_jobs:
-            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.", flush=True)
+            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.")
             break
 
         if g_meta["status"] == "ready":
@@ -442,10 +442,10 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
             if not calc.has_prerequisites():
                 g_meta["status"] = "finished_with_error"
-                print(f" * Global Task '{g_task_id}' aborted: Pre-flight check failed.", flush=True)
+                print(f" * Global Task '{g_task_id}' aborted: Pre-flight check failed.")
                 continue
 
-            print(f" * Submitting global task '{g_task_id}'...", flush=True)
+            print(f" * Submitting global task '{g_task_id}'...")
             calc.generate_input()
             script_path = calc.write_submission_script()
 
@@ -466,7 +466,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
         # Global limit check
         if active_jobs >= max_active_jobs:
-            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.", flush=True)
+            print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.")
             break
 
         rxn_obj = reactions.get(rxn_hash)
@@ -492,8 +492,7 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                         if registry_key in active_species_tasks:
                             # Silently skip submission! Another identical species is doing the work.
                             # It remains "ready" and will be fast-forwarded in PASS 0 on a future loop.
-                            if debug:
-                                print(f"   [DEBUG] ---> Blocked! Identical species calculation already active.")
+                            print(f"   [DEBUG] ---> Blocked! Identical species calculation already active.")
                             continue
                         else:
                             # We are the "leader"! Claim this species/task combo.
@@ -509,11 +508,11 @@ def progress_yarp(work_dir: Path, debug: bool = False):
                     meta["status"] = "finished_with_error"
                     meta["error_log"] = "Pre-flight check failed: Missing required data in reaction object."
                     failed_rxns[rxn_hash] = rxn_obj
-                    print(f"   * [{rxn_hash}] \tTask '{task_id}' aborted: Pre-flight check failed.", flush=True)
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' aborted: Pre-flight check failed.")
                     continue
 
                 # Generate and Submit
-                print(f"   * [{rxn_hash}] \tSubmitting task '{task_id}'...", flush=True)
+                print(f"   * [{rxn_hash}] \tSubmitting task '{task_id}'...")
                 calc.generate_input()
                 script_path = calc.write_submission_script()
 
@@ -535,8 +534,8 @@ def progress_yarp(work_dir: Path, debug: bool = False):
 
     # Write all updates back to disk
     save_state(work_dir, status_tracker, reactions, failed_rxns)
-    print("YARP progress tracking complete.", flush=True)
-    print(f"======================\n", flush=True)
+    print("YARP progress tracking complete.")
+    print(f"======================\n")
 
 def main():
     print("Launching YARP job submitter: yarp-progress")

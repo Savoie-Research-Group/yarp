@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import fnmatch
 import pickle
@@ -6,6 +7,7 @@ import json
 import subprocess
 import traceback
 import signal
+import sys
 import time
 from pathlib import Path
 
@@ -13,6 +15,18 @@ from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.conformer_select import ConformerPairSelector
+from yarp.reaction.external.model_scorer import get_container_prefix
+
+_GSM_HEI_BARRIER_RE = re.compile(r"\(E_hei-E_0\)=\s*([-\d.]+)\s*kJ/mol")
+_GSM_EARLY_STOP_MSG = "too similar. Stopping optimization!"
+
+
+def _parse_gsm_quality(log_text: str):
+    """Return whether GSM stalled and its final HEI barrier estimate."""
+    early_stop = _GSM_EARLY_STOP_MSG in log_text
+    matches = _GSM_HEI_BARRIER_RE.findall(log_text)
+    hei_barrier_kjmol = float(matches[-1]) if matches else None
+    return early_stop, hei_barrier_kjmol
 
 class TSGuessTask(AsyncYarpCalculator):
     def has_prerequisites(self) -> bool:
@@ -80,7 +94,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 ">> gsm_lifecycle.log' EXIT\n"
             )
             f.write(
-                "python -c \""
+                f"{sys.executable} -c \""
                 "from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator; "
                 f"PysisyphusTSGuessCalculator.run_host('{self.scratch_dir / 'payload.pkl'}')"
                 "\" > container.out 2> container.err\n"
@@ -120,6 +134,14 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             if "Wrote splined HEI" not in log_text or "pysisyphus run took" not in log_text:
                 print(f"     ! Run {i} failed: Did not find successful termination message in log. Try increasing mem_per_cpu for tasks using 'pysisyphus'.")
                 continue
+
+            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
+            if early_stop:
+                barrier_str = f"{hei_barrier_kjmol:.1f} kJ/mol" if hei_barrier_kjmol is not None else "unknown"
+                print(
+                    f"     ! Run {i} warning: GSM string images collapsed before converging "
+                    f"(stalled barrier estimate {barrier_str}). TS guess may not represent the true reaction path."
+                )
 
             # If it passes all checks, at least one run succeeded!
             one_successful = True
@@ -161,8 +183,9 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
                 continue
             with open(log_file, "r") as f:
-                if "Wrote splined HEI" not in f.read():
-                    continue
+                log_text = f.read()
+            if "Wrote splined HEI" not in log_text:
+                continue
             # ---------------------------------------------------------
 
             # Parse and store the splined TS guess
@@ -174,6 +197,9 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             ts_conf.lot = self.config.gsm_lot
             ts_conf.software = self.config.software
             ts_conf.type = f"ts_guess_{i}_{ts_conf.lot}_{ts_conf.software}"
+            early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
+            ts_conf.properties["gsm_early_stop"] = early_stop
+            ts_conf.properties["gsm_hei_barrier_kjmol"] = hei_barrier_kjmol
             
             # Store in the reaction object's TS dictionary
             self.rxn.ts_geom[ts_conf.type] = ts_conf
@@ -300,16 +326,19 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         return max(60, int(total * 0.8 / n_pairs))
 
     @staticmethod
-    def _run_pysis(pair_dir, inp_name, out_path, err_path, timeout_s, log):
+    def _run_pysis(pair_dir, inp_name, out_path, err_path, timeout_s, log, job_manager, image_name):
         start = time.time()
+        prefix = get_container_prefix(job_manager, image_name, str(pair_dir))
+        command = f"{prefix} pysis /work/{inp_name}"
         with out_path.open("w", encoding="utf-8") as out:
             with err_path.open("w", encoding="utf-8") as err:
                 proc = subprocess.Popen(
-                    ["pysis", inp_name],
+                    command,
                     cwd=pair_dir,
                     stdout=out,
                     stderr=err,
                     text=True,
+                    shell=True,
                     start_new_session=True,
                 )
                 print(
@@ -457,6 +486,8 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                         pair_dir / f"gsm_{idx}.err",
                         timeout_s,
                         log,
+                        job_manager,
+                        getattr(config, "pysis_image", "erm42/yarp:pysis_xtb"),
                     )
                     if ok:
                         any_success = True

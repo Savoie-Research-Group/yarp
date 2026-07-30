@@ -56,6 +56,7 @@ def test_container_engine_sends_one_batch_and_rehydrates_conformers(monkeypatch,
         (work_dir / "output.json").write_text(
             json.dumps(
                 {
+                    "protocol_version": 1,
                     "results": [
                         {"label": "a", "success": True, "geo": [[0, 0, 0], [1.1, 0, 0]]},
                         {"label": "b", "success": False, "error": "not converged"},
@@ -73,4 +74,40 @@ def test_container_engine_sends_one_batch_and_rehydrates_conformers(monkeypatch,
     assert optimized[0].type == "biased_xtb_conf_a"
     assert optimized[0].software == "xtb"
     assert optimized[0].lot == "gfn2"
-    np.testing.assert_allclose(optimized[0].geo, [[0, 0, 0], [1.1, 0, 0]])
+    assert np.allclose(optimized[0].geo, [[0, 0, 0], [1.1, 0, 0]])
+
+
+def test_container_engine_rejects_wrong_connectivity(monkeypatch, tmp_path):
+    config = SimpleNamespace(
+        joint_opt_engine="xtb",
+        joint_opt_image="example/joint_opt:test",
+        xtb_joint_keep_files=False,
+        xtb_joint_lot="gfn2",
+        charge=0,
+        multiplicity=1,
+        n_cpus=1,
+        xtb_joint_force_constant=1.0,
+        xtb_joint_scf_iters=300,
+        bias_lot="uff",
+    )
+    conformer = SimpleNamespace(
+        elements=["C", "H"],
+        geo=np.array([[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]]),
+        type="conf",
+        lot="crest",
+        software="crest",
+    )
+
+    engine = joint_opt.ContainerJointOptimizationEngine(
+        SimpleNamespace(container="docker"), tmp_path, config
+    )
+    monkeypatch.setattr(joint_opt, "table_generator", lambda *_: np.zeros((2, 2), dtype=int))
+
+    biased = engine._make_biased_conformer(
+        conformer,
+        {"geo": [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]]},
+        np.array([[0, 1], [1, 0]]),
+        "bad-connectivity",
+    )
+
+    assert biased is None

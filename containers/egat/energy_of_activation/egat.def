@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%post
+    set -eux
+    apt-get -y update
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends \
+        ca-certificates \
+        bzip2 \
+        wget \
+    ;
+    rm -rf /var/lib/apt/lists/*
+
+    mkdir -p /opt/micromamba/bin
+    wget -qO- "https://micro.mamba.pm/api/micromamba/linux-64/latest" | tar -xvj -C /opt/micromamba/bin --strip-components=1 bin/micromamba
+
+    # Create env from environment.yml (or use environment_exported.yml if provided via %files)
+    /opt/micromamba/bin/micromamba create -y -p /opt/egat-env \
+        -c conda-forge -c pytorch -c dglteam/label/th24_cpu \
+        python=3.11 pip numpy pandas scipy omegaconf rdkit openbabel ase \
+        pytorch=2.4.* cpuonly dgl=2.4.* ipython xgboost pytest
+    /opt/micromamba/bin/micromamba clean -a -y
+
+    mkdir -p /opt/egat
+    chmod +x /opt/egat/egat_predict_reaction_csv.py 2>/dev/null || true
+
+%environment
+    export LC_ALL=C
+    export PATH="/opt/micromamba/bin:${PATH}"
+    export MAMBA_ROOT_PREFIX="/opt/micromamba"
+    export PYTHONNOUSERSITE=1
+    export PYTHONPATH="/opt/egat/src:${PYTHONPATH}"
+
+%files
+    # Self-contained EGAT_container (no yarp)
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/src /opt/egat/src
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/egat_predict_reaction_csv.py /opt/egat/egat_predict_reaction_csv.py
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/models /opt/egat/models
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/tests /opt/egat/tests
+    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/environment.yml /opt/egat/environment.yml
+
+%runscript
+    set -e
+    exec /opt/micromamba/bin/micromamba run -p /opt/egat-env \
+        python /opt/egat/egat_predict_reaction_csv.py "$@"

@@ -1,0 +1,21 @@
+name: egat-container
+channels:
+  - conda-forge
+  - pytorch
+  - dglteam/label/th24_cpu
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - omegaconf
+  - rdkit
+  - openbabel
+  - ase
+  - pytorch=2.4.*
+  - cpuonly
+  - dgl=2.4.*
+  - ipython
+  - xgboost
+  - pytest

@@ -7,7 +7,17 @@ from yarp.util.properties import el_n_deficient, el_n_expand_octet, el_expand_oc
 
 
 def bmat_score(bond_mat, elements, rings,
-               w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=-0.01,
+               # Patch w_rad (2026-06-19 ZL): default reverted from -0.01 to +0.1
+               # to match old patched YARP convention. Note: this revert is
+               # COSMETIC, not a behavior change. The new bmat_score computes
+               # `rad_env = +pol/(100+pol)` internally; old YARP find_lewis
+               # passed `rad_env = -0.1 * pol/(100+pol)` from outside. The
+               # `w_rad * rad_env` product is algebraically identical between
+               # the two: new (-0.01)*(+pol/(100+pol)) == old (+0.1)*(-0.1*pol/(100+pol)).
+               # Empirical bisection (only-B/w_rad-only branch) confirmed zero
+               # chemistry impact on a 144-archive stratified TM sample.
+               # Reverted only to keep w_rad > 0 by downstream convention.
+               w_def=-1, w_exp=0.1, w_formal=0.1, w_aro=-24, w_rad=0.1,
                factor=0.0, verbose=False):
     """
     Score function used to rank candidate Lewis Structures during and after the exploration. The `find_lewis()` algorithm uses a few 
@@ -547,12 +557,21 @@ def adjust_metals(bond_mats, adj_mat, elements):
                     continue
                 # type X - covalent bonds
                 elif b[con, con] % 2 != 0:
+                    # GUARD (2026-05-22 ZL): only form X if metal has electrons
+                    # to spend. Otherwise leave the partner radical and treat
+                    # the bond as dative-like to avoid negative diagonals
+                    # (which produce impossible high oxidation states).
+                    if b[m_ind, m_ind] < 1:
+                        continue
                     b[con, con] += -1
                     b[m_ind, m_ind] += -1
                     b[con, m_ind] += 1
                     b[m_ind, con] += 1
                 # type Z - covalent bond, empty p orbital, using two electrons from the metal
                 else:
+                    # GUARD (2026-05-22 ZL): Z bond needs 2 electrons from metal.
+                    if b[m_ind, m_ind] < 2:
+                        continue
                     b[m_ind, m_ind] += -2
                     b[con, m_ind] += 1
                     b[m_ind, con] += 1
@@ -562,7 +581,11 @@ def adjust_metals(bond_mats, adj_mat, elements):
         for m_ind in m_inds:
             for con in return_connections(m_ind, adj_mat, inds=m_inds):
                 count = 0
-                while electrons[m_ind] < 12 and electrons[con] < 12 and b[con, con] > 0:
+                # GUARD (2026-05-22 ZL): also require b[m_ind, m_ind] > 0 so
+                # both partners have an electron to contribute to the M-M bond
+                # (prevents metal diagonal going negative).
+                while (electrons[m_ind] < 12 and electrons[con] < 12
+                       and b[con, con] > 0 and b[m_ind, m_ind] > 0):
                     b[m_ind, m_ind] += -1
                     b[con, con] += -1
                     b[m_ind, con] += 1

@@ -80,8 +80,11 @@ class PysisyphusMinOptCalculator(MinOptTask):
         """Write the bash script that the JobManager will execute."""
         script_path = self.scratch_dir / "run_pysis_rpopt.sh"
 
-        # Construct the core command
-        prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
+        env_vars = {
+            "OMP_NUM_THREADS": self.config.n_cpus,
+            "MKL_NUM_THREADS": self.config.n_cpus,
+        }
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir, env_vars=env_vars)
         pysis_cmd = "pysis min_opt.yaml > min_opt.log 2> min_opt.err"
         full_command = f"{prefix} {pysis_cmd}"
 

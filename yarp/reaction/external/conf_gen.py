@@ -37,8 +37,16 @@ class CrestConfCalculator(ConfTask):
         """Write the bash script that the JobManager will execute."""
         script_path = self.scratch_dir / "run_crest_cmd.sh"
 
-        # Construct the core command
-        prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
+        # When a seed is set, pin OMP/MKL threads inside the container so xTB's
+        # geometry optimizations use the same thread count as CREST's -T setting.
+        env_vars = None
+        if self.config.seed is not None:
+            env_vars = {
+                "OMP_NUM_THREADS": self.config.n_cpus,
+                "MKL_NUM_THREADS": self.config.n_cpus,
+            }
+
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir, env_vars=env_vars)
         crest_cmd = self._get_crest_command()
         full_command = f"{prefix} {crest_cmd}"
 
@@ -47,7 +55,6 @@ class CrestConfCalculator(ConfTask):
                 f.write("#!/bin/bash\n")
                 self.write_scheduler_headers(f)
                 f.write(f"cd {self.scratch_dir}\n")
-                # Pipe output to a log file so it doesn't flood the local terminal
                 f.write(f"{full_command} > crest_run.log 2> crest_run.err\n")
         except PermissionError:
             raise PermissionError(
@@ -137,6 +144,9 @@ class CrestConfCalculator(ConfTask):
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"
+
+        if self.config.seed is not None:
+            cmd += f" --seed {self.config.seed}"
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!

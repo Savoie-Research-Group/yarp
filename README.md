@@ -4,7 +4,7 @@ High throughput reaction characterization engine for the exploration of chemical
 
 <img src="images/yarp_3.0_logo.png" alt="YARP 3.0 Overview" width="500">
 
-Here is the available functionality for YARP version 3.0.0:
+Here is the available functionality for YARP version 3.0.1:
 - Visualize and manipulate molecules with yarpecules
 - Perform multiple cycles of break-n, form-m product enumeration to generate chemical reaction networks
 - Estimate forward and reverse reaction barriers with the Savoie Group's EGAT model trained on the RGD1 database
@@ -27,7 +27,7 @@ git clone git@github.com:Savoie-Research-Group/yarp.git
 
 For the latest stable release, you can access the following tag:
 ```bash
-git checkout v3.0.0
+git checkout v3.0.1
 ```
 
 Once you have your desired source code version,

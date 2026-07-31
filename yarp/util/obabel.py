@@ -51,3 +51,56 @@ def obabel_ff_opt(molecule, lot="uff", maxiter=500):
         opt_geom[count_i] = mol.atoms[count_i].coords
 
     return opt_geom
+
+def obabel_joint_opt(conformer, target_bem, target_adj, lot="uff", maxiter=500):
+    '''
+    Attempt to bias conformer geometry toward a target bond-electron matrix
+    (BEM) using Open Babel.
+
+    Parameters
+    ----------
+    conformer : conformer object
+        conformer whose geometry is biased toward target_bem
+
+    target_bem : nd array (N x N)
+        target bond-electron matrix to bias the geometry toward
+
+    target_adj : nd array (N x N)
+        adjacency matrix derived from target_bem
+
+    lot : string
+        Force field used for optimization
+
+    maxiter : int
+        Maximum number of optimization steps
+
+    Returns
+    -------
+    opt_geom : nd array (N x 3) or None
+        optimized geometry, or None if Open Babel could not set up/optimize a
+        force field for the imposed target bonding
+
+    Notes
+    -----
+    Mirrors quick_geom_opt's Open Babel fallback (obabel_ff_opt): writes a
+    temporary mol file with the imposed target bonding and optimizes it via
+    pybel's `localopt`, so both fallbacks behave identically instead of
+    diverging on which part of the Open Babel API they happen to call.
+    '''
+    mol_file = '.tmp_joint.mol'
+    try:
+        mol_write_yp(mol_file, conformer.elements, conformer.geo, target_bem, target_adj)
+
+        mol = next(pybel.readfile("mol", mol_file))
+        mol.localopt(forcefield=lot, steps=maxiter)
+
+        opt_geo = np.zeros_like(conformer.geo)
+        for count_i, i in enumerate(opt_geo):
+            opt_geo[count_i] = mol.atoms[count_i].coords
+
+        return opt_geo
+    except (ValueError, RuntimeError):
+        return None
+    finally:
+        if os.path.exists(mol_file):
+            os.remove(mol_file)

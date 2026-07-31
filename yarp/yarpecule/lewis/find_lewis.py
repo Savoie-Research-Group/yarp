@@ -200,9 +200,13 @@ def gen_init(obj_fun, adj_mat, elements, rings, q):
         yield obj_fun(bond_mat), bond_mat, reactive
 
 
+# Defaults rolled back 2026-06-12 ZL: upstream bumped N_score=100 → 1000 and
+# counter=0 → 100 (which by itself would break immediately if N_score is also
+# 100). The production OS recalculation pipeline ran with N_score=100, so the
+# old behavior is restored here.
 def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
                      reactive, rings, ring_atoms, bridgeheads, seps, min_score,
-                     ind=0, counter=100, N_score=1000, N_max=10000, min_opt=False, min_win=False):
+                     ind=0, counter=0, N_score=100, N_max=10000, min_opt=False, min_win=False):
     """ 
     A generator for Lewis search algorithm that recursively applies a set of valid bond-electron moves to find all relevant resonance structures. 
 
@@ -282,33 +286,61 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
 
     # Loop over all possible moves, recursively calling this function to account for the order dependence.
     # This could get very expensive very quickly, but with a well-curated moveset things are still very quick for most tested chemistries.
-    for ind in range(0, len(bond_mats)):
-        for j in valid_moves(bond_mats[ind], elements, reactive, rings, ring_atoms, bridgeheads, seps):
+    # Patch C (2026-06-12 ZL): removed the outer `for ind in range(0, len(bond_mats)):`
+    # loop to match old-YARP patched behavior (GH commit fed9385). The body of `for j`
+    # now runs once per call against `bond_mats[ind]` only — `ind` is the function
+    # parameter, set to `len(bond_mats)-1` by every recursive call site, so each call
+    # operates on the newly added BEM.
+    #
+    # PERFORMANCE: the old outer loop re-walked every BEM in the running pool at every
+    # recursion depth, causing exponential blow-up of redundant work. Removing it gives
+    # ~10x speedup on the 144-archive TM stratified bench (32,972s -> 1,718s wall when
+    # this patch is applied in isolation). NOT a bug — do not restore the outer loop.
+    # The single-`for j` form is correct because the caller already passes
+    # `ind = len(bond_mats)-1` to indicate which BEM to expand.
+    for j in valid_moves(bond_mats[ind], elements, reactive, rings, ring_atoms, bridgeheads, seps):
 
-            # Carry out moves on trial bond_mat
-            tmp = copy(bond_mats[ind])
-            for k in j:
-                tmp[k[1], k[2]] += k[0]
+        # Carry out moves on trial bond_mat
+        tmp = copy(bond_mats[ind])
+        for k in j:
+            tmp[k[1], k[2]] += k[0]
 
-            # calc objective function and hash value
-            score = obj_fun(tmp)
-            b_hash = bmat_hash(tmp)
+        # calc objective function and hash value
+        score = obj_fun(tmp)
+        b_hash = bmat_hash(tmp)
 
-            # Check if a new best Lewis structure has been found, if so, then reset counter and record new best score
-            if score <= min_score:
-                counter = 0
-                min_score = score
-            else:
-                counter += 1
+        # Check if a new best Lewis structure has been found, if so, then reset counter and record new best score
+        if score <= min_score:
+            counter = 0
+            min_score = score
+        else:
+            counter += 1
 
-            # Break if too long (> N_score) has passed without finding a better Lewis structure
-            if counter >= N_score:
-                return bond_mats, scores, hashes, min_score, counter
+        # Break if too long (> N_score) has passed without finding a better Lewis structure
+        if counter >= N_score:
+            return bond_mats, scores, hashes, min_score, counter
 
-            # If min_opt=True then the search is run in a greedy mode where only moves that reduce the score are accepted
-            if min_opt:
+        # If min_opt=True then the search is run in a greedy mode where only moves that reduce the score are accepted
+        if min_opt:
 
-                if counter == 0:
+            if counter == 0:
+                # Check that the resulting bond_mat is not already in the existing bond_mats
+                if b_hash not in hashes:
+                    bond_mats += [tmp]
+                    scores += [score]
+                    hashes.add(b_hash)
+
+                    # Recursively call this function with the updated bond_mat resulting from this iteration's move.
+                    bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                                                                                     reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                                                                                     ind=len(bond_mats)-1, counter=counter, N_score=N_score,
+                                                                                     N_max=N_max, min_opt=min_opt, min_win=min_win)
+
+        else:
+            # min_win option allows the search to follow structures that increase the score up to min_win above the score of the best structure
+            if min_win:
+                if (score-min_score) < min_win:
+
                     # Check that the resulting bond_mat is not already in the existing bond_mats
                     if b_hash not in hashes:
                         bond_mats += [tmp]
@@ -321,42 +353,25 @@ def gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
                                                                                          ind=len(bond_mats)-1, counter=counter, N_score=N_score,
                                                                                          N_max=N_max, min_opt=min_opt, min_win=min_win)
 
+            # otherwise all structures are recursively explored (can be very expensive)
             else:
-                # min_win option allows the search to follow structures that increase the score up to min_win above the score of the best structure
-                if min_win:
-                    if (score-min_score) < min_win:
 
-                        # Check that the resulting bond_mat is not already in the existing bond_mats
-                        if b_hash not in hashes:
-                            bond_mats += [tmp]
-                            scores += [score]
-                            hashes.add(b_hash)
+                # Check that the resulting bond_mat is not already in the existing bond_mats
+                if b_hash not in hashes:
 
-                            # Recursively call this function with the updated bond_mat resulting from this iteration's move.
-                            bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
-                                                                                             reactive, rings, ring_atoms, bridgeheads, seps, min_score,
-                                                                                             ind=len(bond_mats)-1, counter=counter, N_score=N_score,
-                                                                                             N_max=N_max, min_opt=min_opt, min_win=min_win)
+                    bond_mats += [tmp]
+                    scores += [score]
+                    hashes.add(b_hash)
 
-                # otherwise all structures are recursively explored (can be very expensive)
-                else:
+                    # Recursively call this function with the updated bond_mat resulting from this iteration's move.
+                    bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
+                                                                                     reactive, rings, ring_atoms, bridgeheads, seps, min_score,
+                                                                                     ind=len(bond_mats)-1, counter=counter, N_score=N_score,
+                                                                                     N_max=N_max, min_opt=min_opt, min_win=min_win)
 
-                    # Check that the resulting bond_mat is not already in the existing bond_mats
-                    if b_hash not in hashes:
-
-                        bond_mats += [tmp]
-                        scores += [score]
-                        hashes.add(b_hash)
-
-                        # Recursively call this function with the updated bond_mat resulting from this iteration's move.
-                        bond_mats, scores, hashes, min_score, counter = gen_all_lstructs(obj_fun, bond_mats, scores, hashes, elements,
-                                                                                         reactive, rings, ring_atoms, bridgeheads, seps, min_score,
-                                                                                         ind=len(bond_mats)-1, counter=counter, N_score=N_score,
-                                                                                         N_max=N_max, min_opt=min_opt, min_win=min_win)
-
-            # Break if max has been encountered.
-            if len(bond_mats) > N_max:
-                return bond_mats, scores, hashes, min_score, counter
+        # Break if max has been encountered.
+        if len(bond_mats) > N_max:
+            return bond_mats, scores, hashes, min_score, counter
 
     return bond_mats, scores, hashes, min_score, counter
 
@@ -439,11 +454,23 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
                     for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
                         yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j), (-2, i, i), (2, k, k)]
 
-            if bond_mat[i, i] % 2 != 0:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    if bond_mat[j, j] % 2 != 0:
-                        for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
-                            yield [(-1, i, i), (-1, j, j), (1, i, j), (1, j, i)]
+            # Patch D (2026-06-12 ZL): removed "move 4-bis" (radical-radical
+            # bond formation) to match old-YARP patched behavior
+            # (GH commit fed9385). The yield block below was:
+            #     if bond_mat[i,i] % 2 != 0:
+            #         for j in return_connections(i, bond_mat, inds=reactive):
+            #             if bond_mat[j,j] % 2 != 0:
+            #                 for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
+            #                     yield [(-1,i,i),(-1,j,j),(1,i,j),(1,j,i)]
+            #
+            # WHY: the inner `for k` loop iterates over candidate neighbors of `j`,
+            # but `k` is NEVER USED in the yielded move (which only references
+            # i and j). The block therefore emits the SAME (i,j) radical-coupling
+            # move once per qualifying `k` neighbor — pure duplicates that just
+            # bloat the search. The proper radical-radical bond formation case
+            # is already covered by Move 4 below (which IS the move's intended
+            # form). Looks like leftover experimental code that never got pruned.
+
             # Move 4: i has a radical and a neighbor with unbound electrons, form a bond between i and the neighbor
             if bond_mat[i, i] % 2 != 0 and (el_expand_octet[elements[i]] or e[i] < el_n_deficient[elements[i]]):
 

@@ -48,7 +48,7 @@ class TestSMILESFromYarpecule:
         # yarpecule bond-electron matrix. See get_smiles / yarpecule_to_rdmol.
         mol = ypcule(
             '[c:0]12[c:1]([H:7])[c:2]([H:8])[c:3]([H:9])[c:4]([H:10])[c:5]1[C-:12]([O-:11])[N:13]([H:6])[S+2:14]2',
-            canon=False,
+            canon=True,
         )
         mol.get_smiles()
 

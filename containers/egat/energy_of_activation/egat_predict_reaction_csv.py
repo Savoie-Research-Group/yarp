@@ -5,8 +5,17 @@ Self-contained: uses only EGAT_container/src modules.
 """
 import argparse
 import sys
+import os
 import tempfile
 from pathlib import Path
+
+# Thread env must be set before numpy/torch import. ~8 is the CPU sweet spot for
+# these small graphs (more threads add overhead). Override with --threads.
+_DEFAULT_THREADS = min(8, os.cpu_count() or 1)
+if "EGAT_THREADS" in os.environ:
+    _DEFAULT_THREADS = int(os.environ["EGAT_THREADS"])
+for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, str(_DEFAULT_THREADS))
 
 import numpy as np
 import pandas as pd
@@ -96,7 +105,11 @@ def main():
     p.add_argument("--no-activation", action="store_true", help="Skip activation barrier")
     p.add_argument("--no-enthalpy", action="store_true", help="Skip reaction enthalpy")
     p.add_argument("--self-test", action="store_true", help="Run smoke test")
+    p.add_argument("--threads", type=int, default=_DEFAULT_THREADS,
+                       help=f"Torch intra-op threads (default {_DEFAULT_THREADS}; ~8 is fastest).")
     args = p.parse_args()
+
+    torch.set_num_threads(max(1, args.threads))
 
     if args.self_test:
         sample_csv = _EGAT_ROOT / "examples" / "sample_reactions.csv"

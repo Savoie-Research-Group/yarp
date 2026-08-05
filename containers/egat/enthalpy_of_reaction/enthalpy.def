@@ -31,12 +31,12 @@ From: ubuntu:22.04
 
 %files
     # Self-contained enthalpy-of-reaction EGAT model
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/src /opt/egat/src
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/predict_enthalpy_csv.py /opt/egat/predict_enthalpy_csv.py
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/models /opt/egat/models
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/examples /opt/egat/examples
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/tests /opt/egat/tests
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/enthalpy_of_reaction/environment.yml /opt/egat/environment.yml
+    src /opt/egat/src
+    predict_enthalpy_csv.py /opt/egat/predict_enthalpy_csv.py
+    models /opt/egat/models
+    examples /opt/egat/examples
+    tests /opt/egat/tests
+    environment.yml /opt/egat/environment.yml
 
 %runscript
     set -e

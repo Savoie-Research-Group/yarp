@@ -33,11 +33,11 @@ From: ubuntu:22.04
 
 %files
     # Self-contained EGAT_container (no yarp)
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/src /opt/egat/src
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/egat_predict_reaction_csv.py /opt/egat/egat_predict_reaction_csv.py
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/models /opt/egat/models
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/tests /opt/egat/tests
-    /groups/bsavoie2/bpiguave/yarp-again/EGAT_container/environment.yml /opt/egat/environment.yml
+    src /opt/egat/src
+    egat_predict_reaction_csv.py /opt/egat/egat_predict_reaction_csv.py
+    models /opt/egat/models
+    tests /opt/egat/tests
+    environment.yml /opt/egat/environment.yml
 
 %runscript
     set -e

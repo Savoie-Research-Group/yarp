@@ -64,7 +64,7 @@ def compute_distance(smi1, smi2, metric='soergel'):
     elif metric == 'maccs_tanimoto_distance':
         dist = maccs_tanimoto_distance(smi1, smi2)
     elif metric == 'mcs_bond_edit_distance':
-        dist = mcs_bond_edit_distance(smi1, smi2, ringMatchesRingOnly=False)
+        dist = mcs_bond_edit_distance(smi1, smi2)
     elif metric == 'am_ged':
         dist = atom_map_ged(smi1, smi2)
     elif metric == 'cost_aware_ged':
@@ -75,24 +75,27 @@ def compute_distance(smi1, smi2, metric='soergel'):
     return dist
 
 def soergel(smi1, smi2):
-    mol1 = Chem.MolFromSmiles(smi1)
-    mol2 = Chem.MolFromSmiles(smi2)
+    try:
+        mol1 = Chem.MolFromSmiles(smi1)
+        mol2 = Chem.MolFromSmiles(smi2)
 
-    # Create a Morgan fingerprint generator (radius 2, 2048 bits)
-    generator = GetMorganGenerator(
-        radius=2, fpSize=2048, includeChirality=False)
+        # Create a Morgan fingerprint generator (radius 2, 2048 bits)
+        generator = GetMorganGenerator(
+            radius=2, fpSize=2048, includeChirality=False)
 
-    # Generate fingerprints
-    fp1 = generator.GetFingerprint(mol1)
-    fp2 = generator.GetFingerprint(mol2)
+        # Generate fingerprints
+        fp1 = generator.GetFingerprint(mol1)
+        fp2 = generator.GetFingerprint(mol2)
 
-    # Compute Tanimoto similarity
-    similarity = TanimotoSimilarity(fp1, fp2)
+        # Compute Tanimoto similarity
+        similarity = TanimotoSimilarity(fp1, fp2)
 
-    # Convert to Soergel distance
-    distance = 1.0 - similarity
+        # Convert to Soergel distance
+        distance = 1.0 - similarity
 
-    return distance
+        return distance
+    except Exception as e:
+        return np.nan
 
 def delta_bertz(smi_1,smi_2):
     """Absolute difference in RDKit Bertz topological complexity."""
@@ -104,7 +107,7 @@ def delta_bertz(smi_1,smi_2):
         v2 = float(GraphDescriptors.BertzCT(m2))
         return abs(v1 - v2)
     except Exception as e:
-        return None
+        return np.nan
     
 def crippen_diff(smi1, smi2):
     """Absolute difference in Crippen logP."""
@@ -115,7 +118,7 @@ def crippen_diff(smi1, smi2):
         v2 = Crippen.MolMR(m2)
         return float(abs(v1 - v2))
     except Exception as e:
-        return None
+        return np.nan
     
 def delta_tpsa(smi_1: str, smi_2: str):
     """Absolute difference in Topological Polar Surface Area (TPSA)."""
@@ -126,7 +129,7 @@ def delta_tpsa(smi_1: str, smi_2: str):
         v2 = rdMolDescriptors.CalcTPSA(m2)
         return float(abs(v1 - v2))
     except Exception as e:
-        return None
+        return np.nan
 
 def approx_dipole_magnitude(smi_1, smi_2):
     """Approximate dipole moment magnitude difference using Gasteiger charges."""
@@ -157,9 +160,9 @@ def maccs_tanimoto_distance(smi_1, smi_2):
         sim = DataStructs.TanimotoSimilarity(fp1, fp2)
         return float(1.0 - sim)
     except Exception as e:
-        return None
+        return np.nan
     
-def mcs_bond_edit_distance(smi_1, smi_2, ringMatchesRingOnly, completeRingsOnly=False, timeout=10):
+def mcs_bond_edit_distance(smi_1, smi_2, timeout=10):
     """MCS-based bond edit distance."""
     try:
         m1, m2 = Chem.MolFromSmiles(smi_1), Chem.MolFromSmiles(smi_2)
@@ -169,8 +172,8 @@ def mcs_bond_edit_distance(smi_1, smi_2, ringMatchesRingOnly, completeRingsOnly=
             return 0.0  # both have no bonds; treat as identical
         params = rdFMCS.MCSParameters()
         params.MaximizeBonds = True
-        params.CompleteRingsOnly = completeRingsOnly
-        params.RingMatchesRingOnly = ringMatchesRingOnly
+        # params.CompleteRingsOnly = completeRingsOnly
+        # params.RingMatchesRingOnly = ringMatchesRingOnly
         params.Timeout = timeout
         res = rdFMCS.FindMCS([m1, m2], params)
         mcs_bonds = res.numBonds if res is not None else 0
@@ -180,7 +183,7 @@ def mcs_bond_edit_distance(smi_1, smi_2, ringMatchesRingOnly, completeRingsOnly=
         if dist > 1: dist = 1.0
         return float(dist)
     except Exception as e:
-        return None
+        return np.nan
     
 def atom_map_ged(smi_1, smi_2):
     """Unweighted graph edit distance between two atom-mapped SMILES strings."""
@@ -207,7 +210,7 @@ def atom_map_ged(smi_1, smi_2):
 
         return float(np.sum(np.abs(mat_1 - mat_2)) / 2.0)
     except Exception:
-        return None
+        return np.nan
 
 
 def cost_aware_ged(smi_1, smi_2):
@@ -272,4 +275,4 @@ def cost_aware_ged(smi_1, smi_2):
             edge_ins_cost=lambda bond: 0.7,
         ))
     except Exception:
-        return None
+        return np.nan

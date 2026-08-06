@@ -77,8 +77,8 @@ def main():
     p.add_argument("--model", default=str(_ROOT / "models" / "egat_dh.pth"),
                    help="Path to checkpoint (.pth)")
     p.add_argument("--batch-size", type=int, default=512)
-    p.add_argument("--num-workers", type=int, default=4,
-                   help="Parallel featurization workers (0 = sequential). Default 4.")
+    p.add_argument("--num-workers", type=int, default=0,
+                   help="Parallel featurization workers (0 = sequential). Default 0.")
     p.add_argument("--threads", type=int, default=_DEFAULT_THREADS,
                    help=f"Torch intra-op threads (default {_DEFAULT_THREADS}; ~8 is fastest).")
     p.add_argument("--self-test", action="store_true", help="Run a built-in smoke test")

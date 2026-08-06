@@ -52,7 +52,7 @@ class AsyncYarpCalculator:
             env_flags = ""
             if env_vars:
                 env_flags = " ".join(f"-e {k}={v}" for k, v in env_vars.items()) + " "
-            return f"docker run --platform linux/amd64 --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
+            return f"docker run --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename

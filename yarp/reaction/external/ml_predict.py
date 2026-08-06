@@ -16,7 +16,8 @@ class MLPredictTask(AsyncYarpCalculator):
 class EgatMLPredict(MLPredictTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:egat"
+        self.image_name = {'barrier': 'egat-barrier:test',
+                           'enthalpy': 'egat-enthalpy:test'}
         
     def generate_input(self):
         model = self.config.model
@@ -28,10 +29,11 @@ class EgatMLPredict(MLPredictTask):
             writer.writerow(["reactions"])
 
             for rxn_hash, rxn in self.reactions.items():
-                # Skip if already evaluated by this model
+                # Skip if already evaluated by this model (barrier and enthalpy)
                 if hasattr(rxn, 'barrier') and model in rxn.barrier:
-                    skipped_forward +=1
-                    continue
+                    if hasattr(rxn, 'heat_of_rxn') and model in rxn.heat_of_rxn:
+                        skipped_forward +=1
+                        continue
 
                 mapped_smiles = dense_reaction_smiles_for_egat(rxn.reactant.map_smi, rxn.product.map_smi)
                 writer.writerow([mapped_smiles])
@@ -43,7 +45,7 @@ class EgatMLPredict(MLPredictTask):
             writer.writerow(["reactions"])
 
             for rxn_hash, rxn in self.reactions.items():
-                # Skip if already evaluated by this model
+                # Skip if already evaluated by this model (barrier only)
                 if hasattr(rxn, 'reverse_barrier') and model in rxn.reverse_barrier:
                     skipped_reverse += 1
                     continue
@@ -57,8 +59,11 @@ class EgatMLPredict(MLPredictTask):
     def write_submission_script(self) -> Path:
         script_path = self.scratch_dir / "run_egat.sh"
 
+        env_vars = {'EGAT_THREADS': self.config.n_cpus}
+
         # EGAT flags (--input/--output) follow Docker ENTRYPOINT; use `apptainer run`, not `exec`.
-        prefix = self.get_container_prefix(self.image_name, str(self.scratch_dir), apptainer_run=True)
+        bar_prefix = self.get_container_prefix(self.image_name['barrier'], str(self.scratch_dir), apptainer_run=True, env_vars=env_vars)
+        enth_prefix = self.get_container_prefix(self.image_name['enthalpy'], str(self.scratch_dir), apptainer_run=True, env_vars=env_vars)
 
         with open(script_path, "w") as f:
             f.write("#!/bin/bash\n\n")
@@ -67,17 +72,28 @@ class EgatMLPredict(MLPredictTask):
 
             f.write(f"cd {self.scratch_dir}\n")
 
-            cmd1 = f"{prefix} --input forward_in.csv --output forward_out.csv"
-            f.write(f"{cmd1} > forward.log 2> forward.err\n")
+            f.write("echo 'Running energy of activation barrier prediction'\n")
 
-            cmd2 = f"{prefix} --input reverse_in.csv --output reverse_out.csv"
-            f.write(f"{cmd2} > reverse.log 2> reverse.err\n")
+            bar_cmd1 = f"{bar_prefix} --input forward_in.csv --output forward_barrier_out.csv --no-enthalpy"
+            f.write(f"{bar_cmd1} > forward_barrier.log 2> forward_barrier.err\n")
+
+            bar_cmd2 = f"{bar_prefix} --input reverse_in.csv --output reverse_barrier_out.csv --no-enthalpy"
+            f.write(f"{bar_cmd2} > reverse_barrier.log 2> reverse_barrier.err\n")
+
+            f.write("echo 'Running enthalpy of reaction prediction'\n")
+
+            enth_cmd1 = f"{enth_prefix} --input forward_in.csv --output forward_enthalpy_out.csv"
+            f.write(f"{enth_cmd1} > forward_enthalpy.log 2> forward_enthalpy.err\n")
+
 
         script_path.chmod(0o755)
         return script_path
 
     def check_output(self) -> bool:
-        return (self.scratch_dir / "forward_out.csv").exists() and (self.scratch_dir / "reverse_out.csv").exists()
+        barrier_done = (self.scratch_dir / "forward_barrier_out.csv").exists() and (self.scratch_dir / "reverse_barrier_out.csv").exists()
+        enthalpy_done = (self.scratch_dir / "forward_enthalpy_out.csv").exists()
+
+        return barrier_done and enthalpy_done
 
     def scrape_data(self):
         forward_smiles_to_hash = dict()
@@ -89,6 +105,7 @@ class EgatMLPredict(MLPredictTask):
             rev_smiles = dense_reaction_smiles_for_egat(rxn.product.map_smi, rxn.reactant.map_smi)
             reverse_smiles_to_hash[rev_smiles] = rxn_hash
 
+        # Parse energy of activation barriers (forward and reverse)
         def parse_barrier(row):
             value = (row.get("activation_barrier") or "").strip()
             if not value:
@@ -98,7 +115,7 @@ class EgatMLPredict(MLPredictTask):
             except ValueError:
                 return None
 
-        forward_out_csv = self.scratch_dir / "forward_out.csv"
+        forward_out_csv = self.scratch_dir / "forward_barrier_out.csv"
         with open(forward_out_csv, "r") as f:
             reader = csv.DictReader(f)
 
@@ -113,7 +130,7 @@ class EgatMLPredict(MLPredictTask):
                     rxn = self.reactions[rxn_hash]
                     rxn.barrier[self.config.model] = barrier
 
-        reverse_out_csv = self.scratch_dir / "reverse_out.csv"
+        reverse_out_csv = self.scratch_dir / "reverse_barrier_out.csv"
         with open(reverse_out_csv, "r") as f:
             reader = csv.DictReader(f)
 
@@ -135,9 +152,34 @@ class EgatMLPredict(MLPredictTask):
                     dg_rxn = barrier - f_barrier
                     rxn.dg_rxn[self.config.model] = dg_rxn
 
+        # Parse heat of reaction (forward only)
+        def parse_enthalpy(row):
+            value = (row.get("activation_barrier") or "").strip()
+            if not value:
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
+        enthalpy_csv = self.scratch_dir / "forward_enthalpy_out.csv"
+        with open(enthalpy_csv, "r") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                rxn_smiles = row["reaction_smiles"]
+                enthalpy = parse_enthalpy(row)
+                if enthalpy is None:
+                    continue
+
+                rxn_hash = forward_smiles_to_hash.get(rxn_smiles)
+                if rxn_hash:
+                    rxn = self.reactions[rxn_hash]
+                    rxn.heat_of_rxn[self.config.model] = enthalpy
+
     def cleanup(self):
-        # remove everything except output csv files
-        keep = {"forward_out.csv", "reverse_out.csv"}
+        # remove everything except output csv files and submission script
+        keep = {"forward_barrier_out.csv", "reverse_barrier_out.csv", "forward_enthalpy_out.csv", "run_egat.sh"}
         for item in self.scratch_dir.iterdir():
             if item.name not in keep:
                 if item.is_file():

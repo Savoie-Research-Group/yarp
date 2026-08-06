@@ -47,7 +47,7 @@ class AsyncYarpCalculator:
             # 2. If output is empty, the image isn't local. Pull it!
             if not check_cmd.stdout.strip():
                 print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
-                subprocess.run(["docker", "pull", "--platform", "linux/amd64", image_name], check=True)
+                subprocess.run(["docker", "pull", image_name], check=True)
 
             env_flags = ""
             if env_vars:

@@ -16,8 +16,8 @@ class MLPredictTask(AsyncYarpCalculator):
 class EgatMLPredict(MLPredictTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = {'barrier': 'egat-barrier:test',
-                           'enthalpy': 'egat-enthalpy:test'}
+        self.image_name = {'barrier': 'erm42/yarp-egat-barrier:latest',
+                           'enthalpy': 'erm42/yarp-egat-enthalpy:latest'}
         
     def generate_input(self):
         model = self.config.model

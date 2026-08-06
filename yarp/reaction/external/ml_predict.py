@@ -154,7 +154,7 @@ class EgatMLPredict(MLPredictTask):
 
         # Parse heat of reaction (forward only)
         def parse_enthalpy(row):
-            value = (row.get("activation_barrier") or "").strip()
+            value = (row.get("reaction_enthalpy") or "").strip()
             if not value:
                 return None
             try:

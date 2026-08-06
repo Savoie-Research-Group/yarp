@@ -63,6 +63,7 @@ def _selected_value_groups(args, default=()):
             ("forward", "barrier", "dG_activation"),
             ("reverse", "reverse_barrier", "dG_activation"),
             ("reaction", "dg_rxn", "dG_RXN"),
+            ("reaction", "heat_of_rxn", "dH_RXN"),
         ]
     if args.barriers:
         return [
@@ -77,6 +78,8 @@ def _selected_value_groups(args, default=()):
         groups.append(("reverse", "reverse_barrier", "dG_activation"))
     if args.dg:
         groups.append(("reaction", "dg_rxn", "dG_RXN"))
+    if args.dh:
+            groups.append(("reaction", "heat_of_rxn", "dH_RXN"))
 
     return groups or list(default)
 
@@ -199,10 +202,12 @@ def _add_options(parser):
                         help="Include one column for every key in rxn.reverse_barrier.")
     parser.add_argument("-g", "--dg", action="store_true",
                         help="Include one column for every key in rxn.dg_rxn.")
+    parser.add_argument("-e", "--dh", action="store_true",
+                        help="Include one column for every key in rxn.heat_of_rxn.")
     parser.add_argument("-b", "--barriers", action="store_true",
                         help="Include all forward and reverse barrier columns; equivalent to -fr.")
     parser.add_argument("-a", "--all", action="store_true",
-                        help="Include all forward, reverse, and reaction dG columns; equivalent to -frg.")
+                        help="Include all forward, reverse, and reaction dG columns; equivalent to -frge.")
     parser.add_argument("-n", "--meta", action="store_true",
                             help="Include a column with keys from rxn.network_meta.")
 
@@ -220,8 +225,9 @@ def cli():
               -f  show all forward barrier columns from rxn.barrier
               -r  show all reverse barrier columns from rxn.reverse_barrier
               -g  show all reaction dG columns from rxn.dg_rxn
+              -e  show all reaction dH columns from rxn.heat_of_rxn
               -b  show forward and reverse barriers (-fr)
-              -a  show forward, reverse, and reaction dG columns (-frg)
+              -a  show forward, reverse, and reaction dG/dH columns (-frge)
               --limit N  print at most N reactions
               --visualize  write reactant.pdf and product.pdf for each reaction
               --visual-dir DIR  choose the visualization output directory

@@ -4,7 +4,7 @@ from openbabel import pybel
 
 from yarp.util.write_files import mol_write_yp
 
-def obabel_ff_opt(molecule, lot="uff", maxiter=500):
+def obabel_ff_opt(molecule, lot="uff", maxiter=3000):
     '''
     Perform low-level level geometry optimization on yarpecule using openbabel.
 

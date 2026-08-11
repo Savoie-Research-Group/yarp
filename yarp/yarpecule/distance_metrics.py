@@ -15,7 +15,7 @@ Distance metrics implemented:
 from rdkit import Chem
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
 from rdkit.DataStructs.cDataStructs import TanimotoSimilarity
-from rdkit.Chem import AllChem, GraphDescriptors, Crippen, rdMolDescriptors, MACCSkeys, DataStructs, rdFMCS
+from rdkit.Chem import AllChem, GraphDescriptors, Crippen, rdMolDescriptors, rdFMCS
 import networkx as nx
 import numpy as np
 
@@ -174,7 +174,7 @@ def mcs_bond_edit_distance(smi_1, smi_2, timeout=10):
     """MCS-based bond edit distance."""
     try:
         m1, m2 = Chem.AddHs(Chem.MolFromSmiles(smi_1)), Chem.AddHs(Chem.MolFromSmiles(smi_2))
-        if m1 is None or m2 is None: return None
+        if m1 is None or m2 is None: return np.nan
         b1, b2 = m1.GetNumBonds(), m2.GetNumBonds()
         if (b1 + b2) == 0:
             return 0.0  # both have no bonds; treat as identical
@@ -209,7 +209,7 @@ def atom_map_ged(smi_1, smi_2):
         adj_mat_1, _, atom_info_1 = smiles2adjmat(smi_1)
         adj_mat_2, _, atom_info_2 = smiles2adjmat(smi_2)
         if adj_mat_1 is None or adj_mat_2 is None:
-            return None
+            return np.nan
 
         keep_1 = [i for i in range(len(atom_info_1)) if atom_info_1[i]["element"] != "h"]
         keep_2 = [i for i in range(len(atom_info_2)) if atom_info_2[i]["element"] != "h"]
@@ -268,7 +268,7 @@ def cost_aware_ged(smi_1, smi_2):
         mol_1 = Chem.AddHs(Chem.MolFromSmiles(smi_1))
         mol_2 = Chem.AddHs(Chem.MolFromSmiles(smi_2))
         if mol_1 is None or mol_2 is None:
-            return None
+            return np.nan
 
         graph_1 = nx.Graph()
         for atom in mol_1.GetAtoms():

@@ -231,7 +231,7 @@ def atom_map_ged(smi_1, smi_2):
         return np.nan
 
 
-def cost_aware_ged(smi_1, smi_2):
+def cost_aware_ged(smi_1, smi_2, upper_bound=12.0):
     """
     Cost-aware graph edit distance between two SMILES strings.
 
@@ -291,6 +291,7 @@ def cost_aware_ged(smi_1, smi_2):
             edge_subst_cost=lambda bond1, bond2: 0.0 if bond1["bond_order"] == bond2["bond_order"] else 0.7,
             edge_del_cost=lambda bond: 0.7,
             edge_ins_cost=lambda bond: 0.7,
+            upper_bound=upper_bound,
         ))
     except Exception:
         return np.nan

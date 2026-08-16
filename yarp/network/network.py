@@ -78,7 +78,7 @@ class network:
             for r in rxn.reactant.species:
                 reactant_label = f'Sp_{r.hash}'
                 crn.add_node(reactant_label, type='species', smi=r.canon_smi)
-                crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, -1000), weiner=1)
+                crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, 1000.0), weiner=1)
 
             for p in rxn.product.species:
                 product_label = f'Sp_{p.hash}'

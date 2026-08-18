@@ -155,7 +155,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Per run dir: keep yaml input, log, and final TS geometry; delete Hessian (scraped) and xTB calc dirs."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
@@ -368,7 +368,7 @@ class OrcaTSOptCalculator(TSOptTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Per run dir: keep inp, output log, and final TS geometry; delete Hessian (scraped), .gbw, .densities, etc."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):

@@ -3,10 +3,12 @@ from pathlib import Path
 import shutil
 import subprocess
 
+
 class AsyncYarpCalculator:
     """
     Base class defining the asynchronous lifecycle interface required by progress_yarp.py.
     """
+
     def __init__(self, task_def, rxn_data, job_config):
         self.task_def = task_def
         self.config = task_def.config
@@ -23,7 +25,14 @@ class AsyncYarpCalculator:
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False, env_vars: dict = None) -> str:
+    def get_container_prefix(
+        self,
+        image_name: str,
+        work_dir: str,
+        *,
+        apptainer_run: bool = False,
+        env_vars: dict = None,
+    ) -> str:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
@@ -40,19 +49,22 @@ class AsyncYarpCalculator:
             # Use `docker images -q` rather than `docker image inspect` because
             # the latter fails silently with the containerd image store in Docker Desktop.
             check_cmd = subprocess.run(
-                ["docker", "images", "-q", image_name],
-                capture_output=True, text=True
+                ["docker", "images", "-q", image_name], capture_output=True, text=True
             )
 
             # 2. If output is empty, the image isn't local. Pull it!
             if not check_cmd.stdout.strip():
-                print(f"Docker image '{image_name}' not found locally. Pulling from registry...")
+                print(
+                    f"Docker image '{image_name}' not found locally. Pulling from registry..."
+                )
                 subprocess.run(["docker", "pull", image_name], check=True)
 
             env_flags = ""
             if env_vars:
                 env_flags = " ".join(f"-e {k}={v}" for k, v in env_vars.items()) + " "
-            return f"docker run --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
+            return (
+                f"docker run --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
+            )
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
@@ -77,7 +89,9 @@ class AsyncYarpCalculator:
                         f"  apptainer build {sif_path} /path/to/orca_6.0.1.def\n"
                         "Place the ORCA installer tarball next to the .def as documented in that file."
                     )
-                print(f"Apptainer image not found at {sif_path}. Pulling from Docker Hub...")
+                print(
+                    f"Apptainer image not found at {sif_path}. Pulling from Docker Hub..."
+                )
                 # Ensure the target directory actually exists before pulling
                 sif_path.parent.mkdir(parents=True, exist_ok=True)
                 # 2. Pull the docker image and convert it to a .sif file
@@ -103,7 +117,9 @@ class AsyncYarpCalculator:
 
             env_flags = ""
             if env_vars:
-                env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
+                env_flags = (
+                    " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
+                )
             verb = "run" if apptainer_run else "exec"
             return f"apptainer {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
 
@@ -130,7 +146,9 @@ class AsyncYarpCalculator:
                         f"  singularity build {sif_path} /path/to/orca_6.0.1.def\n"
                         "Place the ORCA installer tarball next to the .def as documented in that file."
                     )
-                print(f"Singularity image not found at {sif_path}. Pulling from Docker Hub...")
+                print(
+                    f"Singularity image not found at {sif_path}. Pulling from Docker Hub..."
+                )
                 # Ensure the target directory actually exists before pulling
                 sif_path.parent.mkdir(parents=True, exist_ok=True)
                 # 2. Pull the docker image and convert it to a .sif file
@@ -141,12 +159,16 @@ class AsyncYarpCalculator:
 
             env_flags = ""
             if env_vars:
-                env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
+                env_flags = (
+                    " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
+                )
             verb = "run" if apptainer_run else "exec"
             return f"singularity {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
 
         else:
-            raise ValueError(f"Unsupported container runner: {self.job_manager.container}")
+            raise ValueError(
+                f"Unsupported container runner: {self.job_manager.container}"
+            )
 
     def write_scheduler_headers(self, f):
         """Writes the top portion of the bash script based on scheduler type."""
@@ -162,13 +184,18 @@ class AsyncYarpCalculator:
                 f.write(f"#SBATCH -A {self.job_manager.account}\n")
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={queue}\n")
-            f.write("#SBATCH -N 1\n") # nodes
-            f.write("#SBATCH -n 1\n") # tasks
+            f.write("#SBATCH -N 1\n")  # nodes
+            f.write("#SBATCH -n 1\n")  # tasks
             f.write(f"#SBATCH --cpus-per-task={cpus}\n")
             f.write(f"#SBATCH --mem-per-cpu={mem}M\n")
             f.write(f"#SBATCH --time={time}\n")
-            f.write("#SBATCH --output /dev/null\n")
-            f.write("#SBATCH --error /dev/null\n\n")
+
+            if self.job_manager.keep_job_logs:
+                f.write(f"#SBATCH --output {self.scratch_dir}/slurm-%j.out\n")
+                f.write(f"#SBATCH --error {self.scratch_dir}/slurm-%j.err\n\n")
+            else:
+                f.write("#SBATCH --output /dev/null\n")
+                f.write("#SBATCH --error /dev/null\n\n")
 
             if self.job_manager.module_container:
                 f.write(f"{self.job_manager.module_container}\n\n")
@@ -176,7 +203,7 @@ class AsyncYarpCalculator:
         elif scheduler == "sge":
             f.write(f"#$ -N {job_name}\n")
             f.write(f"#$ -q {queue}\n")
-            f.write(f"#$ -pe smp {cpus}\n") # ERM: this might be specific to CRC at ND
+            f.write(f"#$ -pe smp {cpus}\n")  # ERM: this might be specific to CRC at ND
             f.write(f"#$ -l h_vmem={mem * cpus}M\n")
             f.write(f"#$ -l h_rt={time}\n")
             f.write("#$ -o /dev/null\n")
@@ -209,8 +236,13 @@ class AsyncYarpCalculator:
         raise NotImplementedError
 
     def cleanup(self):
+        """Entry point for cleanup. Skips deletion entirely when keeping job logs."""
+        if self.job_manager.keep_job_logs:
+            return
+        self._do_cleanup()
+
+    def _do_cleanup(self):
         """5. Clean up large unneeded files, but keep logs if necessary."""
         # Default behavior: nuke the whole folder
         if self.scratch_dir and self.scratch_dir.exists():
             shutil.rmtree(self.scratch_dir)
-

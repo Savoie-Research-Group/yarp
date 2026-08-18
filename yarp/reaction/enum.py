@@ -563,7 +563,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     yield tmp
 
 
-def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=True, lower_score=True, keep_symmetric=True, verbose=True, debug=False):
+def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=True, keep_symmetric=True, verbose=True, debug=False):
     """
     This function provides a shortcut for enumerating "break n form n" products without generating intermediate 
     zwitterionic/dangling bond species

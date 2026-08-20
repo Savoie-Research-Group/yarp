@@ -248,7 +248,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Per run dir: keep inputs, logs, xyzs, and trajectories; delete xTB calc dirs."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):

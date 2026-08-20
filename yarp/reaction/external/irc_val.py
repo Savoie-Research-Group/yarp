@@ -308,7 +308,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Per run dir: keep yaml input, log, and IRC endpoint geometries; delete input TS xyz and xTB calc dirs."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
@@ -542,7 +542,7 @@ class OrcaIRCValCalculator(IRCValTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Per run dir: keep inp, output log, and IRC endpoint geometries; delete input TS xyz, .gbw, .densities, etc."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):

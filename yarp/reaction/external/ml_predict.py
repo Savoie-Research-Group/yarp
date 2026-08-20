@@ -177,7 +177,7 @@ class EgatMLPredict(MLPredictTask):
                     rxn = self.reactions[rxn_hash]
                     rxn.heat_of_rxn[self.config.model] = enthalpy
 
-    def cleanup(self):
+    def _do_cleanup(self):
         # remove everything except output csv files and submission script
         keep = {"forward_barrier_out.csv", "reverse_barrier_out.csv", "forward_enthalpy_out.csv", "run_egat.sh"}
         for item in self.scratch_dir.iterdir():

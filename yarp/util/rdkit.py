@@ -231,7 +231,7 @@ def geom_from_rdmol(mol, conf_index=0):
 
     return geo
 
-def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
+def rdkit_ff_opt(ypcule, lot='uff', maxiter=3000):
     '''
     Perform low-level level geometry optimization of yarpecule geometry
     via RDKit mol object.

@@ -8,7 +8,6 @@ Distance metrics implemented:
     * crippen_diff
     * delta_tpsa
     * approx_dipole_magnitude
-    * maccs_tanimoto_distance
     * mcs_bond_edit_distance
     * am_ged
     * cost_aware_ged
@@ -16,7 +15,7 @@ Distance metrics implemented:
 from rdkit import Chem
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
 from rdkit.DataStructs.cDataStructs import TanimotoSimilarity
-from rdkit.Chem import AllChem, GraphDescriptors, Crippen, rdMolDescriptors, MACCSkeys, DataStructs, rdFMCS
+from rdkit.Chem import AllChem, GraphDescriptors, Crippen, rdMolDescriptors, rdFMCS
 import networkx as nx
 import numpy as np
 
@@ -47,6 +46,7 @@ def compute_min_distance(mol_yp, target_smi, metric='soergel'):
 
     return min(all_dist)
 
+
 def compute_distance(smi1, smi2, metric='soergel'):
     """
     Compute distance between two SMILES based on requested metric.
@@ -61,8 +61,6 @@ def compute_distance(smi1, smi2, metric='soergel'):
         dist = delta_tpsa(smi1, smi2)
     elif metric == 'approx_dipole_magnitude':
         dist = approx_dipole_magnitude(smi1, smi2)
-    elif metric == 'maccs_tanimoto_distance':
-        dist = maccs_tanimoto_distance(smi1, smi2)
     elif metric == 'mcs_bond_edit_distance':
         dist = mcs_bond_edit_distance(smi1, smi2)
     elif metric == 'am_ged':
@@ -74,10 +72,12 @@ def compute_distance(smi1, smi2, metric='soergel'):
 
     return dist
 
+
 def soergel(smi1, smi2):
     try:
-        mol1 = Chem.MolFromSmiles(smi1)
-        mol2 = Chem.MolFromSmiles(smi2)
+        mol1 = Chem.AddHs(Chem.MolFromSmiles(smi1))
+        mol2 = Chem.AddHs(Chem.MolFromSmiles(smi2))
+        if mol1 is None or mol2 is None: return np.nan
 
         # Create a Morgan fingerprint generator (radius 2, 2048 bits)
         generator = GetMorganGenerator(
@@ -97,81 +97,90 @@ def soergel(smi1, smi2):
     except Exception as e:
         return np.nan
 
+
 def delta_bertz(smi_1,smi_2):
-    """Absolute difference in RDKit Bertz topological complexity."""
+    """Absolute difference in Bertz topological complexity."""
     try:
-        m1, m2 = Chem.MolFromSmiles(smi_1), Chem.MolFromSmiles(smi_2)
-        if m1 is None or m2 is None:
-            return None
+        m1, m2 = Chem.AddHs(Chem.MolFromSmiles(smi_1)), Chem.AddHs(Chem.MolFromSmiles(smi_2))
+        if m1 is None or m2 is None: return np.nan
         v1 = float(GraphDescriptors.BertzCT(m1))
         v2 = float(GraphDescriptors.BertzCT(m2))
         return abs(v1 - v2)
     except Exception as e:
         return np.nan
-    
+
+
 def crippen_diff(smi1, smi2):
-    """Absolute difference in Crippen logP."""
+    """Absolute difference in Crippen molar refractivity."""
     try:
-        m1, m2 = Chem.MolFromSmiles(smi1), Chem.MolFromSmiles(smi2)
-        if m1 is None or m2 is None: return None
+        m1, m2 = Chem.AddHs(Chem.MolFromSmiles(smi1)), Chem.AddHs(Chem.MolFromSmiles(smi2))
+        if m1 is None or m2 is None: return np.nan
         v1 = Crippen.MolMR(m1)
         v2 = Crippen.MolMR(m2)
         return float(abs(v1 - v2))
     except Exception as e:
         return np.nan
-    
+
+
 def delta_tpsa(smi_1: str, smi_2: str):
-    """Absolute difference in Topological Polar Surface Area (TPSA)."""
+    """Absolute difference in approximated Topological Polar Surface Area (TPSA)."""
     try:
-        m1, m2 = Chem.MolFromSmiles(smi_1), Chem.MolFromSmiles(smi_2)
-        if m1 is None or m2 is None: return None
+        m1, m2 = Chem.AddHs(Chem.MolFromSmiles(smi_1)), Chem.AddHs(Chem.MolFromSmiles(smi_2))
+        if m1 is None or m2 is None: return np.nan
         v1 = rdMolDescriptors.CalcTPSA(m1)
         v2 = rdMolDescriptors.CalcTPSA(m2)
         return float(abs(v1 - v2))
     except Exception as e:
         return np.nan
 
+
 def approx_dipole_magnitude(smi_1, smi_2):
-    """Approximate dipole moment magnitude difference using Gasteiger charges."""
+    """
+    Approximate dipole moment magnitude difference using Gasteiger charges.
+    ERM: May not work properly for charged species!
+    Also, unsure if units are in true Debye, but since we just want a difference,
+    this shouldn't qualitatively matter.
+    """
     try:
         m_1 = Chem.AddHs(Chem.MolFromSmiles(smi_1))
         m_2 = Chem.AddHs(Chem.MolFromSmiles(smi_2))
+        if m_1 is None or m_2 is None: return np.nan
+
+        # Generate random conformer and optimize with MMFF94
         AllChem.EmbedMolecule(m_1, randomSeed=42)
         AllChem.EmbedMolecule(m_2, randomSeed=42)
+        AllChem.MMFFOptimizeMolecule(m_1)
+        AllChem.MMFFOptimizeMolecule(m_2)
+
+        # Compute atomic charges
         Chem.rdPartialCharges.ComputeGasteigerCharges(m_1)
         Chem.rdPartialCharges.ComputeGasteigerCharges(m_2)
+
+        # Assemble total dipole moment vectors
         coords_1 = m_1.GetConformer().GetPositions()
         coords_2 = m_2.GetConformer().GetPositions()
         charges_1 = np.array([float(a.GetProp('_GasteigerCharge')) for a in m_1.GetAtoms()])
         charges_2 = np.array([float(a.GetProp('_GasteigerCharge')) for a in m_2.GetAtoms()])
         dip_1 = np.sum(coords_1 * charges_1[:, None], axis=0)
         dip_2 = np.sum(coords_2 * charges_2[:, None], axis=0)
+
+        # Return difference in dipole momemnt magnitudes
         return abs(np.linalg.norm(dip_1) - np.linalg.norm(dip_2))
     except:
         return np.nan
-    
-def maccs_tanimoto_distance(smi_1, smi_2):
-    """MACCS Tanimoto distance."""
-    try:
-        m1, m2 = Chem.MolFromSmiles(smi_1), Chem.MolFromSmiles(smi_2)
-        if m1 is None or m2 is None: return None
-        fp1 = MACCSkeys.GenMACCSKeys(m1)
-        fp2 = MACCSkeys.GenMACCSKeys(m2)
-        sim = DataStructs.TanimotoSimilarity(fp1, fp2)
-        return float(1.0 - sim)
-    except Exception as e:
-        return np.nan
-    
+
+
 def mcs_bond_edit_distance(smi_1, smi_2, timeout=10):
     """MCS-based bond edit distance."""
     try:
-        m1, m2 = Chem.MolFromSmiles(smi_1), Chem.MolFromSmiles(smi_2)
-        if m1 is None or m2 is None: return None
+        m1, m2 = Chem.AddHs(Chem.MolFromSmiles(smi_1)), Chem.AddHs(Chem.MolFromSmiles(smi_2))
+        if m1 is None or m2 is None: return np.nan
         b1, b2 = m1.GetNumBonds(), m2.GetNumBonds()
         if (b1 + b2) == 0:
             return 0.0  # both have no bonds; treat as identical
         params = rdFMCS.MCSParameters()
         params.MaximizeBonds = True
+        # ERM: These appear to not be implemented in RDKit v2025.09.5
         # params.CompleteRingsOnly = completeRingsOnly
         # params.RingMatchesRingOnly = ringMatchesRingOnly
         params.Timeout = timeout
@@ -184,14 +193,23 @@ def mcs_bond_edit_distance(smi_1, smi_2, timeout=10):
         return float(dist)
     except Exception as e:
         return np.nan
-    
+
+
 def atom_map_ged(smi_1, smi_2):
-    """Unweighted graph edit distance between two atom-mapped SMILES strings."""
+    """
+    Unweighted graph edit distance between two atom-mapped SMILES strings.
+    ERM: This is not a reliable distance metric to use unless you've got a
+    correct target atom-map. Also, this doesn't consider bond order changes
+    at all, i.e. pi-bond breakage are not reflected here.
+    One reason for this is the issue of aromaticity, and different Kekulizations
+    appearing as non-zero GED values without proper accounting of things.
+    Also... not sure why we're throwing away elements involving hydrogen...
+    """
     try:
         adj_mat_1, _, atom_info_1 = smiles2adjmat(smi_1)
         adj_mat_2, _, atom_info_2 = smiles2adjmat(smi_2)
         if adj_mat_1 is None or adj_mat_2 is None:
-            return None
+            return np.nan
 
         keep_1 = [i for i in range(len(atom_info_1)) if atom_info_1[i]["element"] != "h"]
         keep_2 = [i for i in range(len(atom_info_2)) if atom_info_2[i]["element"] != "h"]
@@ -213,7 +231,7 @@ def atom_map_ged(smi_1, smi_2):
         return np.nan
 
 
-def cost_aware_ged(smi_1, smi_2):
+def cost_aware_ged(smi_1, smi_2, upper_bound=12.0):
     """
     Cost-aware graph edit distance between two SMILES strings.
 
@@ -247,10 +265,10 @@ def cost_aware_ged(smi_1, smi_2):
     changes, and bond creation/destruction.
     """
     try:
-        mol_1 = Chem.MolFromSmiles(smi_1)
-        mol_2 = Chem.MolFromSmiles(smi_2)
+        mol_1 = Chem.AddHs(Chem.MolFromSmiles(smi_1))
+        mol_2 = Chem.AddHs(Chem.MolFromSmiles(smi_2))
         if mol_1 is None or mol_2 is None:
-            return None
+            return np.nan
 
         graph_1 = nx.Graph()
         for atom in mol_1.GetAtoms():
@@ -273,6 +291,7 @@ def cost_aware_ged(smi_1, smi_2):
             edge_subst_cost=lambda bond1, bond2: 0.0 if bond1["bond_order"] == bond2["bond_order"] else 0.7,
             edge_del_cost=lambda bond: 0.7,
             edge_ins_cost=lambda bond: 0.7,
+            upper_bound=upper_bound,
         ))
     except Exception:
         return np.nan

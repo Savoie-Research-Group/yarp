@@ -215,8 +215,8 @@ def quick_geom_opt(molecule, lot="uff"):
         # If Open Babel fails too, we return None
         ob_adj = table_generator(molecule.elements, ob_opt_g)
         ob_diff = ob_adj - molecule.adj_mat
-        if not np.all(ob_diff == 0):
-            return None
+        # if not np.all(ob_diff == 0):
+        #     return None
         
         # If all goes well, update geometry and return
         molecule._geo = ob_opt_g

@@ -3,6 +3,7 @@ Definition of the network object class.
 """
 
 import networkx as nx
+import numpy as np
 from copy import deepcopy
 from typing import Iterable, Dict, Any, Optional
 
@@ -16,7 +17,7 @@ class network:
     def __init__(self, rxns, dG_lot=None):
         self.rxns = self._normalize_rxn_dict(rxns)
 
-        considered_rxns = self._get_rxns_by_metadata(rxns.values(), key="prod_blind_selected", value=True)
+        considered_rxns = self._get_rxns_by_metadata(self.rxns.values(), key="prod_blind_selected", value=True)
         self.n_considered_rxns = len(considered_rxns)
 
         self.crn = self._gen_s2r_bipartite_graph(self.rxns, barrier_lot=dG_lot)
@@ -64,6 +65,20 @@ class network:
                 out[r.hash] = r
         return out
 
+    def _species_label(self, y):
+        """Provenance-independent species node label.
+
+        yarpecule.hash sums over all resonance BEMs, and the number of BEMs
+        lewis_struct() finds depends on atom ordering -- so the same molecule
+        hashes differently as an enumerated product vs. a canon-ordered reactant.
+        Hash the single best-scoring BEM instead.
+        """
+        scores = np.asarray(y.bond_mat_scores)
+        best = min(np.flatnonzero(np.isclose(scores, scores.min())),
+                key=lambda i: np.sum(y.bond_mats[i] * np.outer(y.atom_hashes, y.atom_hashes)))
+        bem = y.bond_mats[best]
+        return f"Sp_{float(np.round(np.sum(bem * np.outer(y.atom_hashes, y.atom_hashes)), 7))}"
+
     def _gen_s2r_bipartite_graph(self, yp_rxns, barrier_lot=None):
         """
         Convert input reactions into NetworkX DiGraph (directed graph) object
@@ -76,12 +91,12 @@ class network:
             crn.add_node(rxn_label, type='reaction')
 
             for r in rxn.reactant.species:
-                reactant_label = f'Sp_{r.hash}'
+                reactant_label = self._species_label(r)
                 crn.add_node(reactant_label, type='species', smi=r.canon_smi)
                 crn.add_edge(reactant_label, rxn_label, dG=rxn.barrier.get(barrier_lot, 1000.0), weiner=1)
 
             for p in rxn.product.species:
-                product_label = f'Sp_{p.hash}'
+                product_label = self._species_label(p)
                 crn.add_node(product_label, type='species', smi=p.canon_smi)
                 crn.add_edge(rxn_label, product_label, dG=0, weiner=0)
 
@@ -109,8 +124,8 @@ class network:
         if len(start.separate()) > 1 or len(end.separate()) > 1:
             raise RuntimeError("Requested start and end nodes must be single molecules")
 
-        start_label = f'Sp_{start.hash}'
-        end_label = f'Sp_{end.hash}'
+        start_label = self._species_label(start)
+        end_label = self._species_label(end)
 
         path = nx.shortest_path(G=self.crn, source=start_label, target=end_label)
 
@@ -237,8 +252,8 @@ class network:
         if verbose:
             print(f"Getting all simple paths from {start.canon_smi} to {end.canon_smi}...")
 
-        start_label = f'Sp_{start.hash}'
-        end_label = f'Sp_{end.hash}'
+        start_label = self._species_label(start)
+        end_label = self._species_label(end)
         paths = list(nx.all_simple_paths(self.crn, start_label, end_label, cutoff=cutoff))
 
         rxn_paths = []
@@ -338,8 +353,8 @@ class network:
         if len(start.separate()) > 1 or len(end.separate()) > 1:
             raise RuntimeError("Requested start and end nodes must be single molecules")
 
-        start_label = f'Sp_{start.hash}'
-        end_label = f'Sp_{end.hash}'
+        start_label = self._species_label(start)
+        end_label = self._species_label(end)
         path = nx.dijkstra_path(self.crn, start_label, end_label, weight=objective)
 
         rxn_steps = path[1::2]  # Extract reaction labels from path

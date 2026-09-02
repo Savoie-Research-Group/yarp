@@ -563,7 +563,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     yield tmp
 
 
-def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=True, keep_symmetric=True, verbose=True, debug=False):
+def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=False, keep_symmetric=True, verbose=True, debug=False):
     """
     This function provides a shortcut for enumerating "break n form n" products without generating intermediate 
     zwitterionic/dangling bond species
@@ -587,14 +587,14 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Tr
             calls, then it is useful to pass the hashes of the genereated products from each call forward to the next to avoid 
             redundant calls. 
 
-    hash_filter: bool, default=True
+    hash_filter: bool, default=False
                  Controls whether the returned products are filtered by uniqueness. Due to symmetry, the same product may be obtained
                  by several distinct bond formations. The default behavior is to avoid returning products that resolve to the same hash.
                  Disabling this option will lead to all distinct mappings being returned (with the associated redundancy). Since isotopomers
                  resolve to distinct hashes, even with this option enabled there may be the appearance of redundant products, but the isotope 
                  placement will be distinct.  
 
-    lower_score: bool, default=True
+    lower_score: bool, default=False
                  During the enumeration it is common to form species that have poor Lewis structures that cost a time to 
                  perform enumeration on. These are often thrown away after enumeration, but they can cost a lot of time to
                  perform enumeration on if a multi-bond enumeration is being done. When this option is True, structures are 

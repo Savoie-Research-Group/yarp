@@ -56,6 +56,10 @@ class TestConcertedClosedShell:
         """
         Test that b3f3 products equal b2f2 products.
         HAA doesn't have enough unique bonds to form "true" b3f3 products.
+
+        ERM: Ok, so after turning the lower_score default to OFF,
+        b3f3 finds and extra product in this case, but with a pretty high
+        Lewis score, which is tossed out after default post-enum filters are applied.
         """
         haa = yarpecule('CC=O')
 
@@ -63,12 +67,12 @@ class TestConcertedClosedShell:
         b3f3_prods = list(bnfn(haa, 3, hashes={haa.hash}))
 
         assert len(b2f2_prods) == 9
-        assert len(b3f3_prods) == 42
+        assert len(b3f3_prods) == 45
 
         b2f2_unique = get_unique_yarpecules(b2f2_prods)
         assert len(b2f2_unique) == 3
         b3f3_unique = get_unique_yarpecules(b3f3_prods)
-        assert len(b3f3_unique) == 3
+        assert len(b3f3_unique) == 4
 
         b2f2_set = set()
         b3f3_set = set()

@@ -10,6 +10,21 @@ from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
 import math
 
+def get_unique_yarpecules(ypcules):
+    """
+    Deduplicate a list of yarpecules based on hash values
+    """
+    unique = []
+    hash_set = set()
+    for mol in ypcules:
+        if mol.hash in hash_set:
+            continue
+        unique.append(mol)
+        hash_set.add(mol.hash)
+
+    return unique
+
+
 class TestConcertedClosedShell:
     def test_haa_b2f2_exact(self):
         """
@@ -18,7 +33,10 @@ class TestConcertedClosedShell:
         haa = yarpecule('CC=O')
         prods = list(bnfn(haa, 2, hashes={haa.hash}))
 
-        assert len(prods) == 3
+        assert len(prods) == 9
+
+        unique_prods = get_unique_yarpecules(prods)
+        assert len(unique_prods) == 3
 
         expected_prods = ['C=CO', 'C1CO1', 'C=C=O.[H][H]']
 
@@ -44,7 +62,13 @@ class TestConcertedClosedShell:
         b2f2_prods = list(bnfn(haa, 2, hashes={haa.hash}))
         b3f3_prods = list(bnfn(haa, 3, hashes={haa.hash}))
 
-        assert len(b2f2_prods) == len(b3f3_prods)
+        assert len(b2f2_prods) == 9
+        assert len(b3f3_prods) == 42
+
+        b2f2_unique = get_unique_yarpecules(b2f2_prods)
+        assert len(b2f2_unique) == 3
+        b3f3_unique = get_unique_yarpecules(b3f3_prods)
+        assert len(b3f3_unique) == 3
 
         b2f2_set = set()
         b3f3_set = set()
@@ -128,8 +152,10 @@ class TestConcertedOpenShell:
         liec = yarpecule('[Li]O[C]1OCCO1')
         prods = list(bnfn(liec, 1, hashes={liec.hash}, lower_score=False))
 
+        assert len(prods) == 16
 
-        assert len(prods) == 7
+        unique_prods = get_unique_yarpecules(prods)
+        assert len(unique_prods) == 7
 
         expected_prods = ['[Li][O][C@@]1(O[CH2])CO1',
                             '[Li][O][C@]1([O])CCO1',

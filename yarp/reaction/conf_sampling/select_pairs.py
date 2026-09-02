@@ -17,8 +17,17 @@ def select_gsm_pairs(rxn, config):
     """
     Orchestrates Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
     """
-    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"] 
-    p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]
+    # GSM pair selection is defined over the CREST ensemble.  A prepared
+    # ``rpopt_*`` geometry may coexist with that ensemble as its seed, but it
+    # must not itself be treated as an additional CREST conformer.
+    r_confs = [
+        conf for key, conf in rxn.reactant.conformers.items()
+        if 'conf_gen' in key and conf.geo is not None
+    ]
+    p_confs = [
+        conf for key, conf in rxn.product.conformers.items()
+        if 'conf_gen' in key and conf.geo is not None
+    ]
 
     # --- STEP A: Apply Joint Optimization (Biasing) ---
     lot = config.bias_lot

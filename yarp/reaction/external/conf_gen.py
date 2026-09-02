@@ -6,10 +6,21 @@ from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 
 class ConfTask(AsyncYarpCalculator):
+    def _seed_conformer(self):
+        """Return the explicitly requested geometry from which CREST starts."""
+        if "reactant" in self.task_def.task_type:
+            target_species = self.rxn.reactant
+        else:
+            target_species = self.rxn.product
+
+        if self.config.geometry_source == 'initial_geom':
+            return target_species.conformers.get('initial_geom')
+
+        key = f"rpopt_{self.config.source_lot}_{self.config.source_software}"
+        return target_species.conformers.get(key)
+
     def has_prerequisites(self) -> bool:
-        if not self.rxn.reactant.conformers.get('initial_geom') or not self.rxn.product.conformers.get('initial_geom'):
-            return False
-        return True
+        return self._seed_conformer() is not None
 
 
 class CrestConfCalculator(ConfTask):
@@ -29,9 +40,7 @@ class CrestConfCalculator(ConfTask):
         """Write the initial 3D geometry for CREST to start from."""
         input_xyz_path = self.scratch_dir / self.xyz_file
         with open(input_xyz_path, "w") as f:
-            # Assuming yarpecule has a method to get a basic 3D string
-            # (e.g., generated via RDKit/ETKDG during initialization)
-            f.write(self.target_species.conformers.get('initial_geom').to_xyz_string())
+            f.write(self._seed_conformer().to_xyz_string())
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""

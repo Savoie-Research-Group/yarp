@@ -43,16 +43,25 @@ class TSGuessTask(AsyncYarpCalculator):
         if not r_node.conformers or not p_node.conformers:
             return False
 
-        r_keys = r_node.conformers.keys()
-        r_match = False
-        for rk in r_keys:
-            if 'conf_gen' in rk and r_node.conformers[rk].geo is not None: 
-                r_match = True
-        p_keys = p_node.conformers.keys()
-        p_match = False
-        for pk in p_keys:
-            if 'conf_gen' in pk and p_node.conformers[pk].geo is not None:
-                p_match = True
+        if self.config.geometry_source == 'preoptimized':
+            expected_key = f"rpopt_{self.config.gsm_lot}_{self.config.software}"
+            r_match = any(
+                expected_key in key and conf.geo is not None
+                for key, conf in r_node.conformers.items()
+            )
+            p_match = any(
+                expected_key in key and conf.geo is not None
+                for key, conf in p_node.conformers.items()
+            )
+        else:
+            r_match = any(
+                'conf_gen' in key and conf.geo is not None
+                for key, conf in r_node.conformers.items()
+            )
+            p_match = any(
+                'conf_gen' in key and conf.geo is not None
+                for key, conf in p_node.conformers.items()
+            )
 
         if not r_match or not p_match:
             return False
@@ -72,8 +81,25 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         Runs the Joint Opt + ML Selection, then writes the files 
         required for the Pysisyphus GSM run.
         """
-        print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
-        self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
+        if self.config.geometry_source == 'preoptimized':
+            expected_key = f"rpopt_{self.config.gsm_lot}_{self.config.software}"
+            reactant_conf = next(
+                conf for key, conf in self.rxn.reactant.conformers.items()
+                if expected_key in key and conf.geo is not None
+            )
+            product_conf = next(
+                conf for key, conf in self.rxn.product.conformers.items()
+                if expected_key in key and conf.geo is not None
+            )
+            self.pairs_to_run = [{
+                "r_conf": reactant_conf,
+                "p_conf": product_conf,
+                "score": 1.0,
+            }]
+            print(f"     * [{self.rxn.hash}] Using the prepared xTB reactant/product pair for GSM.")
+        else:
+            print(f"     * [{self.rxn.hash}] Selecting {self.n_pairs} conformer pairs for GSM...")
+            self.pairs_to_run = select_gsm_pairs(self.rxn, self.config)
         
         # Write inputs for each pair
         for i, pair in enumerate(self.pairs_to_run):

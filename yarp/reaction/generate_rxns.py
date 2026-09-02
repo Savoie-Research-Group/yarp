@@ -14,7 +14,6 @@ from yarp.util.rdkit import rdkit_ff_opt
 from yarp.util.obabel import obabel_ff_opt
 from yarp.yarpecule.graph.adjacency import table_generator
 
-
 def generate_rxns(inp):
     """
     Wrapper function to manage the generation of reaction objects during main_yarp routine
@@ -61,7 +60,11 @@ def generate_rxns(inp):
             )
 
             for prod in clean_products:
-                opt_prod = quick_geom_opt(prod)
+                # The explicit preparation workflow derives product geometry
+                # from the xTB-optimized reactant via UFF joint optimization.
+                # Do not perform an unrelated product-only UFF optimization
+                # here when that workflow is selected.
+                opt_prod = prod if inp.uses_preoptimized_ts_geometries else quick_geom_opt(prod)
                 if opt_prod is None:
                     reactant.get_smiles()
                     prod.get_smiles()
@@ -131,7 +134,7 @@ def generate_rxns(inp):
                 )
 
                 for prod in clean_products:
-                    opt_prod = quick_geom_opt(prod)
+                    opt_prod = prod if inp.uses_preoptimized_ts_geometries else quick_geom_opt(prod)
                     if opt_prod is None:
                         mol.get_smiles()
                         prod.get_smiles()

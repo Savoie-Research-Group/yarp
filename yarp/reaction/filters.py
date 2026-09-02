@@ -197,7 +197,7 @@ def apply_product_blinders(raw_candidates, target_yp,
         print(f"  + Selected {len(candidates)} out of {len(raw_candidates)} potential candidates")
     return candidates
 
-def filter_enum_products(raw_products, l_cutoff=0.0, fc_cutoff=2.0, ring_filter=False,verbose=False):
+def filter_enum_products(raw_products, l_cutoff=0.5, fc_cutoff=2.0, ring_filter=False,verbose=False):
     """
     Parameters:
     -----------

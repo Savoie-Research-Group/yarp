@@ -3,8 +3,10 @@ from yarp.reaction.external.ml_predict import EgatMLPredict
 from yarp.reaction.external.conf_gen import CrestConfCalculator
 from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator
 from yarp.reaction.external.min_opt import PysisyphusMinOptCalculator, OrcaMinOptCalculator
+from yarp.reaction.external.pre_opt import PysisyphusPreOptCalculator
 from yarp.reaction.external.ts_opt import PysisyphusTSOptCalculator, OrcaTSOptCalculator
 from yarp.reaction.external.irc_val import PysisyphusIRCValCalculator, OrcaIRCValCalculator
+from yarp.util.config import PreOptimizationConfig
 
 def get_calculator(task_def, rxn_data, job_config) -> AsyncYarpCalculator:
     """
@@ -31,6 +33,11 @@ def get_calculator(task_def, rxn_data, job_config) -> AsyncYarpCalculator:
 
     # Tasks 4 & 5: Optimizations
     elif t_type in ["reactant_optimization", "product_optimization", "transition_state_optimization"]:
+        # The preparation stage intentionally reuses the normal R/P task
+        # types so the existing downstream refinement/IRC bookkeeping sees
+        # its geometries as ``rpopt_*`` conformers.
+        if t_type in ["reactant_optimization", "product_optimization"] and isinstance(task_def.config, PreOptimizationConfig):
+            return PysisyphusPreOptCalculator(task_def, rxn_data, job_config)
         if software == "pysisyphus":
             if t_type in ["reactant_optimization", "product_optimization"]:
                 return PysisyphusMinOptCalculator(task_def, rxn_data, job_config)

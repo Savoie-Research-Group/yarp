@@ -220,6 +220,53 @@ class InitialGeomConfig:
             raise ValueError(f"Invalid 'label' for initial_geom.transition_state: '{self.transition_state.label}'; valid options are 'ts_guess', 'ts_opt'")
 
 @dataclass
+class PreOptimizationConfig:
+    """xTB geometry-only optimization used before reaction-path generation."""
+    software: str = None
+    lot: str = None
+    charge: int = None
+    multiplicity: int = None
+    max_cycles: int = 100
+    n_cpus: int = 1
+    mem_per_cpu: int = 4000
+    max_runtime: str = "01:00:00"
+
+    def __post_init__(self):
+        if self.software != 'pysisyphus':
+            raise ValueError("preoptimization currently requires software: pysisyphus")
+        if self.lot != 'xtb':
+            raise ValueError("preoptimization currently requires lot: xtb")
+        if self.charge is None or not isinstance(self.charge, int):
+            raise ValueError("preoptimization requires an integer charge")
+        if self.multiplicity is None or not isinstance(self.multiplicity, int):
+            raise ValueError("preoptimization requires an integer multiplicity")
+        if not isinstance(self.max_cycles, int):
+            raise ValueError("preoptimization max_cycles must be an integer")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("preoptimization n_cpus must be an integer")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("preoptimization mem_per_cpu must be an integer")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("preoptimization max_runtime must be HH:MM:SS")
+
+@dataclass
+class JointOptimizationConfig:
+    """Settings for projecting an optimized reactant geometry onto product BEM."""
+    lot: str = 'uff'
+    maxiter: int = 500
+
+    def __post_init__(self):
+        if self.lot not in ['uff', 'Ghemical', 'MMFF94', 'ghemical', 'mmff94']:
+            raise ValueError("joint_opt.lot must be uff, Ghemical, or MMFF94")
+        if not isinstance(self.maxiter, int) or self.maxiter < 1:
+            raise ValueError("joint_opt.maxiter must be a positive integer")
+
+@dataclass
+class ProductPreOptimizationConfig(PreOptimizationConfig):
+    """Product xTB preoptimization plus the preceding UFF joint projection."""
+    joint_opt: JointOptimizationConfig = field(default_factory=JointOptimizationConfig)
+
+@dataclass
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
     model: str
@@ -244,13 +291,22 @@ class MLPropConfig:
 
 @dataclass
 class ConformerConfig:
-    """Holds settings specific to generating a reactant/product conformers"""
+    """Holds settings specific to generating reactant/product conformers.
+
+    ``geometry_source`` controls the seed passed to CREST.  The default keeps
+    the historical behavior (the enumeration ``initial_geom``).  The
+    ``preoptimized`` setting starts CREST from the xTB R/P geometries produced
+    by ``prepare_initial_geometries``.
+    """
     software: str = None
     lot: str = None
     charge: int = None
     n_unpaired_electrons: int = None
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
+    geometry_source: str = "initial_geom"
+    source_lot: Optional[str] = None
+    source_software: Optional[str] = None
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
@@ -268,6 +324,16 @@ class ConformerConfig:
             raise ValueError(f"Invalid 'lot' for CREST software! Valid options: 'gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff'")
         if self.software == 'crest' and self.n_unpaired_electrons == None:
             raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
+        if self.geometry_source not in ['initial_geom', 'preoptimized']:
+            raise ValueError(
+                "Invalid 'geometry_source' for conf_gen. Valid options are "
+                "'initial_geom' and 'preoptimized'"
+            )
+        if self.geometry_source == 'preoptimized' and (not self.source_lot or not self.source_software):
+            raise ValueError(
+                "conf_gen.geometry_source: preoptimized requires both "
+                "source_lot and source_software"
+            )
 
         if not isinstance(self.charge, int):
             raise ValueError("Please provide an integer value to conf_gen: 'charge'")
@@ -294,6 +360,7 @@ class TSGuessConfig:
     max_gsm_nodes: int = 30
     bias_lot: str = "uff"
     joint_opt: str = "dual"
+    geometry_source: str = "conf_gen"
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
@@ -315,6 +382,11 @@ class TSGuessConfig:
             raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
         if self.joint_opt not in ['dual', 'r_only', 'p_only', 'off']:
             raise ValueError(f"Invalid 'joint_opt' entry: '{self.joint_opt}' Valid options are: 'dual', 'r_only', 'p_only', 'off'")
+        if self.geometry_source not in ['conf_gen', 'preoptimized']:
+            raise ValueError(
+                "Invalid 'geometry_source' for ts_guess. Valid options are "
+                "'conf_gen' and 'preoptimized'"
+            )
 
         if not isinstance(self.n_conf, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_conf'")

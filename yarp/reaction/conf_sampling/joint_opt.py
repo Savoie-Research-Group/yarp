@@ -9,7 +9,7 @@ from yarp.util.rdkit import rdkit_joint_opt
 from yarp.util.obabel import obabel_joint_opt
 
 
-def joint_optimize(conformer, target_bem, lot="uff"):
+def joint_optimize(conformer, target_bem, lot="uff", maxiter=500):
     """
     Biases a conformer's geometry toward a target BEM via low-level force
     field optimization. Returns a NEW conformer object with the biased
@@ -26,7 +26,9 @@ def joint_optimize(conformer, target_bem, lot="uff"):
     target_adj = bondmat_to_adjmat(target_bem)
 
     # First, attempt to bias the geometry with RDKit
-    rd_opt_g = rdkit_joint_opt(conformer, target_bem, target_adj, lot=lot)
+    rd_opt_g = rdkit_joint_opt(
+        conformer, target_bem, target_adj, lot=lot, maxiter=maxiter
+    )
 
     # Check if optimization reproduced the target connectivity
     if rd_opt_g is not None:
@@ -34,7 +36,9 @@ def joint_optimize(conformer, target_bem, lot="uff"):
         rd_diff = rd_adj - target_adj
     if rd_opt_g is None or not np.all(rd_diff == 0):
         # If RDKit generated a garbage geom (or failed outright), try Open Babel
-        ob_opt_g = obabel_joint_opt(conformer, target_bem, target_adj, lot=lot)
+        ob_opt_g = obabel_joint_opt(
+            conformer, target_bem, target_adj, lot=lot, maxiter=maxiter
+        )
 
         # If Open Babel fails too, we return None
         if ob_opt_g is None:

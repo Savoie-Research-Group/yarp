@@ -1,8 +1,88 @@
-import os
+import subprocess
+import sys
+import tempfile
+
 import numpy as np
-from openbabel import pybel
 
 from yarp.util.write_files import mol_write_yp
+from yarp.yarpecule.input_parsers import xyz_parse
+
+
+def run_obabel_local_optimization(elements, geo, bond_mat, adj_mat, lot, maxiter):
+    """Optimize one imposed molecular graph with an isolated Open Babel call.
+
+    Parameters
+    ----------
+    elements : sequence
+        Atomic element labels for the molecule.
+    geo : ndarray (N x 3)
+        Starting Cartesian coordinates.
+    bond_mat : ndarray (N x N)
+        Bond-electron matrix to write to the Open Babel MOL input.
+    adj_mat : ndarray (N x N)
+        Adjacency matrix corresponding to ``bond_mat``.
+    lot : str
+        Open Babel force field, for example ``"uff"``.
+    maxiter : int
+        Maximum number of local-optimization steps.
+
+    Returns
+    -------
+    ndarray (N x 3) or None
+        Optimized Cartesian coordinates, or ``None`` when Open Babel cannot
+        produce a readable optimized geometry.
+
+    Notes
+    -----
+    The optimization is run through ``obabel_worker.py`` in a fresh Python
+    process. This prevents native Open Babel force-field state from carrying
+    over between independent YARP candidates.
+    """
+    with tempfile.TemporaryDirectory(prefix="yarp_obabel_") as tmp_dir:
+        input_mol = f"{tmp_dir}/input.mol"
+        output_xyz = f"{tmp_dir}/optimized.xyz"
+
+        # mol_write_yp expects a string, not a pathlib.Path.
+        mol_write_yp(
+            str(input_mol),
+            elements,
+            geo,
+            bond_mat,
+            adj_mat,
+        )
+
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "yarp.util.obabel_worker",
+                    input_mol,
+                    output_xyz,
+                    str(lot),
+                    str(maxiter),
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except OSError:
+            return None
+
+        if result.returncode != 0:
+            return None
+
+        try:
+            out_elements, opt_geom = xyz_parse(output_xyz, multiple=False)
+        except Exception:
+            return None
+
+        if len(out_elements) != len(elements):
+            return None
+
+        return np.asarray(opt_geom, dtype=float)
+
 
 def obabel_ff_opt(molecule, lot="uff", maxiter=500):
     '''
@@ -32,25 +112,15 @@ def obabel_ff_opt(molecule, lot="uff", maxiter=500):
         - 'mmff94' : Merck Molecular Force Field, better for organics
         - 'ghemical' : simpler/faster, less accurate
     '''
+    return run_obabel_local_optimization(
+        molecule.elements,
+        molecule.geo,
+        molecule.bond_mats[0],
+        molecule.adj_mat,
+        lot,
+        maxiter,
+    )
 
-    # Write yarpecule object to a temporary mol file
-    mol_file = '.tmp.mol'
-    mol_write_yp(mol_file, molecule.elements, molecule.geo,
-                 molecule.bond_mats[0], molecule.adj_mat)
-
-    # Use openbabel to perform geometry optimization
-    mol = next(pybel.readfile("mol", mol_file))
-    mol.localopt(forcefield=lot, steps=maxiter)
-
-    # Delete temporary mol file
-    os.system("rm {}".format(mol_file))
-
-    # Collect optimized geometry coordinates
-    opt_geom = np.zeros_like(molecule.geo)
-    for count_i, i in enumerate(opt_geom):
-        opt_geom[count_i] = mol.atoms[count_i].coords
-
-    return opt_geom
 
 def obabel_joint_opt(conformer, target_bem, target_adj, lot="uff", maxiter=500):
     '''
@@ -87,20 +157,11 @@ def obabel_joint_opt(conformer, target_bem, target_adj, lot="uff", maxiter=500):
     pybel's `localopt`, so both fallbacks behave identically instead of
     diverging on which part of the Open Babel API they happen to call.
     '''
-    mol_file = '.tmp_joint.mol'
-    try:
-        mol_write_yp(mol_file, conformer.elements, conformer.geo, target_bem, target_adj)
-
-        mol = next(pybel.readfile("mol", mol_file))
-        mol.localopt(forcefield=lot, steps=maxiter)
-
-        opt_geo = np.zeros_like(conformer.geo)
-        for count_i, i in enumerate(opt_geo):
-            opt_geo[count_i] = mol.atoms[count_i].coords
-
-        return opt_geo
-    except (ValueError, RuntimeError):
-        return None
-    finally:
-        if os.path.exists(mol_file):
-            os.remove(mol_file)
+    return run_obabel_local_optimization(
+        conformer.elements,
+        conformer.geo,
+        target_bem,
+        target_adj,
+        lot,
+        maxiter,
+    )

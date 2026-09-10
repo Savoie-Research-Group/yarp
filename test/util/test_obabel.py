@@ -4,7 +4,7 @@ import yarp as yp
 from yarp.reaction.enum import enumerate_products
 from yarp.yarpecule.graph.adjacency import table_generator
 
-from yarp.util.obabel import obabel_ff_opt
+from yarp.util.obabel import obabel_joint_opt
 
 class TestFFOpt:
     def test_haa_2_ring(self):
@@ -17,7 +17,8 @@ class TestFFOpt:
         target_hash = "1034502.7961211"
         target_product = next(p for p in products if str(p.hash) == str(target_hash))
 
-        opt_geo = obabel_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = obabel_joint_opt(target_product, target_product.bond_mats[0],
+                                   target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat
@@ -33,7 +34,8 @@ class TestFFOpt:
 
         target_product = next(p for p in products if str(p.hash) == str(target.hash))
 
-        opt_geo = obabel_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = obabel_joint_opt(target_product, target_product.bond_mats[0],
+                                   target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat
@@ -49,7 +51,8 @@ class TestFFOpt:
 
         target_product = next(p for p in products if str(p.hash) == str(target.hash))
 
-        opt_geo = obabel_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = obabel_joint_opt(target_product, target_product.bond_mats[0],
+                                   target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat

@@ -7,7 +7,7 @@ from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.util.rdkit import (
     yarpecule_to_rdmol,
     geom_from_rdmol,
-    rdkit_ff_opt,
+    rdkit_joint_opt,
     smiles_to_rdmol,
     adj_from_rdmol,
     el_from_rdmol,
@@ -37,7 +37,8 @@ class TestFFOpt:
         target_hash = "1034502.7961211"
         target_product = next(p for p in products if str(p.hash) == str(target_hash))
 
-        opt_geo = rdkit_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = rdkit_joint_opt(target_product, target_product.bond_mats[0],
+                                  target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat
@@ -54,7 +55,8 @@ class TestFFOpt:
 
         target_product = next(p for p in products if str(p.hash) == str(target.hash))
 
-        opt_geo = rdkit_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = rdkit_joint_opt(target_product, target_product.bond_mats[0],
+                                  target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat
@@ -71,7 +73,8 @@ class TestFFOpt:
 
         target_product = next(p for p in products if str(p.hash) == str(target.hash))
 
-        opt_geo = rdkit_ff_opt(target_product, lot='uff', maxiter=200)
+        opt_geo = rdkit_joint_opt(target_product, target_product.bond_mats[0],
+                                  target_product.adj_mat, lot='uff', maxiter=200)
         opt_adj = table_generator(elements=target_product.elements, geometry=opt_geo)
 
         diff = opt_adj - target_product.adj_mat

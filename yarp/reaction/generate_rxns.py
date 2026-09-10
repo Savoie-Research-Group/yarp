@@ -10,8 +10,8 @@ from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_react
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
-from yarp.util.rdkit import rdkit_ff_opt
-from yarp.util.obabel import obabel_ff_opt
+from yarp.util.rdkit import rdkit_joint_opt
+from yarp.util.obabel import obabel_joint_opt
 from yarp.yarpecule.graph.adjacency import table_generator
 
 
@@ -199,25 +199,37 @@ def quick_geom_opt(molecule, lot="uff"):
     -------
     molecule : yarpecule object
         optimized molecule
+
+    Notes
+    -----
+    The molecule is relaxed under its own bonding, so the "target" BEM and
+    adjacency matrix handed to the joint optimizers are its own. This is the
+    same RDKit-first / Open Babel-fallback pattern used by
+    yarp.reaction.conf_sampling.joint_opt.joint_optimize.
     '''
+    target_bem = molecule.bond_mats[0]
+    target_adj = molecule.adj_mat
 
     # First, attempt to optimize with RDKit
-    rd_opt_g = rdkit_ff_opt(molecule, lot=lot)
+    rd_opt_g = rdkit_joint_opt(molecule, target_bem, target_adj, lot=lot)
 
     # Check if optimization preserved starting connectivity
-    rd_adj = table_generator(molecule.elements, rd_opt_g)
-    rd_diff = rd_adj - molecule.adj_mat
+    if rd_opt_g is not None:
+        rd_adj = table_generator(molecule.elements, rd_opt_g)
+        rd_diff = rd_adj - target_adj
 
-    # If RDKit generated a garbage geom, try Open Babel
-    if not np.all(rd_diff == 0):
-        ob_opt_g = obabel_ff_opt(molecule, lot=lot)
+    # If RDKit generated a garbage geom (or failed outright), try Open Babel
+    if rd_opt_g is None or not np.all(rd_diff == 0):
+        ob_opt_g = obabel_joint_opt(molecule, target_bem, target_adj, lot=lot)
 
         # If Open Babel fails too, we return None
+        if ob_opt_g is None:
+            return None
         ob_adj = table_generator(molecule.elements, ob_opt_g)
-        ob_diff = ob_adj - molecule.adj_mat
+        ob_diff = ob_adj - target_adj
         if not np.all(ob_diff == 0):
             return None
-        
+
         # If all goes well, update geometry and return
         molecule._geo = ob_opt_g
         return molecule

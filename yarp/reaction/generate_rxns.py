@@ -210,7 +210,7 @@ def quick_geom_opt(molecule, lot="uff"):
 
     # If RDKit generated a garbage geom, try Open Babel
     if not np.all(rd_diff == 0):
-        ob_opt_g = obabel_ff_opt(molecule, lot=lot)
+        ob_opt_g = obabel_ff_opt(molecule, lot=lot, maxiter=3000)
 
         # If Open Babel fails too, we return None
         ob_adj = table_generator(molecule.elements, ob_opt_g)

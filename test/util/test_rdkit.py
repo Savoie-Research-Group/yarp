@@ -112,3 +112,49 @@ class TestRDKitSMILESHelpers:
 
         assert mapped_elements == unmapped_elements
         assert np.array_equal(mapped_adj, unmapped_adj)
+
+
+class TestJointOptDeterminism:
+    """
+    RDKit UFF must be a pure function of its input.
+
+    Several checks lean on this: it is the reference the Open Babel
+    nondeterminism is measured against, and it is why `quick_geom_opt` trying
+    RDKit first keeps most products reproducible even though the Open Babel
+    fallback is not. If RDKit ever stops being deterministic, those
+    conclusions need revisiting rather than the tests being relaxed.
+    """
+
+    REPEATS = 3
+
+    def test_repeated_calls_are_bit_identical(self, khp_products):
+        product = khp_products["CC(=O)COO"]
+        bem, adj = product.bond_mats[0], product.adj_mat
+
+        first = rdkit_joint_opt(product, bem, adj, lot="uff", maxiter=200)
+        assert first is not None
+
+        for attempt in range(1, self.REPEATS):
+            again = rdkit_joint_opt(product, bem, adj, lot="uff", maxiter=200)
+            assert np.array_equal(first, again), (
+                f"rdkit_joint_opt returned a different geometry on attempt "
+                f"{attempt}, differing by up to {np.abs(first - again).max():.2e} A"
+            )
+
+    def test_deterministic_for_a_product_open_babel_varies_on(self, khp_products):
+        """
+        Open Babel returns a different geometry for these on every call. RDKit,
+        handed exactly the same input, does not -- which is what isolates the
+        nondeterminism to Open Babel rather than to anything upstream in yarp.
+        """
+        for smi in ("CC(=O)COO", "OOC1CCO1", "O=C(O)CCO"):
+            product = khp_products[smi]
+            bem, adj = product.bond_mats[0], product.adj_mat
+
+            geometries = [rdkit_joint_opt(product, bem, adj, lot="uff", maxiter=200)
+                          for _ in range(self.REPEATS)]
+            assert all(g is not None for g in geometries), f"{smi} produced no geometry"
+            for attempt, geo in enumerate(geometries[1:], start=1):
+                assert np.array_equal(geometries[0], geo), (
+                    f"rdkit_joint_opt was not reproducible for {smi} on attempt {attempt}"
+                )

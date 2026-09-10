@@ -252,7 +252,38 @@ def khp_d1():
 def khp2pp22_soergel_beam2_cyc3():
     """Returns a dictionary object of the reactions contained in khp2pp22 (depth 3) pickle file."""
     file = str(Path(__file__).parent / "pickles" / "khp2pp22_soergel_beam2_cyc3.pkl")
-    return pickle.load(open(file, 'rb'))   
+    return pickle.load(open(file, 'rb'))
+
+# Enumerated products, shared across the geometry/determinism tests
+@pytest.fixture(scope="session")
+def khp_parent():
+    """The ketohydroperoxide reactant, enumerated from in several test modules."""
+    import yarp as yp
+    return yp.yarpecule("O=CCCOO")
+
+@pytest.fixture(scope="session")
+def khp_products(khp_parent):
+    """
+    Break-2/form-2 products of O=CCCOO, keyed by canonical SMILES.
+
+    Session-scoped because enumeration is the expensive part (~0.1 s) and
+    several modules want the same products. Keying by SMILES rather than by
+    position in the generator keeps the tests readable and keeps a failure
+    message chemically meaningful if enumeration order ever shifts. All 37
+    products have distinct canonical SMILES, so the key is unambiguous.
+    """
+    from yarp.reaction.enum import bnfn
+
+    products = {}
+    for prod in bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                     hash_filter=True, lower_score=True, verbose=False):
+        prod.get_smiles()
+        assert prod.canon_smi not in products, (
+            f"canonical SMILES {prod.canon_smi} is no longer unique among the "
+            "enumerated products; these fixtures key on it"
+        )
+        products[prod.canon_smi] = prod
+    return products
 
 # Molecule files
 @pytest.fixture

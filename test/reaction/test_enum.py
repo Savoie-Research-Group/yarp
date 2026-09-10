@@ -345,3 +345,61 @@ class TestReactiveAtomMaps:
         assert missing == []
         assert len(local_react) == 1
         assert len(local_react[0]) == 3
+
+
+class TestGeometryInheritance:
+    """
+    Products carry their parent's coordinates, index-aligned.
+
+    This is the invariant the whole pre-optimization design rests on: bnfn
+    builds products with `canon=False` and hands them `y.geo.copy()`, so a
+    geometry relaxed for the parent is a valid starting point for every product
+    enumerated from it. If canonicalization ever creeps back in, atom indices
+    stop lining up and the failure is silent -- the elements list still matches,
+    so nothing downstream notices.
+    """
+
+    def test_products_inherit_parent_geometry(self, khp_parent, khp_products):
+        assert khp_products, "no products enumerated"
+        for smi, prod in khp_products.items():
+            assert np.array_equal(prod.geo, khp_parent.geo), (
+                f"product {smi} did not inherit the parent geometry exactly"
+            )
+
+    def test_products_preserve_parent_atom_order(self, khp_parent, khp_products):
+        for smi, prod in khp_products.items():
+            assert prod.elements == khp_parent.elements, (
+                f"product {smi} reordered its atoms relative to the parent"
+            )
+
+    def test_products_differ_from_parent_only_in_bonding(self, khp_parent, khp_products):
+        """Same atoms and coordinates, different graph -- otherwise it is not a reaction."""
+        for smi, prod in khp_products.items():
+            assert not np.array_equal(prod.adj_mat, khp_parent.adj_mat), (
+                f"product {smi} has the parent's adjacency matrix"
+            )
+
+
+class TestEnumerationReproducibility:
+    """
+    Enumeration must be a pure function of its input.
+
+    This test will not catch hash-randomization (PYTHONHASHSEED)
+    sensitivity, but it does catch a set or dict iteration order being
+    introduced into the enumeration path.
+    """
+
+    def _fingerprint(self, products):
+        return [p.adj_mat.astype(int).tobytes() for p in products]
+
+    def test_repeated_enumeration_is_identical(self, khp_parent):
+        first = list(bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                          hash_filter=True, lower_score=True, verbose=False))
+        second = list(bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                           hash_filter=True, lower_score=True, verbose=False))
+
+        assert len(first) == len(second)
+        assert self._fingerprint(first) == self._fingerprint(second), (
+            "two identical bnfn calls yielded different products, or the same "
+            "products in a different order"
+        )

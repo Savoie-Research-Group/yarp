@@ -1,0 +1,737 @@
+You are working in the Savoie-Research-Group/yarp repository on a new branch created from `condor_q`.
+
+Goal:
+Design and begin implementing an OSG-specific orchestration workflow for YARP, exposed through a new CLI such as:
+
+    yarp-osg
+
+This workflow should not replace YARP chemistry logic. It should reuse YARP’s existing task discovery, input generation, prerequisite checking, output validation, scraping, pickle updates, and STATUS.json updates wherever possible.
+
+The central design principle is:
+
+    reuse the chemistry/state logic from yarp-progress
+    replace the shared-filesystem execution model with an OSG-aware execution model
+
+I will also point you to an existing coworker-developed repository/workflow called `DFT-Energy-Automated` that successfully runs on OSG. Inspect that workflow carefully and reuse proven patterns for:
+
+- HTCondor submit files
+- container delivery
+- OSDF/Pelican paths
+- input/output staging
+- worker-local scratch
+- batch submission
+- job state tracking
+- retry logic
+- cleanup
+- logging
+
+Do not blindly copy it. Adapt its OSG infrastructure patterns to YARP’s asynchronous reaction-network workflow.
+
+======================================================================
+BACKGROUND
+======================================================================
+
+The existing `condor_q` branch added a generic CondorJobManager suitable for shared-filesystem Condor installations.
+
+That branch can:
+
+- generate `.submit` files
+- request CPUs, memory, and disk
+- submit with `condor_submit`
+- parse cluster IDs
+- inspect jobs with `condor_q`
+- manage normal YARP calculators
+
+However, it assumes:
+
+- executable paths are visible on the worker
+- scratch paths are shared between submit and execute nodes
+- SIF containers are visible at the same absolute path
+- generated worker scripts can `cd` into submit-host directories
+- `apptainer run` can be called from inside the worker job
+
+Those assumptions do not hold on OSG.
+
+OSG workers instead use isolated scratch directories and HTCondor file/container staging.
+
+A real failed example showed:
+
+- the job matched and started correctly
+- 8 CPUs and 8 GB RAM were allocated
+- the executable and input files were transferred
+- the worker scratch directory was something like `/srv/scratch`
+- `/home/thomas.burton/...` did not exist on the worker
+- generated scripts failed because they used absolute submit-host paths
+- transferring a SIF manually worked, but nested `apptainer run` was the wrong long-term design
+- returning explicitly named files that were never created caused Condor output-transfer holds
+
+So this is not fundamentally a Condor syntax problem. It is an OSG orchestration and data-staging problem.
+
+======================================================================
+OSG EXECUTION MODEL TO TARGET
+======================================================================
+
+Use this architecture:
+
+    yarp-init
+        ↓
+    YARP pickle + STATUS.json
+        ↓
+    yarp-osg controller on the access point
+        ↓
+    discover ready YARP tasks
+        ↓
+    generate task-local input directories
+        ↓
+    group compatible tasks into HTCondor clusters
+        ↓
+    use OSDF-hosted container images
+        ↓
+    run inside worker-local scratch
+        ↓
+    return selected outputs
+        ↓
+    harvest and scrape outputs
+        ↓
+    update YARP pickle and STATUS.json
+        ↓
+    repeat until complete
+
+Important OSG conventions:
+
+1. Do not assume `/home/...` paths exist on workers.
+2. Do not run nested `apptainer run` as the normal execution model.
+3. Prefer HTCondor `container_image = osdf://...`.
+4. Put reusable SIF files in versioned OSDF locations.
+5. Use worker-local paths such as:
+       ${_CONDOR_SCRATCH_DIR:-$PWD}
+6. Transfer only small task-specific inputs and outputs through HTCondor.
+7. Do not transfer a 700 MB–4.2 GB SIF separately for every job.
+8. Prefer batched Condor clusters using `queue ... from manifest`.
+9. Do not create and submit thousands of independent `.submit` files if one cluster can represent them.
+10. Return only essential outputs.
+11. Large reusable inputs and containers belong in OSDF.
+12. Large output archives may also need OSDF rather than normal access-point return.
+
+The user’s OSDF namespace is expected to resemble:
+
+    /ospool/ap40/data/thomas.burton/
+
+with URL form:
+
+    osdf:///ospool/ap40/data/thomas.burton/
+
+Use versioned immutable container paths, for example:
+
+    osdf:///ospool/ap40/data/thomas.burton/yarp-containers/v1/yarp-egat-20260615-v1.sif
+    osdf:///ospool/ap40/data/thomas.burton/yarp-containers/v1/yarp-crest-20260615-v1.sif
+    osdf:///ospool/ap40/data/thomas.burton/yarp-containers/v1/yarp-pysis-xtb-20260615-v1.sif
+    osdf:///ospool/ap40/data/thomas.burton/yarp-containers/v1/yarp-orca-6.0.1-20260615-v1.sif
+
+Do not hardcode these exact paths throughout the code. Make them configurable.
+
+======================================================================
+AVAILABLE CONTAINERS
+======================================================================
+
+The user has successfully built and transferred these SIF files:
+
+- `erm42_yarp_egat.sif`
+- `erm42_yarp_crest.sif`
+- `erm42_yarp_pysis_xtb.sif`
+- `orca_6.0.1.sif`
+
+The ORCA container is licensed and must not be redistributed publicly.
+
+Observed behavior:
+
+- CREST container exposes `crest`
+- pysis/xTB container exposes Python and pysisyphus tooling
+- ORCA container exposes `/opt/orca/orca`
+- EGAT does not expose plain `python` or `python3` on PATH
+- EGAT currently works through its Apptainer runscript / OCI-style entrypoint
+- current YARP code uses `apptainer run` for EGAT and passes:
+      --input forward_in.csv
+      --output forward_out.csv
+
+OSG container execution may ignore or bypass the SIF runscript when HTCondor launches the job executable inside the container.
+
+Therefore, inspect the EGAT image runscript and determine the underlying executable or command that must be called directly from the worker script.
+
+Do not assume the EGAT command. Add a configurable or discoverable execution command if needed.
+
+======================================================================
+RELEVANT CURRENT YARP COMPONENTS
+======================================================================
+
+Inspect at least:
+
+- `yarp/progress_yarp.py`
+- `yarp/initialize_yarp.py`
+- `yarp/reaction/external/calc_base.py`
+- `yarp/reaction/external/job_manager.py`
+- `yarp/reaction/external/ml_predict.py`
+- `yarp/reaction/external/conformer.py`
+- `yarp/reaction/external/ts_guess.py`
+- `yarp/reaction/external/min_opt.py`
+- `yarp/reaction/external/ts_opt.py`
+- `yarp/reaction/external/irc_val.py`
+- `yarp/util/config.py`
+- `yarp/util/input.py`
+- task/status tracking classes used by `progress_yarp.py`
+
+Understand the full asynchronous lifecycle:
+
+- task prerequisite checking
+- scratch-directory assignment
+- input generation
+- submission-script generation
+- job submission
+- job ID storage
+- running-state checks
+- output existence checks
+- output scraping
+- cleanup
+- reaction object updates
+- STATUS.json updates
+- pickle persistence
+
+Do not duplicate this logic unless absolutely necessary.
+
+======================================================================
+PROPOSED SEPARATION OF RESPONSIBILITIES
+======================================================================
+
+Preserve the existing generic scheduler abstraction.
+
+Use something conceptually like:
+
+    ProgressEngine
+        discover_ready_tasks()
+        generate_inputs()
+        check_completed_tasks()
+        scrape_outputs()
+        update_state()
+
+    StandardProgressRunner
+        shared-filesystem local / SGE / Slurm / Condor behavior
+
+    OSGProgressRunner
+        OSG manifests
+        worker-local scripts
+        OSDF container references
+        HTCondor transfer declarations
+        batched clusters
+        retry / quarantine
+        result harvesting
+
+The external commands may be:
+
+    yarp-progress .
+    yarp-osg .
+
+But internally they should share as much chemistry logic as possible.
+
+Do not rewrite `yarp-progress.py` wholesale.
+
+Refactor shared logic carefully and minimally.
+
+======================================================================
+DESIRED `yarp-osg` CLI
+======================================================================
+
+A useful first CLI could support:
+
+    yarp-osg init .
+    yarp-osg plan .
+    yarp-osg submit .
+    yarp-osg status .
+    yarp-osg harvest .
+    yarp-osg retry .
+    yarp-osg cleanup .
+    yarp-osg advance .
+    yarp-osg run .
+
+Suggested semantics:
+
+- `plan`
+  - inspect pickle and STATUS.json
+  - discover ready tasks
+  - generate a human-readable plan
+  - do not submit anything
+
+- `submit`
+  - generate manifests and submit ready jobs
+  - record Condor IDs
+
+- `status`
+  - summarize ready, submitted, idle, running, held, complete, failed, retried, quarantined
+
+- `harvest`
+  - collect finished outputs
+  - call existing YARP scrapers
+  - update pickle and STATUS.json
+
+- `retry`
+  - retry eligible transient failures
+  - respect max retry counts
+
+- `cleanup`
+  - remove disposable scratch
+  - preserve essential result files and diagnostics
+
+- `advance`
+  - one controller cycle:
+      harvest → update state → plan → submit
+
+- `run`
+  - repeated controller cycles until complete or no progress is possible
+
+The first implementation may be smaller, but the architecture should allow this.
+
+======================================================================
+TASK GRANULARITY
+======================================================================
+
+YARP has both global and per-reaction tasks.
+
+Global task example:
+
+- EGAT ML prediction
+- one forward CSV
+- one reverse CSV
+- one global job per network/stage
+
+Per-reaction tasks include:
+
+- CREST conformer generation
+- pysisyphus GSM / TS guess
+- xTB reactant/product optimization
+- xTB TS optimization
+- xTB IRC validation
+- ORCA reactant/product optimization
+- ORCA TS optimization
+- ORCA IRC validation
+
+Treat global tasks and per-reaction tasks separately.
+
+Do not force EGAT into the same batching model as reaction-local tasks.
+
+======================================================================
+BATCH SUBMISSION DESIGN
+======================================================================
+
+For thousands of jobs, prefer one submit description per task type and wave.
+
+Example concept:
+
+    crest_jobs.tsv
+    pysis_gsm_jobs.tsv
+    xtb_rpopt_jobs.tsv
+    xtb_tsopt_jobs.tsv
+    xtb_irc_jobs.tsv
+    orca_rpopt_jobs.tsv
+    orca_tsopt_jobs.tsv
+    orca_irc_jobs.tsv
+
+Each row should contain enough information to locate:
+
+- task ID
+- reaction ID/hash
+- local task directory
+- input filename(s)
+- expected output filename(s)
+- resource class
+- retry count
+
+Then use something like:
+
+    queue task_id,task_dir,input_name from crest_jobs.tsv
+
+or `initialdir = $(task_dir)` where appropriate.
+
+Prefer one Condor cluster with many ProcIds over thousands of single-job clusters.
+
+Record:
+
+    ClusterId.ProcId
+
+for every logical task.
+
+A robust mapping should exist between:
+
+    YARP task identity
+    task directory
+    manifest row
+    ClusterId.ProcId
+    attempt number
+
+Use a durable machine-readable state file, not only logs.
+
+SQLite, JSONL, or a structured JSON/YAML state file are acceptable. Prefer something concurrency-safe and easy to audit.
+
+======================================================================
+WORKER SCRIPT REQUIREMENTS
+======================================================================
+
+Generated worker scripts must:
+
+- use `set -uo pipefail` or equivalent diagnostic-safe behavior
+- use worker-local scratch
+- print:
+    hostname
+    working directory
+    task ID
+    selected container
+    key environment variables
+- never reference submit-host `/home/...` paths
+- invoke the task executable directly inside the HTCondor-selected container
+- write expected outputs into worker scratch
+- preserve meaningful stdout/stderr
+- create a compact task result/status record
+- avoid causing output-transfer holds merely because an optional output is absent
+- return explicit exit codes
+- distinguish:
+    infrastructure failure
+    container failure
+    chemistry failure
+    validation failure
+    missing output
+    timeout
+    preemption/eviction
+
+Where possible, use a standard result file such as:
+
+    task_result.json
+
+with fields like:
+
+    task_id
+    reaction_id
+    task_type
+    attempt
+    exit_code
+    status
+    hostname
+    start_time
+    end_time
+    runtime_seconds
+    expected_outputs
+    present_outputs
+    error_category
+    error_message
+
+======================================================================
+RESOURCE REQUESTS
+======================================================================
+
+Start conservative and configurable.
+
+Initial defaults to consider:
+
+- EGAT:
+    8 CPUs
+    8 GB memory
+    2 GB disk
+
+- CREST:
+    2 CPUs
+    4–8 GB memory
+    4–8 GB disk
+
+- pysis GSM:
+    2–4 CPUs
+    8 GB memory
+    8–16 GB disk
+
+- xTB optimization / IRC:
+    1–2 CPUs
+    4 GB memory
+    4–8 GB disk
+
+- ORCA DFT:
+    2–4 CPUs
+    8–16 GB memory
+    larger scratch request as measured
+
+Do not hardcode final values.
+
+Support resource profiles in config.
+
+Later, resource usage should be measured with Condor history and tuned downward where possible to improve matchmaking.
+
+======================================================================
+RETRY AND QUARANTINE
+======================================================================
+
+Support bounded retry behavior.
+
+Suggested categories:
+
+Transient infrastructure errors:
+- retry automatically
+- examples:
+    transfer failure
+    worker eviction
+    container fetch failure
+    site error
+    temporary filesystem failure
+
+Chemistry failure:
+- retry only if configured
+- examples:
+    SCF convergence failure
+    optimizer failure
+    GSM failure
+    missing TS
+    invalid IRC
+
+Configuration/programming failure:
+- do not retry automatically
+- examples:
+    executable missing
+    malformed input
+    unsupported config
+    container command not found
+
+Use configurable values such as:
+
+    max_infrastructure_retries: 3
+    max_chemistry_retries: 1
+    quarantine_after: 3
+
+Quarantined tasks must remain inspectable.
+
+Do not silently discard failures.
+
+======================================================================
+OUTPUT RETENTION
+======================================================================
+
+Do not return all worker scratch files.
+
+Define per-task retention rules.
+
+Always keep:
+
+- final geometry
+- essential energy/result summary
+- task_result.json
+- compact stdout/stderr
+- files required by downstream YARP scraping
+- files required for restart, only when justified
+
+Usually discard:
+
+- redundant temporary files
+- large trajectories
+- duplicate intermediates
+- transient optimizer scratch
+- unnecessary wavefunction files
+- verbose logs after successful scraping, if configured
+
+Preserve more files for failed tasks than successful tasks.
+
+Make cleanup policy configurable.
+
+======================================================================
+CONFIGURATION
+======================================================================
+
+Add an OSG-specific configuration section without polluting the generic Condor config excessively.
+
+Conceptual example:
+
+    initialize:
+      job_manager:
+        scheduler: osg
+
+        osg:
+          submit_host: ap40
+          osdf_namespace: /ospool/ap40/data/thomas.burton
+          state_db: .yarp_osg/state.sqlite
+          max_idle_jobs: 500
+          max_running_jobs: 1000
+          submit_batch_size: 500
+          poll_interval_seconds: 60
+
+          retries:
+            infrastructure: 3
+            chemistry: 1
+
+          containers:
+            egat: osdf:///...
+            crest: osdf:///...
+            pysis_xtb: osdf:///...
+            orca: osdf:///...
+
+          resources:
+            egat:
+              cpus: 8
+              memory_mb: 8000
+              disk_mb: 2048
+            crest:
+              cpus: 2
+              memory_mb: 8000
+              disk_mb: 8192
+            ...
+
+Do not finalize the schema before inspecting the current config parser and coworker workflow.
+
+Prefer dataclasses and validation consistent with the rest of YARP.
+
+======================================================================
+INITIAL IMPLEMENTATION MILESTONE
+======================================================================
+
+Do not attempt the whole pipeline in one pass.
+
+Milestone 1 should be:
+
+1. One initialized YARP directory.
+2. EGAT-only stage.
+3. OSDF-hosted EGAT SIF.
+4. HTCondor `container_image`.
+5. Worker-local script.
+6. Direct invocation of EGAT’s real underlying command.
+7. Transfer:
+       forward_in.csv
+       reverse_in.csv
+   and return:
+       forward_out.csv
+       reverse_out.csv
+       logs
+       task_result.json
+8. Record ClusterId.ProcId.
+9. Detect completion or hold.
+10. Harvest output using existing EGAT scraping code.
+11. Update YARP pickle and STATUS.json.
+12. Rerunning `yarp-osg advance .` should be idempotent.
+
+Do not move to CREST until this works.
+
+Milestone 2:
+
+- CREST per-reaction tasks
+- small manifest
+- 3–10 jobs
+- batched single Condor cluster
+
+Milestone 3:
+
+- pysis/xTB task chain
+- 10–100 jobs
+- retries and harvesting
+
+Milestone 4:
+
+- ORCA
+- filtered subset only
+- careful output retention
+
+Milestone 5:
+
+- 100–1,000 jobs
+- batch controls
+- throttling
+- cleanup
+- operational reporting
+
+======================================================================
+TESTING REQUIREMENTS
+======================================================================
+
+Add unit tests that do not require OSG:
+
+- manifest generation
+- worker-local path generation
+- no `/home/...` leakage into worker scripts
+- correct OSDF `container_image`
+- correct `transfer_input_files`
+- correct expected output handling
+- job/task ID mapping
+- retry-state transitions
+- quarantine logic
+- idempotent harvest
+- missing optional output does not trigger invalid transfer behavior
+- held job classification
+- completed job classification
+- output scraping integration with mocked calculator outputs
+
+Add integration-style fixture tests for:
+
+- one fake EGAT global task
+- several fake CREST tasks
+- successful completion
+- one infrastructure failure
+- one chemistry failure
+- one retry
+- one quarantine
+
+Mock `condor_submit`, `condor_q`, and `condor_history`.
+
+Do not require live HTCondor in normal CI.
+
+======================================================================
+IMPORTANT CONSTRAINTS
+======================================================================
+
+- Do not duplicate chemistry-aware logic from YARP calculators unless necessary.
+- Do not rewrite all of `progress_yarp.py`.
+- Do not break local, SGE, Slurm, or shared-filesystem Condor workflows.
+- Do not commit SIF files.
+- Do not commit the ORCA installer or ORCA container.
+- Do not expose licensed ORCA content.
+- Do not use absolute user-specific paths in library code.
+- Do not assume all OSG sites expose nested Apptainer.
+- Do not transfer large containers per job.
+- Do not submit thousands of independent clusters when one batched cluster is appropriate.
+- Do not delete failure diagnostics.
+- Do not make state transitions non-idempotent.
+
+======================================================================
+FIRST TASK
+======================================================================
+
+Before editing:
+
+1. Inspect the current branch diff from `master`.
+2. Inspect the `condor_q` implementation.
+3. Inspect `progress_yarp.py` and all asynchronous calculator classes.
+4. Inspect the coworker’s `DFT-Energy-Automated` OSG workflow.
+5. Produce a written architecture proposal in:
+       docs/yarp_osg_design.md
+6. Include:
+   - current YARP lifecycle
+   - OSG mismatch
+   - proposed modules/classes
+   - CLI design
+   - state model
+   - directory layout
+   - manifest format
+   - worker script model
+   - container model
+   - retry model
+   - output retention
+   - phased implementation plan
+   - specific code reuse from YARP
+   - specific reusable patterns from DFT-Energy-Automated
+   - risks and open questions
+
+Do not implement large changes until the design document is complete.
+
+After writing the design, implement only Milestone 1: EGAT-only OSG execution.
+
+Keep edits small, reviewable, and well documented.
+
+At the end, report:
+
+- architecture decisions
+- files added
+- files modified
+- tests added
+- commands run
+- what works
+- what remains mocked
+- what requires a live OSG test
+- any questions that need user input

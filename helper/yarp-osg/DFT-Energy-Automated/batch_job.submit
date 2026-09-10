@@ -1,0 +1,48 @@
+# HTCondor submit file for DFT Energy (ORCA + Multiwfn WBO) jobs
+# file: batch_job.submit
+#
+# Placeholder tokens replaced by start.sh:
+#   __CONTAINER_IMAGE__  → full osdf:// path to the SIF container
+#   __RESULTS_DIR__      → absolute path to local results/ directory
+
+# --- Container ---
++SingularityImage = "osdf:///ospool/uw-shared/projects/ND_Savoie/orca_6_1_1-zip-multiwfn-2.sif"
+
+# --- Job Execution ---
+executable = run_orca_wbo.sh
+arguments = $(zip_abspath)
+
+# --- Input Transfer ---
+transfer_input_files = run_orca_wbo.sh, $(zip_abspath)
+
+# --- Output Transfer ---
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+
+# Bring back the generic results file created by the script
+transfer_output_files = results.tar.gz
+
+# Remap output to nested directory structure under results/
+# $(zip_relpath) is the relative path from file_list.txt (e.g., SpringerNature/subdir/05_0_1)
+transfer_output_remaps = "results.tar.gz = __RESULTS_DIR__/$(zip_relpath)_results.tar.gz"
+
+# --- Resources ---
+requirements = (Microarch >= "x86_64-v3")
+request_cpus = 4
+request_memory = 12 GB
+request_disk = 20 GB
+
+# --- Logging ---
+output = logs/$(Cluster)_$(Process).out
+error = logs/$(Cluster)_$(Process).err
+log = logs/$(Cluster)_$(Process).log
+
+# --- Queue ---
+# Input file format (two columns, comma separated):
+#   Column 1 (zip_abspath): Absolute path to input zip file
+#   Column 2 (zip_relpath): Relative path for output naming (no .zip)
+#
+# Example:
+#   /home/user/workdir/inputs/SpringerNature/subdir/05_0_1.zip, SpringerNature/subdir/05_0_1
+
+queue zip_abspath, zip_relpath from $(input_list)

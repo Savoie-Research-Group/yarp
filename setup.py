@@ -11,6 +11,8 @@ setup(
             'yarp-init=yarp.initialize_yarp:main',
             'yarp-loop=yarp.run_yarp_loop:main',
             'yarp-progress=yarp.progress_yarp:main',
+            'yarp-batch-i=helper.yarp_batch.yarp_init_batch:main',
+            'yarp-batch-p=helper.yarp_batch.yarp_progress_batch:main',
             'yarp-read=helper.read_pkl:cli',
             'yarp-out=helper.export_rxn_smi:cli',
         ],

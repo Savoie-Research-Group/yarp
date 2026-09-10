@@ -25,7 +25,7 @@ def main():
     execute_counter = 0
 
     # Open the output file, and record initial message
-    output_file = work_dir / "yarp_loop.out"
+    output_file = work_dir / f"yarp_loop.log"
     with open(output_file, "a") as out_f:
         out_f.write(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}\n")
 
@@ -33,7 +33,7 @@ def main():
         execute_counter += 1
         with open(output_file, "a") as out_f:
             result = subprocess.run(
-                ["python", str(target_script), str(work_dir)],
+                [sys.executable, "-u", str(target_script), str(work_dir)],
                 stdout=out_f,
                 stderr=subprocess.STDOUT,
                 check=False,

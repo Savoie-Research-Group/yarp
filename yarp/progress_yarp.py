@@ -7,8 +7,62 @@ import pickle
 from pathlib import Path
 
 from yarp.util.input import InputParser
+from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calc_factory import get_calculator
+
+# Tasks that operate on a single species rather than on the reaction path.
+# These are the ones the redundancy blocker can deduplicate.
+SINGLE_SPECIES_TASKS = (
+    "reactant_conformer", "product_conformer",
+    "reactant_optimization", "product_optimization",
+    "reactant_pre_opt", "product_pre_opt",
+)
+
+
+def species_registry_key(rxn_obj, task_type, task_id):
+    """
+    Key identifying a unit of single-species work, for the redundancy blocker.
+
+    Most of these tasks depend only on the species they act on, so two
+    reactions sharing that species can share one job. The product
+    pre-optimization is the exception: it starts from a UFF patch of *this
+    reaction's* relaxed reactant, so two reactions with the same product but
+    different reactants genuinely produce different geometries. Keying it on
+    the product alone would hand one reaction's result to the other -- the same
+    class of bug as pooling conformers on a mapping-independent hash.
+
+    Returns None if the task is not a single-species task.
+    """
+    if task_type not in SINGLE_SPECIES_TASKS:
+        return None
+
+    is_reactant = "reactant" in task_type
+    species = rxn_obj.reactant if is_reactant else rxn_obj.product
+    if not species:
+        return None
+
+    if task_type == "product_pre_opt":
+        return (rxn_obj.reactant.identity, species.identity, task_id)
+    return (species.identity, task_id)
+
+
+def shareable_conformers(species, role):
+    """
+    The conformers of `species` that may be pooled with other states of the
+    same identity.
+
+    Everything is shareable except a *product's* pre-optimization. That one is
+    built by patching this reaction's relaxed reactant onto the product
+    bonding, so it is a property of the reaction, not of the product species --
+    two reactions with the same product and different reactants legitimately
+    get different geometries. Both legs write the same conformer key, so
+    without this filter a reactant-leg result could also be handed to a product
+    state of the same identity, which is a different structure entirely.
+    """
+    if role == "product":
+        return {k: v for k, v in species.conformers.items() if not k.startswith("preopt")}
+    return dict(species.conformers)
 
 def load_state(work_dir: Path):
     """
@@ -134,18 +188,21 @@ def progress_yarp(work_dir: Path):
 
     # 0.1.A Pool all conformers from all reactions using the unique identity
     for rxn_obj in reactions.values():
-        for species in [rxn_obj.reactant, rxn_obj.product]:
+        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
             if not species: continue
             sp_id = species.identity
             if sp_id not in species_conformer_pool:
                 species_conformer_pool[sp_id] = {}
-            species_conformer_pool[sp_id].update(species.conformers)
+            species_conformer_pool[sp_id].update(shareable_conformers(species, role))
 
     # 0.1.B Distribute the enriched pools back to all reactions
     for rxn_obj in reactions.values():
-        for species in [rxn_obj.reactant, rxn_obj.product]:
+        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
             if not species: continue
-            species.conformers.update(species_conformer_pool[species.identity])
+            incoming = species_conformer_pool[species.identity]
+            if role == "product":
+                incoming = {k: v for k, v in incoming.items() if not k.startswith("preopt")}
+            species.conformers.update(incoming)
 
     # =================================================================
     # PASS 0.2: Fast-Forward Previously Characterized Reactions
@@ -177,25 +234,32 @@ def progress_yarp(work_dir: Path):
                 already_done = False
                 desired_key = ""
 
-                # Make sure to pull out the right level of theory for GSM input block                     
-                if task_type == "gsm":
+                # Make sure to pull out the right level of theory for GSM input block.
+                # TSGuessConfig names the level of theory 'gsm_lot', not 'lot'.
+                if task_type == "ts_guess":
                     lot = getattr(task_def.config, 'gsm_lot', None)
                     software = getattr(task_def.config, 'software', None)
                 else:
                     lot = getattr(task_def.config, 'lot', None)
                     software = getattr(task_def.config, 'software', None)
-                
+
                 # Generate the desired data key
                 desired_key = f"{lot}_{software}"
-                
+
+                # Check if the xTB pre-optimization has already been run
+                if task_type in ["reactant_pre_opt", "product_pre_opt"]:
+                    preopt_keys = [key for key in target_species.conformers.keys() if "preopt" in key]
+                    if target_species and any(desired_key in key for key in preopt_keys):
+                        already_done = True
+
                 # Check if reactant/product conformers have been generated
-                if task_type in ["reactant_conformer", "product_conformer"]:
+                elif task_type in ["reactant_conformer", "product_conformer"]:
                     conf_gen_keys = [key for key in target_species.conformers.keys() if "conf_gen" in key]
                     if target_species and any(desired_key in key for key in conf_gen_keys):
                         already_done = True
 
                 # Check if transition state initial guess conformers have been generated
-                elif task_type == "gsm":
+                elif task_type == "ts_guess":
                     ts_guess_keys = [key for key in rxn_obj.ts_geom.keys() if "ts_guess" in key]
                     if any(desired_key in key for key in ts_guess_keys):
                         already_done = True
@@ -262,11 +326,9 @@ def progress_yarp(work_dir: Path):
                 task_type = getattr(task_def, 'task_type', '')
 
                 # Only track single-species tasks (skip reaction path tasks)
-                if task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
-                    is_reactant = "reactant" in task_type
-                    species = rxn_obj.reactant if is_reactant else rxn_obj.product
-                    if species:
-                        active_species_tasks.add((species.identity, task_id))
+                registry_key = species_registry_key(rxn_obj, task_type, task_id)
+                if registry_key is not None:
+                    active_species_tasks.add(registry_key)
 
     # =================================================================
     # PASS 1.1: Check Status of Submitted GLOBAL Jobs
@@ -453,7 +515,13 @@ def progress_yarp(work_dir: Path):
                 continue
 
             print(f" * Submitting global task '{g_task_id}'...")
-            calc.generate_input()
+            try:
+                calc.generate_input()
+            except CalculatorInputError as e:
+                g_meta["status"] = "finished_with_error"
+                print(f" * Global Task '{g_task_id}' aborted: {e}")
+                continue
+
             script_path = calc.write_submission_script()
 
             job_id = job_manager.submit(script_path)
@@ -489,25 +557,21 @@ def progress_yarp(work_dir: Path):
                 task_type = getattr(task_def, 'task_type', '')
 
                 # --- Redundancy Blocker ---
-                if task_type in ["reactant_conformer", "product_conformer", "reactant_optimization", "product_optimization"]:
-                    is_reactant = "reactant" in task_type
-                    species = rxn_obj.reactant if is_reactant else rxn_obj.product
-
-                    if species:
-                        # Same reasoning as PASS 0.1: blocking on the bare
-                        # yarpecule hash would let one atom mapping claim the
-                        # job for every other mapping of the same molecule, and
-                        # they would then be fast-forwarded onto its conformers.
-                        registry_key = (species.identity, task_id)
-
-                        if registry_key in active_species_tasks:
-                            # Silently skip submission! Another identical species is doing the work.
-                            # It remains "ready" and will be fast-forwarded in PASS 0 on a future loop.
-                            print(f"   [DEBUG] ---> Blocked! Identical species calculation already active.")
-                            continue
-                        else:
-                            # We are the "leader"! Claim this species/task combo.
-                            active_species_tasks.add(registry_key)
+                # Same reasoning as PASS 0.1: blocking on the bare yarpecule
+                # hash would let one atom mapping claim the job for every other
+                # mapping of the same molecule, and they would then be
+                # fast-forwarded onto its conformers. See species_registry_key
+                # for why the product pre-opt needs a wider key still.
+                registry_key = species_registry_key(rxn_obj, task_type, task_id)
+                if registry_key is not None:
+                    if registry_key in active_species_tasks:
+                        # Silently skip submission! Another identical species is doing the work.
+                        # It remains "ready" and will be fast-forwarded in PASS 0 on a future loop.
+                        print(f"   [DEBUG] ---> Blocked! Identical species calculation already active.")
+                        continue
+                    else:
+                        # We are the "leader"! Claim this species/task combo.
+                        active_species_tasks.add(registry_key)
 
                 calc = get_calculator(task_def, rxn_obj, config.job_manager)
 
@@ -524,7 +588,19 @@ def progress_yarp(work_dir: Path):
 
                 # Generate and Submit
                 print(f"   * [{rxn_hash}] \tSubmitting task '{task_id}'...")
-                calc.generate_input()
+                try:
+                    calc.generate_input()
+                except CalculatorInputError as e:
+                    # The calculator could not build a usable input -- e.g. the
+                    # product pre-optimization's UFF patch never reached the
+                    # product connectivity. Discard this reaction and carry on
+                    # with the rest of the pass.
+                    meta["status"] = "finished_with_error"
+                    meta["error_log"] = f"Input generation failed: {e}"
+                    failed_rxns[rxn_hash] = rxn_obj
+                    print(f"   * [{rxn_hash}] \tTask '{task_id}' aborted: {e}")
+                    continue
+
                 script_path = calc.write_submission_script()
 
                 job_id = job_manager.submit(script_path)

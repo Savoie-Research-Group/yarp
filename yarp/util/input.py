@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 from pprint import pformat
 from typing import List, Dict, Any
 
-from yarp.util.config import InitalStructConfig, JobManagerConfig, EnumerationConfig, PreEnumFilters, PropertyFilterConfig, ProductBlindersConfig, PostEnumFilters, MLPropConfig, ConformerConfig, RPOptConfig, TSOptConfig, TSGuessConfig, IRCValConfig, InitialGeomConfig, GeomSourceConfig
+from yarp.util.config import InitalStructConfig, JobManagerConfig, EnumerationConfig, PreEnumFilters, PropertyFilterConfig, ProductBlindersConfig, PostEnumFilters, MLPropConfig, ConformerConfig, PreOptConfig, RPOptConfig, TSOptConfig, TSGuessConfig, IRCValConfig, InitialGeomConfig, GeomSourceConfig
 
 def has_atom_maps(smiles: str) -> bool:
     """
@@ -53,7 +53,7 @@ INITIALIZE_KEYS = frozenset({
 STAGE_KEYS_BY_METHOD = {
     "ml_rxn_prop": frozenset({"method"} | set(MLPropConfig.__dataclass_fields__)),
     "init_rxn_path": frozenset({
-        "method", "pre_characterize_filters", "conf_gen", "ts_guess",
+        "method", "pre_characterize_filters", "pre_opt", "conf_gen", "ts_guess",
     }),
     "refine_rxn_path": frozenset({
         "method", "initial_geom", "rp_opt", "ts_opt", "irc_val",
@@ -175,7 +175,12 @@ class InputParser:
                 for req in task_def.requires_data:
                     if req in promised_data:
                         # Add the execution dependency automatically!
-                        task_def.depends_on.append(promised_data[req])
+                        # Guard against re-adding a dependency that was already
+                        # declared statically: `ts_guess` names both conformer
+                        # tasks AND requires their data, which used to yield
+                        # [r_conf, p_conf, r_conf, p_conf].
+                        if promised_data[req] not in task_def.depends_on:
+                            task_def.depends_on.append(promised_data[req])
 
                 # Register the data this task will provide to downstream tasks
                 for prov in task_def.provides_data:
@@ -368,6 +373,11 @@ class InputParser:
                     PropertyFilterConfig, pre_filter_node, f"{name}.pre_characterize_filters"
                 )
 
+            # The pre-optimization is not optional and has no 'off' switch, so
+            # an absent block simply means "run with defaults".
+            preopt_data = data.get('pre_opt', {})
+            preopt_cfg = self._build(PreOptConfig, preopt_data, f"{name}.pre_opt")
+
             conf_data = data.get('conf_gen', {})
             conf_cfg = self._build(ConformerConfig, conf_data, f"{name}.conf_gen")
 
@@ -375,6 +385,8 @@ class InputParser:
             tsg_cfg = self._build(TSGuessConfig, tsg_data, f"{name}.ts_guess")
 
             # Define Unique Task IDs
+            r_preopt_id = f"{name}.reactant_pre_opt"
+            p_preopt_id = f"{name}.product_pre_opt"
             r_conf_id = f"{name}.reactant_conformer"
             p_conf_id = f"{name}.product_conformer"
             tsg_id = f"{name}.ts_guess"
@@ -383,11 +395,33 @@ class InputParser:
             initial_deps = [self.ml_task_id] if self.ml_task_id else []
 
             # Create Tasks and Map Dependencies
+            #
+            # The two pre-opt legs are NOT siblings. The product leg starts from
+            # a UFF patch of the *relaxed reactant* onto the product's own BEM,
+            # so it cannot begin until the reactant leg has finished.
+            config.tasks[r_preopt_id] = TaskDef(
+                task_id=r_preopt_id,
+                task_type="reactant_pre_opt",
+                parent_stage=name,
+                depends_on=list(initial_deps),
+                config=preopt_cfg,
+                provides_data=["reactant_preopt"]
+            )
+
+            config.tasks[p_preopt_id] = TaskDef(
+                task_id=p_preopt_id,
+                task_type="product_pre_opt",
+                parent_stage=name,
+                depends_on=[r_preopt_id],
+                config=preopt_cfg,
+                provides_data=["product_preopt"]
+            )
+
             config.tasks[r_conf_id] = TaskDef(
                 task_id=r_conf_id,
                 task_type="reactant_conformer",
                 parent_stage=name,
-                depends_on=initial_deps,
+                depends_on=[r_preopt_id],
                 config=conf_cfg,
                 provides_data=["reactant_conf"]
             )
@@ -396,15 +430,15 @@ class InputParser:
                 task_id=p_conf_id,
                 task_type="product_conformer",
                 parent_stage=name,
-                depends_on=initial_deps,
+                depends_on=[p_preopt_id],
                 config=conf_cfg,
                 provides_data=["product_conf"]
             )
 
             config.tasks[tsg_id] = TaskDef(
-                task_id=tsg_id, 
-                task_type="ts_guess", 
-                parent_stage=name, 
+                task_id=tsg_id,
+                task_type="ts_guess",
+                parent_stage=name,
                 depends_on=[r_conf_id, p_conf_id],
                 config=tsg_cfg,
                 requires_data=["reactant_conf", "product_conf"], # Needs 2 starting nodes to run!

@@ -2,7 +2,6 @@
 Wrapper function to manage the generation of reaction objects during main_yarp routine
 """
 import pickle
-import numpy as np
 from pathlib import Path
 
 from yarp.yarpecule.yarpecule import yarpecule
@@ -10,9 +9,6 @@ from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_react
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
 from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
-from yarp.util.rdkit import rdkit_joint_opt
-from yarp.util.obabel import obabel_joint_opt
-from yarp.yarpecule.graph.adjacency import table_generator
 
 
 def generate_rxns(inp):
@@ -61,14 +57,10 @@ def generate_rxns(inp):
             )
 
             for prod in clean_products:
-                opt_prod = quick_geom_opt(prod)
-                if opt_prod is None:
-                    reactant.get_smiles()
-                    prod.get_smiles()
-                    if verbose:
-                        print(f"    + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({reactant.canon_smi}) geom")
-                    continue
-                r2p = reaction(reactant, opt_prod)
+                # Products carry the parent's coordinates verbatim and
+                # index-aligned. Relaxing them is the xTB pre-optimization's
+                # job now, at the conformer stage.
+                r2p = reaction(reactant, prod)
                 output[r2p.hash] = r2p
 
         # Enumerating from reaction object(s)
@@ -131,15 +123,10 @@ def generate_rxns(inp):
                 )
 
                 for prod in clean_products:
-                    opt_prod = quick_geom_opt(prod)
-                    if opt_prod is None:
-                        mol.get_smiles()
-                        prod.get_smiles()
-                        if verbose:
-                            print(f"    + SKIPPED! Unable to form valid product ({prod.canon_smi}) geom from reactant ({mol.canon_smi}) geom")
-                        continue
-                    r2p = reaction(mol, opt_prod)
-                    p2r = reaction(opt_prod, mol)
+                    # See the note in the 'species' branch above: geometry
+                    # relaxation has moved to the xTB pre-optimization.
+                    r2p = reaction(mol, prod)
+                    p2r = reaction(prod, mol)
 
                     # Skip reactions already discovered (forward/reverse)
                     if r2p.hash in og_rxns_hash or p2r.hash in og_rxns_hash:
@@ -179,62 +166,3 @@ def generate_rxns(inp):
             raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
     return output
-
-
-def quick_geom_opt(molecule, lot="uff"):
-    '''
-    Perform low-level level geometry optimization on yarpecule using openbabel.
-
-    ERM: Can we just change the forcefield from UFF if we want?
-
-    Parameters:
-    ----------
-    molecule : yarpecule object
-        molecule to be optimized 
-
-    lot : string
-        Level of theory used for quick optimization
-
-    Returns
-    -------
-    molecule : yarpecule object
-        optimized molecule
-
-    Notes
-    -----
-    The molecule is relaxed under its own bonding, so the "target" BEM and
-    adjacency matrix handed to the joint optimizers are its own. This is the
-    same RDKit-first / Open Babel-fallback pattern used by
-    yarp.reaction.conf_sampling.joint_opt.joint_optimize.
-    '''
-    target_bem = molecule.bond_mats[0]
-    target_adj = molecule.adj_mat
-
-    # First, attempt to optimize with RDKit
-    rd_opt_g = rdkit_joint_opt(molecule, target_bem, target_adj, lot=lot)
-
-    # Check if optimization preserved starting connectivity
-    if rd_opt_g is not None:
-        rd_adj = table_generator(molecule.elements, rd_opt_g)
-        rd_diff = rd_adj - target_adj
-
-    # If RDKit generated a garbage geom (or failed outright), try Open Babel
-    if rd_opt_g is None or not np.all(rd_diff == 0):
-        ob_opt_g = obabel_joint_opt(molecule, target_bem, target_adj, lot=lot)
-
-        # If Open Babel fails too, we return None
-        if ob_opt_g is None:
-            return None
-        ob_adj = table_generator(molecule.elements, ob_opt_g)
-        ob_diff = ob_adj - target_adj
-        if not np.all(ob_diff == 0):
-            return None
-
-        # If all goes well, update geometry and return
-        molecule._geo = ob_opt_g
-        return molecule
-
-    # Otherwise, if RDKit gave a valid geom, use that one
-    else:
-        molecule._geo = rd_opt_g
-        return molecule

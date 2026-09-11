@@ -1,15 +1,41 @@
 import shutil
 from pathlib import Path
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 
+# Conformer key prefix written by the xTB pre-optimization.
+PREOPT_PREFIX = "preopt"
+
+
 class ConfTask(AsyncYarpCalculator):
+    @property
+    def target_species(self):
+        """The state this task generates conformers for."""
+        return self.rxn.reactant if "reactant" in self.task_def.task_type else self.rxn.product
+
+    def preopt_conformer(self):
+        """
+        The xTB pre-optimized geometry this task starts from, or None.
+
+        Conformer generation used to start from `initial_geom`, the raw
+        yarpecule graph geometry -- which for an enumerated product is the
+        parent's coordinates under the product's bonding, and can be wildly
+        strained. The pre-optimization stage now supplies a relaxed structure,
+        and there is no path that skips it.
+        """
+        for key, conf in self.target_species.conformers.items():
+            if key.startswith(PREOPT_PREFIX) and conf.geo is not None:
+                return conf
+        return None
+
     def has_prerequisites(self) -> bool:
-        if not self.rxn.reactant.conformers.get('initial_geom') or not self.rxn.product.conformers.get('initial_geom'):
-            return False
-        return True
+        # Only this task's own side. The reactant and product legs of the
+        # pre-optimization finish at different times -- the product leg waits on
+        # the reactant leg -- so requiring both here would fail the reactant's
+        # conformer task the moment its dependency was satisfied.
+        return self.preopt_conformer() is not None
 
 
 class CrestConfCalculator(ConfTask):
@@ -19,19 +45,19 @@ class CrestConfCalculator(ConfTask):
         self.image_name = "erm42/yarp:crest"
         self.xyz_file = "input.xyz"
 
-        # Determine if we are working on the reactant or the product
-        if "reactant" in self.task_def.task_type:
-            self.target_species = self.rxn.reactant
-        else:
-            self.target_species = self.rxn.product
-
     def generate_input(self):
-        """Write the initial 3D geometry for CREST to start from."""
+        """Write the pre-optimized 3D geometry for CREST to start from."""
+        initial_conf = self.preopt_conformer()
+        if initial_conf is None:
+            raise CalculatorInputError(
+                f"No '{PREOPT_PREFIX}_*' conformer on the "
+                f"{'reactant' if 'reactant' in self.task_def.task_type else 'product'}; "
+                "the xTB pre-optimization has not produced a geometry for this species."
+            )
+
         input_xyz_path = self.scratch_dir / self.xyz_file
         with open(input_xyz_path, "w") as f:
-            # Assuming yarpecule has a method to get a basic 3D string
-            # (e.g., generated via RDKit/ETKDG during initialization)
-            f.write(self.target_species.conformers.get('initial_geom').to_xyz_string())
+            f.write(initial_conf.to_xyz_string())
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""
@@ -140,7 +166,16 @@ class CrestConfCalculator(ConfTask):
     def _get_crest_command(self):
 
         # basic command (ERM: no way to set memory_per_cpu in CREST????)
-        cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"
+        #
+        # --noopt: CREST's trial metadynamics fails on a free H2 whose H-H
+        # distance exceeds roughly 0.760-0.770 A, and GFN2's equilibrium H-H is
+        # 0.7750 A -- so any structure carrying a free H2 that has been through
+        # an xTB optimization breaks CREST. Skipping CREST's own preoptimization
+        # avoids that. The structures reaching CREST are now xTB-relaxed by the
+        # pre-optimization stage, so the preoptimization CREST would have run is
+        # redundant for the other cases too -- though that has NOT been measured
+        # yet, and is worth checking before trusting it.
+        cmd = f"crest {self.xyz_file} --{self.config.lot} --noopt -nozs -T {self.config.n_cpus}"
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"

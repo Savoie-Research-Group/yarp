@@ -5,40 +5,180 @@ import re
 from pathlib import Path
 import numpy as np
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
+from yarp.reaction.conf_sampling.joint_opt import joint_optimize
+from yarp.yarpecule.graph.adjacency import compare_adjacency, describe_adjacency_change
 from yarp.util.constants import Constants
 
+# Which side of the reaction each task type operates on, and whether it is the
+# cheap pre-optimization that runs ahead of conformer generation or the
+# refinement optimization that runs after it. Both do the same thing --
+# minimize a structure -- so they share a calculator; these two maps are the
+# only places the difference is spelled out.
+_TASK_SIDE = {
+    "reactant_pre_opt": "reactant",
+    "product_pre_opt": "product",
+    "reactant_optimization": "reactant",
+    "product_optimization": "product",
+}
+_PRE_OPT_TASKS = frozenset({"reactant_pre_opt", "product_pre_opt"})
+
+
 class MinOptTask(AsyncYarpCalculator):
-    def has_prerequisites(self) -> bool:
-        # 1. Determine which state we care about for this specific task
-        if self.task_def.task_type == "reactant_optimization":
-            node = self.rxn.reactant
-            source = self.config.initial_geom.reactant
-        elif self.task_def.task_type == "product_optimization":
-            node = self.rxn.product
-            source = self.config.initial_geom.product
-        else:
+    """
+    Shared behaviour for minimizing a reactant or product structure.
+
+    Serves four task types: the two pre-optimization legs and the two
+    refinement legs. The pre-opt legs differ only in where their starting
+    geometry comes from, which optimizer runs, and what the resulting
+    conformer is called.
+    """
+
+    @property
+    def side(self) -> str:
+        """'reactant' or 'product', from the task type."""
+        try:
+            return _TASK_SIDE[self.task_def.task_type]
+        except KeyError:
             raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
 
+    @property
+    def is_pre_opt(self) -> bool:
+        return self.task_def.task_type in _PRE_OPT_TASKS
+
+    @property
+    def node(self):
+        """The state this task optimizes."""
+        return self.rxn.reactant if self.side == "reactant" else self.rxn.product
+
+    def output_key(self) -> str:
+        """Conformer key this task writes its result under."""
+        prefix = "preopt" if self.is_pre_opt else "rpopt"
+        return f"{prefix}_{self.config.lot}_{self.config.software}"
+
+    def source_key(self) -> str:
+        """
+        Conformer key this task reads its starting geometry from.
+
+        Pre-opt has no `initial_geom` block to consult: the reactant leg always
+        starts from the yarpecule's own geometry, and the product leg starts
+        from the relaxed reactant, which it patches onto the product BEM in
+        `generate_input` rather than reading directly.
+        """
+        if self.is_pre_opt:
+            if self.side == "reactant":
+                return "initial_geom"
+            # The product leg reads the RELAXED REACTANT, not a product
+            # conformer -- see `_patched_product_geometry`.
+            return f"preopt_{self.config.lot}_{self.config.software}"
+
+        source = getattr(self.config.initial_geom, self.side)
+        if source.label == "conf_gen":
+            return "conf_gen_rank0"
+        elif source.label == "rp_opt":
+            return f"rpopt_{source.lot}_{source.software}"
+        raise ValueError(f"Unknown initial geom label for R/P MinOpt: {source.label}")
+
+    def source_node(self):
+        """
+        The state the starting geometry is read from.
+
+        Everything reads its own side, except the product pre-opt, which starts
+        from the relaxed reactant.
+        """
+        if self.is_pre_opt and self.side == "product":
+            return self.rxn.reactant
+        return self.node
+
+    def find_conformer(self, node, expected_key):
+        """First conformer on `node` whose key contains `expected_key`."""
+        for key in node.conformers.keys():
+            if expected_key in key and node.conformers[key].geo is not None:
+                return node.conformers[key]
+        return None
+
+    def has_prerequisites(self) -> bool:
+        node = self.source_node()
         if not node.conformers:
             return False
+        return self.find_conformer(node, self.source_key()) is not None
 
-        # 2. Determine the target key to look for
-        if source.label == "conf_gen":
-            expected_key = "conf_gen_rank0"
-        elif source.label == "rp_opt":
-            expected_key = f"rpopt_{source.lot}_{source.software}"
-        else:
-            raise ValueError(f"Unknown initial geom label for R/P MinOpt: {source.label}")
+    def _starting_conformer(self):
+        """The starting geometry, or raise if it has gone missing."""
+        node = self.source_node()
+        initial_conf = self.find_conformer(node, self.source_key())
+        if initial_conf is None:
+            raise CalculatorInputError(
+                f"Could not find requested geometry: {self.source_key()}"
+            )
+        return initial_conf
 
-        # 3. Check if the target conformer exists
-        for key in node.conformers.keys():
-            if expected_key in key and node.conformers[key].geo is not None: 
-                return True
+    def _patched_product_geometry(self):
+        """
+        Build the product pre-opt's starting structure.
 
-        return False
+        Takes the xTB-relaxed reactant and force-field patches it onto the
+        product's OWN bonding. Note `product.paired_bem` is the *reactant's*
+        BEM -- that is what the GSM machinery wants -- so the target here has
+        to come off the product graph directly.
+
+        Products inherit the parent's atom ordering verbatim and index-aligned
+        (`canon=False` at enumeration), which is the only reason a reactant
+        geometry can be reinterpreted under product bonding at all.
+
+        Raises `CalculatorInputError` if neither force field can reach the
+        product connectivity, which discards the reaction.
+        """
+        relaxed_reactant = self._starting_conformer()
+        target_bem = self.rxn.product.graph.bond_mats[0]
+
+        patched = joint_optimize(relaxed_reactant, target_bem, lot=self.config.bias_lot)
+        if patched is None:
+            raise CalculatorInputError(
+                "Product pre-optimization could not patch the relaxed reactant "
+                f"geometry onto the product bonding (bias_lot={self.config.bias_lot}). "
+                "Neither RDKit nor Open Babel reproduced the product connectivity."
+            )
+
+        matches, n_broken, n_formed = compare_adjacency(
+            patched.elements, patched.geo, self.rxn.product.graph.adj_mat
+        )
+        if not matches:
+            raise CalculatorInputError(
+                "Product pre-optimization UFF patch did not reproduce the product "
+                f"graph: {describe_adjacency_change(n_broken, n_formed)}."
+            )
+
+        return patched
+
+    def _check_preopt_adjacency(self, elements, geo) -> bool:
+        """
+        Compare a finished pre-optimization against the graph it should have.
+
+        Returns True if the task should be considered successful. The reactant
+        leg gates on this: a reactant that is not a minimum of its own graph
+        invalidates the whole reaction. The product leg only warns, because the
+        design calls for feeding the xTB geometry to CREST either way -- an
+        enumerated product that is not a GFN2 minimum is a real result, not a
+        failure, and discarding it would throw away chemistry.
+        """
+        matches, n_broken, n_formed = compare_adjacency(
+            elements, geo, self.node.graph.adj_mat
+        )
+        if matches:
+            return True
+
+        change = describe_adjacency_change(n_broken, n_formed)
+        if self.side == "reactant":
+            print(f"     * Pre-optimization changed the reactant graph ({change}). "
+                  f"Rejecting reaction.")
+            return False
+
+        print(f"     ! Pre-optimization changed the product graph ({change}). "
+              f"Keeping it anyway and passing it to conformer generation.")
+        return True
 
 class PysisyphusMinOptCalculator(MinOptTask):
     def __init__(self, *args, **kwargs):
@@ -46,28 +186,13 @@ class PysisyphusMinOptCalculator(MinOptTask):
         self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
-        if self.task_def.task_type == "reactant_optimization":
-            node = self.rxn.reactant
-            source = self.config.initial_geom.reactant
-        elif self.task_def.task_type == "product_optimization":
-            node = self.rxn.product
-            source = self.config.initial_geom.product
+        # The product pre-opt is the one case with no ready-made starting
+        # geometry: it has to be built by patching the relaxed reactant onto
+        # the product bonding first.
+        if self.is_pre_opt and self.side == "product":
+            initial_conf = self._patched_product_geometry()
         else:
-            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
-
-        if source.label == "conf_gen":
-            expected_key = "conf_gen_rank0"
-        elif source.label == "rp_opt":
-            expected_key = f"rpopt_{source.lot}_{source.software}"
-
-        initial_conf = None
-        for key in node.conformers.keys():
-            if expected_key in key:
-                initial_conf = node.conformers[key]
-                break
-                
-        if not initial_conf:
-            raise ValueError(f"Could not find requested geometry: {expected_key}")
+            initial_conf = self._starting_conformer()
 
         input_xyz_path = self.scratch_dir / "initial_geom.xyz"
         with open(input_xyz_path, "w") as f:
@@ -102,12 +227,17 @@ class PysisyphusMinOptCalculator(MinOptTask):
     def check_output(self) -> bool:
         log_file = self.scratch_dir / f"min_opt.log"
         xyz_file = self.scratch_dir / "final_geometry.xyz"
-        hess_file = self.scratch_dir / "final_hessian.h5"
+
+        # The pre-optimization does not request a Hessian, so there is no
+        # final_hessian.h5 to look for.
+        expected = [log_file, xyz_file]
+        if not self.is_pre_opt:
+            expected.append(self.scratch_dir / "final_hessian.h5")
 
         success = True
 
         # 1. File existence check
-        if not (log_file.exists() and xyz_file.exists() and hess_file.exists()):
+        if not all(path.exists() for path in expected):
             print(f"     * Run failed: Missing expected output files.")
             return False
 
@@ -119,13 +249,19 @@ class PysisyphusMinOptCalculator(MinOptTask):
             print(f"     * Run failed: Did not find successful termination message in log.")
             success = False
 
-        return success            
+        # 3. Did the pre-optimization keep the graph it was given?
+        #    Gates the reactant leg, warns on the product leg.
+        if success and self.is_pre_opt:
+            opt_elements, opt_geo = self._parse_opt_geo()
+            success = self._check_preopt_adjacency(opt_elements, opt_geo)
+
+        return success
 
     def scrape_data(self) -> bool:
         conf = conformer()
         conf.lot = self.config.lot
         conf.software = self.config.software
-        conf.type = f"rpopt_{self.config.lot}_{self.config.software}"
+        conf.type = self.output_key()
 
         opt_elements, opt_geo = self._parse_opt_geo()
         conf.elements = opt_elements
@@ -133,16 +269,14 @@ class PysisyphusMinOptCalculator(MinOptTask):
 
         conf.properties['internal_energy_Eh'] = self._parse_energy()
 
-        hess, freq = self._parse_hessian_freq()
-        conf.vibrational_freqs = freq
-        conf.hessian = hess
-        
-        if self.task_def.task_type == "reactant_optimization":
-            self.rxn.reactant.conformers[conf.type] = conf
-        elif self.task_def.task_type == "product_optimization":
-            self.rxn.product.conformers[conf.type] = conf
-        else:
-            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
+        # No Hessian is requested for the pre-optimization: nothing downstream
+        # consumes its frequencies, and the geometry goes straight to CREST.
+        if not self.is_pre_opt:
+            hess, freq = self._parse_hessian_freq()
+            conf.vibrational_freqs = freq
+            conf.hessian = hess
+
+        self.node.conformers[conf.type] = conf
 
         return True
 
@@ -172,7 +306,15 @@ class PysisyphusMinOptCalculator(MinOptTask):
             f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
 
             # set opt block
-            f.write(f'opt:\n type: rfo\n max_cycles: {self.config.max_cycles}\n overachieve_factor: 3\n hessian_recalc: {self.config.hessian_recalc}\n do_hess: True\n')
+            #
+            # The pre-optimization defaults to lbfgs and skips the Hessian.
+            # 'rfo' cannot optimize a free diatomic -- a linear fragment yields
+            # a 7th small Hessian eigenvalue and trips a pysisyphus assertion --
+            # and products shedding H2 or O2 are common. The Hessian is skipped
+            # because nothing downstream reads pre-opt frequencies.
+            f.write(f'opt:\n type: {self.config.opt_type}\n max_cycles: {self.config.max_cycles}\n overachieve_factor: 3\n')
+            if not self.is_pre_opt:
+                f.write(f' hessian_recalc: {self.config.hessian_recalc}\n do_hess: True\n')
 
     def _parse_opt_geo(self):
         xyz_file = self.scratch_dir / "final_geometry.xyz"
@@ -208,28 +350,7 @@ class OrcaMinOptCalculator(MinOptTask):
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):
-        if self.task_def.task_type == "reactant_optimization":
-            node = self.rxn.reactant
-            source = self.config.initial_geom.reactant
-        elif self.task_def.task_type == "product_optimization":
-            node = self.rxn.product
-            source = self.config.initial_geom.product
-        else:
-            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
-
-        if source.label == "conf_gen":
-            expected_key = "conf_gen_rank0"
-        elif source.label == "rp_opt":
-            expected_key = f"rpopt_{source.lot}_{source.software}"
-
-        initial_conf = None
-        for key in node.conformers.keys():
-            if expected_key in key:
-                initial_conf = node.conformers[key]
-                break
-                
-        if not initial_conf:
-            raise ValueError(f"Could not find requested geometry: {expected_key}")
+        initial_conf = self._starting_conformer()
 
         input_xyz_path = self.scratch_dir / "initial_geom.xyz"
         with open(input_xyz_path, "w") as f:
@@ -283,7 +404,7 @@ class OrcaMinOptCalculator(MinOptTask):
         conf = conformer()
         conf.lot = self.config.lot
         conf.software = self.config.software
-        conf.type = f"rpopt_{self.config.lot}_{self.config.software}"
+        conf.type = self.output_key()
 
         xyz_file = self.scratch_dir / "min_opt.xyz"
         opt_elements, opt_geo = self._parse_opt_geo(xyz_file)
@@ -302,13 +423,8 @@ class OrcaMinOptCalculator(MinOptTask):
         hess, freq = self._parse_hessian_freq(hess_file)
         conf.vibrational_freqs = freq
         conf.hessian = hess
-        
-        if self.task_def.task_type == "reactant_optimization":
-            self.rxn.reactant.conformers[conf.type] = conf
-        elif self.task_def.task_type == "product_optimization":
-            self.rxn.product.conformers[conf.type] = conf
-        else:
-            raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
+
+        self.node.conformers[conf.type] = conf
 
         return True
 

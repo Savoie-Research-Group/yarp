@@ -17,8 +17,13 @@ def select_gsm_pairs(rxn, config):
     """
     Orchestrates Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
     """
-    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"] 
-    p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]
+    # Select the conformer-generation output explicitly, rather than taking
+    # "everything that is not initial_geom". The states also carry the xTB
+    # pre-optimization's structure (and, on a second refinement pass, the
+    # rp_opt geometries), none of which are CREST conformers -- sweeping them
+    # in here would quietly seed GSM with the wrong structures.
+    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if "conf_gen" in key]
+    p_confs = [conf for key, conf in rxn.product.conformers.items() if "conf_gen" in key]
 
     # --- STEP A: Apply Joint Optimization (Biasing) ---
     lot = config.bias_lot

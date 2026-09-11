@@ -332,6 +332,59 @@ class TSGuessConfig:
 
 
 @dataclass
+class PreOptConfig:
+    """
+    Holds settings for the xTB pre-optimization that runs ahead of conformer
+    generation.
+
+    Sub-block of `init_rxn_path`. An absent block means "run with these
+    defaults" -- the pre-optimization is not optional, so there is deliberately
+    no switch to turn it off.
+
+    Unlike `RPOptConfig` there is no `initial_geom`: the reactant leg always
+    starts from the yarpecule's own geometry, and the product leg always starts
+    from the UFF patch of the relaxed reactant, so there is nothing to choose.
+    """
+    software: str = "pysisyphus"
+    lot: str = "xtb"
+    charge: int = 0
+    multiplicity: int = 1
+    # 'rfo' cannot optimize a free diatomic -- a linear fragment gives a 7th
+    # small Hessian eigenvalue and trips a pysisyphus assertion. Products
+    # shedding H2 or O2 are common enough that lbfgs has to be the default.
+    opt_type: str = "lbfgs"
+    max_cycles: int = 300
+    bias_lot: str = "uff"
+
+    n_cpus: int = 1
+    mem_per_cpu: int = 4000
+    max_runtime: str = "01:00:00"
+
+    def __post_init__(self):
+        if self.software not in ['pysisyphus']:
+            raise ValueError(f"Invalid pre_opt.'software' provided: '{self.software}'; valid option: 'pysisyphus'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
+            raise ValueError(f"Invalid pre_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.opt_type not in ['lbfgs', 'rfo']:
+            raise ValueError(f"Invalid pre_opt.'opt_type': '{self.opt_type}'. Valid options are 'lbfgs', 'rfo'")
+        if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
+            raise ValueError(f"Invalid force field selected for pre_opt.'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
+
+        if not isinstance(self.charge, int):
+            raise ValueError("Please provide an integer value to pre_opt: 'charge'")
+        if not isinstance(self.multiplicity, int):
+            raise ValueError("Please provide an integer value to pre_opt: 'multiplicity'")
+        if not isinstance(self.max_cycles, int):
+            raise ValueError("Please provide an integer value to pre_opt: 'max_cycles'")
+        if not isinstance(self.n_cpus, int):
+            raise ValueError("Please provide an integer value to pre_opt: 'n_cpus'")
+        if not isinstance(self.mem_per_cpu, int):
+            raise ValueError("Please provide an integer value (in MB) to pre_opt: 'mem_per_cpu'")
+        if not is_valid_time_format(self.max_runtime):
+            raise ValueError("Please provide pre_opt: 'max_runtime' time in HH:MM:SS!")
+
+
+@dataclass
 class RPOptConfig:
     """Holds settings specific to optimizing reactant/product conformers"""
     software: str = None
@@ -340,6 +393,9 @@ class RPOptConfig:
     multiplicity: int = None
     hessian_recalc: int = 3
     max_cycles: int = 300
+    # Was hardcoded to 'rfo' in the pysisyphus input writer. Exposed so the
+    # refine stage can also escape the free-diatomic problem; default unchanged.
+    opt_type: str = "rfo"
     initial_geom: Optional[InitialGeomConfig] = None
     # ERM: To-do -> put in convergence threshold and solvent options?
 
@@ -357,6 +413,8 @@ class RPOptConfig:
         if self.software == 'pysisyphus' and self.lot not in ['xtb']:
             raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
+        if self.opt_type not in ['rfo', 'lbfgs']:
+            raise ValueError(f"Invalid rp_opt.'opt_type': '{self.opt_type}'. Valid options are 'rfo', 'lbfgs'")
 
         if not isinstance(self.hessian_recalc, int):
             raise ValueError("Please provide an integer value to rp_opt: 'hessian_recalc'")

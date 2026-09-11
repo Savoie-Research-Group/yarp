@@ -4,7 +4,7 @@ import numpy as np
 from openbabel import pybel
 from rdkit.Chem import AllChem
 
-from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.graph.adjacency import compare_adjacency
 from yarp.util.rdkit import rdkit_joint_opt
 from yarp.util.obabel import obabel_joint_opt
 
@@ -29,19 +29,16 @@ def joint_optimize(conformer, target_bem, lot="uff"):
     rd_opt_g = rdkit_joint_opt(conformer, target_bem, target_adj, lot=lot)
 
     # Check if optimization reproduced the target connectivity
-    if rd_opt_g is not None:
-        rd_adj = table_generator(conformer.elements, rd_opt_g)
-        rd_diff = rd_adj - target_adj
-    if rd_opt_g is None or not np.all(rd_diff == 0):
+    rd_ok = rd_opt_g is not None and compare_adjacency(conformer.elements, rd_opt_g, target_adj)[0]
+
+    if not rd_ok:
         # If RDKit generated a garbage geom (or failed outright), try Open Babel
         ob_opt_g = obabel_joint_opt(conformer, target_bem, target_adj, lot=lot)
 
         # If Open Babel fails too, we return None
         if ob_opt_g is None:
             return None
-        ob_adj = table_generator(conformer.elements, ob_opt_g)
-        ob_diff = ob_adj - target_adj
-        if not np.all(ob_diff == 0):
+        if not compare_adjacency(conformer.elements, ob_opt_g, target_adj)[0]:
             return None
 
         opt_geo = ob_opt_g

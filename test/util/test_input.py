@@ -60,6 +60,7 @@ TYPO_CASES = [
     ("initialize.enumeration.post_enum_filters", "lewis_scor",      "lewis_score"),
     ("egat",                                     "n_cpu",           "n_cpus"),
     ("ll_path",                                  "conf_genn",       "conf_gen"),
+    ("ll_path",                                  "pre_opts",        "pre_opt"),
     ("ll_path.conf_gen",                         "n_cpu",           "n_cpus"),
     ("ll_path.ts_guess",                         "n_confs",         "n_conf"),
     ("ll_refine.initial_geom",                   "transiton_state", "transition_state"),
@@ -169,6 +170,113 @@ class TestUnknownKeyRejection:
             InputParser(cfg)
 
         assert "sorce" in str(exc_info.value)
+
+
+class TestPreOptWiring:
+    """
+    The xTB pre-optimization sits between the ML stage and conformer
+    generation. Its two legs are NOT siblings: the product leg starts from a
+    UFF patch of the *relaxed reactant*, so it cannot begin until the reactant
+    leg has finished.
+    """
+
+    def _tasks(self, cfg):
+        return InputParser(cfg).pipeline_tasks
+
+    def test_both_legs_exist(self, enum_egat_llpath_llrefine):
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.reactant_pre_opt"].task_type == "reactant_pre_opt"
+        assert tasks["ll_path.product_pre_opt"].task_type == "product_pre_opt"
+
+    def test_product_leg_waits_for_the_reactant_leg(self, enum_egat_llpath_llrefine):
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.product_pre_opt"].depends_on == ["ll_path.reactant_pre_opt"]
+
+    def test_conformers_wait_for_their_own_leg(self, enum_egat_llpath_llrefine):
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.reactant_conformer"].depends_on == ["ll_path.reactant_pre_opt"]
+        assert tasks["ll_path.product_conformer"].depends_on == ["ll_path.product_pre_opt"]
+
+    def test_reactant_leg_still_waits_for_the_ml_stage(self, enum_egat_llpath_llrefine):
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.reactant_pre_opt"].depends_on == ["egat.ml_predict"]
+
+    def test_ts_guess_is_unchanged(self, enum_egat_llpath_llrefine):
+        """Pre-opt is inserted upstream; the TS guess still hangs off the conformers."""
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.ts_guess"].depends_on == [
+            "ll_path.reactant_conformer", "ll_path.product_conformer",
+        ]
+
+    def test_absent_block_runs_with_defaults(self, enum_egat_llpath_llrefine):
+        """
+        There is deliberately no way to switch the pre-optimization off, so an
+        absent block means 'run with defaults', not 'skip'.
+        """
+        assert "pre_opt" not in enum_egat_llpath_llrefine["ll_path"]
+        cfg = self._tasks(enum_egat_llpath_llrefine)["ll_path.reactant_pre_opt"].config
+
+        assert cfg.software == "pysisyphus"
+        assert cfg.lot == "xtb"
+        assert cfg.opt_type == "lbfgs"
+
+    def test_block_customises_the_stage(self, enum_egat_llpath_llrefine):
+        cfg = copy.deepcopy(enum_egat_llpath_llrefine)
+        cfg["ll_path"]["pre_opt"] = {"n_cpus": 4, "max_cycles": 50, "opt_type": "rfo"}
+        parsed = self._tasks(cfg)["ll_path.reactant_pre_opt"].config
+
+        assert (parsed.n_cpus, parsed.max_cycles, parsed.opt_type) == (4, 50, "rfo")
+
+    def test_both_legs_share_one_config_object(self, enum_egat_llpath_llrefine):
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.reactant_pre_opt"].config is tasks["ll_path.product_pre_opt"].config
+
+    def test_optimizer_default_is_lbfgs_not_rfo(self, enum_egat_llpath_llrefine):
+        """
+        'rfo' cannot optimize a free diatomic, and products shedding H2 or O2
+        are common, so the pre-opt default has to be lbfgs. The refine stage
+        keeps rfo.
+        """
+        tasks = self._tasks(enum_egat_llpath_llrefine)
+
+        assert tasks["ll_path.reactant_pre_opt"].config.opt_type == "lbfgs"
+        assert tasks["ll_refine.reactant_optimization"].config.opt_type == "rfo"
+
+
+class TestNoDuplicateDependencies:
+    """
+    Static `depends_on` and the `requires_data` ledger both appended, so
+    `ts_guess` used to list both conformer tasks twice and `irc_validation`
+    listed `ts_opt` twice.
+    """
+
+    @pytest.mark.parametrize("task_id", [
+        "ll_path.ts_guess",
+        "ll_refine.irc_validation",
+        "ll_refine.reactant_optimization",
+        "ll_refine.product_optimization",
+        "ll_refine.transition_state_optimization",
+    ])
+    def test_dependencies_are_unique(self, enum_egat_llpath_llrefine, task_id):
+        deps = InputParser(enum_egat_llpath_llrefine).pipeline_tasks[task_id].depends_on
+
+        assert len(deps) == len(set(deps)), f"{task_id} has duplicate entries: {deps}"
+
+    def test_ledger_still_links_what_it_should(self, enum_egat_llpath_llrefine):
+        """Deduplicating must not drop a dependency that only the ledger knows about."""
+        deps = InputParser(enum_egat_llpath_llrefine).pipeline_tasks["ll_refine.irc_validation"].depends_on
+
+        assert set(deps) == {
+            "ll_refine.transition_state_optimization",
+            "ll_refine.reactant_optimization",
+            "ll_refine.product_optimization",
+        }
 
 
 class TestMLPropDefaults:

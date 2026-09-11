@@ -222,7 +222,10 @@ class InitialGeomConfig:
 @dataclass
 class MLPropConfig:
     """Holds settings for global ML reaction property predictions."""
-    model: str
+    # Defaulted to None (rather than being a required positional) so that an
+    # omitted 'model' reaches the __post_init__ check below and reports a
+    # readable message, the same way every other config block here does.
+    model: str = None
 
     n_cpus: int = 8
     mem_per_cpu: int = 1000

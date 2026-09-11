@@ -1,6 +1,7 @@
 """
 Definition of input object class
 """
+import difflib
 import os
 import re
 
@@ -32,6 +33,32 @@ def has_atom_maps(smiles: str) -> bool:
     atom_map_pattern = r'\[[^\]]+:\d+\]'
 
     return bool(re.search(atom_map_pattern, smiles))
+
+# Keys a user may write directly under `initialize:`. This block is read with
+# .get() rather than unpacked into a dataclass, so there is no field list to
+# derive the allowed set from.
+INITIALIZE_KEYS = frozenset({
+    "output",
+    "status",
+    "verbose",
+    "initial_structure",
+    "job_manager",
+    "enumeration",
+})
+
+# Keys a user may write directly in a stage body, per `method`. `ml_rxn_prop`
+# carries its settings flat in the stage body; the other two methods nest
+# theirs inside sub-blocks, each of which is validated against its own
+# dataclass.
+STAGE_KEYS_BY_METHOD = {
+    "ml_rxn_prop": frozenset({"method"} | set(MLPropConfig.__dataclass_fields__)),
+    "init_rxn_path": frozenset({
+        "method", "pre_characterize_filters", "conf_gen", "ts_guess",
+    }),
+    "refine_rxn_path": frozenset({
+        "method", "initial_geom", "rp_opt", "ts_opt", "irc_val",
+    }),
+}
 
 @dataclass
 class TaskDef:
@@ -69,6 +96,12 @@ class InputParser:
         if not initnode:
             raise RuntimeError("Hey bro beans, I need some molecules or reactions to work with. "
                                 "Missing `initialize` node in YAML file.")
+
+        # This block is read key-by-key with .get() below, so an unrecognized
+        # key would otherwise be dropped without a word -- and `outpt:` silently
+        # redirecting your reactions to the default YARP_RXNS.pkl is exactly the
+        # kind of thing you only notice after the run.
+        self._reject_unknown(initnode, INITIALIZE_KEYS, "initialize")
 
         # Control of output generation
         self.out_file = initnode.get("output", "YARP_RXNS.pkl")
@@ -172,33 +205,88 @@ class InputParser:
             },
         })
 
+    def _reject_unknown(self, node: dict, allowed, path: str):
+        """
+        Raise if `node` carries any key outside `allowed`.
+
+        Every config block used to be filtered with
+        `{k: v for k, v in node.items() if k in X.__dataclass_fields__}`, which
+        silently discarded anything it did not recognize. So `schedular:`
+        parsed cleanly and the scheduler quietly stayed on its default. For a
+        config-driven code that is the worst available failure mode: the run
+        starts, and the setting you thought you changed was never read.
+
+        Reports every unrecognized key in the block at once, with the closest
+        valid key, so a YAML with several typos takes one edit rather than one
+        edit per typo.
+        """
+        if not isinstance(node, dict):
+            return
+
+        unknown = [k for k in node if k not in allowed]
+        if not unknown:
+            return
+
+        valid = sorted(str(a) for a in allowed)
+        lines = [f"Invalid '{path}' configuration in YAML: unrecognized key(s)."]
+        for key in unknown:
+            close = difflib.get_close_matches(str(key), valid, n=1, cutoff=0.6)
+            suggestion = f" Did you mean '{close[0]}'?" if close else ""
+            lines.append(f"  - '{key}' is not a valid key here.{suggestion}")
+        lines.append(f"  Valid keys for '{path}': {', '.join(valid)}")
+
+        raise ValueError("\n".join(lines))
+
+    def _build(self, cls, node: dict, path: str, **parser_supplied):
+        """
+        Construct `cls` from `node` after rejecting unrecognized keys.
+
+        `parser_supplied` carries values the parser assembles itself (an
+        already-parsed sub-block, say), which are not subject to the key check.
+
+        Note that only `TypeError` is converted here. The dataclasses raise
+        `ValueError` from `__post_init__` for out-of-range or invalid *values*,
+        and those messages are user-facing as written, so they propagate
+        untouched.
+        """
+        kwargs = node if isinstance(node, dict) else {}
+        self._reject_unknown(kwargs, set(cls.__dataclass_fields__), path)
+        try:
+            return cls(**kwargs, **parser_supplied)
+        except TypeError as e:
+            # A required field (one without a default) is missing. Unrecognized
+            # keys can no longer reach this point.
+            raise ValueError(f"Invalid '{path}' configuration in YAML: {e}")
+
+    def _stage_keys(self, name: str, method: str):
+        """
+        Allowed keys for a stage body, chosen by `method`.
+
+        Also the only thing validating `method` itself. An unrecognized method
+        used to fall straight through the if/elif chain in `_parse_stage` and
+        return a `StageConfig` with zero tasks, so a typo'd `init_rxn_paths`
+        produced a stage that silently did nothing at all.
+        """
+        allowed = STAGE_KEYS_BY_METHOD.get(method)
+        if allowed is None:
+            valid = sorted(STAGE_KEYS_BY_METHOD)
+            close = difflib.get_close_matches(str(method), valid, n=1, cutoff=0.6)
+            suggestion = f" Did you mean '{close[0]}'?" if close else ""
+            raise ValueError(
+                f"Stage '{name}' has an unrecognized 'method': '{method}'.{suggestion}"
+                f"\n  Valid methods: {', '.join(valid)}"
+            )
+        return allowed
+
     def _parse_init_struct(self, init_struct: dict) -> InitalStructConfig:
         if not init_struct or init_struct == {}:
             raise ValueError("Missing required block! 'initial_structure' must be provided!")
 
-        kwargs = init_struct
-        # 2. Unpack the clean dictionary into the dataclass
-        try:
-            return InitalStructConfig(**kwargs)
-        except TypeError as e:
-            # Python's dataclass automatically raises a TypeError for two reasons:
-            # A) A required field (one without a default) is missing.
-            # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
-            raise ValueError(f"Invalid 'initial_structure' configuration in YAML: {e}")
+        return self._build(InitalStructConfig, init_struct, "initial_structure")
 
     def _parse_job_manager(self, jm_node: dict) -> JobManagerConfig:
         """Extracts job manager settings and returns a clean JobManagerConfig object."""
-
-        kwargs = jm_node
-
-        # 2. Unpack the clean dictionary into the dataclass
-        try:
-            return JobManagerConfig(**{k: v for k, v in kwargs.items() if k in JobManagerConfig.__dataclass_fields__})
-        except TypeError as e:
-            # Python's dataclass automatically raises a TypeError for two reasons:
-            # A) A required field (one without a default) is missing.
-            # B) An unexpected/unrecognized key was provided (e.g., a typo in the YAML).
-            raise ValueError(f"Invalid 'job_manager' configuration in YAML: {e}")
+        return self._build(JobManagerConfig, jm_node, "job_manager")
 
     def _parse_enum_config(self, enum_node: dict) -> EnumerationConfig:
         kwargs = dict(enum_node)
@@ -209,40 +297,46 @@ class InputParser:
         pre_filters = self._parse_pre_enum_filters(pre_node)
         post_filters = self._parse_post_enum_filters(post_node)
 
-        try:
-            return EnumerationConfig(
-                pre_enum_filters=pre_filters,
-                post_enum_filters=post_filters,
-                **{k: v for k, v in kwargs.items() if k in EnumerationConfig.__dataclass_fields__}
-            )
-        except TypeError as e:
-            raise ValueError(f"Invalid 'enumeration' configuration in YAML: {e}")
+        return self._build(
+            EnumerationConfig, kwargs, "enumeration",
+            pre_enum_filters=pre_filters,
+            post_enum_filters=post_filters,
+        )
 
     def _parse_pre_enum_filters(self, pre_node: dict) -> PreEnumFilters:
         if pre_node is None:
             pre_node = {}
 
         kwargs = dict(pre_node)
+        path = "enumeration.pre_enum_filters"
 
         property_data = kwargs.pop("property_filter", {}) or {}
         product_blinders_data = kwargs.pop("product_blinders", {}) or {}
 
-        return PreEnumFilters(
-            property_filter=PropertyFilterConfig(**property_data) if property_data else None,
-            product_blinders=ProductBlindersConfig(**product_blinders_data) if product_blinders_data else None,
-            **{k: v for k, v in kwargs.items() if k in PreEnumFilters.__dataclass_fields__}
+        return self._build(
+            PreEnumFilters, kwargs, path,
+            property_filter=(
+                self._build(PropertyFilterConfig, property_data, f"{path}.property_filter")
+                if property_data else None
+            ),
+            product_blinders=(
+                self._build(ProductBlindersConfig, product_blinders_data, f"{path}.product_blinders")
+                if product_blinders_data else None
+            ),
         )
 
     def _parse_post_enum_filters(self, post_node: dict) -> PostEnumFilters:
         if post_node is None:
             post_node = {}
 
-        return PostEnumFilters(**{k: v for k, v in post_node.items() if k in PostEnumFilters.__dataclass_fields__})
+        return self._build(PostEnumFilters, post_node, "enumeration.post_enum_filters")
 
     def _parse_stage(self, name: str, data: dict) -> StageConfig:
         method = data.get('method')
         if not method:
             raise ValueError(f"Stage '{name}' is missing the required 'method' key.")
+
+        self._reject_unknown(data, self._stage_keys(name, method), name)
 
         config = StageConfig(name=name, method=method)
 
@@ -250,12 +344,12 @@ class InputParser:
             # Save the ID to the instance so downstream stages can see it
             self.ml_task_id = f"{name}.ml_predict" 
 
-            ml_cfg = MLPropConfig(
-                model=data.get("model"),
-                n_cpus=data.get("n_cpus", 1),
-                mem_per_cpu=data.get("mem_per_cpu", 1000),
-                max_runtime=data.get("max_runtime", "01:00:00")
-            )
+            # `ml_rxn_prop` carries its settings flat in the stage body rather
+            # than in a sub-block, so everything except `method` belongs to
+            # MLPropConfig. Defaults come from the dataclass, like every other
+            # block.
+            ml_data = {k: v for k, v in data.items() if k != "method"}
+            ml_cfg = self._build(MLPropConfig, ml_data, name)
             
             # Add to global_tasks instead of pipeline_tasks
             self.global_tasks[self.ml_task_id] = TaskDef(
@@ -270,13 +364,15 @@ class InputParser:
         elif method == 'init_rxn_path':
             pre_filter_node = data.get("pre_characterize_filters")
             if pre_filter_node:
-                self.stage_filters[name] = PropertyFilterConfig(**{k: v for k, v in pre_filter_node.items() if k in PropertyFilterConfig.__dataclass_fields__})
+                self.stage_filters[name] = self._build(
+                    PropertyFilterConfig, pre_filter_node, f"{name}.pre_characterize_filters"
+                )
 
             conf_data = data.get('conf_gen', {})
-            conf_cfg = ConformerConfig(**{k: v for k, v in conf_data.items() if k in ConformerConfig.__dataclass_fields__})
+            conf_cfg = self._build(ConformerConfig, conf_data, f"{name}.conf_gen")
 
             tsg_data = data.get('ts_guess', {})
-            tsg_cfg = TSGuessConfig(**{k: v for k, v in tsg_data.items() if k in TSGuessConfig.__dataclass_fields__})
+            tsg_cfg = self._build(TSGuessConfig, tsg_data, f"{name}.ts_guess")
 
             # Define Unique Task IDs
             r_conf_id = f"{name}.reactant_conformer"
@@ -320,7 +416,7 @@ class InputParser:
             if not ig_node:
                 raise ValueError(f"Stage '{name}' uses 'refine_rxn_path' but is missing the required 'initial_geom' block.")
 
-            ig_config = self._parse_initial_geom(ig_node)
+            ig_config = self._parse_initial_geom(ig_node, name)
 
             missing_blocks = [
                 block for block in ("rp_opt", "ts_opt", "irc_val")
@@ -333,15 +429,15 @@ class InputParser:
                 )
 
             rp_data = data.get('rp_opt', {})
-            rp_cfg = RPOptConfig(**{k: v for k, v in rp_data.items() if k in RPOptConfig.__dataclass_fields__})
+            rp_cfg = self._build(RPOptConfig, rp_data, f"{name}.rp_opt")
             rp_cfg.initial_geom = ig_config
 
             ts_data = data.get('ts_opt', {})
-            ts_cfg = TSOptConfig(**{k: v for k, v in ts_data.items() if k in TSOptConfig.__dataclass_fields__})
+            ts_cfg = self._build(TSOptConfig, ts_data, f"{name}.ts_opt")
             ts_cfg.initial_geom = ig_config
 
             irc_data = data.get('irc_val', {})
-            irc_cfg = IRCValConfig(**{k: v for k, v in irc_data.items() if k in IRCValConfig.__dataclass_fields__})
+            irc_cfg = self._build(IRCValConfig, irc_data, f"{name}.irc_val")
 
             # Define Unique Task IDs
             r_opt_id = f"{name}.reactant_optimization"
@@ -391,30 +487,26 @@ class InputParser:
 
         return config
 
-    def _parse_initial_geom(self, ig_node: dict) -> InitialGeomConfig:
+    def _parse_initial_geom(self, ig_node: dict, stage: str) -> InitialGeomConfig:
+        path = f"{stage}.initial_geom"
         if not isinstance(ig_node, dict):
-            raise ValueError("'initial_geom' must be a mapping/dictionary")
+            raise ValueError(f"'{path}' must be a mapping/dictionary")
         required = ["reactant", "product", "transition_state"]
         missing = [k for k in required if k not in ig_node]
         if missing:
-            raise ValueError(f"'initial_geom' is missing required entries: {missing}")
-        extra = [k for k in ig_node if k not in required]
-        if extra:
-            raise ValueError(f"Unexpected keys in 'initial_geom': {extra}")
+            raise ValueError(f"'{path}' is missing required entries: {missing}")
+        self._reject_unknown(ig_node, set(required), path)
 
         return InitialGeomConfig(
-            reactant=self._parse_geom_source(ig_node["reactant"], "reactant"),
-            product=self._parse_geom_source(ig_node["product"], "product"),
-            transition_state=self._parse_geom_source(ig_node["transition_state"], "transition_state")
+            reactant=self._parse_geom_source(ig_node["reactant"], f"{path}.reactant"),
+            product=self._parse_geom_source(ig_node["product"], f"{path}.product"),
+            transition_state=self._parse_geom_source(ig_node["transition_state"], f"{path}.transition_state")
         )
 
-    def _parse_geom_source(self, section: dict, name: str) -> GeomSourceConfig:
+    def _parse_geom_source(self, section: dict, path: str) -> GeomSourceConfig:
         if not isinstance(section, dict):
-            raise ValueError(f"'initial_geom.{name}' must be a dictionary")
-        try:
-            return GeomSourceConfig(**{k: v for k, v in section.items() if k in GeomSourceConfig.__dataclass_fields__})
-        except TypeError as e:
-            raise ValueError(f"Invalid 'initial_geom.{name}' configuration: {e}")
+            raise ValueError(f"'{path}' must be a dictionary")
+        return self._build(GeomSourceConfig, section, path)
 
     def _link_refine_dependencies(self):
         """

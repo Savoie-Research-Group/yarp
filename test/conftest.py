@@ -285,6 +285,29 @@ def khp_products(khp_parent):
         products[prod.canon_smi] = prod
     return products
 
+@pytest.fixture(scope="session")
+def khp_remapped_products(khp_parent):
+    """
+    Groups of products that are the same molecule under different atom mappings.
+
+    `hash_filter=False` keeps the redundant mappings that `bnfn` would
+    otherwise collapse, which is the only way to get two yarpecules that share
+    a yarpecule hash but carry different adjacency matrices. Returns
+    {canonical SMILES: [yarpecule, ...]} for the groups with more than one
+    member.
+    """
+    from yarp.reaction.enum import bnfn
+
+    groups = {}
+    for prod in bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                     hash_filter=False, lower_score=False, verbose=False):
+        prod.get_smiles()
+        groups.setdefault(prod.canon_smi, []).append(prod)
+
+    remapped = {smi: mols for smi, mols in groups.items() if len(mols) > 1}
+    assert remapped, "no duplicated mappings were enumerated"
+    return remapped
+
 # Molecule files
 @pytest.fixture
 def ethene_xyz():

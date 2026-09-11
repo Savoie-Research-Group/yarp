@@ -122,23 +122,30 @@ def progress_yarp(work_dir: Path):
     # =================================================================
     # PASS 0.1: Synchronize Conformers Across Identical Species
     # =================================================================
+    # Keyed on state.identity, NOT state.hash. The yarpecule hash is
+    # mapping-independent, so two states that are the same molecule under
+    # different atom mappings share it -- and conformer geometries are
+    # index-ordered arrays. Pooling on the bare hash hands one mapping's
+    # coordinates to a state whose paired_bem, adj_mat and bond_changes are
+    # indexed to the other, and nothing detects it because the element lists
+    # still match.
     print("Synchronizing conformer data across identical chemical species...")
     species_conformer_pool = {}
 
-    # 0.1.A Pool all conformers from all reactions using the unique hash
+    # 0.1.A Pool all conformers from all reactions using the unique identity
     for rxn_obj in reactions.values():
         for species in [rxn_obj.reactant, rxn_obj.product]:
             if not species: continue
-            sp_hash = species.hash 
-            if sp_hash not in species_conformer_pool:
-                species_conformer_pool[sp_hash] = {}
-            species_conformer_pool[sp_hash].update(species.conformers)
+            sp_id = species.identity
+            if sp_id not in species_conformer_pool:
+                species_conformer_pool[sp_id] = {}
+            species_conformer_pool[sp_id].update(species.conformers)
 
     # 0.1.B Distribute the enriched pools back to all reactions
     for rxn_obj in reactions.values():
         for species in [rxn_obj.reactant, rxn_obj.product]:
             if not species: continue
-            species.conformers.update(species_conformer_pool[species.hash])
+            species.conformers.update(species_conformer_pool[species.identity])
 
     # =================================================================
     # PASS 0.2: Fast-Forward Previously Characterized Reactions
@@ -259,7 +266,7 @@ def progress_yarp(work_dir: Path):
                     is_reactant = "reactant" in task_type
                     species = rxn_obj.reactant if is_reactant else rxn_obj.product
                     if species:
-                        active_species_tasks.add((species.hash, task_id))
+                        active_species_tasks.add((species.identity, task_id))
 
     # =================================================================
     # PASS 1.1: Check Status of Submitted GLOBAL Jobs
@@ -487,7 +494,11 @@ def progress_yarp(work_dir: Path):
                     species = rxn_obj.reactant if is_reactant else rxn_obj.product
 
                     if species:
-                        registry_key = (species.hash, task_id)
+                        # Same reasoning as PASS 0.1: blocking on the bare
+                        # yarpecule hash would let one atom mapping claim the
+                        # job for every other mapping of the same molecule, and
+                        # they would then be fast-forwarded onto its conformers.
+                        registry_key = (species.identity, task_id)
 
                         if registry_key in active_species_tasks:
                             # Silently skip submission! Another identical species is doing the work.

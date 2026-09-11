@@ -18,7 +18,7 @@ class MinOptTask(AsyncYarpCalculator):
             source = self.config.initial_geom.reactant
         elif self.task_def.task_type == "product_optimization":
             node = self.rxn.product
-            source = self.config.initial_geom.reactant
+            source = self.config.initial_geom.product
         else:
             raise ValueError(f"Unknown task type for MinOpt: {self.task_def.task_type}")
 

@@ -11,6 +11,10 @@ from typing import Iterable, Tuple
 from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
+from yarp.reaction.enum_support import (
+    apply_legacy_shared_atom_b2f2,
+    legacy_shared_atom_b2f2_changes,
+)
 
 def _reactive_maps_from_react(react):
     """
@@ -676,12 +680,31 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 print("Bond matrix after breaking bonds:")
                 print(base_bmat)
 
+            # A repeated B2F2 endpoint can represent the legacy shared-atom
+            # bond/electron rearrangement, so identify it before ordinary
+            # pairing treats the repeated endpoint as a dangling bond.
+            shared_atom_changes = legacy_shared_atom_b2f2_changes(
+                n, formset, radicals, y.lewis.bond_mats[fc_ind], y.elements
+            )
+
             # Loop over all unique ways to pair reactive atoms into new bonds
+            if shared_atom_changes is not None:
+                formation_changes = [
+                    (change.bonds_to_form, change)
+                    for change in shared_atom_changes
+                ]
+            else:
+                formation_changes = [
+                    (formation, None)
+                    for formation in unique_set_partition_generator(formset, 2)
+                ]
+
             if debug:
                 print(f"this is the formset: {formset}")
                 print(f"these are the bond formations we will test: "
-                      f"{list(unique_set_partition_generator(formset, 2))}")
-            for g in unique_set_partition_generator(formset, 2):
+                      f"{[formation for formation, _ in formation_changes]}")
+
+            for g, shared_atom_change in formation_changes:
 
                 # Skip if we would just reform a bond we broke
                 if frozenset(g) in avoid:
@@ -699,10 +722,34 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 if debug:
                     print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
 
-                # Create new adjacency matrix by adding the new bonds
-                adj_mat = copy(base_bmat)
+                if shared_atom_change is not None:
+                    if debug:
+                        print(
+                            "Legacy shared-atom criterion: "
+                            f"{shared_atom_change.criterion}"
+                        )
+                    # Mirror the complete legacy special case at the BEM level:
+                    # account for electrons released/consumed by bond changes,
+                    # then move the donor's electron pair to the shared atom.
+                    product_bmat = apply_legacy_shared_atom_b2f2(
+                        y.lewis.bond_mats[fc_ind],
+                        [bonds[_] for _ in b],
+                        shared_atom_change,
+                    )
+                    if debug:
+                        print("Bond matrix after legacy electron redistribution:")
+                        print(product_bmat)
+                else:
+                    product_bmat = copy(base_bmat)
+                    product_bmat = add_bonds(
+                        product_bmat, [list(_) for _ in g], val=1
+                    )
+
+                # Current YARP constructs a product from connectivity and then
+                # determines its Lewis structures. Convert the redistributed
+                # BEM only after all legacy BEM operations are complete.
+                adj_mat = np.where(product_bmat > 0, 1, 0).astype(int)
                 np.fill_diagonal(adj_mat, 0)
-                adj_mat = add_bonds(adj_mat, [list(_) for _ in g], val=1)
 
                 # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
                 product = yarpecule((
@@ -727,7 +774,10 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                     print(f"New adjacency matrix:\n{product._adj_mat}")
 
                 # Optional: skip products with higher bond matrix scores (worse quality)
-                if lower_score:
+                # The legacy shared-atom route predates the current Lewis-score gate;
+                # applying that gate here removes the intended CO-containing product.
+
+                if lower_score and shared_atom_change is None:
                     if product.lewis._scores[0] > y.lewis._scores[0]:
                         if debug:
                             print(f"Skipping - higher score: "

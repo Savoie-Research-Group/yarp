@@ -22,16 +22,42 @@ class CrestConfCalculator(ConfTask):
         # Determine if we are working on the reactant or the product
         if "reactant" in self.task_def.task_type:
             self.target_species = self.rxn.reactant
+            self.species_label = "reactant"
         else:
             self.target_species = self.rxn.product
+            self.species_label = "product"
 
     def generate_input(self):
         """Write the initial 3D geometry for CREST to start from."""
+        self._warn_if_o2_multiplicity_mismatch()
+
         input_xyz_path = self.scratch_dir / self.xyz_file
         with open(input_xyz_path, "w") as f:
             # Assuming yarpecule has a method to get a basic 3D string
             # (e.g., generated via RDKit/ETKDG during initialization)
             f.write(self.target_species.conformers.get('initial_geom').to_xyz_string())
+
+    def _warn_if_o2_multiplicity_mismatch(self):
+        """
+        CREST needs O2 to be run as a triplet (n_unpaired_electrons = 2) to converge;
+        ground-state O2 is a triplet, not a singlet. YARP applies a single, user-configured
+        n_unpaired_electrons value to the whole reactant/product state, so there's no way
+        to special-case O2 without overriding what the user explicitly asked for.
+        Instead, just warn loudly and let the (likely doomed) CREST job run anyway.
+        """
+        has_o2 = any(
+            len(sp.elements) == 2 and all(el.lower() == 'o' for el in sp.elements)
+            for sp in self.target_species.species
+        )
+        if has_o2 and self.config.n_unpaired_electrons != 2:
+            print(
+                f"   ! WARNING: Detected diatomic O2 in the {self.species_label} species for "
+                f"task '{self.task_def.task_type}', but conf_gen is configured with "
+                f"n_unpaired_electrons={self.config.n_unpaired_electrons}. Ground-state O2 is a "
+                f"triplet (n_unpaired_electrons=2), and CREST is unlikely to converge for O2 run "
+                f"as anything else. Proceeding with the configured multiplicity anyway, but expect "
+                f"this CREST job to fail."
+            )
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""
@@ -140,7 +166,7 @@ class CrestConfCalculator(ConfTask):
     def _get_crest_command(self):
 
         # basic command (ERM: no way to set memory_per_cpu in CREST????)
-        cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"
+        cmd = f"crest {self.xyz_file} --noopt --{self.config.lot} -nozs -T {self.config.n_cpus}"  # fix for CREST issues: KMH
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"

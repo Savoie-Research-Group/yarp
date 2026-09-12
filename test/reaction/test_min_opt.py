@@ -386,3 +386,71 @@ class TestGsmPoolExcludesNonConformers:
         new = [k for k in khp_reaction.reactant.conformers if "conf_gen" in k]
 
         assert set(old) - set(new) == {"preopt_xtb_pysisyphus", "rpopt_xtb_pysisyphus"}
+
+
+# =====================================================================
+# CREST MD timestep for free diatomics
+# =====================================================================
+from yarp.reaction.external.conf_gen import DIATOMIC_MD_TIMESTEP_FS
+
+
+class TestCrestDiatomicTimestep:
+    """
+    CREST's default 5 fs metadynamics is only stable because SHAKE constrains
+    the bonds, and SHAKE can only constrain bonds xtb perceives. An xTB-relaxed
+    free H2 sits at 0.7750 A, just outside the ~0.768 A H-H perception cutoff,
+    so it is never constrained and the MD diverges. Measured: every --tstep
+    variant survives, every 5 fs variant fails, and --shake 1 also fails --
+    confirming the issue is topology, not SHAKE mode.
+    """
+
+    def _calc(self, rxn, task_type, lot="gfn2", n_cpus=4):
+        config = SimpleNamespace(lot=lot, n_cpus=n_cpus, charge=0,
+                                 n_unpaired_electrons=0, seed=42, solvent=None)
+        task_def = SimpleNamespace(task_type=task_type, config=config,
+                                   task_id=f"s.{task_type}")
+        return CrestConfCalculator(task_def, rxn, MagicMock())
+
+    def test_noopt_is_gone(self, khp_reaction):
+        """
+        --noopt was the first attempt at this and does not work: the failure
+        reproduces with and without it, and keeping it costs conformers.
+        """
+        cmd = self._calc(khp_reaction, "reactant_conformer")._get_crest_command()
+
+        assert "--noopt" not in cmd
+
+    def test_no_timestep_flag_without_a_diatomic(self, khp_reaction):
+        """The ~70% of systems with no diatomic keep CREST's default 5 fs."""
+        calc = self._calc(khp_reaction, "reactant_conformer")
+
+        assert not calc.has_free_diatomic()
+        assert "--tstep" not in calc._get_crest_command()
+
+    def test_timestep_flag_when_a_diatomic_is_present(self, khp_parent, khp_products):
+        """O=C=CCOO.[H][H] carries a free H2 -- this is the failing case."""
+        product = khp_products["O=C=CCOO.[H][H]"]
+        rxn = reaction(khp_parent, product)
+        calc = self._calc(rxn, "product_conformer")
+
+        assert calc.has_free_diatomic()
+        assert f"--tstep {DIATOMIC_MD_TIMESTEP_FS}" in calc._get_crest_command()
+
+    def test_the_reactant_side_of_that_reaction_is_unaffected(self, khp_parent, khp_products):
+        """
+        The H2 is on the product side only. Flagging the reactant too would
+        pay the runtime cost for nothing.
+        """
+        rxn = reaction(khp_parent, khp_products["O=C=CCOO.[H][H]"])
+        calc = self._calc(rxn, "reactant_conformer")
+
+        assert not calc.has_free_diatomic()
+        assert "--tstep" not in calc._get_crest_command()
+
+    def test_timestep_is_short_enough_to_integrate_an_H2_stretch(self):
+        """
+        H2 stretches near 4400 cm-1, a period of ~7.6 fs. Stable integration
+        wants roughly ten steps per period; 2.0 fs gives ~3.8 and was measured
+        working but marginal, so the default must stay at or below 1.0.
+        """
+        assert DIATOMIC_MD_TIMESTEP_FS <= 1.0

@@ -8,6 +8,24 @@ from yarp.reaction.conformer import conformer
 # Conformer key prefix written by the xTB pre-optimization.
 PREOPT_PREFIX = "preopt"
 
+# MD timestep (fs) used when the system carries a free diatomic fragment.
+#
+# CREST's metadynamics defaults to 5 fs, which is only stable because SHAKE
+# constrains the bonds -- and SHAKE can only constrain bonds present in the
+# topology. xtb perceives bonds by a covalent-radius cutoff, roughly 0.768 A
+# for H-H, while GFN2's equilibrium H-H is 0.7750 A. So an xTB-relaxed free H2
+# falls just outside its own topology cutoff, never gets constrained, and a
+# 5 fs step on an unconstrained ~4400 cm-1 oscillator (period ~7.6 fs) diverges
+# immediately: the metadynamics runs "terminate EARLY" and CREST then crashes
+# sorting an ensemble that is too small.
+#
+# 1.0 fs gives ~7.6 integration steps per period. 2.0 fs also worked when
+# measured but gives only ~3.8, which is uncomfortably close to the edge.
+# Measured cost is ~2.5x runtime with identical conformer counts -- a smaller
+# timestep is strictly more accurate MD, so this buys safety with wall time and
+# nothing else. Evidence: debug/.../implementation_checks/08_crest_h2/.
+DIATOMIC_MD_TIMESTEP_FS = 1.0
+
 
 class ConfTask(AsyncYarpCalculator):
     @property
@@ -36,6 +54,19 @@ class ConfTask(AsyncYarpCalculator):
         # the reactant leg -- so requiring both here would fail the reactant's
         # conformer task the moment its dependency was satisfied.
         return self.preopt_conformer() is not None
+
+    def has_free_diatomic(self) -> bool:
+        """
+        Whether any fragment of this state is a free two-atom molecule.
+
+        A diatomic is the only fragment that can be left wholly unconstrained
+        when its single bond falls outside xtb's perception cutoff, which is
+        what breaks CREST's default 5 fs metadynamics (see
+        DIATOMIC_MD_TIMESTEP_FS). Measured on H2; applied to every diatomic
+        because the cost lands only on the runs that carry one, and a diatomic
+        has no intramolecular conformational sampling to slow down anyway.
+        """
+        return any(len(frag.elements) == 2 for frag in self.target_species.species)
 
 
 class CrestConfCalculator(ConfTask):
@@ -166,16 +197,13 @@ class CrestConfCalculator(ConfTask):
     def _get_crest_command(self):
 
         # basic command (ERM: no way to set memory_per_cpu in CREST????)
-        #
-        # --noopt: CREST's trial metadynamics fails on a free H2 whose H-H
-        # distance exceeds roughly 0.760-0.770 A, and GFN2's equilibrium H-H is
-        # 0.7750 A -- so any structure carrying a free H2 that has been through
-        # an xTB optimization breaks CREST. Skipping CREST's own preoptimization
-        # avoids that. The structures reaching CREST are now xTB-relaxed by the
-        # pre-optimization stage, so the preoptimization CREST would have run is
-        # redundant for the other cases too -- though that has NOT been measured
-        # yet, and is worth checking before trusting it.
-        cmd = f"crest {self.xyz_file} --{self.config.lot} --noopt -nozs -T {self.config.n_cpus}"
+        cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"
+
+        # A free diatomic needs a shorter MD timestep or the metadynamics
+        # diverges; see DIATOMIC_MD_TIMESTEP_FS. Only applied when one is
+        # present, so the ~70% of systems without one keep CREST's default 5 fs.
+        if self.has_free_diatomic():
+            cmd += f" --tstep {DIATOMIC_MD_TIMESTEP_FS}"
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"

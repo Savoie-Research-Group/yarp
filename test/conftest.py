@@ -285,6 +285,18 @@ def khp_products(khp_parent):
         products[prod.canon_smi] = prod
     return products
 
+@pytest.fixture
+def khp_reaction(khp_parent, khp_products):
+    """
+    A real reaction object: KHP -> one of its break-2/form-2 products.
+
+    Function-scoped: `reaction()` deep-copies both states, so every test gets
+    conformer dictionaries of its own to write into.
+    """
+    from yarp.reaction.reaction import reaction
+
+    return reaction(khp_parent, khp_products["C=COCOO"])
+
 @pytest.fixture(scope="session")
 def khp_remapped_products(khp_parent):
     """

@@ -62,7 +62,7 @@ class TestConcertedClosedShell:
         Lewis score, which is tossed out after default post-enum filters are applied.
         """
         haa = yarpecule('CC=O')
-
+        co = yarpecule('C.[C-]#[O+]')
         b2f2_prods = list(bnfn(haa, 2, hashes={haa.hash}))
         b3f3_prods = list(bnfn(haa, 3, hashes={haa.hash}))
 
@@ -78,7 +78,7 @@ class TestConcertedClosedShell:
         b3f3_set = set()
         for i in range(len(b2f2_prods)):
             #discard carbon monoxide which is created from legacy shared atom b2f2.
-            if b2f2_prods[i].hash == 424816.7402037:
+            if b2f2_prods[i].hash == co.hash:
                 continue
             b2f2_set.add(b2f2_prods[i].hash)
             b3f3_set.add(b3f3_prods[i].hash)
@@ -119,7 +119,7 @@ class TestConcertedClosedShell:
         """
 
         khp = yarpecule('O=CCCOO')
-
+        co =yarpecule('[C-]#[O+].CCOO')
         khp_b2f2 = list(bnfn(khp, 2, hashes={khp.hash}))
         khp_b2f2_hash = set()
         
@@ -127,7 +127,7 @@ class TestConcertedClosedShell:
             khp_b2f2_hash.add(_.hash)
     
         #discard carbon monoxide which is created from legacy shared atom b2f2. 
-        khp_b2f2_hash.discard(1437818.7601011)
+        khp_b2f2_hash.discard(co.hash)
         khp_b3f3 = list(bnfn(khp, 3, hashes={khp.hash}))
         khp_b3f3_hash = set()
         for _ in khp_b3f3:

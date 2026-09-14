@@ -16,8 +16,8 @@ def joint_optimize(conformer, target_bem, lot="uff"):
     geometry, or None if no optimizer could produce a geometry consistent
     with the target BEM's connectivity.
 
-    Mirrors the RDKit-first / Open Babel fallback pattern used by
-    yarp.reaction.generate_rxns.quick_geom_opt: RDKit is tried first, and its
+    Uses the RDKit-first / Open Babel fallback pattern:
+    RDKit is tried first, and its
     result is only kept if the resulting geometry's connectivity matches
     target_bem; otherwise Open Babel is tried as a fallback, and if that also
     fails to reproduce the target connectivity, None is returned so the

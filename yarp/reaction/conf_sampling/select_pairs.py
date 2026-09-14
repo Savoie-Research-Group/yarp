@@ -36,8 +36,8 @@ def select_gsm_pairs(rxn, config):
     # biased_r: reactant geometries guided by product geometries
     #
     # joint_optimize returns None when neither optimizer can produce a
-    # geometry consistent with the target BEM (mirrors quick_geom_opt in
-    # generate_rxns.py); such conformers are dropped, keeping r_confs/p_confs
+    # geometry consistent with the target BEM;
+    # such conformers are dropped, keeping r_confs/p_confs
     # aligned with their biased counterparts.
     if mode in ['dual', 'r_only']:
         kept_r_confs, biased_p = [], []

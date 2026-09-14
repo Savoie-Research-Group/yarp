@@ -119,7 +119,7 @@ class TestJointOptDeterminism:
     RDKit UFF must be a pure function of its input.
 
     Several checks lean on this: it is the reference the Open Babel
-    nondeterminism is measured against, and it is why `quick_geom_opt` trying
+    nondeterminism is measured against, and it is why `joint_optimize` trying
     RDKit first keeps most products reproducible even though the Open Babel
     fallback is not. If RDKit ever stops being deterministic, those
     conclusions need revisiting rather than the tests being relaxed.

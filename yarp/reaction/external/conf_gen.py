@@ -166,7 +166,7 @@ class CrestConfCalculator(ConfTask):
     def _get_crest_command(self):
 
         # basic command (ERM: no way to set memory_per_cpu in CREST????)
-        cmd = f"crest {self.xyz_file} --noopt --{self.config.lot} -nozs -T {self.config.n_cpus}"  # fix for CREST issues: KMH
+        cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"  # fix for CREST issues: KMH
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"

@@ -91,29 +91,29 @@ class CrestConfCalculator(ConfTask):
             f.write(initial_conf.to_xyz_string())
 
     def _warn_if_o2_multiplicity_mismatch(self):
-    """
-    CREST needs O2 to be run as a triplet (n_unpaired_electrons = 2) to converge;
-    ground-state O2 is a triplet, not a singlet. YARP applies a single, user-configured
-    n_unpaired_electrons value to the whole reactant/product state, so there's no way
-    to special-case O2 without overriding what the user explicitly asked for.
-    Instead, just warn loudly and let the (likely doomed) CREST job run anyway.
-    """
-    species_label = "reactant" if "reactant" in self.task_def.task_type else "product"
-    species = self.rxn.reactant if species_label == "reactant" else self.rxn.product
-
-    has_o2 = any(
-        len(sp.elements) == 2 and all(el.lower() == 'o' for el in sp.elements)
-        for sp in species.species
-    )
-    if has_o2 and self.config.n_unpaired_electrons != 2:
-        print(
-            f"   ! WARNING: Detected diatomic O2 in the {species_label} species for "
-            f"task '{self.task_def.task_type}', but conf_gen is configured with "
-            f"n_unpaired_electrons={self.config.n_unpaired_electrons}. Ground-state O2 is a "
-            f"triplet (n_unpaired_electrons=2), and CREST is unlikely to converge for O2 run "
-            f"as anything else. Proceeding with the configured multiplicity anyway, but expect "
-            f"this CREST job to fail."
+        """
+        CREST needs O2 to be run as a triplet (n_unpaired_electrons = 2) to converge;
+        ground-state O2 is a triplet, not a singlet. YARP applies a single, user-configured
+        n_unpaired_electrons value to the whole reactant/product state, so there's no way
+        to special-case O2 without overriding what the user explicitly asked for.
+        Instead, just warn loudly and let the (likely doomed) CREST job run anyway.
+        """
+        species_label = "reactant" if "reactant" in self.task_def.task_type else "product"
+        species = self.rxn.reactant if species_label == "reactant" else self.rxn.product
+    
+        has_o2 = any(
+            len(sp.elements) == 2 and all(el.lower() == 'o' for el in sp.elements)
+            for sp in species.species
         )
+        if has_o2 and self.config.n_unpaired_electrons != 2:
+            print(
+                f"   ! WARNING: Detected diatomic O2 in the {species_label} species for "
+                f"task '{self.task_def.task_type}', but conf_gen is configured with "
+                f"n_unpaired_electrons={self.config.n_unpaired_electrons}. Ground-state O2 is a "
+                f"triplet (n_unpaired_electrons=2), and CREST is unlikely to converge for O2 run "
+                f"as anything else. Proceeding with the configured multiplicity anyway, but expect "
+                f"this CREST job to fail."
+            )
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""

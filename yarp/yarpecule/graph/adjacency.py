@@ -151,6 +151,56 @@ def table_generator(elements, geometry, scale_factor=1.2, filename=None,verbose=
     return adj_mat
 
 
+def compare_adjacency(elements, geo, target_adj):
+    """
+    Perceive bonds from a geometry and compare them against a target graph.
+
+    The recurring question after any geometry manipulation is "does this
+    structure still have the bonding we asked for". Callers were each writing
+    `table_generator(...) - target_adj` and testing it against zero, which
+    answers the question but throws away what actually changed.
+
+    Parameters
+    ----------
+    elements : list of str
+        Atomic symbols, index-aligned with `geo` and `target_adj`.
+
+    geo : nd array (N x 3)
+        Cartesian coordinates to perceive bonds from.
+
+    target_adj : nd array (N x N)
+        The adjacency matrix the geometry is supposed to reproduce.
+
+    Returns
+    -------
+    matches : bool
+        True if the perceived bonding is exactly `target_adj`.
+
+    n_broken : int
+        Bonds present in `target_adj` but absent from the geometry.
+
+    n_formed : int
+        Bonds present in the geometry but absent from `target_adj`.
+
+    Notes
+    -----
+    Counts are per bond, not per matrix element: both matrices are symmetric,
+    so each off-diagonal disagreement is seen twice and halved.
+    """
+    perceived = table_generator(elements, geo)
+    diff = np.asarray(perceived) - np.asarray(target_adj)
+
+    n_broken = int(np.count_nonzero(diff < 0) // 2)
+    n_formed = int(np.count_nonzero(diff > 0) // 2)
+
+    return (n_broken == 0 and n_formed == 0), n_broken, n_formed
+
+
+def describe_adjacency_change(n_broken, n_formed):
+    """Render `compare_adjacency` counts for a log line."""
+    return f"{n_broken} bond(s) broken, {n_formed} bond(s) formed"
+
+
 def adjmat_to_adjlist(adj_mat):
     """
     Convenience function for converting between adjacency matrix

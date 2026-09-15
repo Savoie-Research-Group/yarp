@@ -81,6 +81,25 @@ class state:
         return self._graph.hash
 
     @property
+    def bem_sum_hash(self):
+        return self._graph.bem_sum_hash
+
+    @property
+    def identity(self):
+        """
+        Key identifying this state as a specific molecule with a specific atom
+        indexing.
+
+        `hash` alone is mapping-independent, so two states that are the same
+        molecule under different atom mappings share it. Anything keyed on
+        `hash` that then exchanges index-ordered data -- geometries, paired
+        BEMs, bond_changes -- will silently mix the two. Measured over the KHP
+        cycle-2 collection: 1110 products span 712 distinct (graph, mapping)
+        pairs but only 268 distinct yarpecule hashes.
+        """
+        return (self._graph.hash, self._graph.bem_sum_hash)
+
+    @property
     def bond_mats(self):
         return self._graph.bond_mats
 

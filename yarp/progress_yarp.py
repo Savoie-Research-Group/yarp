@@ -10,6 +10,7 @@ from yarp.util.input import InputParser
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calc_factory import get_calculator
+from yarp.reaction.external.min_opt import adopt_reactant_preopt_geometry
 
 # Tasks that operate on a single species rather than on the reaction path.
 # These are the ones the redundancy blocker can deduplicate.
@@ -63,6 +64,36 @@ def shareable_conformers(species, role):
     if role == "product":
         return {k: v for k, v in species.conformers.items() if not k.startswith("preopt")}
     return dict(species.conformers)
+
+def synchronize_conformers(reactions):
+    """
+    PASS 0.1: pool conformers across states of the same identity, then hand the
+    pooled set back to every state.
+    """
+    species_conformer_pool = {}
+
+    # 0.1.A Pool all conformers from all reactions using the unique identity
+    for rxn_obj in reactions.values():
+        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
+            if not species: continue
+            sp_id = species.identity
+            if sp_id not in species_conformer_pool:
+                species_conformer_pool[sp_id] = {}
+            species_conformer_pool[sp_id].update(shareable_conformers(species, role))
+
+    # 0.1.B Distribute the enriched pools back to all reactions
+    for rxn_obj in reactions.values():
+        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
+            if not species: continue
+            incoming = species_conformer_pool[species.identity]
+            if role == "product":
+                incoming = {k: v for k, v in incoming.items() if not k.startswith("preopt")}
+            species.conformers.update(incoming)
+            # A reactant that received its pre-opt through the pool never
+            # scraped the job itself, so its graph geometry is updated here.
+            # (A product's pre-opt is written back when its own job is scraped.)
+            if role == "reactant":
+                adopt_reactant_preopt_geometry(species)
 
 def load_state(work_dir: Path):
     """
@@ -184,25 +215,7 @@ def progress_yarp(work_dir: Path):
     # indexed to the other, and nothing detects it because the element lists
     # still match.
     print("Synchronizing conformer data across identical chemical species...")
-    species_conformer_pool = {}
-
-    # 0.1.A Pool all conformers from all reactions using the unique identity
-    for rxn_obj in reactions.values():
-        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
-            if not species: continue
-            sp_id = species.identity
-            if sp_id not in species_conformer_pool:
-                species_conformer_pool[sp_id] = {}
-            species_conformer_pool[sp_id].update(shareable_conformers(species, role))
-
-    # 0.1.B Distribute the enriched pools back to all reactions
-    for rxn_obj in reactions.values():
-        for role, species in (("reactant", rxn_obj.reactant), ("product", rxn_obj.product)):
-            if not species: continue
-            incoming = species_conformer_pool[species.identity]
-            if role == "product":
-                incoming = {k: v for k, v in incoming.items() if not k.startswith("preopt")}
-            species.conformers.update(incoming)
+    synchronize_conformers(reactions)
 
     # =================================================================
     # PASS 0.2: Fast-Forward Previously Characterized Reactions

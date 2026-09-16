@@ -509,7 +509,9 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
 # =====================================================================
 from types import SimpleNamespace
 
-from yarp.progress_yarp import species_registry_key, shareable_conformers
+import numpy as np
+
+from yarp.progress_yarp import species_registry_key, shareable_conformers, synchronize_conformers
 
 
 def _state(identity):
@@ -615,3 +617,45 @@ class TestShareableConformers:
         shareable_conformers(species, "reactant")["injected"] = "x"
 
         assert "injected" not in species.conformers
+
+
+class TestSynchronizeWritesReactantGeometry:
+    """
+    One reactant pre-opt job serves every reaction sharing that reactant; the
+    others receive its conformer only through PASS 0.1. Their graph geometry
+    has to be written back there, or only the reaction that ran the job would
+    carry relaxed coordinates.
+    """
+
+    def _two_reactions_sharing_a_reactant(self, khp_parent, khp_products):
+        from yarp.reaction.reaction import reaction
+        a = reaction(khp_parent, khp_products["CCC(=O)OO"])
+        b = reaction(khp_parent, khp_products["C=COCOO"])
+        assert a.reactant.identity == b.reactant.identity
+        return a, b
+
+    def _preopt(self, graph, shift):
+        from yarp.reaction.conformer import conformer
+        conf = conformer()
+        conf.elements = graph.elements
+        conf.geo = graph.geo + shift
+        conf.properties["internal_energy_Eh"] = -20.0
+        return conf
+
+    def test_pooled_reactant_takes_the_shared_pre_opt(self, khp_parent, khp_products):
+        a, b = self._two_reactions_sharing_a_reactant(khp_parent, khp_products)
+        a.reactant.conformers["preopt_xtb_pysisyphus"] = self._preopt(a.reactant.graph, 1.0)
+
+        synchronize_conformers({"a": a, "b": b})
+
+        assert np.allclose(b.reactant.graph.geo, a.reactant.conformers["preopt_xtb_pysisyphus"].geo)
+
+    def test_product_pre_opt_is_not_written_back_here(self, khp_parent, khp_products):
+        """A product's pre-opt may be off its graph; only scrape_data decides what to store."""
+        a, b = self._two_reactions_sharing_a_reactant(khp_parent, khp_products)
+        before = a.product.graph.geo.copy()
+        a.product.conformers["preopt_xtb_pysisyphus"] = self._preopt(a.product.graph, 1.0)
+
+        synchronize_conformers({"a": a, "b": b})
+
+        assert np.array_equal(a.product.graph.geo, before)

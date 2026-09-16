@@ -3,6 +3,8 @@ Definition of the state object class.
 """
 from copy import deepcopy
 
+import numpy as np
+
 from yarp.reaction.conformer import conformer
 
 class state:
@@ -56,6 +58,25 @@ class state:
             _.get_smiles()
             self.conc[_.canon_smi] = 0.0
 
+
+    def set_graph_geometry(self, geo):
+        """
+        Replace the coordinates held by this state's yarpecule.
+
+        The pre-optimization writes back a geometry that sits on the graph's
+        own connectivity, so a later enumeration cycle -- which builds its
+        parents from `rxn.product.graph` -- starts from relaxed, on-graph
+        coordinates rather than the ones a product inherited from its parent.
+
+        The array is replaced, not written into. `conformers["initial_geom"]`
+        holds the *same* array object as the graph when the state is built, so
+        an in-place write would silently rewrite the starting geometry too.
+        """
+        geo = np.array(geo, dtype=float, copy=True)
+        expected = (len(self._graph.elements), 3)
+        if geo.shape != expected:
+            raise ValueError(f"Geometry has shape {geo.shape}; this state's graph needs {expected}.")
+        self._graph._geo = geo
 
     ###############
     # Properties  #

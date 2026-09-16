@@ -26,6 +26,32 @@ _TASK_SIDE = {
 _PRE_OPT_TASKS = frozenset({"reactant_pre_opt", "product_pre_opt"})
 
 
+def adopt_reactant_preopt_geometry(state) -> bool:
+    """
+    Write a reactant's pre-optimized geometry back onto its yarpecule.
+
+    One reactant pre-opt job serves every reaction sharing that reactant, and
+    the other reactions only receive its conformer through PASS 0.1 pooling, so
+    this is called both when the job is scraped and during that pooling. It
+    needs no adjacency check: a reactant pre-opt that walks off its graph fails
+    `check_output` and never produces a conformer.
+
+    If more than one pre-opt conformer is present, the lowest-energy one wins.
+    Returns True if the graph geometry was replaced.
+    """
+    candidates = [c for key, c in state.conformers.items()
+                  if key.startswith("preopt") and c.geo is not None]
+    if not candidates:
+        return False
+
+    def energy(conf):
+        e = conf.properties.get("internal_energy_Eh")
+        return float("inf") if e is None else e
+
+    state.set_graph_geometry(min(candidates, key=energy).geo)
+    return True
+
+
 class MinOptTask(AsyncYarpCalculator):
     """
     Shared behaviour for minimizing a reactant or product structure.
@@ -180,6 +206,25 @@ class MinOptTask(AsyncYarpCalculator):
               f"Keeping it anyway and passing it to conformer generation.")
         return True
 
+    def _product_graph_geometry(self, opt_elements, opt_geo):
+        """
+        The coordinates a finished product pre-opt writes back onto the
+        product's yarpecule.
+
+        The xTB geometry if it kept the product graph; otherwise the UFF patch
+        the job started from, which `_patched_product_geometry` already
+        verified reproduces the product graph. Either way the yarpecule ends up
+        with coordinates on its own connectivity. The `preopt_*` conformer, and
+        so what CREST sees, is the xTB geometry regardless.
+        """
+        matches, _, _ = compare_adjacency(opt_elements, opt_geo, self.node.graph.adj_mat)
+        if matches:
+            return opt_geo
+
+        _, patched_geo = xyz_parse(self.scratch_dir / "initial_geom.xyz", multiple=False)
+        print(f"     ! Storing the UFF patch, not the xTB geometry, as the product graph geometry.")
+        return patched_geo
+
 class PysisyphusMinOptCalculator(MinOptTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -277,6 +322,14 @@ class PysisyphusMinOptCalculator(MinOptTask):
             conf.hessian = hess
 
         self.node.conformers[conf.type] = conf
+
+        # Keep the yarpecule's own coordinates on its own graph, so the next
+        # enumeration cycle starts its parents from a relaxed structure.
+        if self.is_pre_opt:
+            if self.side == "reactant":
+                adopt_reactant_preopt_geometry(self.node)
+            else:
+                self.node.set_graph_geometry(self._product_graph_geometry(opt_elements, opt_geo))
 
         return True
 

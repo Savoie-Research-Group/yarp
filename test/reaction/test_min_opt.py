@@ -14,8 +14,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from yarp.reaction.external.calc_base import CalculatorInputError
-from yarp.reaction.external.min_opt import MinOptTask, PysisyphusMinOptCalculator
+from yarp.reaction.conf_sampling.joint_opt import joint_optimize
+from yarp.reaction.conformer import conformer
+from yarp.reaction.external.min_opt import (
+    MinOptTask, PysisyphusMinOptCalculator, adopt_reactant_preopt_geometry,
+)
 from yarp.util.config import PreOptConfig, RPOptConfig, InitialGeomConfig, GeomSourceConfig
+from yarp.util.write_files import xyz_generate_string
+from yarp.yarpecule.graph.adjacency import compare_adjacency
 
 
 def make_calc(rxn, task_type, config, cls=MinOptTask):
@@ -245,3 +251,111 @@ class TestPysisInputBlock:
 
         assert "type: rfo" in self._written(tmp_path, calc)
 
+
+
+@pytest.fixture
+def patchable_reaction(khp_parent, khp_products):
+    """
+    KHP -> CCC(=O)OO. Not `khp_reaction`: its product is the one whose UFF
+    patch from the raw reactant coordinates fails, and these tests need a real
+    on-graph product geometry.
+    """
+    from yarp.reaction.reaction import reaction
+
+    return reaction(khp_parent, khp_products["CCC(=O)OO"])
+
+
+def _write_finished_job(scratch, elements, final_geo, start_geo=None):
+    """The files a finished pysisyphus pre-opt leaves behind in SCRATCH."""
+    scratch.mkdir(parents=True, exist_ok=True)
+    (scratch / "final_geometry.xyz").write_text(xyz_generate_string(elements, final_geo))
+    (scratch / "min_opt.log").write_text("energy: -20.5 hartree\n")
+    if start_geo is not None:
+        (scratch / "initial_geom.xyz").write_text(xyz_generate_string(elements, start_geo))
+
+
+def _scrape(rxn, task_type, scratch):
+    calc = make_calc(rxn, task_type, PreOptConfig(), cls=PysisyphusMinOptCalculator)
+    calc.set_scratch_dir(scratch)
+    assert calc.scrape_data()
+    return calc
+
+
+class TestPreOptGraphGeometryWriteback:
+    """
+    A finished pre-opt writes coordinates that sit on the state's own graph
+    back onto its yarpecule. Cycle-2 parents are built from
+    `rxn.product.graph`, so without this they would carry the geometry the
+    product inherited from its own parent (NOTES 6.18).
+    """
+
+    def test_reactant_takes_the_xtb_geometry(self, tmp_path, patchable_reaction):
+        graph = patchable_reaction.reactant.graph
+        relaxed = graph.geo + 1.0
+        _write_finished_job(tmp_path, graph.elements, relaxed)
+
+        _scrape(patchable_reaction, "reactant_pre_opt", tmp_path)
+
+        assert np.allclose(patchable_reaction.reactant.graph.geo, relaxed)
+
+    def test_product_takes_the_xtb_geometry_when_it_keeps_the_graph(self, tmp_path, patchable_reaction):
+        rxn = patchable_reaction
+        on_graph = joint_optimize(rxn.reactant.conformers["initial_geom"], rxn.product.graph.bond_mats[0]).geo
+        xtb = on_graph + 1.0
+        uff = on_graph - 1.0
+        assert compare_adjacency(rxn.product.graph.elements, xtb, rxn.product.graph.adj_mat)[0]
+        _write_finished_job(tmp_path, rxn.product.graph.elements, xtb, start_geo=uff)
+
+        _scrape(rxn, "product_pre_opt", tmp_path)
+
+        assert np.allclose(rxn.product.graph.geo, xtb)
+
+    def test_product_falls_back_to_the_uff_patch_when_xtb_changes_the_graph(self, tmp_path, patchable_reaction):
+        rxn = patchable_reaction
+        uff = joint_optimize(rxn.reactant.conformers["initial_geom"], rxn.product.graph.bond_mats[0]).geo
+        # The product's inherited coordinates are the reactant's, so they
+        # perceive to the reactant graph -- an xTB result that left the product graph.
+        xtb = rxn.product.graph.geo.copy()
+        assert not compare_adjacency(rxn.product.graph.elements, xtb, rxn.product.graph.adj_mat)[0]
+        _write_finished_job(tmp_path, rxn.product.graph.elements, xtb, start_geo=uff)
+
+        calc = _scrape(rxn, "product_pre_opt", tmp_path)
+
+        assert np.allclose(rxn.product.graph.geo, uff)
+        assert compare_adjacency(rxn.product.graph.elements, rxn.product.graph.geo,
+                                 rxn.product.graph.adj_mat)[0]
+        # What CREST reads is still the xTB geometry (decision 7c.1).
+        assert np.allclose(rxn.product.conformers[calc.output_key()].geo, xtb)
+
+    def test_refinement_does_not_write_back(self, tmp_path, patchable_reaction, rpopt_config, monkeypatch):
+        graph = patchable_reaction.reactant.graph
+        before = graph.geo.copy()
+        _write_finished_job(tmp_path, graph.elements, graph.geo + 1.0)
+        calc = make_calc(patchable_reaction, "reactant_optimization", rpopt_config,
+                         cls=PysisyphusMinOptCalculator)
+        calc.set_scratch_dir(tmp_path)
+        monkeypatch.setattr(calc, "_parse_hessian_freq", lambda: (None, None))
+
+        calc.scrape_data()
+
+        assert np.array_equal(patchable_reaction.reactant.graph.geo, before)
+
+
+class TestAdoptReactantPreoptGeometry:
+    def test_no_pre_opt_leaves_the_graph_alone(self, khp_reaction):
+        before = khp_reaction.reactant.graph.geo.copy()
+
+        assert not adopt_reactant_preopt_geometry(khp_reaction.reactant)
+        assert np.array_equal(khp_reaction.reactant.graph.geo, before)
+
+    def test_lowest_energy_pre_opt_wins(self, khp_reaction):
+        reactant = khp_reaction.reactant
+        for key, shift, energy in (("preopt_a", 1.0, -20.0), ("preopt_b", 2.0, -21.0)):
+            conf = conformer()
+            conf.elements = reactant.graph.elements
+            conf.geo = reactant.graph.geo + shift
+            conf.properties["internal_energy_Eh"] = energy
+            reactant.conformers[key] = conf
+
+        assert adopt_reactant_preopt_geometry(reactant)
+        assert np.allclose(reactant.graph.geo, reactant.conformers["preopt_b"].geo)

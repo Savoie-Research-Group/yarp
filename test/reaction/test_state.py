@@ -2,6 +2,9 @@
 Testing suite for the state class
 """
 
+import numpy as np
+import pytest
+
 from yarp.reaction.state import state
 from yarp.yarpecule.yarpecule import yarpecule as ypcule
 
@@ -67,3 +70,42 @@ class TestStateIdentity:
         assert "marker" not in by_identity[second.identity], (
             f"pooling by identity leaked a conformer across mappings of {smi}"
         )
+
+
+class TestSetGraphGeometry:
+    """
+    The pre-optimization writes an on-graph geometry back onto the yarpecule,
+    so the next enumeration cycle starts its parents from relaxed coordinates.
+    """
+
+    def test_replaces_the_graph_coordinates(self):
+        st = state(ypcule('C=C.O'))
+        new_geo = st.graph.geo + 1.0
+
+        st.set_graph_geometry(new_geo)
+
+        assert np.array_equal(st.graph.geo, new_geo)
+
+    def test_leaves_initial_geom_untouched(self):
+        """`initial_geom` shares the graph's array; an in-place write would rewrite it."""
+        st = state(ypcule('C=C.O'))
+        original = st.conformers["initial_geom"].geo.copy()
+
+        st.set_graph_geometry(st.graph.geo + 1.0)
+
+        assert np.array_equal(st.conformers["initial_geom"].geo, original)
+
+    def test_stores_a_copy(self):
+        st = state(ypcule('C=C.O'))
+        new_geo = st.graph.geo + 1.0
+
+        st.set_graph_geometry(new_geo)
+        new_geo[0, 0] = 999.0
+
+        assert st.graph.geo[0, 0] != 999.0
+
+    def test_rejects_a_wrong_shape(self):
+        st = state(ypcule('C=C.O'))
+
+        with pytest.raises(ValueError):
+            st.set_graph_geometry(np.zeros((1, 3)))

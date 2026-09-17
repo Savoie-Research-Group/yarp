@@ -83,11 +83,10 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_distinguish_mapping(self):
+    def test_mapping_equivalence(self):
         """
-        Test that two reactions with same reactant/product connectivities,
-        but different atom mappings can be distinguished via reaction hash.
-        Test reaction: H2 elimination from ethanol (CCO) to form HAA (C=CO)
+        Test that chemically distinct mappings remain different while
+        symmetry-equivalent mappings receive the same reaction hash.
         """
 
         # H2 elimination from H's attached to 2 C atoms
@@ -112,7 +111,7 @@ class TestRxnHash:
         rxn4 = reaction(r4, p4)
 
         assert rxn3.id == rxn4.id
-        assert rxn3.hash != rxn4.hash
+        assert rxn3.hash == rxn4.hash
 
     def test_order_invariance(self):
         """
@@ -140,12 +139,12 @@ class TestRxnHash:
 
         assert rxn1.hash == rxn3.hash
 
-        # Swap indexes involved in the reaction
+        # Consistently reindex atoms involved in the same reaction
         r4 = yarpecule('[C:1]([C:0]([H:3])([H:4])[H:5])([O:2][H:6])([H:7])[H:8]', canon=False)
         p4 = yarpecule('[C:1](=[C:0]([H:3])[H:4])([O:2][H:6])[H:7].[H:8][H:5]', canon=False)
         rxn4 = reaction(r4, p4)
 
-        assert rxn1.hash != rxn4.hash # TODO: figure out if this *should* be equivalent or not
+        assert rxn1.hash == rxn4.hash
 
 
     def test_reverse_reaction(self):

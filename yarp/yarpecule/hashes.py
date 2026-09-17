@@ -1,7 +1,10 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
+from itertools import permutations, product as cartesian_product
+
 import numpy as np
+
 
 def atom_hash(ind, adj_mat, masses, alpha=100.0, beta=0.1, gens=10):
     """
@@ -142,29 +145,120 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def reaction_hash(rxn):
+def _canonical_diff_bem(reactant_state, product_state):
+    """Return a mapping-invariant, reactant-anchored BEM difference.
+
+    Product rows and columns are aligned to reactant atoms using
+    ``atom_info["atom_map"]``. The map values establish correspondence only;
+    canonical order comes from YARP's existing, unrounded reactant atom
+    hashes. Each endpoint's resonance BEMs are averaged so that differing
+    resonance counts do not make unchanged bonds appear reactive.
+
+    Equal-hash atoms remain tied. Unchanged atoms have zero rows in the
+    difference matrix, so their internal order cannot affect its hash. Only
+    changed atoms within an equal-hash group are permuted, and the row-major
+    lexicographically smallest matrix is returned. For YARP's b2f2 reactions,
+    this confines the exact search to the small reaction center.
+
+    Raises
+    ------
+    ValueError
+        If the endpoints do not contain identical, unique atom-map sets.
     """
-    Creates a unique hash value for the reaction object based on the sum of reactant/product
-    yarpecule hashes and the hash of the summed BEM difference matrix.
+    reactant, product = reactant_state.graph, product_state.graph
+
+    reactant_maps = [
+        reactant._atom_info[i]["atom_map"] for i in range(len(reactant.elements))
+    ]
+    product_by_map = {
+        product._atom_info[i]["atom_map"]: i for i in range(len(product.elements))
+    }
+    if (
+        any(atom_map is None for atom_map in reactant_maps)
+        or None in product_by_map
+        or len(set(reactant_maps)) != len(reactant_maps)
+        or len(product_by_map) != len(product.elements)
+        or set(reactant_maps) != set(product_by_map)
+    ):
+        raise ValueError("Reactant and product require identical unique atom-map sets.")
+
+    product_order = [product_by_map[atom_map] for atom_map in reactant_maps]
+    # Averaging prevents the number of valid resonance structures from making
+    # every unchanged bond appear in the reaction difference.
+    reactant_bem = np.mean(np.asarray(reactant.bond_mats), axis=0)
+    product_bem = np.mean(np.asarray(product.bond_mats), axis=0)[
+        np.ix_(product_order, product_order)
+    ]
+
+    difference = reactant_bem - product_bem
+    reactant_hashes = np.asarray(reactant.atom_hashes)
+    changed_rows = np.any(difference != 0, axis=1)
+    order = []
+    tied_positions = []
+    tied_orders = []
+
+    for atom_hash_value in sorted(set(reactant_hashes), reverse=True):
+        atoms = np.flatnonzero(reactant_hashes == atom_hash_value).tolist()
+        changed = [atom for atom in atoms if changed_rows[atom]]
+        unchanged = [atom for atom in atoms if not changed_rows[atom]]
+
+        start = len(order)
+        order.extend(changed)
+        order.extend(unchanged)
+        if len(changed) > 1:
+            tied_positions.append(range(start, start + len(changed)))
+            tied_orders.append(permutations(changed))
+
+    if not tied_orders:
+        return difference[np.ix_(order, order)]
+
+    best_difference = None
+    best_key = None
+
+    # Exhaustively choose the canonical representative of the active ties.
+    for choices in cartesian_product(*tied_orders):
+        candidate = list(order)
+        for atoms, positions in zip(choices, tied_positions):
+            for atom, position in zip(atoms, positions):
+                candidate[position] = atom
+        candidate_difference = difference[np.ix_(candidate, candidate)]
+        candidate_key = tuple(candidate_difference.ravel())
+        if best_key is None or candidate_key < best_key:
+            best_key = candidate_key
+            best_difference = candidate_difference
+
+    return best_difference
+
+
+def reaction_hash(rxn, directional=True):
+    """
+    Return a scalar, mapping-invariant reaction hash.
+
+    The calculation retains YARP's reactant-hash + product-hash +
+    BEM-difference structure. With ``directional=True``, the actual reactant
+    anchors atom ordering and endpoint order sets the sign of the difference
+    contribution. With ``directional=False``, the lower-hash endpoint anchors
+    ordering, so a reaction and its reverse receive the same hash.
 
     Parameters
     ----------
-    y : reaction
-        This is the reaction instance that the hash is being calculated for.
+    rxn : reaction
+        Reaction-like object with reactant and product states.
+    directional : bool, default=True
+        Distinguish forward and reverse reactions when true.
 
     Returns
     -------
-    hash_value: float
+    hash_value : float
+        Scalar reaction hash.
     """
+    if not directional and rxn.product.hash < rxn.reactant.hash:
+        reactant, product = rxn.product, rxn.reactant
+    else:
+        reactant, product = rxn.reactant, rxn.product
 
-    r_bem_sum = np.zeros_like(rxn.reactant.bond_mats[0])
-    for rmat in rxn.reactant.bond_mats:
-        r_bem_sum += rmat
+    difference_hash = abs(bmat_hash(_canonical_diff_bem(reactant, product)))
+    if directional and rxn.reactant.hash < rxn.product.hash:
+        difference_hash = -difference_hash
 
-    p_bem_sum = np.zeros_like(rxn.product.bond_mats[0])
-    for pmat in rxn.product.bond_mats:
-        p_bem_sum += pmat
-
-    diff_bem = r_bem_sum - p_bem_sum
-
-    return rxn.reactant.hash + rxn.product.hash + bmat_hash(diff_bem)
+    return rxn.reactant.hash + rxn.product.hash + difference_hash

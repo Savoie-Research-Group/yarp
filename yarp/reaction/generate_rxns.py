@@ -6,6 +6,7 @@ import numpy as np
 from pathlib import Path
 
 from yarp.yarpecule.yarpecule import yarpecule
+from yarp.yarpecule.hashes import reaction_hash
 from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_reactions_from_xyz_directory, load_reactions_from_smiles_file
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
@@ -85,6 +86,9 @@ def generate_rxns(inp):
                 og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
                 assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
                 assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
+                for rxn in og_rxns.values():
+                    rxn.hash = reaction_hash(rxn)
+                og_rxns = {rxn.hash: rxn for rxn in og_rxns.values()}
 
             elif inp.init_struct.type == 'xyz':
                 if source.is_dir():
@@ -161,6 +165,9 @@ def generate_rxns(inp):
             output = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(output, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in output.values()), "YARP requires a dictionary of reaction objects to continue"
+            for rxn in output.values():
+                rxn.hash = reaction_hash(rxn)
+            output = {rxn.hash: rxn for rxn in output.values()}
 
         elif inp.init_struct.type == 'xyz':
             if source.is_dir():

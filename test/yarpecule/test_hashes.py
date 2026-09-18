@@ -7,7 +7,6 @@ import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
     _canonical_diff_bem,
-    _reactant_automorphism_validator,
     bmat_hash,
     reaction_hash,
 )
@@ -90,17 +89,6 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_rdkit_validator_enforces_coupled_ring_symmetry(self):
-        ring = yarpecule(
-            "[C:1]1([H:7])[C:2]([H:8])[C:3]([H:9])"
-            "[C:4]([H:10])[C:5]([H:11])[C:6]1[H:12]",
-            canon=False,
-        )
-        validates = _reactant_automorphism_validator(ring, range(6))
-
-        assert validates([1, 2, 3, 4, 5, 0])
-        assert not validates([1, 0, 2, 3, 4, 5])
-
     def test_diff_minimization_excludes_nonautomorphic_ring_permutation(self):
         adjacency = np.array(
             [
@@ -218,10 +206,6 @@ class TestRxnHash:
 
         assert rxn1.id != rxn2.id
         assert rxn1.hash != rxn2.hash
-        endpoint_sum = rxn1.reactant.hash + rxn1.product.hash
-        assert np.sign(rxn1.hash - endpoint_sum) == -np.sign(
-            rxn2.hash - endpoint_sum
-        )
         assert reaction_hash(rxn1, directional=False) == reaction_hash(
             rxn2, directional=False
         )

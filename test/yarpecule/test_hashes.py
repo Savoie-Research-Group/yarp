@@ -1,9 +1,16 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
+from types import SimpleNamespace
+
 import pytest
 import numpy as np
-from yarp.yarpecule.hashes import bmat_hash
+from yarp.yarpecule.hashes import (
+    _canonical_diff_bem,
+    _reactant_automorphism_validator,
+    bmat_hash,
+    reaction_hash,
+)
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
 
@@ -83,6 +90,58 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
+    def test_rdkit_validator_enforces_coupled_ring_symmetry(self):
+        ring = yarpecule(
+            "[C:1]1([H:7])[C:2]([H:8])[C:3]([H:9])"
+            "[C:4]([H:10])[C:5]([H:11])[C:6]1[H:12]",
+            canon=False,
+        )
+        validates = _reactant_automorphism_validator(ring, range(6))
+
+        assert validates([1, 2, 3, 4, 5, 0])
+        assert not validates([1, 0, 2, 3, 4, 5])
+
+    def test_diff_minimization_excludes_nonautomorphic_ring_permutation(self):
+        adjacency = np.array(
+            [
+                [0, 1, 0, 1],
+                [1, 0, 1, 0],
+                [0, 1, 0, 1],
+                [1, 0, 1, 0],
+            ]
+        )
+        difference = np.array(
+            [
+                [0, 2, 2, 0],
+                [2, 0, 2, -2],
+                [2, 2, 0, -1],
+                [0, -2, -1, 0],
+            ]
+        )
+        atom_info = {index: {"atom_map": index} for index in range(4)}
+        common = {
+            "elements": ["c"] * 4,
+            "adj_mat": adjacency,
+            "atom_hashes": np.ones(4),
+            "_masses": np.full(4, 12.0),
+            "_atom_info": atom_info,
+        }
+        reactant = SimpleNamespace(**common, bond_mats=[adjacency.copy()])
+        product = SimpleNamespace(
+            **common, bond_mats=[adjacency.copy() - difference]
+        )
+
+        result = _canonical_diff_bem(
+            SimpleNamespace(graph=reactant), SimpleNamespace(graph=product)
+        )
+
+        # The unconstrained lexicographic minimum is (3, 1, 2, 0), which is
+        # not a square automorphism. RDKit restricts the minimum to D4.
+        valid_order = [3, 2, 1, 0]
+        assert np.array_equal(
+            result, difference[np.ix_(valid_order, valid_order)]
+        )
+
     def test_mapping_equivalence(self):
         """
         Test that chemically distinct mappings remain different while
@@ -159,3 +218,10 @@ class TestRxnHash:
 
         assert rxn1.id != rxn2.id
         assert rxn1.hash != rxn2.hash
+        endpoint_sum = rxn1.reactant.hash + rxn1.product.hash
+        assert np.sign(rxn1.hash - endpoint_sum) == -np.sign(
+            rxn2.hash - endpoint_sum
+        )
+        assert reaction_hash(rxn1, directional=False) == reaction_hash(
+            rxn2, directional=False
+        )

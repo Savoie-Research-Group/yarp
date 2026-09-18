@@ -1,8 +1,6 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
-from types import SimpleNamespace
-
 import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
@@ -89,46 +87,27 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_diff_minimization_excludes_nonautomorphic_ring_permutation(self):
-        adjacency = np.array(
-            [
-                [0, 1, 0, 1],
-                [1, 0, 1, 0],
-                [0, 1, 0, 1],
-                [1, 0, 1, 0],
-            ]
-        )
-        difference = np.array(
-            [
-                [0, 2, 2, 0],
-                [2, 0, 2, -2],
-                [2, 2, 0, -1],
-                [0, -2, -1, 0],
-            ]
-        )
-        atom_info = {index: {"atom_map": index} for index in range(4)}
-        common = {
-            "elements": ["c"] * 4,
-            "adj_mat": adjacency,
-            "atom_hashes": np.ones(4),
-            "_masses": np.full(4, 12.0),
-            "_atom_info": atom_info,
-        }
-        reactant = SimpleNamespace(**common, bond_mats=[adjacency.copy()])
-        product = SimpleNamespace(
-            **common, bond_mats=[adjacency.copy() - difference]
-        )
-
+    def test_diff_minimization_preserves_coupled_ring_symmetry(
+        self, cyclohexane_dehydrogenation
+    ):
         result = _canonical_diff_bem(
-            SimpleNamespace(graph=reactant), SimpleNamespace(graph=product)
+            cyclohexane_dehydrogenation.reactant,
+            cyclohexane_dehydrogenation.product,
         )
 
-        # The unconstrained lexicographic minimum is (3, 1, 2, 0), which is
-        # not a square automorphism. RDKit restricts the minimum to D4.
-        valid_order = [3, 2, 1, 0]
-        assert np.array_equal(
-            result, difference[np.ix_(valid_order, valid_order)]
+        # The reacting carbons and hydrogens must move together under a valid
+        # cyclohexane automorphism. Independent swaps produce crossed C-H rows.
+        active = result[np.ix_([0, 1, 6, 7], [0, 1, 6, 7])]
+        expected = np.array(
+            [
+                [0, -1, 1, 0],
+                [-1, 0, 0, 1],
+                [1, 0, 0, -1],
+                [0, 1, -1, 0],
+            ]
         )
+        assert np.count_nonzero(result) == np.count_nonzero(expected)
+        assert np.array_equal(active, expected)
 
     def test_mapping_equivalence(self):
         """

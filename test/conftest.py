@@ -297,6 +297,17 @@ def test_smiles_file():
     """Returns a Path object of the absolute path to the test SMILES file."""
     return Path(__file__).parent / "molecules" / "batch_SMILES_rxn.txt"
 
+
+@pytest.fixture
+def cyclohexane_dehydrogenation():
+    """Return the mapped ring-dehydrogenation reaction used for hash tests."""
+    from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
+
+    source = Path(__file__).parent / "molecules" / "cyclohexane_dehydrogenation.smi"
+    reactions = load_reactions_from_smiles_file(source)
+    assert len(reactions) == 1
+    return next(iter(reactions.values()))
+
 # SMILES
 @pytest.fixture
 def ethene_smi():

@@ -1,7 +1,6 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
-from functools import lru_cache
 from itertools import permutations, product as cartesian_product
 
 import numpy as np
@@ -180,14 +179,6 @@ def rec_sum(ind, adj_mat, masses, beta, gens, avoid_list=[]):
         return masses[ind]*beta
 
 
-@lru_cache(maxsize=None)
-def _bmat_weights(size):
-    return (
-        np.arange(1, size**2 + 1).reshape(size, size),
-        10 ** (-np.arange(size) / 100),
-    )
-
-
 def bmat_hash(bond_mat):
     """ 
     Creates a unique hash value for each bond-electron matrix that is used to speed uniqueness checks.
@@ -207,8 +198,7 @@ def bmat_hash(bond_mat):
     The hash is calculated as bond_mat * an ascending array (1,2,... counting up through all elements and rows) summed over rows, 
     then those values are multiplied by 10**(-i/100) where i is the column, and summed.
     """
-    weights, decay = _bmat_weights(len(bond_mat))
-    return np.sum(np.sum(bond_mat * weights, axis=0) * decay)
+    return np.sum([_*10**(-(count/100)) for count, _ in enumerate(np.sum(bond_mat*np.arange(1, len(bond_mat)**2+1).reshape(len(bond_mat), len(bond_mat)), axis=0))])
 
 
 def yarpecule_hash(y):

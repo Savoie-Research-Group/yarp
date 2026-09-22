@@ -197,15 +197,11 @@ def reaction_hash(rxn):
         np.asarray(bem)[np.ix_(other_order, other_order)]
         for bem in other.bond_mats
     )
-    combined_bem = np.zeros_like(combined_bems[0])
-    for bem in combined_bems:
-        combined_bem += bem
-    combined_atom_hashes = (
+    bem = np.zeros_like(combined_bems[0])
+    for mat in combined_bems:
+        bem += mat
+    atom_hashes = (
         np.asarray(anchor.atom_hashes)
         + np.asarray(other.atom_hashes)[other_order]
     )
-    combined_hash = np.round(
-        np.sum(combined_bem * np.outer(combined_atom_hashes, combined_atom_hashes)),
-        7,
-    )
-    return rxn.reactant.hash + rxn.product.hash + combined_hash
+    return rxn.reactant.hash + rxn.product.hash + np.round(np.sum(bem*np.outer(atom_hashes, atom_hashes)), 7)

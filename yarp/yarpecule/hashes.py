@@ -1,7 +1,7 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
-from copy import copy
+import warnings
 
 import numpy as np
 
@@ -116,6 +116,14 @@ def bmat_hash(bond_mat):
     return np.sum([_*10**(-(count/100)) for count, _ in enumerate(np.sum(bond_mat*np.arange(1, len(bond_mat)**2+1).reshape(len(bond_mat), len(bond_mat)), axis=0))])
 
 
+def _yarpecule_hash_from_data(bem, atom_hashes, decimals=7):
+    """Apply the yarpecule hash formula to an already-combined BEM."""
+    return np.round(
+        np.sum(np.asarray(bem) * np.outer(atom_hashes, atom_hashes)),
+        decimals,
+    )
+
+
 def yarpecule_hash(y):
     """ 
     Creates a unique hash value for the yarpecule object based on the sum of all bond-electron matrices and the atom hashes.
@@ -142,23 +150,16 @@ def yarpecule_hash(y):
     for mat in y.bond_mats:
         bem += mat
 
-    return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
+    return _yarpecule_hash_from_data(bem, y.atom_hashes)
 
 
-def _combined_reaction_yarpecule(anchor_state, other_state):
-    """Build a yarpecule-shaped object from both aligned reaction endpoints.
+def _combined_reaction_hash_inputs(anchor_state, other_state):
+    """Return the combined BEM and atom hashes for a mapped reaction.
 
-    Every resonance BEM from the anchor is retained, and every resonance BEM
-    from the other endpoint is atom-map aligned and retained with the same
-    sign. The dummy adjacency is the union of the two aligned endpoint
-    adjacencies. Its atom hashes are the sums of the existing, atom-map-aligned
-    endpoint atom hashes. Thus both the BEM and atom-hash inputs to
-    ``yarpecule_hash`` are symmetric with respect to reaction direction and
-    transform together under a consistent atom reindexing.
-
-    The dummy copies the anchor state needed by ``yarpecule_hash`` and carries
-    a separate copy of its ``atom_info``. Atom maps establish correspondence;
-    their numeric values are not themselves part of the scalar hash.
+    Every resonance BEM from both endpoints is summed with the same sign after
+    aligning the other endpoint to the anchor through atom maps. Existing
+    endpoint atom hashes are aligned and summed in the same frame. Atom-map
+    values are arbitrary correspondence labels and are not hash inputs.
 
     Raises
     ------
@@ -182,57 +183,68 @@ def _combined_reaction_yarpecule(anchor_state, other_state):
         raise ValueError("Reaction endpoints require identical unique atom-map sets.")
 
     other_order = [other_by_map[atom_map] for atom_map in anchor_maps]
-    # Keep a real yarpecule instance, but copy only the mutable state replaced
-    # below. A full deepcopy also duplicates geometries, cached identifiers,
-    # and Lewis-structure bookkeeping that ``yarpecule_hash`` never reads.
-    dummy = copy(anchor)
-    # The hash path only reads atom metadata, so a shallow container copy is
-    # sufficient and avoids copying every per-atom metadata dictionary.
-    dummy._atom_info = copy(anchor._atom_info)
-    dummy._lewis_struct = copy(anchor._lewis_struct)
-    # The dummy owns the list while safely reusing the immutable anchor arrays.
-    combined_bems = list(anchor.bond_mats)
-    combined_bems.extend(
-        np.asarray(bem)[np.ix_(other_order, other_order)]
-        for bem in other.bond_mats
-    )
-    dummy._lewis_struct._bond_mats = combined_bems
-    aligned_other_adjacency = np.asarray(other.adj_mat)[
+    element_mismatches = [
+        (
+            atom_map,
+            anchor.elements[anchor_index],
+            other.elements[other_by_map[atom_map]],
+        )
+        for anchor_index, atom_map in enumerate(anchor_maps)
+        if anchor.elements[anchor_index]
+        != other.elements[other_by_map[atom_map]]
+    ]
+    if element_mismatches:
+        mismatch_text = ", ".join(
+            f"map {atom_map}: {anchor_element}->{other_element}"
+            for atom_map, anchor_element, other_element in element_mismatches
+        )
+        warnings.warn(
+            "Element-inconsistent atom maps detected "
+            f"({mismatch_text}). Check the maps for this reaction; "
+            "hashing will continue using the supplied correspondence labels.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+    combined_bem = np.sum(np.asarray(anchor.bond_mats), axis=0) + np.sum(
+        np.asarray(other.bond_mats), axis=0
+    )[
         np.ix_(other_order, other_order)
     ]
-    dummy._adj_mat = np.logical_or(
-        np.asarray(anchor.adj_mat), aligned_other_adjacency
-    ).astype(np.asarray(anchor.adj_mat).dtype)
-
-    dummy._masses = np.asarray(
-        [
-            dummy._atom_info[i].get("mass", anchor._masses[i])
-            for i in range(len(anchor.elements))
-        ],
-        dtype=float,
-    )
-    dummy._atom_hashes = (
+    combined_atom_hashes = (
         np.asarray(anchor.atom_hashes)
         + np.asarray(other.atom_hashes)[other_order]
     )
-    dummy._yarpecule_hash = None
-    return dummy
+    return combined_bem, combined_atom_hashes
 
 
 def _combined_reaction_hash(anchor_state, other_state):
-    """Hash all aligned endpoint BEMs and atom hashes in one dummy yarpecule."""
-    return yarpecule_hash(_combined_reaction_yarpecule(anchor_state, other_state))
+    """Apply the yarpecule hash formula to both aligned reaction endpoints."""
+    combined_bem, combined_atom_hashes = _combined_reaction_hash_inputs(
+        anchor_state, other_state
+    )
+    # Atom reindexing only permutes these scalar terms. Sort before summing so
+    # increasing the precision to eight decimals cannot expose reduction-order
+    # noise as a false distinction between equivalent mappings. This does not
+    # canonicalize or reorder either endpoint's BEM.
+    terms = (
+        np.asarray(combined_bem)
+        * np.outer(combined_atom_hashes, combined_atom_hashes)
+    ).ravel()
+    return np.round(
+        np.sum(np.sort(terms)),
+        8,
+    )
 
 
 def reaction_hash(rxn):
     """Return a scalar mapping- and direction-invariant reaction hash.
 
-    All endpoint resonance BEMs are placed on a dummy yarpecule in the provided
-    reactant's atom order. Its atom hashes are the sums of the existing,
-    atom-map-aligned endpoint atom hashes. A reverse reaction therefore
-    describes the same dummy graph and summed atom descriptors in the opposite
-    endpoint's order, so no endpoint ordering or symmetry canonicalization is
-    required.
+    All endpoint resonance BEMs are summed in the provided reactant's atom
+    order. The atom descriptors are the sums of the existing, atom-map-aligned
+    endpoint atom hashes. A reverse reaction therefore describes the same
+    combined inputs in the opposite endpoint's order, so no endpoint ordering
+    or symmetry canonicalization is required.
     The result supplies the reaction term in the established
     endpoint-sum-plus-reaction formula.
     """

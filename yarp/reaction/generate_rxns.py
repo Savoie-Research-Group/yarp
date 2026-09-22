@@ -21,6 +21,14 @@ def rekey_reactions(reactions):
     output = {}
     for rxn in reactions.values():
         rxn.hash = reaction_hash(rxn)
+        if rxn.hash in output:
+            retained = output[rxn.hash]
+            print(
+                "WARNING: Deduplicated reaction "
+                f"{rxn.id}; retaining earlier reaction {retained.id} "
+                f"for hash {rxn.hash}."
+            )
+            continue
         output[rxn.hash] = rxn
     return output
 

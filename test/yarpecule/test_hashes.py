@@ -1,11 +1,13 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
+import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
-    _combined_reaction_yarpecule,
+    _combined_reaction_hash_inputs,
     bmat_hash,
 )
+from yarp.reaction.generate_rxns import rekey_reactions
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
 
@@ -85,10 +87,10 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_combined_yarpecule_uses_all_bems_atom_hashes_and_atom_info(
+    def test_combined_hash_uses_all_bems_and_mapped_atom_hashes(
         self, cyclohexane_dehydrogenation
     ):
-        dummy = _combined_reaction_yarpecule(
+        combined_bem, combined_atom_hashes = _combined_reaction_hash_inputs(
             cyclohexane_dehydrogenation.reactant,
             cyclohexane_dehydrogenation.product,
         )
@@ -105,46 +107,84 @@ class TestRxnHash:
         expected_bem = np.sum(np.asarray(reactant.bond_mats), axis=0) + np.sum(
             np.asarray(product.bond_mats), axis=0,
         )[np.ix_(product_order, product_order)]
-        expected_adjacency = np.logical_or(
-            reactant.adj_mat,
-            np.asarray(product.adj_mat)[np.ix_(product_order, product_order)],
-        ).astype(np.asarray(reactant.adj_mat).dtype)
         expected_atom_hashes = (
             np.asarray(reactant.atom_hashes)
             + np.asarray(product.atom_hashes)[product_order]
         )
 
-        assert dummy is not reactant
-        assert dummy._atom_info == reactant._atom_info
-        assert len(dummy.bond_mats) == (
-            len(reactant.bond_mats) + len(product.bond_mats)
-        )
-        assert np.array_equal(np.sum(dummy.bond_mats, axis=0), expected_bem)
-        assert np.array_equal(dummy.adj_mat, expected_adjacency)
-        assert np.array_equal(dummy.atom_hashes, expected_atom_hashes)
+        assert np.array_equal(combined_bem, expected_bem)
+        assert np.array_equal(combined_atom_hashes, expected_atom_hashes)
 
-        reverse_dummy = _combined_reaction_yarpecule(
+        reverse_bem, reverse_atom_hashes = _combined_reaction_hash_inputs(
             cyclohexane_dehydrogenation.product,
             cyclohexane_dehydrogenation.reactant,
         )
+        reverse_graph = cyclohexane_dehydrogenation.product.graph
         reverse_by_map = {
-            reverse_dummy._atom_info[i]["atom_map"]: i
-            for i in range(len(reverse_dummy.elements))
+            reverse_graph._atom_info[i]["atom_map"]: i
+            for i in range(len(reverse_graph.elements))
         }
         reverse_order = [
-            reverse_by_map[dummy._atom_info[i]["atom_map"]]
-            for i in range(len(dummy.elements))
+            reverse_by_map[reactant._atom_info[i]["atom_map"]]
+            for i in range(len(reactant.elements))
         ]
         assert np.array_equal(
-            dummy.atom_hashes,
-            np.asarray(reverse_dummy.atom_hashes)[reverse_order],
+            combined_atom_hashes,
+            np.asarray(reverse_atom_hashes)[reverse_order],
         )
         assert np.array_equal(
-            np.sum(dummy.bond_mats, axis=0),
-            np.sum(reverse_dummy.bond_mats, axis=0)[
-                np.ix_(reverse_order, reverse_order)
-            ],
+            combined_bem,
+            reverse_bem[np.ix_(reverse_order, reverse_order)],
         )
+
+    def test_element_inconsistent_maps_warn_and_continue(self):
+        reactant = yarpecule("[C:0][O:1]", canon=False)
+        product = yarpecule("[C:1][O:0]", canon=False)
+
+        with pytest.warns(RuntimeWarning, match="Element-inconsistent atom maps"):
+            mapped_reaction = reaction(reactant, product)
+
+        assert isinstance(mapped_reaction.hash, float)
+
+    def test_rekey_retains_first_reaction_and_reports_deduplication(
+        self, capsys
+    ):
+        reactant = yarpecule(
+            "[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]",
+            canon=False,
+        )
+        product = yarpecule(
+            "[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]",
+            canon=False,
+        )
+        first = reaction(reactant, product)
+        second = reaction(product, reactant)
+        first.network_meta["retained"] = True
+
+        result = rekey_reactions({"first": first, "second": second})
+
+        assert len(result) == 1
+        assert next(iter(result.values())) is first
+        assert next(iter(result.values())).network_meta["retained"] is True
+        assert "Deduplicated reaction" in capsys.readouterr().out
+
+    def test_atom_map_values_are_arbitrary_correspondence_labels(self):
+        first = reaction(
+            yarpecule("[C:0]([H:1])([H:2])([H:3])[H:4]", canon=False),
+            yarpecule("[C:0]([H:1])([H:2])([H:3])[H:4]", canon=False),
+        )
+        relabeled = reaction(
+            yarpecule(
+                "[C:100]([H:101])([H:102])([H:103])[H:104]",
+                canon=False,
+            ),
+            yarpecule(
+                "[C:100]([H:101])([H:102])([H:103])[H:104]",
+                canon=False,
+            ),
+        )
+
+        assert first.hash == relabeled.hash
 
     def test_mapping_equivalence(self):
         """

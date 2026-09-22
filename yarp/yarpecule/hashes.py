@@ -1,7 +1,6 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
-from copy import copy
 import warnings
 
 import numpy as np
@@ -146,21 +145,14 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def _combined_reaction_yarpecule(anchor_state, other_state):
-    """Build a yarpecule-shaped object from both aligned reaction endpoints.
+def reaction_hash(rxn):
+    """Return a scalar mapping- and direction-invariant reaction hash.
 
-    Every resonance BEM from the anchor is retained, and every resonance BEM
-    from the other endpoint is atom-map aligned and retained with the same
-    sign. Its atom hashes are the sums of the existing, atom-map-aligned
-    endpoint atom hashes. Atom-map values are arbitrary correspondence labels
-    and are not hash inputs.
-
-    Raises
-    ------
-    ValueError
-        If the endpoints do not contain identical, unique atom-map sets.
+    Align the product to the provided reactant order using arbitrary atom-map
+    labels, sum all endpoint resonance BEMs and mapped atom hashes, then apply
+    the same scalar algebra and rounding as ``yarpecule_hash`` directly.
     """
-    anchor, other = anchor_state.graph, other_state.graph
+    anchor, other = rxn.reactant.graph, rxn.product.graph
     anchor_maps = [
         anchor._atom_info[i]["atom_map"] for i in range(len(anchor.elements))
     ]
@@ -200,66 +192,20 @@ def _combined_reaction_yarpecule(anchor_state, other_state):
             stacklevel=2,
         )
 
-    dummy = copy(anchor)
-    # ``yarpecule_hash`` does not read atom_info. Keep a separate container so
-    # this temporary object remains internally coherent without sharing a
-    # mutable metadata dictionary with the reactant.
-    dummy._atom_info = copy(anchor._atom_info)
-
-    # ``yarpecule_hash`` reads bond_mats through the Lewis-structure property.
-    dummy._lewis_struct = copy(anchor._lewis_struct)
     combined_bems = list(anchor.bond_mats)
     combined_bems.extend(
         np.asarray(bem)[np.ix_(other_order, other_order)]
         for bem in other.bond_mats
     )
-    dummy._lewis_struct._bond_mats = combined_bems
-
-    # Adjacency and masses are not read by the current master implementation
-    # of ``yarpecule_hash``. They are populated so the dummy remains a valid
-    # combined yarpecule if inspected while debugging or used by future code.
-    aligned_other_adjacency = np.asarray(other.adj_mat)[
-        np.ix_(other_order, other_order)
-    ]
-    dummy._adj_mat = np.logical_or(
-        np.asarray(anchor.adj_mat), aligned_other_adjacency
-    ).astype(np.asarray(anchor.adj_mat).dtype)
-    dummy._masses = np.asarray(
-        [
-            dummy._atom_info[i].get("mass", anchor._masses[i])
-            for i in range(len(anchor.elements))
-        ],
-        dtype=float,
-    )
-
-    # Along with bond_mats above, atom_hashes are the only dummy data consumed
-    # by ``yarpecule_hash``.
-    dummy._atom_hashes = (
+    combined_bem = np.zeros_like(combined_bems[0])
+    for bem in combined_bems:
+        combined_bem += bem
+    combined_atom_hashes = (
         np.asarray(anchor.atom_hashes)
         + np.asarray(other.atom_hashes)[other_order]
     )
-
-    # The direct function call below recomputes the hash and does not read this
-    # cache. Clear the copied reactant value to avoid exposing a stale hash if
-    # the dummy is inspected through its public ``hash`` property.
-    dummy._yarpecule_hash = None
-    return dummy
-
-
-def _combined_reaction_hash(anchor_state, other_state):
-    """Hash both aligned endpoints with the unmodified yarpecule hash."""
-    return yarpecule_hash(_combined_reaction_yarpecule(anchor_state, other_state))
-
-
-def reaction_hash(rxn):
-    """Return a scalar mapping- and direction-invariant reaction hash.
-
-    All endpoint resonance BEMs are placed on a dummy yarpecule in the provided
-    reactant's atom order. Its atom hashes are the sums of the existing,
-    atom-map-aligned endpoint atom hashes. The unmodified ``yarpecule_hash``
-    function supplies the combined term, so no separate BEM hash is used.
-    The result supplies the reaction term in the established
-    endpoint-sum-plus-reaction formula.
-    """
-    combined_hash = _combined_reaction_hash(rxn.reactant, rxn.product)
+    combined_hash = np.round(
+        np.sum(combined_bem * np.outer(combined_atom_hashes, combined_atom_hashes)),
+        7,
+    )
     return rxn.reactant.hash + rxn.product.hash + combined_hash

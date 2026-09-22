@@ -1,11 +1,13 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
+from importlib import import_module
+
 import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
-    _combined_reaction_yarpecule,
     bmat_hash,
+    reaction_hash,
 )
 from yarp.reaction.generate_rxns import rekey_reactions
 from yarp.yarpecule.yarpecule import yarpecule
@@ -87,13 +89,9 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_combined_yarpecule_uses_all_bems_and_mapped_atom_hashes(
-        self, cyclohexane_dehydrogenation
+    def test_direct_hash_uses_all_bems_and_mapped_atom_hashes(
+        self, cyclohexane_dehydrogenation, monkeypatch
     ):
-        dummy = _combined_reaction_yarpecule(
-            cyclohexane_dehydrogenation.reactant,
-            cyclohexane_dehydrogenation.product,
-        )
         reactant = cyclohexane_dehydrogenation.reactant.graph
         product = cyclohexane_dehydrogenation.product.graph
         product_by_map = {
@@ -104,39 +102,38 @@ class TestRxnHash:
             product_by_map[reactant._atom_info[i]["atom_map"]]
             for i in range(len(reactant.elements))
         ]
-        expected_bem = np.sum(np.asarray(reactant.bond_mats), axis=0) + np.sum(
-            np.asarray(product.bond_mats), axis=0,
-        )[np.ix_(product_order, product_order)]
+        combined_bems = list(reactant.bond_mats) + [
+            np.asarray(bem)[np.ix_(product_order, product_order)]
+            for bem in product.bond_mats
+        ]
+        expected_bem = np.zeros_like(combined_bems[0])
+        for bem in combined_bems:
+            expected_bem += bem
         expected_atom_hashes = (
             np.asarray(reactant.atom_hashes)
             + np.asarray(product.atom_hashes)[product_order]
         )
+        expected_hash = (
+            cyclohexane_dehydrogenation.reactant.hash
+            + cyclohexane_dehydrogenation.product.hash
+            + np.round(
+                np.sum(
+                    expected_bem
+                    * np.outer(expected_atom_hashes, expected_atom_hashes)
+                ),
+                7,
+            )
+        )
 
-        assert np.array_equal(np.sum(dummy.bond_mats, axis=0), expected_bem)
-        assert np.array_equal(dummy.atom_hashes, expected_atom_hashes)
+        def unexpected_yarpecule_hash(_):
+            raise AssertionError("Reaction hashing must use the direct algebra")
 
-        reverse_dummy = _combined_reaction_yarpecule(
-            cyclohexane_dehydrogenation.product,
-            cyclohexane_dehydrogenation.reactant,
+        monkeypatch.setattr(
+            import_module("yarp.yarpecule.hashes"),
+            "yarpecule_hash",
+            unexpected_yarpecule_hash,
         )
-        reverse_by_map = {
-            reverse_dummy._atom_info[i]["atom_map"]: i
-            for i in range(len(reverse_dummy.elements))
-        }
-        reverse_order = [
-            reverse_by_map[dummy._atom_info[i]["atom_map"]]
-            for i in range(len(dummy.elements))
-        ]
-        assert np.array_equal(
-            dummy.atom_hashes,
-            np.asarray(reverse_dummy.atom_hashes)[reverse_order],
-        )
-        assert np.array_equal(
-            np.sum(dummy.bond_mats, axis=0),
-            np.sum(reverse_dummy.bond_mats, axis=0)[
-                np.ix_(reverse_order, reverse_order)
-            ],
-        )
+        assert reaction_hash(cyclohexane_dehydrogenation) == expected_hash
 
     def test_element_inconsistent_maps_warn_and_continue(self):
         reactant = yarpecule("[C:0][O:1]", canon=False)

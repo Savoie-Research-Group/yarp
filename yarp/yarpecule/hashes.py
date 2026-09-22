@@ -201,7 +201,12 @@ def _combined_reaction_yarpecule(anchor_state, other_state):
         )
 
     dummy = copy(anchor)
+    # ``yarpecule_hash`` does not read atom_info. Keep a separate container so
+    # this temporary object remains internally coherent without sharing a
+    # mutable metadata dictionary with the reactant.
     dummy._atom_info = copy(anchor._atom_info)
+
+    # ``yarpecule_hash`` reads bond_mats through the Lewis-structure property.
     dummy._lewis_struct = copy(anchor._lewis_struct)
     combined_bems = list(anchor.bond_mats)
     combined_bems.extend(
@@ -209,6 +214,10 @@ def _combined_reaction_yarpecule(anchor_state, other_state):
         for bem in other.bond_mats
     )
     dummy._lewis_struct._bond_mats = combined_bems
+
+    # Adjacency and masses are not read by the current master implementation
+    # of ``yarpecule_hash``. They are populated so the dummy remains a valid
+    # combined yarpecule if inspected while debugging or used by future code.
     aligned_other_adjacency = np.asarray(other.adj_mat)[
         np.ix_(other_order, other_order)
     ]
@@ -222,10 +231,17 @@ def _combined_reaction_yarpecule(anchor_state, other_state):
         ],
         dtype=float,
     )
+
+    # Along with bond_mats above, atom_hashes are the only dummy data consumed
+    # by ``yarpecule_hash``.
     dummy._atom_hashes = (
         np.asarray(anchor.atom_hashes)
         + np.asarray(other.atom_hashes)[other_order]
     )
+
+    # The direct function call below recomputes the hash and does not read this
+    # cache. Clear the copied reactant value to avoid exposing a stale hash if
+    # the dummy is inspected through its public ``hash`` property.
     dummy._yarpecule_hash = None
     return dummy
 

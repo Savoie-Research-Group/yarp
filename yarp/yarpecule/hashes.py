@@ -1,6 +1,7 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
+from math import fsum
 import warnings
 
 import numpy as np
@@ -150,7 +151,8 @@ def reaction_hash(rxn):
 
     Align the product to the provided reactant order using arbitrary atom-map
     labels, sum all endpoint resonance BEMs and mapped atom hashes, then apply
-    the same scalar algebra and rounding as ``yarpecule_hash`` directly.
+    the same scalar algebra and rounding as ``yarpecule_hash`` directly. Use
+    ``fsum`` to avoid order-dependent reduction at rounding boundaries.
     """
     anchor, other = rxn.reactant.graph, rxn.product.graph
     anchor_maps = [
@@ -204,4 +206,4 @@ def reaction_hash(rxn):
         np.asarray(anchor.atom_hashes)
         + np.asarray(other.atom_hashes)[other_order]
     )
-    return rxn.reactant.hash + rxn.product.hash + np.round(np.sum(bem*np.outer(atom_hashes, atom_hashes)), 7)
+    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((bem*np.outer(atom_hashes, atom_hashes)).flat), 7)

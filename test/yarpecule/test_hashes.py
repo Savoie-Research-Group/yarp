@@ -2,6 +2,7 @@
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
 from importlib import import_module
+from math import fsum
 
 import pytest
 import numpy as np
@@ -117,9 +118,11 @@ class TestRxnHash:
             cyclohexane_dehydrogenation.reactant.hash
             + cyclohexane_dehydrogenation.product.hash
             + np.round(
-                np.sum(
-                    expected_bem
-                    * np.outer(expected_atom_hashes, expected_atom_hashes)
+                fsum(
+                    (
+                        expected_bem
+                        * np.outer(expected_atom_hashes, expected_atom_hashes)
+                    ).flat
                 ),
                 7,
             )
@@ -128,12 +131,21 @@ class TestRxnHash:
         def unexpected_yarpecule_hash(_):
             raise AssertionError("Reaction hashing must use the direct algebra")
 
+        fsum_calls = []
+
+        def checked_fsum(values):
+            fsum_calls.append(True)
+            return fsum(values)
+
+        hashes_module = import_module("yarp.yarpecule.hashes")
         monkeypatch.setattr(
-            import_module("yarp.yarpecule.hashes"),
+            hashes_module,
             "yarpecule_hash",
             unexpected_yarpecule_hash,
         )
+        monkeypatch.setattr(hashes_module, "fsum", checked_fsum)
         assert reaction_hash(cyclohexane_dehydrogenation) == expected_hash
+        assert fsum_calls == [True]
 
     def test_element_inconsistent_maps_warn_and_continue(self):
         reactant = yarpecule("[C:0][O:1]", canon=False)

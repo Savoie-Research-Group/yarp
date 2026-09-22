@@ -4,7 +4,7 @@ Testing suite for functions contained in yarp/yarpecule/hashes.py
 import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
-    _combined_reaction_hash_inputs,
+    _combined_reaction_yarpecule,
     bmat_hash,
 )
 from yarp.reaction.generate_rxns import rekey_reactions
@@ -87,10 +87,10 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_combined_hash_uses_all_bems_and_mapped_atom_hashes(
+    def test_combined_yarpecule_uses_all_bems_and_mapped_atom_hashes(
         self, cyclohexane_dehydrogenation
     ):
-        combined_bem, combined_atom_hashes = _combined_reaction_hash_inputs(
+        dummy = _combined_reaction_yarpecule(
             cyclohexane_dehydrogenation.reactant,
             cyclohexane_dehydrogenation.product,
         )
@@ -112,29 +112,30 @@ class TestRxnHash:
             + np.asarray(product.atom_hashes)[product_order]
         )
 
-        assert np.array_equal(combined_bem, expected_bem)
-        assert np.array_equal(combined_atom_hashes, expected_atom_hashes)
+        assert np.array_equal(np.sum(dummy.bond_mats, axis=0), expected_bem)
+        assert np.array_equal(dummy.atom_hashes, expected_atom_hashes)
 
-        reverse_bem, reverse_atom_hashes = _combined_reaction_hash_inputs(
+        reverse_dummy = _combined_reaction_yarpecule(
             cyclohexane_dehydrogenation.product,
             cyclohexane_dehydrogenation.reactant,
         )
-        reverse_graph = cyclohexane_dehydrogenation.product.graph
         reverse_by_map = {
-            reverse_graph._atom_info[i]["atom_map"]: i
-            for i in range(len(reverse_graph.elements))
+            reverse_dummy._atom_info[i]["atom_map"]: i
+            for i in range(len(reverse_dummy.elements))
         }
         reverse_order = [
-            reverse_by_map[reactant._atom_info[i]["atom_map"]]
-            for i in range(len(reactant.elements))
+            reverse_by_map[dummy._atom_info[i]["atom_map"]]
+            for i in range(len(dummy.elements))
         ]
         assert np.array_equal(
-            combined_atom_hashes,
-            np.asarray(reverse_atom_hashes)[reverse_order],
+            dummy.atom_hashes,
+            np.asarray(reverse_dummy.atom_hashes)[reverse_order],
         )
         assert np.array_equal(
-            combined_bem,
-            reverse_bem[np.ix_(reverse_order, reverse_order)],
+            np.sum(dummy.bond_mats, axis=0),
+            np.sum(reverse_dummy.bond_mats, axis=0)[
+                np.ix_(reverse_order, reverse_order)
+            ],
         )
 
     def test_element_inconsistent_maps_warn_and_continue(self):

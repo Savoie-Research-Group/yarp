@@ -107,7 +107,8 @@ def test_enum_d2_pkl(enum_d2_pkl):
     with open(output_str, "rb") as f:
         saved_reactions = pickle.load(f)
 
-    assert len(saved_reactions) == 25
+    # Four forward/reverse pairs collapse to one nondirectional reaction each.
+    assert len(saved_reactions) == 21
     assert_current_reaction_hash_keys(saved_reactions)
 
 # ERM: There are some known bugs with the generation of XYZs/SMILES that are probably causing

@@ -1,12 +1,10 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
-import pytest
 import numpy as np
 from yarp.yarpecule.hashes import (
-    _canonical_diff_bem,
+    _combined_reaction_yarpecule,
     bmat_hash,
-    reaction_hash,
 )
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
@@ -87,27 +85,66 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_diff_minimization_preserves_coupled_ring_symmetry(
+    def test_combined_yarpecule_uses_all_bems_atom_hashes_and_atom_info(
         self, cyclohexane_dehydrogenation
     ):
-        result = _canonical_diff_bem(
+        dummy = _combined_reaction_yarpecule(
             cyclohexane_dehydrogenation.reactant,
             cyclohexane_dehydrogenation.product,
         )
-
-        # The reacting carbons and hydrogens must move together under a valid
-        # cyclohexane automorphism. Independent swaps produce crossed C-H rows.
-        active = result[np.ix_([0, 1, 6, 7], [0, 1, 6, 7])]
-        expected = np.array(
-            [
-                [0, -1, 1, 0],
-                [-1, 0, 0, 1],
-                [1, 0, 0, -1],
-                [0, 1, -1, 0],
-            ]
+        reactant = cyclohexane_dehydrogenation.reactant.graph
+        product = cyclohexane_dehydrogenation.product.graph
+        product_by_map = {
+            product._atom_info[i]["atom_map"]: i
+            for i in range(len(product.elements))
+        }
+        product_order = [
+            product_by_map[reactant._atom_info[i]["atom_map"]]
+            for i in range(len(reactant.elements))
+        ]
+        expected_bem = np.sum(np.asarray(reactant.bond_mats), axis=0) + np.sum(
+            np.asarray(product.bond_mats), axis=0,
+        )[np.ix_(product_order, product_order)]
+        expected_adjacency = np.logical_or(
+            reactant.adj_mat,
+            np.asarray(product.adj_mat)[np.ix_(product_order, product_order)],
+        ).astype(np.asarray(reactant.adj_mat).dtype)
+        expected_atom_hashes = (
+            np.asarray(reactant.atom_hashes)
+            + np.asarray(product.atom_hashes)[product_order]
         )
-        assert np.count_nonzero(result) == np.count_nonzero(expected)
-        assert np.array_equal(active, expected)
+
+        assert dummy is not reactant
+        assert dummy._atom_info == reactant._atom_info
+        assert len(dummy.bond_mats) == (
+            len(reactant.bond_mats) + len(product.bond_mats)
+        )
+        assert np.array_equal(np.sum(dummy.bond_mats, axis=0), expected_bem)
+        assert np.array_equal(dummy.adj_mat, expected_adjacency)
+        assert np.array_equal(dummy.atom_hashes, expected_atom_hashes)
+
+        reverse_dummy = _combined_reaction_yarpecule(
+            cyclohexane_dehydrogenation.product,
+            cyclohexane_dehydrogenation.reactant,
+        )
+        reverse_by_map = {
+            reverse_dummy._atom_info[i]["atom_map"]: i
+            for i in range(len(reverse_dummy.elements))
+        }
+        reverse_order = [
+            reverse_by_map[dummy._atom_info[i]["atom_map"]]
+            for i in range(len(dummy.elements))
+        ]
+        assert np.array_equal(
+            dummy.atom_hashes,
+            np.asarray(reverse_dummy.atom_hashes)[reverse_order],
+        )
+        assert np.array_equal(
+            np.sum(dummy.bond_mats, axis=0),
+            np.sum(reverse_dummy.bond_mats, axis=0)[
+                np.ix_(reverse_order, reverse_order)
+            ],
+        )
 
     def test_mapping_equivalence(self):
         """
@@ -174,7 +211,7 @@ class TestRxnHash:
 
 
     def test_reverse_reaction(self):
-        """Forward and reverse reactions have distinct directional hashes."""
+        """Forward and reverse reactions have the same hash."""
         r1 = yarpecule('[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]', canon=False)
         p1 = yarpecule('[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]', canon=False)
         rxn1 = reaction(r1, p1)
@@ -184,7 +221,4 @@ class TestRxnHash:
         rxn2 = reaction(r2, p2)
 
         assert rxn1.id != rxn2.id
-        assert rxn1.hash != rxn2.hash
-        assert reaction_hash(rxn1, directional=False) == reaction_hash(
-            rxn2, directional=False
-        )
+        assert rxn1.hash == rxn2.hash

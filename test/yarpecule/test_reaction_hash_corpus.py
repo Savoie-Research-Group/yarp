@@ -7,36 +7,37 @@ not stereochemistry, which remains upstream work for yarpecule hashing.
 """
 
 from copy import deepcopy
-from pathlib import Path
-import pickle
 from types import SimpleNamespace
+import warnings
 
 import networkx as nx
 import numpy as np
 import pytest
 
+from yarp.reaction.reaction import reaction
 from yarp.yarpecule.hashes import reaction_hash
 
 
-pytestmark = pytest.mark.filterwarnings(
-    "ignore:Element-inconsistent atom maps detected:RuntimeWarning"
-)
-
-
-PICKLES = Path(__file__).resolve().parents[1] / "pickles"
-
-
-def load_cases(name):
-    with (PICKLES / name).open("rb") as stream:
-        payload = pickle.load(stream)
-    assert payload["version"] == 1
-    return payload["cases"]
-
-
-SYMMETRY = load_cases("reaction_hash_symmetry.pkl")
-NONISOMORPHIC = load_cases("reaction_hash_nonisomorphic.pkl")
-DIRECTION = load_cases("reaction_hash_direction.pkl")
-NETWORK_REVERSES = load_cases("reaction_hash_network_reverses.pkl")
+def hash_with_checked_map_warnings(rxn):
+    """Assert only element-inconsistent correspondences emit a hash warning."""
+    anchor = rxn.reactant.graph
+    other = rxn.product.graph
+    other_by_map = {
+        other._atom_info[i]["atom_map"]: i for i in range(len(other.elements))
+    }
+    mismatched = any(
+        anchor.elements[i]
+        != other.elements[other_by_map[anchor._atom_info[i]["atom_map"]]]
+        for i in range(len(anchor.elements))
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        value = reaction_hash(rxn)
+    assert len(caught) == int(mismatched)
+    if mismatched:
+        assert issubclass(caught[0].category, RuntimeWarning)
+        assert "Element-inconsistent atom maps detected" in str(caught[0].message)
+    return value
 
 
 def remap_product(rxn, permutation):
@@ -90,40 +91,94 @@ def isomorphic(left, right):
     )
 
 
-def test_corpus_case_counts():
-    assert (len(SYMMETRY), len(NONISOMORPHIC), len(DIRECTION)) == (200, 100, 100)
-    assert len(NETWORK_REVERSES) == 5
+def test_corpus_case_counts(
+    reaction_hash_symmetry_cases,
+    reaction_hash_nonisomorphic_cases,
+    reaction_hash_direction_cases,
+    reaction_hash_network_reverse_cases,
+):
+    assert (
+        len(reaction_hash_symmetry_cases),
+        len(reaction_hash_nonisomorphic_cases),
+        len(reaction_hash_direction_cases),
+        len(reaction_hash_network_reverse_cases),
+    ) == (200, 100, 100, 5)
 
 
-@pytest.mark.parametrize("case", SYMMETRY, ids=[f"symmetry-{i:03d}" for i in range(200)])
-def test_symmetry_equivalents_share_hash(case):
-    original, permutation = case
+@pytest.mark.parametrize(
+    "case_index", range(200), ids=[f"symmetry-{i:03d}" for i in range(200)]
+)
+def test_symmetry_equivalents_share_hash(case_index, reaction_hash_symmetry_cases):
+    original, permutation = reaction_hash_symmetry_cases[case_index]
     variant = remap_product(original, permutation)
     assert isomorphic(original, variant)
-    assert reaction_hash(original) == reaction_hash(variant)
+    assert hash_with_checked_map_warnings(original) == hash_with_checked_map_warnings(
+        variant
+    )
 
 
-@pytest.mark.parametrize("case", NONISOMORPHIC, ids=[f"nonisomorphic-{i:03d}" for i in range(100)])
-def test_nonisomorphic_correspondences_have_distinct_hashes(case):
-    original, left, right = case
+@pytest.mark.parametrize(
+    "case_index", range(100), ids=[f"nonisomorphic-{i:03d}" for i in range(100)]
+)
+def test_nonisomorphic_correspondences_have_distinct_hashes(
+    case_index, reaction_hash_nonisomorphic_cases
+):
+    original, left, right = reaction_hash_nonisomorphic_cases[case_index]
     permutation = list(range(len(original.reactant.graph.elements)))
     permutation[left], permutation[right] = permutation[right], permutation[left]
     variant = remap_product(original, permutation)
     assert not isomorphic(original, variant)
-    assert reaction_hash(original) != reaction_hash(variant)
-
-
-@pytest.mark.parametrize("forward", DIRECTION, ids=[f"direction-{i:03d}" for i in range(100)])
-def test_forward_reverse_share_hash(forward):
-    reverse = SimpleNamespace(reactant=forward.product, product=forward.reactant)
-    assert reaction_hash(forward) == reaction_hash(reverse)
+    assert hash_with_checked_map_warnings(original) != hash_with_checked_map_warnings(
+        variant
+    )
 
 
 @pytest.mark.parametrize(
-    "pair", NETWORK_REVERSES, ids=[f"network-reverse-{i:02d}" for i in range(5)]
+    "case_index", range(100), ids=[f"direction-{i:03d}" for i in range(100)]
 )
-def test_dropped_network_records_are_exact_reverses(pair):
-    first, later = pair
+def test_forward_reverse_share_hash(case_index, reaction_hash_direction_cases):
+    forward = reaction_hash_direction_cases[case_index]
+    reverse = SimpleNamespace(reactant=forward.product, product=forward.reactant)
+    assert hash_with_checked_map_warnings(forward) == hash_with_checked_map_warnings(
+        reverse
+    )
+
+
+@pytest.mark.parametrize(
+    "case_index", range(5), ids=[f"network-reverse-{i:02d}" for i in range(5)]
+)
+def test_dropped_network_records_are_exact_reverses(
+    case_index, reaction_hash_network_reverse_cases
+):
+    first, later = reaction_hash_network_reverse_cases[case_index]
     reversed_later = SimpleNamespace(reactant=later.product, product=later.reactant)
     assert isomorphic(first, reversed_later)
-    assert reaction_hash(first) == reaction_hash(later)
+    assert hash_with_checked_map_warnings(first) == hash_with_checked_map_warnings(
+        later
+    )
+
+
+class TestReactionHashIntegration:
+    def test_symmetry_equivalent_reactions(self, reaction_hash_symmetry_cases):
+        original, permutation = reaction_hash_symmetry_cases[0]
+        variant = remap_product(original, permutation)
+        assert isomorphic(original, variant)
+        first = reaction(original.reactant.graph, original.product.graph)
+        second = reaction(variant.reactant.graph, variant.product.graph)
+        assert first.hash == second.hash
+
+    def test_distinct_correspondence_reactions(self, reaction_hash_nonisomorphic_cases):
+        original, left, right = reaction_hash_nonisomorphic_cases[0]
+        permutation = list(range(len(original.reactant.graph.elements)))
+        permutation[left], permutation[right] = permutation[right], permutation[left]
+        variant = remap_product(original, permutation)
+        assert not isomorphic(original, variant)
+        first = reaction(original.reactant.graph, original.product.graph)
+        second = reaction(variant.reactant.graph, variant.product.graph)
+        assert first.hash != second.hash
+
+    def test_reverse_reactions(self, reaction_hash_direction_cases):
+        forward = reaction_hash_direction_cases[0]
+        first = reaction(forward.reactant.graph, forward.product.graph)
+        second = reaction(forward.product.graph, forward.reactant.graph)
+        assert first.hash == second.hash

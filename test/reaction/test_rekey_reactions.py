@@ -1,4 +1,4 @@
-"""Tests for the optional, offline reaction-pickle rekey utility."""
+"""Tests for the optional YARP reaction-pickle rekey utility."""
 
 from yarp.helpers.rekey_reactions import rekey_reactions
 

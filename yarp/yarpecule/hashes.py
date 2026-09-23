@@ -161,6 +161,8 @@ def reaction_hash(rxn):
     other_by_map = {
         other._atom_info[i]["atom_map"]: i for i in range(len(other.elements))
     }
+    # Maps are correspondence labels only. Both endpoints need a one-to-one,
+    # complete match so product rows and columns can be aligned unambiguously.
     if (
         any(atom_map is None for atom_map in anchor_maps)
         or None in other_by_map
@@ -182,6 +184,8 @@ def reaction_hash(rxn):
         != other.elements[other_by_map[atom_map]]
     ]
     if element_mismatches:
+        # Keep the supplied correspondence, but surface likely mapping mistakes;
+        # the map numbers and this check do not contribute to the hash value.
         mismatch_text = ", ".join(
             f"map {atom_map}: {anchor_element}->{other_element}"
             for atom_map, anchor_element, other_element in element_mismatches

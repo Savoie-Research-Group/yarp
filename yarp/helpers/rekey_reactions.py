@@ -1,6 +1,6 @@
 """One-off migration of a YARP reaction pickle to the current hash scheme.
 
-Usage: python test/helpers/rekey_reactions.py input.pkl output.pkl
+Usage: python -m yarp.helpers.rekey_reactions input.pkl output.pkl
 
 The input is never overwritten. Duplicate current hashes keep the first
 reaction encountered in the input dictionary and print a warning.

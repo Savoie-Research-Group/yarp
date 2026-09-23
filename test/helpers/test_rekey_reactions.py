@@ -1,6 +1,6 @@
 """Tests for the optional, offline reaction-pickle rekey utility."""
 
-from rekey_reactions import rekey_reactions
+from yarp.helpers.rekey_reactions import rekey_reactions
 
 from yarp.reaction.reaction import reaction
 from yarp.yarpecule.yarpecule import yarpecule

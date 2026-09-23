@@ -1,12 +1,7 @@
 # Reaction-hash test utilities
 
-`rekey_reactions.py` is an **offline** migration tool for trusted YARP reaction
-pickles. It keeps the first record for each current hash and writes to a new
-output file; it is not imported by YARP production code. Example:
-
-```sh
-python test/helpers/rekey_reactions.py old.pkl rekeyed.pkl
-```
+The offline pickle-rekeying utility is in `yarp/helpers/rekey_reactions.py`.
+It is not called by normal YARP initialization.
 
 The hand-review drawing generator and PNGs remain local under ignored
 `debug/reaction_hash_canonicalization/`; they are not part of this test suite.

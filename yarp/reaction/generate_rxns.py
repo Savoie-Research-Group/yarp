@@ -6,7 +6,6 @@ import numpy as np
 from pathlib import Path
 
 from yarp.yarpecule.yarpecule import yarpecule
-from yarp.yarpecule.hashes import reaction_hash
 from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file, load_reactions_from_xyz_directory, load_reactions_from_smiles_file
 from yarp.reaction.reaction import reaction
 from yarp.reaction.enum import enumerate_products
@@ -14,23 +13,6 @@ from yarp.reaction.filters import filter_enum_candidates, filter_enum_products
 from yarp.util.rdkit import rdkit_ff_opt
 from yarp.util.obabel import obabel_ff_opt
 from yarp.yarpecule.graph.adjacency import table_generator
-
-
-def rekey_reactions(reactions):
-    """Rebuild a reaction dictionary with the active hash implementation."""
-    output = {}
-    for rxn in reactions.values():
-        rxn.hash = reaction_hash(rxn)
-        if rxn.hash in output:
-            retained = output[rxn.hash]
-            print(
-                "WARNING: Deduplicated reaction "
-                f"{rxn.id}; retaining earlier reaction {retained.id} "
-                f"for hash {rxn.hash}."
-            )
-            continue
-        output[rxn.hash] = rxn
-    return output
 
 
 def generate_rxns(inp):
@@ -103,7 +85,6 @@ def generate_rxns(inp):
                 og_rxns = pickle.load(open(inp.init_struct.source, 'rb'))
                 assert isinstance(og_rxns, dict), "Input pickle file must contain a dictionary!"
                 assert all(isinstance(v, reaction) for v in og_rxns.values()), "YARP requires a dictionary of reaction objects to continue"
-                og_rxns = rekey_reactions(og_rxns)
 
             elif inp.init_struct.type == 'xyz':
                 if source.is_dir():
@@ -180,7 +161,6 @@ def generate_rxns(inp):
             output = pickle.load(open(inp.init_struct.source, 'rb'))
             assert isinstance(output, dict), "Input pickle file must contain a dictionary!"
             assert all(isinstance(v, reaction) for v in output.values()), "YARP requires a dictionary of reaction objects to continue"
-            output = rekey_reactions(output)
 
         elif inp.init_struct.type == 'xyz':
             if source.is_dir():

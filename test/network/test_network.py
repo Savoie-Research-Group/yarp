@@ -16,7 +16,8 @@ def test_khp2pp22_soergel_beam2_cyc3(khp2pp22_soergel_beam2_cyc3):
     target = ypcule('OC1CCOO1')
 
     assert crn.n_species == 48
-    assert crn.n_rxns == 78
+    # The migrated fixture collapses five reverse-hash reaction records.
+    assert crn.n_rxns == 73
     assert crn.n_considered_rxns == 4
 
     terminals = crn.get_terminal_species()
@@ -29,4 +30,3 @@ def test_khp2pp22_soergel_beam2_cyc3(khp2pp22_soergel_beam2_cyc3):
 
     with pytest.raises(NodeNotFound, match=f"Target Sp_{target.hash} is not in G"):
         crn.calc_min_dist(start=start, end=target)
-    

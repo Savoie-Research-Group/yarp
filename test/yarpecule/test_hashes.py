@@ -10,7 +10,6 @@ from yarp.yarpecule.hashes import (
     bmat_hash,
     reaction_hash,
 )
-from yarp.reaction.generate_rxns import rekey_reactions
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
 
@@ -155,28 +154,6 @@ class TestRxnHash:
             mapped_reaction = reaction(reactant, product)
 
         assert isinstance(mapped_reaction.hash, float)
-
-    def test_rekey_retains_first_reaction_and_reports_deduplication(
-        self, capsys
-    ):
-        reactant = yarpecule(
-            "[C:0]([C:1](=[O:2])[H:3])([H:4])([H:5])[H:6]",
-            canon=False,
-        )
-        product = yarpecule(
-            "[C:0](=[C:1]([O:2][H:4])[H:3])([H:5])[H:6]",
-            canon=False,
-        )
-        first = reaction(reactant, product)
-        second = reaction(product, reactant)
-        first.network_meta["retained"] = True
-
-        result = rekey_reactions({"first": first, "second": second})
-
-        assert len(result) == 1
-        assert next(iter(result.values())) is first
-        assert next(iter(result.values())).network_meta["retained"] is True
-        assert "Deduplicated reaction" in capsys.readouterr().out
 
     def test_atom_map_values_are_arbitrary_correspondence_labels(self):
         first = reaction(

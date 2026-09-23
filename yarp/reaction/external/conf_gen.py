@@ -127,7 +127,7 @@ class CrestConfCalculator(ConfTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         """Delete CREST intermediate files, keeping conformer data and logs."""
         keep = {"crest_conformers.xyz", "cre_members", "crest.energies", "crest_run.log", self.xyz_file, "run_crest_cmd.sh"}    # SHQK : Keeping cre_members helps readily get the total number of generated conformers. Please keep it.
         for item in self.scratch_dir.iterdir():

@@ -146,7 +146,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         # Keep input, log, and final geometry; delete Hessian (scraped) and xTB calc dirs
         keep = {"min_opt.yaml", "min_opt.log", "final_geometry.xyz", "initial_geom.xyz", "run_pysis_rpopt.sh"}
         for item in self.scratch_dir.iterdir():
@@ -312,7 +312,7 @@ class OrcaMinOptCalculator(MinOptTask):
 
         return True
 
-    def cleanup(self):
+    def _do_cleanup(self):
         # Keep input, log, and final geometry; delete Hessian (scraped), .gbw, .densities, etc.
         keep = {"min_opt.inp", "min_opt.out", "min_opt.xyz", "initial_geom.xyz", "run_orca_rpopt.sh"}
         for item in self.scratch_dir.iterdir():

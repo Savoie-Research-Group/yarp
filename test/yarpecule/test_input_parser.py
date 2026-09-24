@@ -234,6 +234,12 @@ class TestMolParser:
         assert q == 0
 
 
+def assert_file_order_atom_maps(elements, atom_info):
+    expected_maps = list(range(len(elements)))
+    assert list(atom_info) == expected_maps
+    assert [atom_info[i]["atom_map"] for i in expected_maps] == expected_maps
+
+
 class TestXYZRxn:
     def test_initialize_xyz_reaction_folder(self, test_xyz_dir, capsys):
         reactions = load_reactions_from_xyz_directory(test_xyz_dir)
@@ -241,7 +247,7 @@ class TestXYZRxn:
 
         structure_error = (
             "must contain exactly two coordinate sets (reactant first, product second) "
-            "where first line of each set is the number of atoms and the second line is a "
+            "where the first line of each set is the number of atoms and the second line is a "
             "comment or optionally contains charge information with the format `q <charge>`"
         )
 
@@ -266,10 +272,21 @@ class TestXYZRxn:
 
     def test_reaction1_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction1.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            reactant_atom_info,
+            product_elements,
+            product_geo,
+            product_q,
+            product_atom_info,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
+        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
+        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (9, 3)
         assert product_geo.shape == (9, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -291,10 +308,21 @@ class TestXYZRxn:
 
     def test_reaction2_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction2.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            reactant_atom_info,
+            product_elements,
+            product_geo,
+            product_q,
+            product_atom_info,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
+        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
+        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (10, 3)
         assert product_geo.shape == (10, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -316,10 +344,21 @@ class TestXYZRxn:
 
     def test_reaction3_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction3.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            reactant_atom_info,
+            product_elements,
+            product_geo,
+            product_q,
+            product_atom_info,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "o", "o", "o"]
         assert product_elements == ["n", "o", "o", "o"]
+        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
+        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (4, 3)
         assert product_geo.shape == (4, 3)
         assert reactant_q == pytest.approx(-1, rel=1e-5)
@@ -341,10 +380,21 @@ class TestXYZRxn:
 
     def test_reaction4_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction4.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            reactant_atom_info,
+            product_elements,
+            product_geo,
+            product_q,
+            product_atom_info,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
         assert product_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
+        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
+        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (19, 3)
         assert product_geo.shape == (19, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -366,10 +416,21 @@ class TestXYZRxn:
 
     def test_reaction5_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction5.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            reactant_atom_info,
+            product_elements,
+            product_geo,
+            product_q,
+            product_atom_info,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "h", "h", "h", "h"]
         assert product_elements == ["n", "h", "h", "h", "h"]
+        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
+        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (5, 3)
         assert product_geo.shape == (5, 3)
         assert reactant_q == pytest.approx(1, rel=1e-5)
@@ -398,7 +459,7 @@ class TestSMILESRxn:
         assert f"Failed to initialize 3 reaction(s) from {test_smiles_file}:" in captured.out
         assert f"Line 5 in {test_smiles_file}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization" in captured.out
         assert "Line 6: No >> or more than 1 >>" in captured.out
-        assert f"Line 7 in {test_smiles_file}: Mismatched atom mapping. Check again" in captured.out
+        assert "Line 7: Reaction endpoints require identical atom-map sets." in captured.out
 
         assert len(reactions) == 4
 

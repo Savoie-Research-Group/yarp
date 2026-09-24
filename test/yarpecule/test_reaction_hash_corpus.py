@@ -8,7 +8,6 @@ not stereochemistry, which remains upstream work for yarpecule hashing.
 
 from copy import deepcopy
 from types import SimpleNamespace
-import warnings
 
 import networkx as nx
 import numpy as np
@@ -16,29 +15,6 @@ import pytest
 
 from yarp.reaction.reaction import reaction
 from yarp.yarpecule.hashes import reaction_hash
-
-
-def hash_with_checked_map_warnings(rxn):
-    """Assert only element-inconsistent correspondences emit a hash warning."""
-    anchor = rxn.reactant.graph
-    other = rxn.product.graph
-    other_by_map = {
-        other._atom_info[i]["atom_map"]: i for i in range(len(other.elements))
-    }
-    mismatched = any(
-        anchor.elements[i]
-        != other.elements[other_by_map[anchor._atom_info[i]["atom_map"]]]
-        for i in range(len(anchor.elements))
-    )
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        value = reaction_hash(rxn)
-    assert len(caught) == int(mismatched)
-    if mismatched:
-        assert issubclass(caught[0].category, RuntimeWarning)
-        assert "Element-inconsistent atom maps detected" in str(caught[0].message)
-    return value
-
 
 def remap_product(rxn, permutation):
     variant = deepcopy(rxn)
@@ -112,9 +88,7 @@ def test_symmetry_equivalents_share_hash(case_index, reaction_hash_symmetry_case
     original, permutation = reaction_hash_symmetry_cases[case_index]
     variant = remap_product(original, permutation)
     assert isomorphic(original, variant)
-    assert hash_with_checked_map_warnings(original) == hash_with_checked_map_warnings(
-        variant
-    )
+    assert reaction_hash(original) == reaction_hash(variant)
 
 
 @pytest.mark.parametrize(
@@ -128,9 +102,7 @@ def test_nonisomorphic_correspondences_have_distinct_hashes(
     permutation[left], permutation[right] = permutation[right], permutation[left]
     variant = remap_product(original, permutation)
     assert not isomorphic(original, variant)
-    assert hash_with_checked_map_warnings(original) != hash_with_checked_map_warnings(
-        variant
-    )
+    assert reaction_hash(original) != reaction_hash(variant)
 
 
 @pytest.mark.parametrize(
@@ -139,9 +111,7 @@ def test_nonisomorphic_correspondences_have_distinct_hashes(
 def test_forward_reverse_share_hash(case_index, reaction_hash_direction_cases):
     forward = reaction_hash_direction_cases[case_index]
     reverse = SimpleNamespace(reactant=forward.product, product=forward.reactant)
-    assert hash_with_checked_map_warnings(forward) == hash_with_checked_map_warnings(
-        reverse
-    )
+    assert reaction_hash(forward) == reaction_hash(reverse)
 
 
 @pytest.mark.parametrize(
@@ -153,9 +123,7 @@ def test_dropped_network_records_are_exact_reverses(
     first, later = reaction_hash_network_reverse_cases[case_index]
     reversed_later = SimpleNamespace(reactant=later.product, product=later.reactant)
     assert isomorphic(first, reversed_later)
-    assert hash_with_checked_map_warnings(first) == hash_with_checked_map_warnings(
-        later
-    )
+    assert reaction_hash(first) == reaction_hash(later)
 
 
 class TestReactionHashIntegration:

@@ -114,11 +114,6 @@ Module Contents
               If canon is True, atom hashes are updated according to the `canon_order()` function.
               If canon is False, atom hashes are calculated directly from the `atom_hash()` function.
 
-      self._mapping
-              I don't know what is currently/should be done with this yet. - ERM
-
-
-
    .. py:method:: _read_structure(mol, mode)
 
       Read in an externally provided molecular structure and update
@@ -283,11 +278,6 @@ Module Contents
 
 
 
-   .. py:attribute:: _mapping
-      :value: None
-
-
-
    .. py:attribute:: _masses
       :value: None
 
@@ -355,5 +345,4 @@ Module Contents
 
 
    .. py:property:: rings
-
 

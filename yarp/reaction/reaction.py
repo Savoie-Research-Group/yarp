@@ -58,6 +58,7 @@ class reaction:
         # Geometries
         self.reactant = state(reactant)
         self.product = state(product)
+        self._validate_reaction()
 
         self.ts_geom = dict()
 
@@ -78,3 +79,68 @@ class reaction:
         
         self.outcome_label = dict()
         self.network_meta = dict()
+
+    ######################
+    # Internal Functions #
+    ######################
+
+    def _validate_reaction(self):
+        """
+        Validate that the reactant and product are atom-balanced and have
+        consistent atom-map sets.
+
+        Element-inconsistent mappings are reported but accepted because atom
+        maps are treated as user-supplied correspondence labels.
+        """
+        reactant = self.reactant.graph
+        product = self.product.graph
+
+        if reactant.adj_mat.shape != product.adj_mat.shape:
+            raise ValueError(
+                "Reactant and product adjacency matrices must have the same shape."
+            )
+
+        # Endpoint atom order may differ.
+        if sorted(reactant.elements) != sorted(product.elements):
+            raise ValueError(
+                "Reactant and product must contain the same element composition."
+            )
+
+        reactant_maps = [
+            reactant._atom_info[i]["atom_map"]
+            for i in range(len(reactant.elements))
+        ]
+        product_by_map = {
+            product._atom_info[i]["atom_map"]: i
+            for i in range(len(product.elements))
+        }
+
+        if set(reactant_maps) != set(product_by_map):
+            raise ValueError(
+                "Reaction endpoints require identical atom-map sets."
+            )
+
+        element_mismatches = [
+            (
+                atom_map,
+                reactant.elements[reactant_index],
+                product.elements[product_by_map[atom_map]],
+            )
+            for reactant_index, atom_map in enumerate(reactant_maps)
+            if (
+                reactant.elements[reactant_index]
+                != product.elements[product_by_map[atom_map]]
+            )
+        ]
+
+        if element_mismatches:
+            mismatch_text = ", ".join(
+                f"map {atom_map}: {reactant_element}->{product_element}"
+                for atom_map, reactant_element, product_element
+                in element_mismatches
+            )
+            print(
+                "WARNING: Element-inconsistent atom maps detected "
+                f"({mismatch_text}). Check the maps for this reaction; "
+                "while exciting in principle, nuclear chemistry is not yet fully supported."
+            )

@@ -226,39 +226,66 @@ def print_reaction_load_failures(source, failures):
 
 def reaction_xyz_parse(xyz):
     """
-    Parse a reaction xyz file containing exactly two xyz coordinate sets:
+    Parse a reaction XYZ file containing exactly two coordinate sets:
     the reactant first and the product second.
-    """
 
+    Atom maps correspond to row positions in the XYZ file. Therefore, matching
+    reactant and product rows receive the same atom-map value.
+    """
     elements, geos = xyz_parse(xyz, multiple=True)
-    q = xyz_q_parse(xyz)
+    reactant_q = xyz_q_parse(xyz)
+    product_q = reactant_q
 
     if len(elements) != 2 or len(geos) != 2:
         raise RuntimeError(
-        f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets "
-        "(reactant first, product second) where first line of each set is the number "
-        "of atoms and the second line is a comment or optionally contains charge "
-        "information with the format `q <charge>`"
-    )
+            f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets "
+            "(reactant first, product second) where the first line of each set is the "
+            "number of atoms and the second line is a comment or optionally contains "
+            "charge information with the format `q <charge>`"
+        )
 
-
-    reactant_elements = elements[0]
+    reactant_elements = [element.lower() for element in elements[0]]
     reactant_geo = geos[0]
-    product_elements = elements[1]
+    product_elements = [element.lower() for element in elements[1]]
     product_geo = geos[1]
 
     if len(reactant_elements) != len(product_elements):
         raise RuntimeError(
-            f"ERROR in reaction_xyz_parse: {xyz} has mismatched reactant/product atom counts."
+            f"ERROR in reaction_xyz_parse: {xyz} has mismatched "
+            "reactant/product atom counts."
         )
 
     if reactant_elements != product_elements:
         raise RuntimeError(
-            f"ERROR in reaction_xyz_parse: {xyz} requires identical atom ordering between reactant and product."
+            f"ERROR in reaction_xyz_parse: {xyz} requires identical atom "
+            "ordering between reactant and product."
         )
 
-    return [element.lower() for element in reactant_elements], reactant_geo, q, [element.lower() for element in product_elements], product_geo, q
+    reactant_atom_info = {
+        atom_index: {
+            "atom_index": atom_index,
+            "atom_map": atom_index,
+        }
+        for atom_index in range(len(reactant_elements))
+    }
+    product_atom_info = {
+        atom_index: {
+            "atom_index": atom_index,
+            "atom_map": atom_index,
+        }
+        for atom_index in range(len(product_elements))
+    }
 
+    return (
+        reactant_elements,
+        reactant_geo,
+        reactant_q,
+        reactant_atom_info,
+        product_elements,
+        product_geo,
+        product_q,
+        product_atom_info,
+    )
 
 
 def load_reaction_from_xyz_file(xyz_file):
@@ -266,13 +293,22 @@ def load_reaction_from_xyz_file(xyz_file):
     from yarp.yarpecule.graph.adjacency import table_generator
     from yarp.reaction.reaction import reaction
 
-    reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+    (
+        reactant_elements,
+        reactant_geo,
+        reactant_q,
+        reactant_atom_info,
+        product_elements,
+        product_geo,
+        product_q,
+        product_atom_info,
+    ) = reaction_xyz_parse(str(xyz_file))
 
     reactant_adj = table_generator(reactant_elements, reactant_geo)
     product_adj = table_generator(product_elements, product_geo)
 
-    reactant = yarpecule((reactant_adj, reactant_geo, reactant_elements, reactant_q), canon=False)
-    product = yarpecule((product_adj, product_geo, product_elements, product_q), canon=False)
+    reactant = yarpecule((reactant_adj, reactant_geo, reactant_elements, reactant_q, reactant_atom_info), canon=False)
+    product = yarpecule((product_adj, product_geo, product_elements, product_q, product_atom_info), canon=False)
 
     return reaction(reactant, product)
 
@@ -299,25 +335,6 @@ def load_reactions_from_xyz_directory(xyz_dir):
 
     return output
 
-def reaction_smiles_atom_maps(smiles, line_number, source_path):
-    
-    try:
-        _, _, _, _, atom_info = xyz_from_smiles(smiles, mode="yarp")
-    except Exception:
-        raise RuntimeError(
-            f"Line {line_number} in {source_path}: could not parse reaction SMILES."
-        )
-
-    atom_maps = [atom_info[i]["atom_map"] for i in atom_info]
-
-    if any(_ is None for _ in atom_maps):
-        raise RuntimeError(
-            f"Line {line_number} in {source_path}: Unmapped smiles string. "
-            "Please provide mapped reaction for this particular type of initialization"
-        )
-
-    return atom_maps
-
 def load_reactions_from_smiles_file(source_path):
     from yarp.yarpecule.yarpecule import yarpecule
     from yarp.reaction.reaction import reaction
@@ -339,22 +356,59 @@ def load_reactions_from_smiles_file(source_path):
             try:
                 reactant_smiles, product_smiles = [_.strip() for _ in line.split(">>")]
 
-                reactant_maps = reaction_smiles_atom_maps(reactant_smiles, line_number, source_path)
-                product_maps = reaction_smiles_atom_maps(product_smiles, line_number, source_path)
-
-                if set(reactant_maps) != set(product_maps):
+                try:
+                    (
+                        reactant_elements,
+                        reactant_geo,
+                        reactant_adj,
+                        reactant_q,
+                        reactant_atom_info,
+                    ) = xyz_from_smiles(reactant_smiles, mode="yarp")
+                    (
+                        product_elements,
+                        product_geo,
+                        product_adj,
+                        product_q,
+                        product_atom_info,
+                    ) = xyz_from_smiles(product_smiles, mode="yarp")
+                except Exception:
                     raise RuntimeError(
-                        f"Line {line_number} in {source_path}: Mismatched atom mapping. Check again"
+                        f"Line {line_number} in {source_path}: could not parse reaction SMILES."
                     )
 
-                reactant = yarpecule(reactant_smiles, mode="yarp", canon=False)
-                product = yarpecule(product_smiles, mode="yarp", canon=False)
+                for atom_info in (reactant_atom_info, product_atom_info):
+                    if any(atom_info[i]["atom_map"] is None for i in atom_info):
+                        raise RuntimeError(
+                            f"Line {line_number} in {source_path}: Unmapped smiles string. "
+                            "Please provide mapped reaction for this particular type of initialization"
+                        )
+
+                reactant = yarpecule(
+                    (
+                        reactant_adj,
+                        reactant_geo,
+                        reactant_elements,
+                        reactant_q,
+                        reactant_atom_info,
+                    ),
+                    canon=False,
+                )
+                product = yarpecule(
+                    (
+                        product_adj,
+                        product_geo,
+                        product_elements,
+                        product_q,
+                        product_atom_info,
+                    ),
+                    canon=False,
+                )
+                rxn = reaction(reactant, product)
 
             except Exception as exc:
                 failures.append((f"Line {line_number}", str(exc)))
                 continue
 
-            rxn = reaction(reactant, product)
             output[rxn.hash] = rxn
 
     print_reaction_load_failures(source_path, failures)

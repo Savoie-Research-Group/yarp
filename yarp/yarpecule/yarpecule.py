@@ -90,9 +90,7 @@ class yarpecule:
         self._adj_mat = None
         self._atom_info = {
             # atom_index: {
-            #     "atom_index": int,
             #     "atom_map": int | None,
-            #     "input_atom_map": int | None,
             #     "element": str,
             #     "formal_charge": int | None,
             #     "mass": float,
@@ -308,9 +306,7 @@ class yarpecule:
                 record = dict(self._atom_info[i])
 
             normalized_atom_info[i] = {
-                "atom_index": i,
                 "atom_map": record.get("atom_map", None),
-                "input_atom_map": record.get("input_atom_map", None),
                 "element": self._elements[i],
                 "formal_charge": record.get("formal_charge", None),
                 "mass": record.get("mass", el_mass[self._elements[i]]),
@@ -366,7 +362,6 @@ class yarpecule:
                 reordered_atom_info = {}
                 for new_idx, old_idx in enumerate(atom_order):
                     record = dict(self._atom_info[old_idx])
-                    record["atom_index"] = new_idx
                     reordered_atom_info[new_idx] = record
                 self._atom_info = reordered_atom_info
         else:
@@ -594,7 +589,6 @@ class yarpecule:
 
                 atom_info[offset + i] = {
                     **original_info,
-                    "atom_index": offset + i,
                     "atom_map": atom_map,
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
@@ -655,7 +649,6 @@ class yarpecule:
             atom_info = {
                 i: {
                     **dict(self._atom_info[i]),
-                    "atom_index": i,
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
                 }
@@ -691,7 +684,6 @@ class yarpecule:
                     new_idx = old_to_new[old_idx]
                     frag_atom_info[new_idx] = {
                         **dict(self._atom_info[old_idx]),
-                        "atom_index": new_idx,
                         "formal_charge": None,
                         "stereo": {"atom": None, "bonds": {}},
                     }

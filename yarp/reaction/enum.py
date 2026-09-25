@@ -247,7 +247,6 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                             {
                                 i: {
                                     **dict(y._atom_info[i]),
-                                    "atom_index": i,
                                     "formal_charge": None,
                                     "stereo": {"atom": None, "bonds": {}},
                                 }
@@ -276,7 +275,6 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                             {
                                 i: {
                                     **dict(y._atom_info[i]),
-                                    "atom_index": i,
                                     "formal_charge": None,
                                     "stereo": {"atom": None, "bonds": {}},
                                 }
@@ -316,7 +314,6 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                         for i in range(len(yp.elements)):
                                             atom_info[offset + i] = {
                                                 **dict(yp._atom_info[i]),
-                                                "atom_index": offset + i,
                                                 "formal_charge": None,
                                                 "stereo": {"atom": None, "bonds": {}},
                                             }
@@ -341,7 +338,6 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                         for i in range(len(yp.elements)):
                                             atom_info[offset + i] = {
                                                 **dict(yp._atom_info[i]),
-                                                "atom_index": offset + i,
                                                 "formal_charge": None,
                                                 "stereo": {"atom": None, "bonds": {}},
                                             }
@@ -547,7 +543,6 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     {
                         i: {
                             **dict(y._atom_info[i]),
-                            "atom_index": i,
                             "formal_charge": None,
                             "stereo": {"atom": None, "bonds": {}},
                         }
@@ -713,7 +708,6 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                     {
                         i: {
                             **dict(y._atom_info[i]),
-                            "atom_index": i,
                             "formal_charge": None,
                             "stereo": {"atom": None, "bonds": {}},
                         }

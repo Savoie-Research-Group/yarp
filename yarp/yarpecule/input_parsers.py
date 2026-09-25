@@ -263,14 +263,12 @@ def reaction_xyz_parse(xyz):
 
     reactant_atom_info = {
         atom_index: {
-            "atom_index": atom_index,
             "atom_map": atom_index,
         }
         for atom_index in range(len(reactant_elements))
     }
     product_atom_info = {
         atom_index: {
-            "atom_index": atom_index,
             "atom_map": atom_index,
         }
         for atom_index in range(len(product_elements))
@@ -453,7 +451,6 @@ def mol_parse(mol):
         isotope = atom.GetIsotope()
         mass = float(isotope) if isotope else el_mass[atom.GetSymbol().lower()]
         atom_info[i] = {
-            "atom_index": i,
             "atom_map": atom_map,
             "element": atom.GetSymbol().lower(),
             "formal_charge": atom.GetFormalCharge(),
@@ -524,7 +521,7 @@ def xyz_from_smiles(smiles, mode="yarp"):
         )
 
             for i in atom_info:
-                atom_info[i]["input_atom_map"] = original_atom_info[i].get("atom_map")
+                atom_info[i]["atom_map"] = original_atom_info[i].get("atom_map")
 
         elements = [atom_info[i]["element"] for i in atom_info]
 

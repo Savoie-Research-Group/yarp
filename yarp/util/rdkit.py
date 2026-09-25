@@ -73,7 +73,6 @@ def atom_info_from_rdmol(mol):
         atom_map = int(atom.GetProp("molAtomMapNumber")) if atom.HasProp("molAtomMapNumber") else None
 
         atom_info[i] = {
-            "atom_index": i,
             "atom_map": atom_map,
             "element": element,
             "formal_charge": atom.GetFormalCharge(),

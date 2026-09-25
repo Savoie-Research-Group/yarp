@@ -167,6 +167,19 @@ def test_smiles_species_preserves_input_atom_maps():
     }
 
 
+@pytest.mark.parametrize("canon", [False, True])
+def test_partially_mapped_smiles_uses_one_atom_map_field(canon):
+    molecule = yarpecule("[C:41]([H])([H])([H])[O:99][H]", canon=canon)
+    maps = atom_maps(molecule)
+    element_by_map = dict(zip(maps, molecule.elements))
+
+    assert element_by_map[41] == "c"
+    assert element_by_map[99] == "o"
+    assert len(maps) == len(set(maps))
+    assert all("input_atom_map" not in info for info in molecule._atom_info.values())
+    assert all("atom_index" not in info for info in molecule._atom_info.values())
+
+
 def test_smiles_species_scrambled_labels_change_output_maps():
     original = yarpecule("[O:41]([H:7])[C:99]([H:8])([H:9])[H:10]")
     scrambled = yarpecule("[H:310][O:341][C:399]([H:307])([H:308])[H:309]")

@@ -157,10 +157,10 @@ def reaction_hash(rxn):
     """
     anchor, other = rxn.reactant.graph, rxn.product.graph
     anchor_maps = [
-        anchor._atom_info[i]["atom_map"] for i in range(len(anchor.elements))
+        anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))
     ]
     other_by_map = {
-        other._atom_info[i]["atom_map"]: i for i in range(len(other.elements))
+        other.atom_info[i]["atom_map"]: i for i in range(len(other.elements))
     }
     other_order = [other_by_map[atom_map] for atom_map in anchor_maps]
 

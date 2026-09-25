@@ -107,11 +107,11 @@ class reaction:
             )
 
         reactant_maps = [
-            reactant._atom_info[i]["atom_map"]
+            reactant.atom_info[i]["atom_map"]
             for i in range(len(reactant.elements))
         ]
         product_maps = [
-            product._atom_info[i]["atom_map"]
+            product.atom_info[i]["atom_map"]
             for i in range(len(product.elements))
         ]
 

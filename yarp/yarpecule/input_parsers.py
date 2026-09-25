@@ -239,8 +239,8 @@ def reaction_xyz_parse(xyz):
     if len(elements) != 2 or len(geos) != 2:
         raise RuntimeError(
             f"ERROR in reaction_xyz_parse: {xyz} must contain exactly two coordinate sets "
-            "(reactant first, product second) where the first line of each set is the "
-            "number of atoms and the second line is a comment or optionally contains "
+            "(reactant first, product second) where first line of each set is the number "
+            "of atoms and the second line is a comment or optionally contains "
             "charge information with the format `q <charge>`"
         )
 

@@ -199,7 +199,7 @@ def progress_yarp(work_dir: Path):
     container_runner = config.job_manager.container
     max_active_jobs = config.job_manager.max_active_jobs
 
-    job_manager = get_job_manager(scheduler)
+    job_manager = get_job_manager(scheduler, config.job_manager)
 
     print(f"Jobs will be run using '{scheduler}' scheduler and '{container_runner}' containers.")
     print(f"Max active jobs allowed: {max_active_jobs}")
@@ -537,7 +537,7 @@ def progress_yarp(work_dir: Path):
 
             script_path = calc.write_submission_script()
 
-            job_id = job_manager.submit(script_path)
+            job_id = job_manager.submit(script_path, task_def.config)
 
             if job_id:
                 g_meta["status"] = "submitted"
@@ -616,7 +616,7 @@ def progress_yarp(work_dir: Path):
 
                 script_path = calc.write_submission_script()
 
-                job_id = job_manager.submit(script_path)
+                job_id = job_manager.submit(script_path, task_def.config)
 
                 if job_id:
                     meta["status"] = "submitted"

@@ -110,15 +110,25 @@ class reaction:
             reactant._atom_info[i]["atom_map"]
             for i in range(len(reactant.elements))
         ]
-        product_by_map = {
-            product._atom_info[i]["atom_map"]: i
+        product_maps = [
+            product._atom_info[i]["atom_map"]
             for i in range(len(product.elements))
-        }
+        ]
 
-        if set(reactant_maps) != set(product_by_map):
+        if (
+            None in reactant_maps
+            or None in product_maps
+            or len(set(reactant_maps)) != len(reactant_maps)
+            or len(set(product_maps)) != len(product_maps)
+            or set(reactant_maps) != set(product_maps)
+        ):
             raise ValueError(
-                "Reaction endpoints require identical atom-map sets."
+                "Reaction endpoints require identical unique atom-map sets."
             )
+
+        product_by_map = {
+            atom_map: i for i, atom_map in enumerate(product_maps)
+        }
 
         element_mismatches = [
             (

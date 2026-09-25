@@ -459,7 +459,7 @@ class TestSMILESRxn:
         assert f"Failed to initialize 3 reaction(s) from {test_smiles_file}:" in captured.out
         assert f"Line 5 in {test_smiles_file}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization" in captured.out
         assert "Line 6: No >> or more than 1 >>" in captured.out
-        assert "Line 7: Reaction endpoints require identical atom-map sets." in captured.out
+        assert "Line 7: Reaction endpoints require identical unique atom-map sets." in captured.out
 
         assert len(reactions) == 4
 

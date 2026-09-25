@@ -156,6 +156,20 @@ class TestRxnHash:
         assert "WARNING: Element-inconsistent atom maps detected" in captured.out
         assert isinstance(mapped_reaction.hash, float)
 
+    @pytest.mark.parametrize("atom_map", [None, 0])
+    def test_reaction_rejects_missing_or_duplicate_maps(self, atom_map):
+        reactant = yarpecule("[C:0][O:1]", canon=False)
+        product = yarpecule("[C:0][O:1]", canon=False)
+        mapped_reaction = reaction(reactant, product)
+
+        # A restored object can bypass yarpecule construction checks.
+        for graph in (mapped_reaction.reactant.graph, mapped_reaction.product.graph):
+            for info in graph._atom_info.values():
+                info["atom_map"] = atom_map
+
+        with pytest.raises(ValueError, match="identical unique atom-map sets"):
+            mapped_reaction._validate_reaction()
+
     def test_atom_map_values_are_arbitrary_correspondence_labels(self):
         first = reaction(
             yarpecule("[C:0]([H:1])([H:2])([H:3])[H:4]", canon=False),

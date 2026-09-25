@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from yarp.yarpecule.input_parsers import (
     load_reaction_from_xyz_file,
@@ -28,6 +29,18 @@ def geometry_by_map(molecule):
         molecule._atom_info[i]["atom_map"]: molecule.geo[i]
         for i in range(len(molecule.elements))
     }
+
+
+def test_tuple_input_requires_atom_info_container():
+    adjacency = np.zeros((1, 1), dtype=int)
+    geometry = np.zeros((1, 3))
+    core = (adjacency, geometry, ["h"], 0)
+
+    with pytest.raises(TypeError):
+        yarpecule(core, canon=False, strict=True)
+
+    molecule = yarpecule((*core, {}), canon=False)
+    assert atom_maps(molecule) == [0]
 
 
 def write_xyz(path, elements, geo, comment=""):

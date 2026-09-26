@@ -31,7 +31,7 @@ class yarpecule:
 
     mol : var
           The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding
-          (adj_mat, elements, charge),  or one or more filenames. (<-- ERM: CAN it handle multiple files?)
+          (adj_mat, geo, elements, charge, atom_info),  or one or more filenames. (<-- ERM: CAN it handle multiple files?)
           For strings the extension is used to determine which parser to use (e.g., .xyz etc),
           otherwise the constructor will attempt to parse the input as a smiles string using rdkit.
 
@@ -70,8 +70,11 @@ class yarpecule:
     atom_hashes : array
             A list of hash values for each atom, based on graph connectivity and the masses of the atoms.
 
-    mapping : ???
-            Oh dang, what is this friend?????
+    atom_info : dict of dict
+            Per-atom attributes keyed by the current yarpecule atom index. Each record
+            contains an atom-map label, element, formal charge, mass, stereo markers,
+            and whether aromatic notation was present in the input. The atom-map
+            label stays attached to its atom when canonicalization changes indices.
 
     lewis_struct : list of `lewis_struct` object(s)
             Lewis structure(s) of the yarpecule. Multiple structures are generated for cases involving resonance.
@@ -85,18 +88,17 @@ class yarpecule:
     # Constructor #
     ###############
 
-    def __init__(self, mol, mode='yarp', canon=True, strict=False, atom_info=None):
+    def __init__(self, mol, mode='yarp', canon=True, strict=False):
         self._geo = None
         self._elements = None
         self._q = 0
         self._masses = None
         self._adj_mat = None
-        self._atom_info = None
+        self._atom_info = {}
 
-        self._read_structure(mol, mode, strict=strict, atom_info=atom_info)
+        self._read_structure(mol, mode, strict=strict)
 
         self._atom_hashes = None
-        self._mapping = None
 
         self._order_atoms(canon=canon)
 
@@ -165,6 +167,11 @@ class yarpecule:
         return self._atom_hashes
 
     @property
+    def atom_info(self):
+        """Per-atom records keyed by current index; assign through internal methods only."""
+        return self._atom_info
+
+    @property
     def n_e_accept(self):
         return self._lewis_struct._e_acceptors
 
@@ -200,7 +207,7 @@ class yarpecule:
     # Internal Functions #
     ######################
 
-    def _read_structure(self, mol, mode, strict=False, atom_info=None):
+    def _read_structure(self, mol, mode, strict=False):
         """
         Read in an externally provided molecular structure and update
         core attributes of the yarpecule object.
@@ -230,19 +237,20 @@ class yarpecule:
         self._masses : numpy.ndarray
                 Atomic masses are computed from `elements`
                 according to `el_mass` from `yarp.util.properties.py`
+
+        self._atom_info : dict
+                Set to reflect input structure; XYZ labels follow coordinate-row order.
         """
 
-        # direct branch: user passes core attributes directly
-        carried_atom_info = atom_info
-
-        if isinstance(mol, (tuple, list)) and len(mol) in [4, 5]:
+        if isinstance(mol, (tuple, list)) and len(mol) == 5:
             # consistency checks
             if (isinstance(mol[0], np.ndarray) is False or
                 isinstance(mol[1], np.ndarray) is False or
                 isinstance(mol[2], list) is False or
-                    isinstance(mol[3], int) is False):
+                isinstance(mol[3], int) is False or
+                isinstance(mol[4], dict) is False):
                 raise TypeError(
-                    "The yarpecule constructor expects a string or a tuple containing (adj_mat,geo,elements,q).")
+                    "The yarpecule constructor expects a string or a tuple containing (adj_mat,geo,elements,q,atom_info).")
             elif (len(mol[0]) != len(mol[1]) or len(mol[0]) != len(mol[2])):
                 raise TypeError(
                     "The size of the adjacency array, geometry array, and elements list do not match.")
@@ -252,18 +260,16 @@ class yarpecule:
             self._geo = mol[1]
             self._elements = mol[2]
             self._q = mol[3]
-            if len(mol) == 5:
-                if carried_atom_info is not None:
-                    raise TypeError("Pass carried atom_info either as the fifth tuple item or as atom_info=..., not both.")
-                carried_atom_info = mol[4]
-            self._atom_info = carried_atom_info
+            self._atom_info = mol[4]
 
         # xyz branch
         elif len(mol) > 4 and mol[-4:] == ".xyz":
             self._elements, self._geo = xyz_parse(mol)
             self._adj_mat = table_generator(self._elements, self._geo)
             self._q = xyz_q_parse(mol)
-            self._atom_info = carried_atom_info
+            self._atom_info = {
+                i: {"atom_map": i} for i in range(len(self._elements))
+            }
 
         # mol branch
         elif len(mol) > 4 and mol[-4:] == ".mol":
@@ -293,17 +299,10 @@ class yarpecule:
         self._masses = np.array([el_mass[_] for _ in self._elements])
         normalized_atom_info = {}
         for i in range(len(self._elements)):
-            if self._atom_info is None:
-                record = {}
-            elif isinstance(self._atom_info, dict):
-                record = dict(self._atom_info[i]) if i in self._atom_info else {}
-            else:
-                record = dict(self._atom_info[i])
+            record = dict(self._atom_info.get(i, {}))
 
             normalized_atom_info[i] = {
-                "atom_index": i,
                 "atom_map": record.get("atom_map", None),
-                "input_atom_map": record.get("input_atom_map", None),
                 "element": self._elements[i],
                 "formal_charge": record.get("formal_charge", None),
                 "mass": record.get("mass", el_mass[self._elements[i]]),
@@ -338,37 +337,29 @@ class yarpecule:
         self._atom_hashes
                 If canon is True, atom hashes are updated according to the `canon_order()` function.
                 If canon is False, atom hashes are calculated directly from the `atom_hash()` function.
-
-        self._mapping
-                I don't know what is currently/should be done with this yet. - ERM
         """
 
         # TO-DO: send read-only copies to canon_order() and atom_hash()?
-        if self._atom_info is not None:
-            used = {self._atom_info[i]["atom_map"] for i in self._atom_info if self._atom_info[i]["atom_map"] is not None}
-            next_map = 0
-            for i in self._atom_info:
-                if self._atom_info[i]["atom_map"] is None:
-                    while next_map in used:
-                        next_map += 1
-                    self._atom_info[i]["atom_map"] = next_map
-                    used.add(next_map)
+        used = {info["atom_map"] for info in self._atom_info.values() if info["atom_map"] is not None}
+        next_map = 0
+        for info in self._atom_info.values():
+            if info["atom_map"] is None:
+                while next_map in used:
                     next_map += 1
+                info["atom_map"] = next_map
+                used.add(next_map)
+                next_map += 1
 
         if canon:
-            self._elements, self._adj_mat, self._atom_hashes, self._mapping, self._geo, self._masses = canon_order(
+            self._elements, self._adj_mat, self._atom_hashes, atom_order, self._geo, self._masses = canon_order(
                 self._elements, self._adj_mat, masses=self._masses, things_to_order=[self._geo, self._masses])
-            if self._atom_info is not None:
-                reordered_atom_info = {}
-                for new_idx, old_idx in enumerate(self._mapping):
-                    record = dict(self._atom_info[old_idx])
-                    record["atom_index"] = new_idx
-                    reordered_atom_info[new_idx] = record
-                self._atom_info = reordered_atom_info
+            self._atom_info = {
+                new_idx: self._atom_info[old_idx]
+                for new_idx, old_idx in enumerate(atom_order)
+            }
         else:
             self._atom_hashes = np.array(
                 [atom_hash(_, self._adj_mat, self._masses) for _ in range(len(self._elements))])
-            # self._mapping = list(range(len(self)))
 
     def _gen_lewis_struct(self):
         """
@@ -398,7 +389,6 @@ class yarpecule:
         Option to export SMILES with explicit atom mappings.
         Maybe also make it so we can optionally map the H atoms, but default to only reporting heavy atoms?
 
-        
         Modifies
         --------
         self._canon_smi : str
@@ -422,7 +412,7 @@ class yarpecule:
 
         # Use RDKit to get atom-mapped SMILES string (all atoms, with maps)
         mol2 = yarpecule_to_rdmol(self.elements, self.adj_mat,
-                                  self.bond_mats[0], atom_info=self._atom_info,
+                                  self.bond_mats[0], atom_info=self.atom_info,
                                   geo=self.geo)
         if verbose:
             print("RDKit mol dump after mapping:")
@@ -523,16 +513,6 @@ class yarpecule:
         else:
             self._inchi = '-'.join(sorted([i[:14] for i in inchikey]))
 
-    def update_atom_order(self, atom_index=None, canon=True):
-        """
-        Update the atom order of the yarpecule.
-        And then update all the other attributes that depend on the atom order.
-
-        User can just ask to canonicalize the yarpecule,
-        or they can provide a magic little list to tell us how to reorder the atoms.
-        Not sure what exactly this should look like yet. - ERM
-        """
-
     def join(self, yarpecules, canon=True):
         """
         Method for creating a new yarpecule containing the union of the current yarpecule and all supplied yarpecules.
@@ -574,7 +554,7 @@ class yarpecule:
 
         for count_y, y in enumerate(all_y):
             for i in range(len(y.elements)):
-                original_info = dict(y._atom_info[i])
+                original_info = dict(y.atom_info[i])
                 original_map = original_info.get("atom_map")
 
                 if original_map is None or original_map in used_maps:
@@ -592,7 +572,6 @@ class yarpecule:
 
                 atom_info[offset + i] = {
                     **original_info,
-                    "atom_index": offset + i,
                     "atom_map": atom_map,
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
@@ -652,12 +631,11 @@ class yarpecule:
             # where we can just feed in the BEMs we already have.
             atom_info = {
                 i: {
-                    **dict(self._atom_info[i]),
-                    "atom_index": i,
+                    **dict(self.atom_info[i]),
                     "formal_charge": None,
                     "stereo": {"atom": None, "bonds": {}},
                 }
-                for i in self._atom_info
+                for i in self.atom_info
             }
             return [yarpecule((self.adj_mat, self.geo, self.elements, self.q, atom_info), canon=canon)]
         else:
@@ -688,8 +666,7 @@ class yarpecule:
                 for old_idx in g:
                     new_idx = old_to_new[old_idx]
                     frag_atom_info[new_idx] = {
-                        **dict(self._atom_info[old_idx]),
-                        "atom_index": new_idx,
+                        **dict(self.atom_info[old_idx]),
                         "formal_charge": None,
                         "stereo": {"atom": None, "bonds": {}},
                     }
@@ -715,7 +692,7 @@ class yarpecule:
                 self.get_smiles()
             xyz_write(filename, self.elements, self.geo, comment=self._canon_smi)
         elif format == 'mol':
-            mol_write_yp(filename, self.elements, self.geo, self.bond_mats[0], self.adj_mat, atom_info=self._atom_info)
+            mol_write_yp(filename, self.elements, self.geo, self.bond_mats[0], self.adj_mat, atom_info=self.atom_info)
         else:
             raise RuntimeError("Valid export formats: xyz or mol")
 
@@ -730,8 +707,8 @@ class yarpecule:
         using the atom mapping information and element types.
         """
         i, j = sorted(tuple(pair))
-        i_map = self._atom_info[i]["atom_map"]
-        j_map = self._atom_info[j]["atom_map"]
+        i_map = self.atom_info[i]["atom_map"]
+        j_map = self.atom_info[j]["atom_map"]
         i_el = self.elements[i].upper()
         j_el = self.elements[j].upper()
 

@@ -1,6 +1,8 @@
 """
 Definition of the reaction object class.
 """
+import warnings
+
 from yarp.reaction.state import state
 from yarp.yarpecule.hashes import reaction_hash
 
@@ -58,6 +60,7 @@ class reaction:
         # Geometries
         self.reactant = state(reactant)
         self.product = state(product)
+        self._validate_reaction()
 
         self.ts_geom = dict()
 
@@ -74,7 +77,84 @@ class reaction:
 
         # Identifiers & Metadata
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
-        self.hash = reaction_hash(self)
+        self.hash = reaction_hash(self, _validated=True)
         
         self.outcome_label = dict()
         self.network_meta = dict()
+
+    ######################
+    # Internal Functions #
+    ######################
+
+    def _validate_reaction(self):
+        """
+        Validate that the reactant and product are atom-balanced and have
+        consistent atom-map sets.
+
+        Element-inconsistent mappings are reported but accepted because atom
+        maps are treated as user-supplied correspondence labels.
+        """
+        reactant = self.reactant.graph
+        product = self.product.graph
+
+        if reactant.adj_mat.shape != product.adj_mat.shape:
+            raise ValueError(
+                "Reactant and product adjacency matrices must have the same shape."
+            )
+
+        # Endpoint atom order may differ.
+        if sorted(reactant.elements) != sorted(product.elements):
+            raise ValueError(
+                "Reactant and product must contain the same element composition."
+            )
+
+        reactant_maps = [
+            reactant.atom_info[i]["atom_map"]
+            for i in range(len(reactant.elements))
+        ]
+        product_maps = [
+            product.atom_info[i]["atom_map"]
+            for i in range(len(product.elements))
+        ]
+
+        if (
+            None in reactant_maps
+            or None in product_maps
+            or len(set(reactant_maps)) != len(reactant_maps)
+            or len(set(product_maps)) != len(product_maps)
+            or set(reactant_maps) != set(product_maps)
+        ):
+            raise ValueError(
+                "Reaction endpoints require identical unique atom-map sets."
+            )
+
+        product_by_map = {
+            atom_map: i for i, atom_map in enumerate(product_maps)
+        }
+
+        element_mismatches = [
+            (
+                atom_map,
+                reactant.elements[reactant_index],
+                product.elements[product_by_map[atom_map]],
+            )
+            for reactant_index, atom_map in enumerate(reactant_maps)
+            if (
+                reactant.elements[reactant_index]
+                != product.elements[product_by_map[atom_map]]
+            )
+        ]
+
+        if element_mismatches:
+            mismatch_text = ", ".join(
+                f"map {atom_map}: {reactant_element}->{product_element}"
+                for atom_map, reactant_element, product_element
+                in element_mismatches
+            )
+            warnings.warn(
+                "Element-inconsistent atom maps detected "
+                f"({mismatch_text}). Check the maps for this reaction; "
+                "while exciting in principle, nuclear chemistry is not yet fully supported.",
+                RuntimeWarning,
+                stacklevel=2,
+            )

@@ -73,7 +73,6 @@ def atom_info_from_rdmol(mol):
         atom_map = int(atom.GetProp("molAtomMapNumber")) if atom.HasProp("molAtomMapNumber") else None
 
         atom_info[i] = {
-            "atom_index": i,
             "atom_map": atom_map,
             "element": element,
             "formal_charge": atom.GetFormalCharge(),
@@ -256,7 +255,7 @@ def rdkit_ff_opt(ypcule, lot='uff', maxiter=200):
     '''
 
     rdmol = yarpecule_to_rdmol(elements=ypcule.elements, adj=ypcule.adj_mat, bond_orders=ypcule.bond_mats[0],
-                               atom_info=ypcule._atom_info, geo=ypcule.geo)
+                               atom_info=ypcule.atom_info, geo=ypcule.geo)
 
     if lot == "uff":
         opt = AllChem.UFFOptimizeMolecule(rdmol, maxIters=maxiter, ignoreInterfragInteractions=False)

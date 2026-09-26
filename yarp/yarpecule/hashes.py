@@ -2,7 +2,6 @@
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
 from math import fsum
-import warnings
 
 import numpy as np
 
@@ -146,57 +145,28 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def reaction_hash(rxn):
+def reaction_hash(rxn, *, _validated=False):
     """Return a scalar mapping- and direction-invariant reaction hash.
 
     Align the product to the provided reactant order using arbitrary atom-map
     labels, sum all endpoint resonance BEMs and mapped atom hashes, then apply
     the same scalar algebra and rounding as ``yarpecule_hash`` directly. Use
-    ``fsum`` to avoid order-dependent reduction at rounding boundaries.
+    ``fsum`` to avoid order-dependent reduction at rounding boundaries. The
+    reaction constructor validates endpoint atom maps before calling this
+    function. Direct calls on reaction objects validate again, since their
+    maps may have changed after construction.
     """
+    if not _validated and hasattr(rxn, "_validate_reaction"):
+        rxn._validate_reaction()
+
     anchor, other = rxn.reactant.graph, rxn.product.graph
     anchor_maps = [
-        anchor._atom_info[i]["atom_map"] for i in range(len(anchor.elements))
+        anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))
     ]
     other_by_map = {
-        other._atom_info[i]["atom_map"]: i for i in range(len(other.elements))
+        other.atom_info[i]["atom_map"]: i for i in range(len(other.elements))
     }
-    # Maps are correspondence labels only. Both endpoints need a one-to-one,
-    # complete match so product rows and columns can be aligned unambiguously.
-    if (
-        any(atom_map is None for atom_map in anchor_maps)
-        or None in other_by_map
-        or len(set(anchor_maps)) != len(anchor_maps)
-        or len(other_by_map) != len(other.elements)
-        or set(anchor_maps) != set(other_by_map)
-    ):
-        raise ValueError("Reaction endpoints require identical unique atom-map sets.")
-
     other_order = [other_by_map[atom_map] for atom_map in anchor_maps]
-    element_mismatches = [
-        (
-            atom_map,
-            anchor.elements[anchor_index],
-            other.elements[other_by_map[atom_map]],
-        )
-        for anchor_index, atom_map in enumerate(anchor_maps)
-        if anchor.elements[anchor_index]
-        != other.elements[other_by_map[atom_map]]
-    ]
-    if element_mismatches:
-        # Keep the supplied correspondence, but surface likely mapping mistakes;
-        # the map numbers and this check do not contribute to the hash value.
-        mismatch_text = ", ".join(
-            f"map {atom_map}: {anchor_element}->{other_element}"
-            for atom_map, anchor_element, other_element in element_mismatches
-        )
-        warnings.warn(
-            "Element-inconsistent atom maps detected "
-            f"({mismatch_text}). Check the maps for this reaction; "
-            "hashing will continue using the supplied correspondence labels.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
 
     combined_bems = list(anchor.bond_mats)
     combined_bems.extend(

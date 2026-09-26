@@ -2,15 +2,18 @@
 Testing suite for functions contained in yarp/yarpecule/input_parser.py
 """
 from collections import Counter
+import numpy as np
 import pytest
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.yarpecule.input_parsers import xyz_q_parse
 from yarp.yarpecule.input_parsers import mol_parse
 from yarp.yarpecule.input_parsers import reaction_xyz_parse
 from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory
+from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file
 from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
 from yarp.yarpecule.input_parsers import xyz_from_smiles
 from yarp.yarpecule.yarpecule import yarpecule
+from yarp.util.write_files import xyz_generate_string
 
 
 class TestXYZParser:
@@ -266,7 +269,16 @@ class TestXYZRxn:
 
     def test_reaction1_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction1.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            _,
+            product_elements,
+            product_geo,
+            product_q,
+            _,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
@@ -291,7 +303,16 @@ class TestXYZRxn:
 
     def test_reaction2_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction2.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            _,
+            product_elements,
+            product_geo,
+            product_q,
+            _,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
@@ -316,7 +337,16 @@ class TestXYZRxn:
 
     def test_reaction3_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction3.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            _,
+            product_elements,
+            product_geo,
+            product_q,
+            _,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "o", "o", "o"]
         assert product_elements == ["n", "o", "o", "o"]
@@ -341,7 +371,16 @@ class TestXYZRxn:
 
     def test_reaction4_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction4.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            _,
+            product_elements,
+            product_geo,
+            product_q,
+            _,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
         assert product_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
@@ -366,7 +405,16 @@ class TestXYZRxn:
 
     def test_reaction5_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction5.xyz"
-        reactant_elements, reactant_geo, reactant_q, product_elements, product_geo, product_q = reaction_xyz_parse(str(xyz_file))
+        (
+            reactant_elements,
+            reactant_geo,
+            reactant_q,
+            _,
+            product_elements,
+            product_geo,
+            product_q,
+            _,
+        ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "h", "h", "h", "h"]
         assert product_elements == ["n", "h", "h", "h", "h"]
@@ -398,7 +446,7 @@ class TestSMILESRxn:
         assert f"Failed to initialize 3 reaction(s) from {test_smiles_file}:" in captured.out
         assert f"Line 5 in {test_smiles_file}: Unmapped smiles string. Please provide mapped reaction for this particular type of initialization" in captured.out
         assert "Line 6: No >> or more than 1 >>" in captured.out
-        assert f"Line 7 in {test_smiles_file}: Mismatched atom mapping. Check again" in captured.out
+        assert "Line 7: Reaction endpoints require identical unique atom-map sets." in captured.out
 
         assert len(reactions) == 4
 
@@ -460,3 +508,145 @@ class TestSMILESRxn:
         assert product.elements == ['o', 'c', 'c', 'o', 'c', 'c', 'c', 'c', 'c', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h']
         assert reactant.map_smi == "[C:4](=[C:5]([C:6](=[C:7]([H:15])[H:16])[H:14])[H:13])([H:11])[H:12].[O:0]=[C:1]([C:2]([O:3][H:10])=[C:8]([H:17])[H:18])[H:9]"
         assert product.map_smi == "[O:0]=[C:1]([C@:2]1([O:3][H:10])[C:4]([H:11])([H:12])[C:5]([H:13])=[C:6]([H:14])[C:7]([H:15])([H:16])[C:8]1([H:17])[H:18])[H:9]"
+
+
+class TestAtomMapIngestion:
+    """Input labels remain attached to atoms as parsers and constructors reorder them."""
+
+    @staticmethod
+    def maps(molecule):
+        return [molecule.atom_info[i]["atom_map"] for i in range(len(molecule.elements))]
+
+    @staticmethod
+    def geometry_by_map(molecule):
+        return {info["atom_map"]: molecule.geo[i] for i, info in molecule.atom_info.items()}
+
+    def test_tuple_input_requires_atom_info_container(self):
+        """Direct construction requires the five-item tuple, even if atom info is empty."""
+        core = (np.zeros((1, 1), dtype=int), np.zeros((1, 3)), ["h"], 0)
+        with pytest.raises(TypeError):
+            yarpecule(core, canon=False, strict=True)
+        assert self.maps(yarpecule((*core, {}), canon=False)) == [0]
+
+    def test_atom_info_property_exposes_normalized_records(self, ethene_xyz):
+        """The public getter exposes atom records without a writable property setter."""
+        molecule = yarpecule(ethene_xyz)
+        assert molecule.atom_info == molecule._atom_info
+        assert set(molecule.atom_info) == set(range(len(molecule.elements)))
+        with pytest.raises(AttributeError):
+            molecule.atom_info = {}
+
+    def test_xyz_species_maps_follow_file_order(self, ethene_xyz):
+        """Canonical ordering must carry each XYZ row label with its atom and geometry."""
+        elements, geo = xyz_parse(ethene_xyz)
+        molecule = yarpecule(ethene_xyz)
+        maps = self.maps(molecule)
+        assert sorted(maps) == list(range(len(elements)))
+        for i, atom_map in enumerate(maps):
+            assert molecule.elements[i] == elements[atom_map].lower()
+            assert np.allclose(molecule.geo[i], geo[atom_map])
+
+    def test_xyz_species_scrambled_rows_change_map_correspondence(self, ethene_xyz, tmp_path):
+        """XYZ row labels describe input order, not a molecule's canonical identity."""
+        elements, geo = xyz_parse(ethene_xyz)
+        order = [1, 0, 3, 2, 5, 4]
+        scrambled_path = tmp_path / "scrambled_species.xyz"
+        scrambled_path.write_text(xyz_generate_string([elements[i] for i in order], geo[order]))
+
+        original = yarpecule(ethene_xyz)
+        scrambled = yarpecule(str(scrambled_path))
+        assert sorted(self.maps(scrambled)) == list(range(len(order)))
+        assert np.allclose(self.geometry_by_map(scrambled)[0], geo[order[0]])
+        assert not np.allclose(self.geometry_by_map(scrambled)[0], self.geometry_by_map(original)[0])
+
+    def test_xyz_reaction_endpoints_share_file_order_maps(self, test_xyz_dir):
+        """Corresponding reactant and product XYZ rows get the same map labels."""
+        rxn = load_reaction_from_xyz_file(test_xyz_dir / "reaction1.xyz")
+        expected = list(range(len(rxn.reactant.graph.elements)))
+        assert self.maps(rxn.reactant.graph) == expected
+        assert self.maps(rxn.product.graph) == expected
+        assert rxn.hash is not None
+
+    def test_xyz_reaction_scrambled_rows_change_map_correspondence(self, test_xyz_dir, tmp_path):
+        """Scrambling both XYZ endpoints changes row correspondence, not reaction identity."""
+        source = test_xyz_dir / "reaction1.xyz"
+        r_elements, r_geo, r_q, _, p_elements, p_geo, p_q, _ = reaction_xyz_parse(source)
+        assert r_q == p_q
+        order = list(reversed(range(len(r_elements))))
+        scrambled_path = tmp_path / "scrambled_reaction.xyz"
+        frames = []
+        for elements, geo in ((r_elements, r_geo), (p_elements, p_geo)):
+            frame = xyz_generate_string([elements[i] for i in order], geo[order])
+            frames.append(frame.replace("\n\n", f"\nq {r_q}\n", 1))
+        scrambled_path.write_text("".join(frames))
+
+        original = load_reaction_from_xyz_file(source)
+        scrambled = load_reaction_from_xyz_file(scrambled_path)
+        assert self.maps(scrambled.reactant.graph) == list(range(len(order)))
+        assert self.maps(scrambled.product.graph) == list(range(len(order)))
+        assert np.allclose(self.geometry_by_map(scrambled.reactant.graph)[0], r_geo[order[0]])
+        assert not np.allclose(
+            self.geometry_by_map(scrambled.reactant.graph)[0],
+            self.geometry_by_map(original.reactant.graph)[0],
+        )
+        assert scrambled.hash == original.hash
+
+    def test_smiles_species_preserves_supplied_atom_maps(self):
+        """Explicit SMILES map labels remain attached to their parsed elements."""
+        molecule = yarpecule("[O:41]([H:7])[C:99]([H:8])([H:9])[H:10]")
+        element_by_map = dict(zip(self.maps(molecule), molecule.elements))
+        assert element_by_map == {7: "h", 8: "h", 9: "h", 10: "h", 41: "o", 99: "c"}
+
+    @pytest.mark.parametrize("canon", [False, True])
+    def test_partially_mapped_smiles_preserves_labels(self, canon):
+        """Partial labels survive ordering; unlabeled atoms get unique, unused labels."""
+        molecule = yarpecule("[C:41]([H])([H])([H])[O:99][H]", canon=canon)
+        maps = self.maps(molecule)
+        element_by_map = dict(zip(maps, molecule.elements))
+        assert element_by_map[41] == "c"
+        assert element_by_map[99] == "o"
+        assert len(maps) == len(set(maps))
+
+    def test_smiles_species_scrambled_labels_change_output_maps(self):
+        """Relabeling atom maps changes labels without changing species identity."""
+        original = yarpecule("[O:41]([H:7])[C:99]([H:8])([H:9])[H:10]")
+        scrambled = yarpecule("[H:310][O:341][C:399]([H:307])([H:308])[H:309]")
+        element_by_map = dict(zip(self.maps(scrambled), scrambled.elements))
+        assert set(element_by_map) != set(self.maps(original))
+        assert element_by_map == {
+            307: "h", 308: "h", 309: "h", 310: "h", 341: "o", 399: "c"
+        }
+        assert scrambled.hash == original.hash
+
+    def test_smiles_reaction_endpoints_preserve_matching_maps(self, tmp_path):
+        """SMILES reaction parsing retains corresponding endpoint labels."""
+        source = tmp_path / "reaction.smi"
+        source.write_text(
+            "[C:11]([H:21])([H:22])([H:23])[O:12][H:24]>>"
+            "[H:24][O:12][C:11]([H:21])([H:22])[H:23]\n"
+        )
+        rxn = next(iter(load_reactions_from_smiles_file(source).values()))
+        expected = {11, 12, 21, 22, 23, 24}
+        assert set(self.maps(rxn.reactant.graph)) == expected
+        assert set(self.maps(rxn.product.graph)) == expected
+        assert rxn.hash is not None
+
+    def test_smiles_reaction_scrambled_labels_change_endpoint_maps(self, tmp_path):
+        """Consistent endpoint relabeling leaves the reaction hash unchanged."""
+        original_path = tmp_path / "original.smi"
+        original_path.write_text(
+            "[C:11]([H:21])([H:22])([H:23])[O:12][H:24]>>"
+            "[H:24][O:12][C:11]([H:21])([H:22])[H:23]\n"
+        )
+        scrambled_path = tmp_path / "scrambled.smi"
+        scrambled_path.write_text(
+            "[C:211]([H:321])([H:322])([H:323])[O:212][H:324]>>"
+            "[H:324][O:212][C:211]([H:321])([H:322])[H:323]\n"
+        )
+        original = next(iter(load_reactions_from_smiles_file(original_path).values()))
+        scrambled = next(iter(load_reactions_from_smiles_file(scrambled_path).values()))
+        reactant_maps = set(self.maps(scrambled.reactant.graph))
+        assert reactant_maps != set(self.maps(original.reactant.graph))
+        assert reactant_maps == set(self.maps(scrambled.product.graph))
+        assert reactant_maps == {211, 212, 321, 322, 323, 324}
+        assert scrambled.hash == original.hash

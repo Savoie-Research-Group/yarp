@@ -28,7 +28,11 @@ def initialize_from_dict(file_dict):
     # Use string keys for Pickle/JSON without replacing an earlier duplicate.
     reactions = {}
     for key, rxn in raw_reactions.items():
-        reactions.setdefault(str(key), rxn)
+        hash_key = str(key)
+        if hash_key in reactions:
+            print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
+            continue
+        reactions[hash_key] = rxn
     
     # Initialize the STATUS dictionary
     status_tracker = {

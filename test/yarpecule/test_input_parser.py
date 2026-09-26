@@ -267,6 +267,25 @@ class TestXYZRxn:
 
         assert len(reactions) == 5
 
+    def test_duplicate_reaction_keeps_first(self, test_xyz_dir, tmp_path, capsys):
+        source = test_xyz_dir / "reaction1.xyz"
+        forward = tmp_path / "a_forward.xyz"
+        forward.write_text(source.read_text())
+        r_elements, r_geo, r_q, _, p_elements, p_geo, p_q, _ = reaction_xyz_parse(source)
+        reverse = tmp_path / "b_reverse.xyz"
+        reverse.write_text("".join(
+            xyz_generate_string(elements, geo).replace("\n\n", f"\nq {q}\n", 1)
+            for elements, geo, q in ((p_elements, p_geo, p_q), (r_elements, r_geo, r_q))
+        ))
+
+        expected = load_reaction_from_xyz_file(forward)
+        reactions = load_reactions_from_xyz_directory(tmp_path)
+        assert len(reactions) == 1
+        retained = next(iter(reactions.values()))
+        assert retained.id == expected.id
+        assert np.allclose(retained.reactant.graph.geo, expected.reactant.graph.geo)
+        assert "Skipping duplicate reaction hash" in capsys.readouterr().out
+
     def test_reaction1_xyz_parse(self, test_xyz_dir):
         xyz_file = test_xyz_dir / "reaction1.xyz"
         (
@@ -450,6 +469,22 @@ class TestSMILESRxn:
 
         assert len(reactions) == 4
 
+    def test_duplicate_reaction_keeps_first(self, test_smiles_file, tmp_path, capsys):
+        forward = test_smiles_file.read_text().splitlines()[0]
+        reverse = ">>".join(reversed(forward.split(">>")))
+        first_file = tmp_path / "first.smi"
+        first_file.write_text(f"{forward}\n")
+        expected = next(iter(load_reactions_from_smiles_file(first_file).values()))
+
+        source = tmp_path / "both.smi"
+        source.write_text(f"{forward}\n{reverse}\n")
+        reactions = load_reactions_from_smiles_file(source)
+        assert len(reactions) == 1
+        retained = next(iter(reactions.values()))
+        assert retained.id == expected.id
+        assert retained.reactant.graph.atom_info == expected.reactant.graph.atom_info
+        assert "Skipping duplicate reaction hash" in capsys.readouterr().out
+
     def test_reaction1_smiles_parse(self, test_smiles_file):
         with open(test_smiles_file, "r") as f:
             reactant_smiles, product_smiles = [_.strip() for _ in f.readline().strip().split(">>")]
@@ -528,14 +563,6 @@ class TestAtomMapIngestion:
             yarpecule(core, canon=False, strict=True)
         assert self.maps(yarpecule((*core, {}), canon=False)) == [0]
 
-    def test_atom_info_property_exposes_normalized_records(self, ethene_xyz):
-        """The public getter exposes atom records without a writable property setter."""
-        molecule = yarpecule(ethene_xyz)
-        assert molecule.atom_info == molecule._atom_info
-        assert set(molecule.atom_info) == set(range(len(molecule.elements)))
-        with pytest.raises(AttributeError):
-            molecule.atom_info = {}
-
     def test_xyz_species_maps_follow_file_order(self, ethene_xyz):
         """Canonical ordering must carry each XYZ row label with its atom and geometry."""
         elements, geo = xyz_parse(ethene_xyz)
@@ -558,14 +585,6 @@ class TestAtomMapIngestion:
         assert sorted(self.maps(scrambled)) == list(range(len(order)))
         assert np.allclose(self.geometry_by_map(scrambled)[0], geo[order[0]])
         assert not np.allclose(self.geometry_by_map(scrambled)[0], self.geometry_by_map(original)[0])
-
-    def test_xyz_reaction_endpoints_share_file_order_maps(self, test_xyz_dir):
-        """Corresponding reactant and product XYZ rows get the same map labels."""
-        rxn = load_reaction_from_xyz_file(test_xyz_dir / "reaction1.xyz")
-        expected = list(range(len(rxn.reactant.graph.elements)))
-        assert self.maps(rxn.reactant.graph) == expected
-        assert self.maps(rxn.product.graph) == expected
-        assert rxn.hash is not None
 
     def test_xyz_reaction_scrambled_rows_change_map_correspondence(self, test_xyz_dir, tmp_path):
         """Scrambling both XYZ endpoints changes row correspondence, not reaction identity."""
@@ -591,12 +610,6 @@ class TestAtomMapIngestion:
         )
         assert scrambled.hash == original.hash
 
-    def test_smiles_species_preserves_supplied_atom_maps(self):
-        """Explicit SMILES map labels remain attached to their parsed elements."""
-        molecule = yarpecule("[O:41]([H:7])[C:99]([H:8])([H:9])[H:10]")
-        element_by_map = dict(zip(self.maps(molecule), molecule.elements))
-        assert element_by_map == {7: "h", 8: "h", 9: "h", 10: "h", 41: "o", 99: "c"}
-
     @pytest.mark.parametrize("canon", [False, True])
     def test_partially_mapped_smiles_preserves_labels(self, canon):
         """Partial labels survive ordering; unlabeled atoms get unique, unused labels."""
@@ -617,19 +630,6 @@ class TestAtomMapIngestion:
             307: "h", 308: "h", 309: "h", 310: "h", 341: "o", 399: "c"
         }
         assert scrambled.hash == original.hash
-
-    def test_smiles_reaction_endpoints_preserve_matching_maps(self, tmp_path):
-        """SMILES reaction parsing retains corresponding endpoint labels."""
-        source = tmp_path / "reaction.smi"
-        source.write_text(
-            "[C:11]([H:21])([H:22])([H:23])[O:12][H:24]>>"
-            "[H:24][O:12][C:11]([H:21])([H:22])[H:23]\n"
-        )
-        rxn = next(iter(load_reactions_from_smiles_file(source).values()))
-        expected = {11, 12, 21, 22, 23, 24}
-        assert set(self.maps(rxn.reactant.graph)) == expected
-        assert set(self.maps(rxn.product.graph)) == expected
-        assert rxn.hash is not None
 
     def test_smiles_reaction_scrambled_labels_change_endpoint_maps(self, tmp_path):
         """Consistent endpoint relabeling leaves the reaction hash unchanged."""

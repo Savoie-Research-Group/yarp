@@ -61,6 +61,9 @@ def generate_rxns(inp):
                 # index-aligned. Relaxing them is the xTB pre-optimization's
                 # job now, at the conformer stage.
                 r2p = reaction(reactant, prod)
+                if r2p.hash in output:
+                    print(f"Skipping duplicate reaction hash {r2p.hash}; keeping the first reaction.")
+                    continue
                 output[r2p.hash] = r2p
 
         # Enumerating from reaction object(s)
@@ -97,7 +100,11 @@ def generate_rxns(inp):
             # Pickles may contain string, numeric, or mixed hash keys.
             original = {}
             for key, rxn in og_rxns.items():
-                original.setdefault(str(key), rxn)
+                hash_key = str(key)
+                if hash_key in original:
+                    print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
+                    continue
+                original[hash_key] = rxn
             og_rxns = original
             og_rxns_hash = set(og_rxns)
 

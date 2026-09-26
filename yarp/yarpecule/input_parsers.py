@@ -327,6 +327,9 @@ def load_reactions_from_xyz_directory(xyz_dir):
             failures.append((str(xyz_file), str(exc)))
             continue
 
+        if rxn.hash in output:
+            print(f"Skipping duplicate reaction hash {rxn.hash}; keeping the first reaction.")
+            continue
         output[rxn.hash] = rxn
 
     print_reaction_load_failures(xyz_dir, failures)
@@ -407,6 +410,9 @@ def load_reactions_from_smiles_file(source_path):
                 failures.append((f"Line {line_number}", str(exc)))
                 continue
 
+            if rxn.hash in output:
+                print(f"Skipping duplicate reaction hash {rxn.hash}; keeping the first reaction.")
+                continue
             output[rxn.hash] = rxn
 
     print_reaction_load_failures(source_path, failures)

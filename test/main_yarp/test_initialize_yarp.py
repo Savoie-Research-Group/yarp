@@ -122,7 +122,7 @@ def test_enum_d2_pkl(enum_d2_pkl):
     assert_current_reaction_hash_keys(saved_reactions)
 
 
-def test_next_depth_keeps_original_reactions(enum_d2_pkl, tmp_path):
+def test_next_depth_keeps_original_reactions(enum_d2_pkl, tmp_path, capsys):
     """Saved string keys and mixed keys must retain the first forward record."""
     first, tracker = initialize_from_dict(enum_d2_pkl)
     metadata_fields = (
@@ -133,11 +133,14 @@ def test_next_depth_keeps_original_reactions(enum_d2_pkl, tmp_path):
         for field in metadata_fields:
             getattr(rxn, field)["original_index"] = index
     save_state(tmp_path, first, tracker)
+    capsys.readouterr()
 
     next_input = deepcopy(enum_d2_pkl)
     next_input["initialize"]["initial_structure"]["source"] = tracker["reaction_output_file"]
     second, _ = initialize_from_dict(next_input)
+    assert "Skipping duplicate reaction hash" in capsys.readouterr().out
     assert set(first) <= set(second)
+    assert len(second) > len(first)
     for key, original in first.items():
         retained = second[key]
         assert retained.id == original.id
@@ -159,6 +162,7 @@ def test_next_depth_keeps_original_reactions(enum_d2_pkl, tmp_path):
         pickle.dump(mixed, stream)
     next_input["initialize"]["initial_structure"]["source"] = str(mixed_path)
     mixed_output, _ = initialize_from_dict(next_input)
+    assert "Skipping duplicate reaction hash" in capsys.readouterr().out
     assert mixed_output[first_key].id == first[first_key].id
     for field in metadata_fields:
         assert getattr(mixed_output[first_key], field) == getattr(first[first_key], field)

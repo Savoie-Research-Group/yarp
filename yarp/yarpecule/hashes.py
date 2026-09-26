@@ -1,7 +1,10 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
+from math import fsum
+
 import numpy as np
+
 
 def atom_hash(ind, adj_mat, masses, alpha=100.0, beta=0.1, gens=10):
     """
@@ -142,29 +145,39 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def reaction_hash(rxn):
+def reaction_hash(rxn, *, _validated=False):
+    """Return a scalar mapping- and direction-invariant reaction hash.
+
+    Align the product to the provided reactant order using arbitrary atom-map
+    labels, sum all endpoint resonance BEMs and mapped atom hashes, then apply
+    the same scalar algebra and rounding as ``yarpecule_hash`` directly. Use
+    ``fsum`` to avoid order-dependent reduction at rounding boundaries. The
+    reaction constructor validates endpoint atom maps before calling this
+    function. Direct calls on reaction objects validate again, since their
+    maps may have changed after construction.
     """
-    Creates a unique hash value for the reaction object based on the sum of reactant/product
-    yarpecule hashes and the hash of the summed BEM difference matrix.
+    if not _validated and hasattr(rxn, "_validate_reaction"):
+        rxn._validate_reaction()
 
-    Parameters
-    ----------
-    y : reaction
-        This is the reaction instance that the hash is being calculated for.
+    anchor, other = rxn.reactant.graph, rxn.product.graph
+    anchor_maps = [
+        anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))
+    ]
+    other_by_map = {
+        other.atom_info[i]["atom_map"]: i for i in range(len(other.elements))
+    }
+    other_order = [other_by_map[atom_map] for atom_map in anchor_maps]
 
-    Returns
-    -------
-    hash_value: float
-    """
-
-    r_bem_sum = np.zeros_like(rxn.reactant.bond_mats[0])
-    for rmat in rxn.reactant.bond_mats:
-        r_bem_sum += rmat
-
-    p_bem_sum = np.zeros_like(rxn.product.bond_mats[0])
-    for pmat in rxn.product.bond_mats:
-        p_bem_sum += pmat
-
-    diff_bem = r_bem_sum - p_bem_sum
-
-    return rxn.reactant.hash + rxn.product.hash + bmat_hash(diff_bem)
+    combined_bems = list(anchor.bond_mats)
+    combined_bems.extend(
+        np.asarray(bem)[np.ix_(other_order, other_order)]
+        for bem in other.bond_mats
+    )
+    bem = np.zeros_like(combined_bems[0])
+    for mat in combined_bems:
+        bem += mat
+    atom_hashes = (
+        np.asarray(anchor.atom_hashes)
+        + np.asarray(other.atom_hashes)[other_order]
+    )
+    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((bem*np.outer(atom_hashes, atom_hashes)).flat), 7)

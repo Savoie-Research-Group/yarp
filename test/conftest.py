@@ -225,6 +225,37 @@ def enum_d2_xyz_dir(tmp_path):
     return data
 
 # Pickle files
+def _reaction_hash_cases(filename, expected_count):
+    """Load a committed reaction-hash case set when its fixture is requested."""
+    source = Path(__file__).parent / "pickles" / filename
+    with source.open("rb") as stream:
+        payload = pickle.load(stream)
+    assert payload["version"] == 1
+    cases = payload["cases"]
+    assert len(cases) == expected_count
+    return cases
+
+
+@pytest.fixture(scope="module")
+def reaction_hash_symmetry_cases():
+    return _reaction_hash_cases("reaction_hash_symmetry.pkl", 200)
+
+
+@pytest.fixture(scope="module")
+def reaction_hash_nonisomorphic_cases():
+    return _reaction_hash_cases("reaction_hash_nonisomorphic.pkl", 100)
+
+
+@pytest.fixture(scope="module")
+def reaction_hash_direction_cases():
+    return _reaction_hash_cases("reaction_hash_direction.pkl", 100)
+
+
+@pytest.fixture(scope="module")
+def reaction_hash_network_reverse_cases():
+    return _reaction_hash_cases("reaction_hash_network_reverses.pkl", 5)
+
+
 @pytest.fixture
 def glucose_single_path():
     """Returns a dictionary object of the reactions contained in glucose pickle file."""
@@ -362,6 +393,17 @@ def test_xyz_dir():
 def test_smiles_file():
     """Returns a Path object of the absolute path to the test SMILES file."""
     return Path(__file__).parent / "molecules" / "batch_SMILES_rxn.txt"
+
+
+@pytest.fixture
+def cyclohexane_dehydrogenation():
+    """Return the mapped ring-dehydrogenation reaction used for hash tests."""
+    from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
+
+    source = Path(__file__).parent / "molecules" / "cyclohexane_dehydrogenation.smi"
+    reactions = load_reactions_from_smiles_file(source)
+    assert len(reactions) == 1
+    return next(iter(reactions.values()))
 
 # SMILES
 @pytest.fixture

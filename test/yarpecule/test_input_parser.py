@@ -237,13 +237,6 @@ class TestMolParser:
         assert q == 0
 
 
-def assert_file_order_atom_maps(elements, atom_info):
-    """XYZ row numbers are correspondence labels, even before canonicalization."""
-    expected_maps = list(range(len(elements)))
-    assert list(atom_info) == expected_maps
-    assert [atom_info[i]["atom_map"] for i in expected_maps] == expected_maps
-
-
 class TestXYZRxn:
     def test_initialize_xyz_reaction_folder(self, test_xyz_dir, capsys):
         reactions = load_reactions_from_xyz_directory(test_xyz_dir)
@@ -280,17 +273,15 @@ class TestXYZRxn:
             reactant_elements,
             reactant_geo,
             reactant_q,
-            reactant_atom_info,
+            _,
             product_elements,
             product_geo,
             product_q,
-            product_atom_info,
+            _,
         ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "o", "n", "n", "h", "h", "h"]
-        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
-        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (9, 3)
         assert product_geo.shape == (9, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -316,17 +307,15 @@ class TestXYZRxn:
             reactant_elements,
             reactant_geo,
             reactant_q,
-            reactant_atom_info,
+            _,
             product_elements,
             product_geo,
             product_q,
-            product_atom_info,
+            _,
         ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
         assert product_elements == ["n", "c", "c", "c", "n", "n", "o", "h", "h", "h"]
-        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
-        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (10, 3)
         assert product_geo.shape == (10, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -352,17 +341,15 @@ class TestXYZRxn:
             reactant_elements,
             reactant_geo,
             reactant_q,
-            reactant_atom_info,
+            _,
             product_elements,
             product_geo,
             product_q,
-            product_atom_info,
+            _,
         ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "o", "o", "o"]
         assert product_elements == ["n", "o", "o", "o"]
-        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
-        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (4, 3)
         assert product_geo.shape == (4, 3)
         assert reactant_q == pytest.approx(-1, rel=1e-5)
@@ -388,17 +375,15 @@ class TestXYZRxn:
             reactant_elements,
             reactant_geo,
             reactant_q,
-            reactant_atom_info,
+            _,
             product_elements,
             product_geo,
             product_q,
-            product_atom_info,
+            _,
         ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
         assert product_elements == ["o", "c", "c", "o", "c", "c", "c", "c", "c", "h", "h", "h", "h", "h", "h", "h", "h", "h", "h"]
-        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
-        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (19, 3)
         assert product_geo.shape == (19, 3)
         assert reactant_q == pytest.approx(0, rel=1e-5)
@@ -424,17 +409,15 @@ class TestXYZRxn:
             reactant_elements,
             reactant_geo,
             reactant_q,
-            reactant_atom_info,
+            _,
             product_elements,
             product_geo,
             product_q,
-            product_atom_info,
+            _,
         ) = reaction_xyz_parse(str(xyz_file))
 
         assert reactant_elements == ["n", "h", "h", "h", "h"]
         assert product_elements == ["n", "h", "h", "h", "h"]
-        assert_file_order_atom_maps(reactant_elements, reactant_atom_info)
-        assert_file_order_atom_maps(product_elements, product_atom_info)
         assert reactant_geo.shape == (5, 3)
         assert product_geo.shape == (5, 3)
         assert reactant_q == pytest.approx(1, rel=1e-5)

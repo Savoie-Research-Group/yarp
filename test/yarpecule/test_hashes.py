@@ -149,15 +149,12 @@ class TestRxnHash:
         assert reaction_hash(cyclohexane_dehydrogenation) == expected_hash
         assert fsum_calls == [True]
 
-    def test_element_inconsistent_maps_warn_and_continue(self, capsys):
+    def test_element_inconsistent_maps_warn_and_continue(self):
         reactant = yarpecule("[C:0][O:1]", canon=False)
         product = yarpecule("[C:1][O:0]", canon=False)
 
-        mapped_reaction = reaction(reactant, product)
-        captured = capsys.readouterr()
-
-        assert "WARNING: Element-inconsistent atom maps detected" in captured.out
-        assert captured.out.count("WARNING: Element-inconsistent atom maps detected") == 1
+        with pytest.warns(RuntimeWarning, match="Element-inconsistent atom maps"):
+            mapped_reaction = reaction(reactant, product)
         assert isinstance(mapped_reaction.hash, float)
 
     def test_direct_rehash_revalidates_changed_maps(self):

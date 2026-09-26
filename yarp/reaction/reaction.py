@@ -1,6 +1,8 @@
 """
 Definition of the reaction object class.
 """
+import warnings
+
 from yarp.reaction.state import state
 from yarp.yarpecule.hashes import reaction_hash
 
@@ -149,8 +151,10 @@ class reaction:
                 for atom_map, reactant_element, product_element
                 in element_mismatches
             )
-            print(
-                "WARNING: Element-inconsistent atom maps detected "
+            warnings.warn(
+                "Element-inconsistent atom maps detected "
                 f"({mismatch_text}). Check the maps for this reaction; "
-                "while exciting in principle, nuclear chemistry is not yet fully supported."
+                "while exciting in principle, nuclear chemistry is not yet fully supported.",
+                RuntimeWarning,
+                stacklevel=2,
             )

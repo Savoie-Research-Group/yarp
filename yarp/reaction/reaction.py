@@ -75,7 +75,7 @@ class reaction:
 
         # Identifiers & Metadata
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
-        self.hash = reaction_hash(self)
+        self.hash = reaction_hash(self, _validated=True)
         
         self.outcome_label = dict()
         self.network_meta = dict()

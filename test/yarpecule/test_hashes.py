@@ -157,7 +157,20 @@ class TestRxnHash:
         captured = capsys.readouterr()
 
         assert "WARNING: Element-inconsistent atom maps detected" in captured.out
+        assert captured.out.count("WARNING: Element-inconsistent atom maps detected") == 1
         assert isinstance(mapped_reaction.hash, float)
+
+    def test_direct_rehash_revalidates_changed_maps(self):
+        """An existing reaction cannot be rehashed after its maps become ambiguous."""
+        mapped_reaction = reaction(
+            yarpecule("[C:0][O:1]", canon=False),
+            yarpecule("[C:0][O:1]", canon=False),
+        )
+        for graph in (mapped_reaction.reactant.graph, mapped_reaction.product.graph):
+            graph._atom_info[1]["atom_map"] = 0
+
+        with pytest.raises(ValueError, match="identical unique atom-map sets"):
+            reaction_hash(mapped_reaction)
 
     @pytest.mark.parametrize("atom_map", [None, 0])
     def test_reaction_rejects_missing_or_duplicate_maps(self, atom_map):

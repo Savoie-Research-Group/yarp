@@ -145,7 +145,7 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def reaction_hash(rxn):
+def reaction_hash(rxn, *, _validated=False):
     """Return a scalar mapping- and direction-invariant reaction hash.
 
     Align the product to the provided reactant order using arbitrary atom-map
@@ -153,8 +153,12 @@ def reaction_hash(rxn):
     the same scalar algebra and rounding as ``yarpecule_hash`` directly. Use
     ``fsum`` to avoid order-dependent reduction at rounding boundaries. The
     reaction constructor validates endpoint atom maps before calling this
-    function.
+    function. Direct calls on reaction objects validate again, since their
+    maps may have changed after construction.
     """
+    if not _validated and hasattr(rxn, "_validate_reaction"):
+        rxn._validate_reaction()
+
     anchor, other = rxn.reactant.graph, rxn.product.graph
     anchor_maps = [
         anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))

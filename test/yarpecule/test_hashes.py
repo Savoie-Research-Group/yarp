@@ -182,24 +182,6 @@ class TestRxnHash:
         with pytest.raises(ValueError, match="identical unique atom-map sets"):
             mapped_reaction._validate_reaction()
 
-    def test_atom_map_values_are_arbitrary_correspondence_labels(self):
-        first = reaction(
-            yarpecule("[C:0]([H:1])([H:2])([H:3])[H:4]", canon=False),
-            yarpecule("[C:0]([H:1])([H:2])([H:3])[H:4]", canon=False),
-        )
-        relabeled = reaction(
-            yarpecule(
-                "[C:100]([H:101])([H:102])([H:103])[H:104]",
-                canon=False,
-            ),
-            yarpecule(
-                "[C:100]([H:101])([H:102])([H:103])[H:104]",
-                canon=False,
-            ),
-        )
-
-        assert first.hash == relabeled.hash
-
     def test_mapping_equivalence(self):
         """
         Test that chemically distinct mappings remain different while

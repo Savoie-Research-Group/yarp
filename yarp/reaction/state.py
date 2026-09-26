@@ -3,6 +3,8 @@ Definition of the state object class.
 """
 from copy import deepcopy
 
+import numpy as np
+
 from yarp.reaction.conformer import conformer
 
 class state:
@@ -57,6 +59,25 @@ class state:
             self.conc[_.canon_smi] = 0.0
 
 
+    def set_graph_geometry(self, geo):
+        """
+        Replace the coordinates held by this state's yarpecule.
+
+        The pre-optimization writes back a geometry that sits on the graph's
+        own connectivity, so a later enumeration cycle -- which builds its
+        parents from `rxn.product.graph` -- starts from relaxed, on-graph
+        coordinates rather than the ones a product inherited from its parent.
+
+        The array is replaced, not written into. `conformers["initial_geom"]`
+        holds the *same* array object as the graph when the state is built, so
+        an in-place write would silently rewrite the starting geometry too.
+        """
+        geo = np.array(geo, dtype=float, copy=True)
+        expected = (len(self._graph.elements), 3)
+        if geo.shape != expected:
+            raise ValueError(f"Geometry has shape {geo.shape}; this state's graph needs {expected}.")
+        self._graph._geo = geo
+
     ###############
     # Properties  #
     ###############
@@ -79,6 +100,25 @@ class state:
     @property
     def hash(self):
         return self._graph.hash
+
+    @property
+    def bem_sum_hash(self):
+        return self._graph.bem_sum_hash
+
+    @property
+    def identity(self):
+        """
+        Key identifying this state as a specific molecule with a specific atom
+        indexing.
+
+        `hash` alone is mapping-independent, so two states that are the same
+        molecule under different atom mappings share it. Anything keyed on
+        `hash` that then exchanges index-ordered data -- geometries, paired
+        BEMs, bond_changes -- will silently mix the two. Measured over the KHP
+        cycle-2 collection: 1110 products span 712 distinct (graph, mapping)
+        pairs but only 268 distinct yarpecule hashes.
+        """
+        return (self._graph.hash, self._graph.bem_sum_hash)
 
     @property
     def bond_mats(self):

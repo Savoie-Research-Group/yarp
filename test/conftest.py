@@ -283,7 +283,73 @@ def khp_d1():
 def khp2pp22_soergel_beam2_cyc3():
     """Returns a dictionary object of the reactions contained in khp2pp22 (depth 3) pickle file."""
     file = str(Path(__file__).parent / "pickles" / "khp2pp22_soergel_beam2_cyc3.pkl")
-    return pickle.load(open(file, 'rb'))   
+    return pickle.load(open(file, 'rb'))
+
+# Enumerated products, shared across the geometry/determinism tests
+@pytest.fixture(scope="session")
+def khp_parent():
+    """The ketohydroperoxide reactant, enumerated from in several test modules."""
+    import yarp as yp
+    return yp.yarpecule("O=CCCOO")
+
+@pytest.fixture(scope="session")
+def khp_products(khp_parent):
+    """
+    Break-2/form-2 products of O=CCCOO, keyed by canonical SMILES.
+
+    Session-scoped because enumeration is the expensive part (~0.1 s) and
+    several modules want the same products. Keying by SMILES rather than by
+    position in the generator keeps the tests readable and keeps a failure
+    message chemically meaningful if enumeration order ever shifts. All 37
+    products have distinct canonical SMILES, so the key is unambiguous.
+    """
+    from yarp.reaction.enum import bnfn
+
+    products = {}
+    for prod in bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                     hash_filter=True, lower_score=True, verbose=False):
+        prod.get_smiles()
+        assert prod.canon_smi not in products, (
+            f"canonical SMILES {prod.canon_smi} is no longer unique among the "
+            "enumerated products; these fixtures key on it"
+        )
+        products[prod.canon_smi] = prod
+    return products
+
+@pytest.fixture
+def khp_reaction(khp_parent, khp_products):
+    """
+    A real reaction object: KHP -> one of its break-2/form-2 products.
+
+    Function-scoped: `reaction()` deep-copies both states, so every test gets
+    conformer dictionaries of its own to write into.
+    """
+    from yarp.reaction.reaction import reaction
+
+    return reaction(khp_parent, khp_products["C=COCOO"])
+
+@pytest.fixture(scope="session")
+def khp_remapped_products(khp_parent):
+    """
+    Groups of products that are the same molecule under different atom mappings.
+
+    `hash_filter=False` keeps the redundant mappings that `bnfn` would
+    otherwise collapse, which is the only way to get two yarpecules that share
+    a yarpecule hash but carry different adjacency matrices. Returns
+    {canonical SMILES: [yarpecule, ...]} for the groups with more than one
+    member.
+    """
+    from yarp.reaction.enum import bnfn
+
+    groups = {}
+    for prod in bnfn(yarpecules=khp_parent, n=2, hashes={khp_parent.hash},
+                     hash_filter=False, lower_score=False, verbose=False):
+        prod.get_smiles()
+        groups.setdefault(prod.canon_smi, []).append(prod)
+
+    remapped = {smi: mols for smi, mols in groups.items() if len(mols) > 1}
+    assert remapped, "no duplicated mappings were enumerated"
+    return remapped
 
 # Molecule files
 @pytest.fixture

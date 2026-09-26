@@ -25,8 +25,10 @@ def initialize_from_dict(file_dict):
     
     print("Let's generate some initial reaction objects...")
     raw_reactions = generate_rxns(inp)
-    # FORCE KEYS TO STRINGS to ensure consistency between Pickle and JSON
-    reactions = {str(k): v for k, v in raw_reactions.items()}
+    # Use string keys for Pickle/JSON without replacing an earlier duplicate.
+    reactions = {}
+    for key, rxn in raw_reactions.items():
+        reactions.setdefault(str(key), rxn)
     
     # Initialize the STATUS dictionary
     status_tracker = {

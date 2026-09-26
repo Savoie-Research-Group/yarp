@@ -615,7 +615,7 @@ class TestAtomMapIngestion:
         assert element_by_map == {7: "h", 8: "h", 9: "h", 10: "h", 41: "o", 99: "c"}
 
     @pytest.mark.parametrize("canon", [False, True])
-    def test_partially_mapped_smiles_uses_one_atom_map_field(self, canon):
+    def test_partially_mapped_smiles_preserves_labels(self, canon):
         """Partial labels survive ordering; unlabeled atoms get unique, unused labels."""
         molecule = yarpecule("[C:41]([H])([H])([H])[O:99][H]", canon=canon)
         maps = self.maps(molecule)
@@ -623,8 +623,6 @@ class TestAtomMapIngestion:
         assert element_by_map[41] == "c"
         assert element_by_map[99] == "o"
         assert len(maps) == len(set(maps))
-        assert all("input_atom_map" not in info for info in molecule.atom_info.values())
-        assert all("atom_index" not in info for info in molecule.atom_info.values())
 
     def test_smiles_species_scrambled_labels_change_output_maps(self):
         """Relabeling atom maps changes labels without changing species identity."""

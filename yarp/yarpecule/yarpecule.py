@@ -11,7 +11,7 @@ from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, xyz_
 from yarp.yarpecule.graph.adjacency import table_generator, graph_seps
 from yarp.yarpecule.lewis.bem_score import return_bo_dict, return_formals
 from yarp.yarpecule.atom_mapping import canon_order
-from yarp.yarpecule.hashes import atom_hash, yarpecule_hash
+from yarp.yarpecule.hashes import atom_hash, bmat_hash, yarpecule_hash
 from yarp.util.properties import el_mass
 from yarp.util.misc import prepare_list, merge_arrays
 from yarp.util.write_files import mol_write_yp, xyz_write
@@ -103,6 +103,7 @@ class yarpecule:
         self._lewis_struct = None
         self._bond_order_dict = None
         self._yarpecule_hash = None
+        self._bem_sum_hash = None
 
         self._gen_lewis_struct()
 
@@ -159,6 +160,39 @@ class yarpecule:
     @property
     def hash(self):
         return self._yarpecule_hash
+
+    @property
+    def bem_sum_hash(self):
+        """
+        Mapping-DEPENDENT identifier, from the hash of the summed bond-electron
+        matrices.
+
+        `hash` (the yarpecule hash) is mapping-independent by design: it weights
+        the summed bond-electron matrix by `outer(atom_hashes, atom_hashes)`,
+        and atom hashes are graph invariants, so relabelling the atoms leaves it
+        unchanged. That is the right answer to "is this the same molecule" and
+        the wrong answer to "is this the same molecule, indexed the same way" --
+        the question anything sharing index-ordered geometries has to ask. This
+        hash omits that invariant factor, so it keeps the mapping.
+
+        The bond-electron matrices are summed before hashing so the value does
+        not depend on the order `find_lewis` returns resonance structures in.
+        The minimum Lewis score is frequently tied -- benzene, nitrate and
+        benzoic acid all tie at the minimum -- which makes `bond_mats[0]` a
+        tie-break rather than a well-defined choice.
+
+        Carries no element information: it is purely the bond-electron matrix,
+        so acetate and nitromethane hash identically. Use it together with
+        `hash`, never on its own.
+        """
+        if getattr(self, "_bem_sum_hash", None) is None:
+            raise AttributeError(
+                "This yarpecule has no bem_sum_hash. It was almost certainly "
+                "unpickled from a file written before bem_sum_hash existed, "
+                "since unpickling does not run __init__. Regenerate the pickle "
+                "with yarp-init to add it."
+            )
+        return self._bem_sum_hash
 
     @property
     def atom_hashes(self):
@@ -378,6 +412,8 @@ class yarpecule:
         Updated Attributes:
         ------------------
         self.lewis_struct
+        self._yarpecule_hash
+        self._bem_sum_hash
         """
 
         self._lewis_struct = lewis_struct(
@@ -386,6 +422,13 @@ class yarpecule:
         self._bond_order_dict = return_bo_dict(self)
 
         self._yarpecule_hash = yarpecule_hash(self)
+
+        # Mapping-dependent counterpart to the yarpecule hash. See the
+        # bem_sum_hash property for why this exists and what it is good for.
+        bem = np.zeros_like(self.bond_mats[0])
+        for mat in self.bond_mats:
+            bem += mat
+        self._bem_sum_hash = bmat_hash(bem)
 
     ######################
     # External Functions #

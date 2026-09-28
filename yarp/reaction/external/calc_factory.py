@@ -29,6 +29,17 @@ def get_calculator(task_def, rxn_data, job_config) -> AsyncYarpCalculator:
         if software == "pysisyphus":
             return PysisyphusTSGuessCalculator(task_def, rxn_data, job_config)
 
+    # Task 2b: xTB pre-optimization, ahead of conformer generation.
+    # Same operation as the R/P refinement optimization, so it reuses that
+    # calculator; only the geometry source, optimizer and output key differ.
+    # There is deliberately no ORCA route -- the pre-opt is xTB by design.
+    elif t_type in ["reactant_pre_opt", "product_pre_opt"]:
+        if software == "pysisyphus":
+            return PysisyphusMinOptCalculator(task_def, rxn_data, job_config)
+        raise ValueError(
+            f"Pre-optimization only runs under pysisyphus/xTB, got software='{software}'."
+        )
+
     # Tasks 4 & 5: Optimizations
     elif t_type in ["reactant_optimization", "product_optimization", "transition_state_optimization"]:
         if software == "pysisyphus":

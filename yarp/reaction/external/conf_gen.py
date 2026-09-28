@@ -1,15 +1,72 @@
 import shutil
 from pathlib import Path
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 
+# Conformer key prefix written by the xTB pre-optimization.
+PREOPT_PREFIX = "preopt"
+
+# MD timestep (fs) used when the system carries a free diatomic fragment.
+#
+# CREST's metadynamics defaults to 5 fs, which is only stable because SHAKE
+# constrains the bonds -- and SHAKE can only constrain bonds present in the
+# topology. xtb perceives bonds by a covalent-radius cutoff, roughly 0.768 A
+# for H-H, while GFN2's equilibrium H-H is 0.7750 A. So an xTB-relaxed free H2
+# falls just outside its own topology cutoff, never gets constrained, and a
+# 5 fs step on an unconstrained ~4400 cm-1 oscillator (period ~7.6 fs) diverges
+# immediately: the metadynamics runs "terminate EARLY" and CREST then crashes
+# sorting an ensemble that is too small.
+#
+# 1.0 fs gives ~7.6 integration steps per period. 2.0 fs also worked when
+# measured but gives only ~3.8, which is uncomfortably close to the edge.
+# Measured cost is ~2.5x runtime with identical conformer counts -- a smaller
+# timestep is strictly more accurate MD, so this buys safety with wall time and
+# nothing else. Evidence: debug/.../implementation_checks/08_crest_h2/.
+DIATOMIC_MD_TIMESTEP_FS = 1.0
+
+
 class ConfTask(AsyncYarpCalculator):
+    @property
+    def target_species(self):
+        """The state this task generates conformers for."""
+        return self.rxn.reactant if "reactant" in self.task_def.task_type else self.rxn.product
+
+    def preopt_conformer(self):
+        """
+        The xTB pre-optimized geometry this task starts from, or None.
+
+        Conformer generation used to start from `initial_geom`, the raw
+        yarpecule graph geometry -- which for an enumerated product is the
+        parent's coordinates under the product's bonding, and can be wildly
+        strained. The pre-optimization stage now supplies a relaxed structure,
+        and there is no path that skips it.
+        """
+        for key, conf in self.target_species.conformers.items():
+            if key.startswith(PREOPT_PREFIX) and conf.geo is not None:
+                return conf
+        return None
+
     def has_prerequisites(self) -> bool:
-        if not self.rxn.reactant.conformers.get('initial_geom') or not self.rxn.product.conformers.get('initial_geom'):
-            return False
-        return True
+        # Only this task's own side. The reactant and product legs of the
+        # pre-optimization finish at different times -- the product leg waits on
+        # the reactant leg -- so requiring both here would fail the reactant's
+        # conformer task the moment its dependency was satisfied.
+        return self.preopt_conformer() is not None
+
+    def has_free_diatomic(self) -> bool:
+        """
+        Whether any fragment of this state is a free two-atom molecule.
+
+        A diatomic is the only fragment that can be left wholly unconstrained
+        when its single bond falls outside xtb's perception cutoff, which is
+        what breaks CREST's default 5 fs metadynamics (see
+        DIATOMIC_MD_TIMESTEP_FS). Measured on H2; applied to every diatomic
+        because the cost lands only on the runs that carry one, and a diatomic
+        has no intramolecular conformational sampling to slow down anyway.
+        """
+        return any(len(frag.elements) == 2 for frag in self.target_species.species)
 
 
 class CrestConfCalculator(ConfTask):
@@ -19,19 +76,44 @@ class CrestConfCalculator(ConfTask):
         self.image_name = "erm42/yarp:crest"
         self.xyz_file = "input.xyz"
 
-        # Determine if we are working on the reactant or the product
-        if "reactant" in self.task_def.task_type:
-            self.target_species = self.rxn.reactant
-        else:
-            self.target_species = self.rxn.product
-
     def generate_input(self):
-        """Write the initial 3D geometry for CREST to start from."""
+        """Write the pre-optimized 3D geometry for CREST to start from."""
+        initial_conf = self.preopt_conformer()
+        if initial_conf is None:
+            raise CalculatorInputError(
+                f"No '{PREOPT_PREFIX}_*' conformer on the "
+                f"{'reactant' if 'reactant' in self.task_def.task_type else 'product'}; "
+                "the xTB pre-optimization has not produced a geometry for this species."
+            )
+
         input_xyz_path = self.scratch_dir / self.xyz_file
         with open(input_xyz_path, "w") as f:
-            # Assuming yarpecule has a method to get a basic 3D string
-            # (e.g., generated via RDKit/ETKDG during initialization)
-            f.write(self.target_species.conformers.get('initial_geom').to_xyz_string())
+            f.write(initial_conf.to_xyz_string())
+
+    def _warn_if_o2_multiplicity_mismatch(self):
+        """
+        CREST needs O2 to be run as a triplet (n_unpaired_electrons = 2) to converge;
+        ground-state O2 is a triplet, not a singlet. YARP applies a single, user-configured
+        n_unpaired_electrons value to the whole reactant/product state, so there's no way
+        to special-case O2 without overriding what the user explicitly asked for.
+        Instead, just warn loudly and let the (likely doomed) CREST job run anyway.
+        """
+        species_label = "reactant" if "reactant" in self.task_def.task_type else "product"
+        species = self.rxn.reactant if species_label == "reactant" else self.rxn.product
+    
+        has_o2 = any(
+            len(sp.elements) == 2 and all(el.lower() == 'o' for el in sp.elements)
+            for sp in species.species
+        )
+        if has_o2 and self.config.n_unpaired_electrons != 2:
+            print(
+                f"   ! WARNING: Detected diatomic O2 in the {species_label} species for "
+                f"task '{self.task_def.task_type}', but conf_gen is configured with "
+                f"n_unpaired_electrons={self.config.n_unpaired_electrons}. Ground-state O2 is a "
+                f"triplet (n_unpaired_electrons=2), and CREST is unlikely to converge for O2 run "
+                f"as anything else. Proceeding with the configured multiplicity anyway, but expect "
+                f"this CREST job to fail."
+            )
 
     def write_submission_script(self) -> Path:
         """Write the bash script that the JobManager will execute."""
@@ -141,6 +223,12 @@ class CrestConfCalculator(ConfTask):
 
         # basic command (ERM: no way to set memory_per_cpu in CREST????)
         cmd = f"crest {self.xyz_file} --{self.config.lot} -nozs -T {self.config.n_cpus}"
+
+        # A free diatomic needs a shorter MD timestep or the metadynamics
+        # diverges; see DIATOMIC_MD_TIMESTEP_FS. Only applied when one is
+        # present, so the ~70% of systems without one keep CREST's default 5 fs.
+        if self.has_free_diatomic():
+            cmd += f" --tstep {DIATOMIC_MD_TIMESTEP_FS}"
 
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"

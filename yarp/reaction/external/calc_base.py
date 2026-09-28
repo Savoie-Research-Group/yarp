@@ -3,6 +3,26 @@ from pathlib import Path
 import shutil
 import subprocess
 
+
+class CalculatorInputError(Exception):
+    """
+    `generate_input()` could not build a usable input; discard this reaction.
+
+    There are otherwise only two places a reaction can be dropped:
+    `has_prerequisites()` returning False, and a job failing its
+    `check_output()`. Neither covers input construction that legitimately
+    fails -- the product pre-optimization's UFF patch onto the product BEM can
+    simply not converge to the target connectivity, at which point there is no
+    geometry to submit. Returning quietly would submit a job against a stale
+    or missing file and surface an hour later as an opaque output-validation
+    error; raising anything else would propagate out of `progress_yarp` and
+    kill the whole invocation for every other reaction in the pass.
+
+    Raised by a calculator, caught narrowly by PASS 3.1/3.2, which route the
+    reaction to `failed_rxns` with this exception's message.
+    """
+
+
 class AsyncYarpCalculator:
     """
     Base class defining the asynchronous lifecycle interface required by progress_yarp.py.
@@ -193,7 +213,13 @@ class AsyncYarpCalculator:
 
     # --- The 5 Lifecycle Methods (Overridden by Software classes) ---
     def generate_input(self):
-        """1. Write input files (e.g., .xyz, .inp) based on self.rxn geometries."""
+        """
+        1. Write input files (e.g., .xyz, .inp) based on self.rxn geometries.
+
+        Raise `CalculatorInputError` if a usable input cannot be built; the
+        caller discards the reaction cleanly. Any other exception is a bug and
+        will take down the whole `yarp-progress` invocation.
+        """
         raise NotImplementedError
 
     def write_submission_script(self) -> Path:

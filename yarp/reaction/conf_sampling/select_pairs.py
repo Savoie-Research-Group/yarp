@@ -11,14 +11,46 @@ from ase.build import minimize_rotation_and_translation
 
 from yarp.reaction.conf_sampling.joint_opt import joint_optimize
 from yarp.reaction.conf_sampling.indicator import return_indicator
+from yarp.reaction.external.calc_base import CalculatorInputError
+from yarp.yarpecule.graph.adjacency import compare_adjacency
 
 
 def select_gsm_pairs(rxn, config):
     """
-    Orchestrates Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
+    Orchestrates Collapse Check -> Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
+
+    Raises `CalculatorInputError` if every reactant or every product conformer
+    has collapsed onto the other side's graph, which discards the reaction.
     """
-    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if key != "initial_geom"] 
-    p_confs = [conf for key, conf in rxn.product.conformers.items() if key != "initial_geom"]
+    # Select the conformer-generation output explicitly, rather than taking
+    # "everything that is not initial_geom". The states also carry the xTB
+    # pre-optimization's structure (and, on a second refinement pass, the
+    # rp_opt geometries), none of which are CREST conformers -- sweeping them
+    # in here would quietly seed GSM with the wrong structures.
+    r_confs = [conf for key, conf in rxn.reactant.conformers.items() if "conf_gen" in key]
+    p_confs = [conf for key, conf in rxn.product.conformers.items() if "conf_gen" in key]
+
+    # A conformer whose bonds perceive to exactly the OTHER side's graph has
+    # collapsed -- e.g. a product that relaxed back onto the reactant during the
+    # pre-optimization, which only warns on a graph change. Pairing it gives GSM
+    # nothing to do. This is decided here, per reaction, because conformers are
+    # pooled across every reaction sharing a species and "the other side"
+    # differs between them.
+    r_confs, r_collapsed = drop_collapsed_conformers(r_confs, rxn.product.graph.adj_mat)
+    p_confs, p_collapsed = drop_collapsed_conformers(p_confs, rxn.reactant.graph.adj_mat)
+    if r_collapsed or p_collapsed:
+        print(f"     ! [{rxn.hash}] Dropped conformers that collapsed onto the other side's graph: "
+              f"{r_collapsed} reactant, {p_collapsed} product.")
+
+    # An empty side cannot be paired. Stop here rather than let it reach the
+    # loops below, where an empty reactant list surfaces as a NameError.
+    for side, kept, n_collapsed, other in (("reactant", r_confs, r_collapsed, "product"),
+                                           ("product", p_confs, p_collapsed, "reactant")):
+        if not kept:
+            raise CalculatorInputError(
+                f"No usable {side} conformers for GSM "
+                f"({n_collapsed} collapsed onto the {other} graph)."
+            )
 
     # --- STEP A: Apply Joint Optimization (Biasing) ---
     lot = config.bias_lot
@@ -31,8 +63,8 @@ def select_gsm_pairs(rxn, config):
     # biased_r: reactant geometries guided by product geometries
     #
     # joint_optimize returns None when neither optimizer can produce a
-    # geometry consistent with the target BEM (mirrors quick_geom_opt in
-    # generate_rxns.py); such conformers are dropped, keeping r_confs/p_confs
+    # geometry consistent with the target BEM;
+    # such conformers are dropped, keeping r_confs/p_confs
     # aligned with their biased counterparts.
     if mode in ['dual', 'r_only']:
         kept_r_confs, biased_p = [], []
@@ -163,6 +195,22 @@ def select_gsm_pairs(rxn, config):
 ##############################################################################
     # Truncate to the number requested by the user
     return approved_pairs[:n_conf]
+
+
+def drop_collapsed_conformers(confs, other_adj):
+    """
+    Removes conformers whose perceived bonding is exactly the other side's graph.
+
+    The comparison is atom-for-atom against `other_adj` rather than by species
+    hash, so a reaction whose reactant and product are the same species under
+    different atom mappings is not mistaken for a collapse. Any other change of
+    graph is left alone: the product pre-optimization deliberately keeps a
+    product that is not a minimum of its enumerated graph.
+
+    Returns (kept conformers, number dropped).
+    """
+    kept = [conf for conf in confs if not compare_adjacency(conf.elements, conf.geo, other_adj)[0]]
+    return kept, len(confs) - len(kept)
 
 
 def align_conformers(conf, biased_conf):

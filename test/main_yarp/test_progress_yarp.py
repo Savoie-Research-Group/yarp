@@ -503,3 +503,159 @@ def test_handoff_scenario_3_init_to_refine_pipeline(tmp_path, mocker):
     assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.reactant_optimization"]["status"] == "submitted"
     assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.product_optimization"]["status"] == "submitted"
     assert status_tracker["reactions"]["rxn_complete"]["tasks"]["ll_refine.transition_state_optimization"]["status"] == "submitted"
+
+# =====================================================================
+# BATCH 4: PRE-OPTIMIZATION KEYING
+# =====================================================================
+from types import SimpleNamespace
+
+import numpy as np
+
+from yarp.progress_yarp import species_registry_key, shareable_conformers, synchronize_conformers
+
+
+def _state(identity):
+    """A stand-in state carrying just the attributes the keying logic reads."""
+    return SimpleNamespace(identity=identity, conformers={})
+
+
+def _rxn(reactant_identity, product_identity):
+    return SimpleNamespace(reactant=_state(reactant_identity), product=_state(product_identity))
+
+
+class TestSpeciesRegistryKey:
+    """
+    The redundancy blocker lets two reactions share one single-species job.
+    That is sound for every task whose result depends only on the species it
+    acts on -- and unsound for the product pre-optimization, whose starting
+    structure is a UFF patch of *this reaction's* relaxed reactant.
+    """
+
+    @pytest.mark.parametrize("task_type", [
+        "reactant_conformer", "reactant_optimization", "reactant_pre_opt",
+    ])
+    def test_reactant_tasks_key_on_the_reactant_alone(self, task_type):
+        rxn = _rxn(("rhash", 1.0), ("phash", 2.0))
+
+        assert species_registry_key(rxn, task_type, "s.t") == (("rhash", 1.0), "s.t")
+
+    @pytest.mark.parametrize("task_type", ["product_conformer", "product_optimization"])
+    def test_most_product_tasks_key_on_the_product_alone(self, task_type):
+        rxn = _rxn(("rhash", 1.0), ("phash", 2.0))
+
+        assert species_registry_key(rxn, task_type, "s.t") == (("phash", 2.0), "s.t")
+
+    def test_product_pre_opt_also_keys_on_the_reactant(self):
+        rxn = _rxn(("rhash", 1.0), ("phash", 2.0))
+
+        assert species_registry_key(rxn, "product_pre_opt", "s.t") == (
+            ("rhash", 1.0), ("phash", 2.0), "s.t",
+        )
+
+    def test_same_product_different_reactants_are_not_deduplicated(self):
+        """
+        The bug this guards: two reactions reaching the same product from
+        different reactants produce genuinely different patched geometries, so
+        one must not claim the other's job.
+        """
+        a = _rxn(("reactant_A", 1.0), ("shared_product", 9.0))
+        b = _rxn(("reactant_B", 2.0), ("shared_product", 9.0))
+
+        assert species_registry_key(a, "product_pre_opt", "s.t") != \
+               species_registry_key(b, "product_pre_opt", "s.t")
+
+    def test_same_product_same_reactant_is_deduplicated(self):
+        """Genuine duplicates must still collapse, or dedup buys us nothing."""
+        a = _rxn(("reactant_A", 1.0), ("shared_product", 9.0))
+        b = _rxn(("reactant_A", 1.0), ("shared_product", 9.0))
+
+        assert species_registry_key(a, "product_pre_opt", "s.t") == \
+               species_registry_key(b, "product_pre_opt", "s.t")
+
+    @pytest.mark.parametrize("task_type", ["ts_guess", "irc_validation", "ml_predict"])
+    def test_reaction_path_tasks_are_not_deduplicated(self, task_type):
+        rxn = _rxn(("rhash", 1.0), ("phash", 2.0))
+
+        assert species_registry_key(rxn, task_type, "s.t") is None
+
+
+class TestShareableConformers:
+    """
+    PASS 0.1 pools conformers across states of the same identity. Both pre-opt
+    legs write the same conformer key, but the product's is reaction-specific,
+    so pooling it would hand one reaction's structure to another.
+    """
+
+    def test_reactant_shares_everything_including_its_pre_opt(self):
+        species = _state(("h", 1.0))
+        species.conformers = {"initial_geom": "a", "preopt_xtb_pysisyphus": "b",
+                              "conf_gen_rank0_gfn2_crest": "c"}
+
+        assert set(shareable_conformers(species, "reactant")) == set(species.conformers)
+
+    def test_product_withholds_its_pre_opt(self):
+        species = _state(("h", 1.0))
+        species.conformers = {"initial_geom": "a", "preopt_xtb_pysisyphus": "b",
+                              "conf_gen_rank0_gfn2_crest": "c"}
+
+        shared = shareable_conformers(species, "product")
+
+        assert "preopt_xtb_pysisyphus" not in shared
+        assert set(shared) == {"initial_geom", "conf_gen_rank0_gfn2_crest"}
+
+    def test_conformer_generation_results_still_pool(self):
+        """Withholding the pre-opt must not break CREST deduplication."""
+        species = _state(("h", 1.0))
+        species.conformers = {"conf_gen_rank0_gfn2_crest": "c", "rpopt_xtb_pysisyphus": "d"}
+
+        assert set(shareable_conformers(species, "product")) == set(species.conformers)
+
+    def test_returns_a_copy_not_the_live_dict(self):
+        species = _state(("h", 1.0))
+        species.conformers = {"initial_geom": "a"}
+
+        shareable_conformers(species, "reactant")["injected"] = "x"
+
+        assert "injected" not in species.conformers
+
+
+class TestSynchronizeWritesReactantGeometry:
+    """
+    One reactant pre-opt job serves every reaction sharing that reactant; the
+    others receive its conformer only through PASS 0.1. Their graph geometry
+    has to be written back there, or only the reaction that ran the job would
+    carry relaxed coordinates.
+    """
+
+    def _two_reactions_sharing_a_reactant(self, khp_parent, khp_products):
+        from yarp.reaction.reaction import reaction
+        a = reaction(khp_parent, khp_products["CCC(=O)OO"])
+        b = reaction(khp_parent, khp_products["C=COCOO"])
+        assert a.reactant.identity == b.reactant.identity
+        return a, b
+
+    def _preopt(self, graph, shift):
+        from yarp.reaction.conformer import conformer
+        conf = conformer()
+        conf.elements = graph.elements
+        conf.geo = graph.geo + shift
+        conf.properties["internal_energy_Eh"] = -20.0
+        return conf
+
+    def test_pooled_reactant_takes_the_shared_pre_opt(self, khp_parent, khp_products):
+        a, b = self._two_reactions_sharing_a_reactant(khp_parent, khp_products)
+        a.reactant.conformers["preopt_xtb_pysisyphus"] = self._preopt(a.reactant.graph, 1.0)
+
+        synchronize_conformers({"a": a, "b": b})
+
+        assert np.allclose(b.reactant.graph.geo, a.reactant.conformers["preopt_xtb_pysisyphus"].geo)
+
+    def test_product_pre_opt_is_not_written_back_here(self, khp_parent, khp_products):
+        """A product's pre-opt may be off its graph; only scrape_data decides what to store."""
+        a, b = self._two_reactions_sharing_a_reactant(khp_parent, khp_products)
+        before = a.product.graph.geo.copy()
+        a.product.conformers["preopt_xtb_pysisyphus"] = self._preopt(a.product.graph, 1.0)
+
+        synchronize_conformers({"a": a, "b": b})
+
+        assert np.array_equal(a.product.graph.geo, before)

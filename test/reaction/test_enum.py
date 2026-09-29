@@ -33,12 +33,12 @@ class TestConcertedClosedShell:
         haa = yarpecule('CC=O')
         prods = list(bnfn(haa, 2, hashes={haa.hash}))
 
-        assert len(prods) == 9
+        assert len(prods) == 10
 
         unique_prods = get_unique_yarpecules(prods)
-        assert len(unique_prods) == 3
+        assert len(unique_prods) == 4
 
-        expected_prods = ['C=CO', 'C1CO1', 'C=C=O.[H][H]']
+        expected_prods = ['C=CO', 'C1CO1', 'C=C=O.[H][H]', 'C.[C-]#[O+]']
 
         expected_prods_hash = set()
         for smi in expected_prods:
@@ -62,21 +62,24 @@ class TestConcertedClosedShell:
         Lewis score, which is tossed out after default post-enum filters are applied.
         """
         haa = yarpecule('CC=O')
-
+        co = yarpecule('C.[C-]#[O+]')
         b2f2_prods = list(bnfn(haa, 2, hashes={haa.hash}))
         b3f3_prods = list(bnfn(haa, 3, hashes={haa.hash}))
 
-        assert len(b2f2_prods) == 9
+        assert len(b2f2_prods) == 10
         assert len(b3f3_prods) == 45
 
         b2f2_unique = get_unique_yarpecules(b2f2_prods)
-        assert len(b2f2_unique) == 3
+        assert len(b2f2_unique) == 4
         b3f3_unique = get_unique_yarpecules(b3f3_prods)
         assert len(b3f3_unique) == 4
 
         b2f2_set = set()
         b3f3_set = set()
         for i in range(len(b2f2_prods)):
+            #discard carbon monoxide which is created from legacy shared atom b2f2.
+            if b2f2_prods[i].hash == co.hash:
+                continue
             b2f2_set.add(b2f2_prods[i].hash)
             b3f3_set.add(b3f3_prods[i].hash)
 
@@ -94,7 +97,7 @@ class TestConcertedClosedShell:
         for _ in khp_b2f2:
             khp_b2f2_hash.add(_.hash)
 
-        expected_prods = ['O=CC=C.OO', '[H][H].O=C=CCOO', 'O=CCC=O.O', 'O=COO.C=C', 'O=CC(OO)C', '[H][H].O=CC=COO', 'O=CCC(O)O', 'O=COOCC']
+        expected_prods = ['O=CC=C.OO', '[H][H].O=C=CCOO', 'O=CCC=O.O', 'O=COO.C=C', 'O=CC(OO)C', '[H][H].O=CC=COO', 'O=CCC(O)O', 'O=COOCC', "[C-]#[O+].CCOO"]
 
         expected_prods_hash = set()
         for smi in expected_prods:
@@ -116,12 +119,15 @@ class TestConcertedClosedShell:
         """
 
         khp = yarpecule('O=CCCOO')
-
+        co =yarpecule('[C-]#[O+].CCOO')
         khp_b2f2 = list(bnfn(khp, 2, hashes={khp.hash}))
         khp_b2f2_hash = set()
+        
         for _ in khp_b2f2:
             khp_b2f2_hash.add(_.hash)
-
+    
+        #discard carbon monoxide which is created from legacy shared atom b2f2. 
+        khp_b2f2_hash.discard(co.hash)
         khp_b3f3 = list(bnfn(khp, 3, hashes={khp.hash}))
         khp_b3f3_hash = set()
         for _ in khp_b3f3:

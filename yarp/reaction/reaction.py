@@ -2,9 +2,12 @@
 Definition of the reaction object class.
 """
 import warnings
+from copy import deepcopy
+
+import numpy as np
 
 from yarp.reaction.state import state
-from yarp.yarpecule.hashes import reaction_hash
+from yarp.yarpecule.hashes import bmat_hash, reaction_hash
 
 class reaction:
     """
@@ -77,7 +80,7 @@ class reaction:
 
         # Identifiers & Metadata
         self.id = self.reactant.inchi + "_to_" + self.product.inchi
-        self.hash = reaction_hash(self, _validated=True)
+        self.hash = reaction_hash(self)
         
         self.outcome_label = dict()
         self.network_meta = dict()
@@ -88,8 +91,7 @@ class reaction:
 
     def _validate_reaction(self):
         """
-        Validate that the reactant and product are atom-balanced and have
-        consistent atom-map sets.
+        Validate atom balance and maps, then align product indices if needed.
 
         Element-inconsistent mappings are reported but accepted because atom
         maps are treated as user-supplied correspondence labels.
@@ -97,17 +99,20 @@ class reaction:
         reactant = self.reactant.graph
         product = self.product.graph
 
+        # Check that the reactant and product adjacency matrices have the same shape.
         if reactant.adj_mat.shape != product.adj_mat.shape:
             raise ValueError(
                 "Reactant and product adjacency matrices must have the same shape."
             )
 
-        # Endpoint atom order may differ.
+        # Enforce that the reactant and product have the same element composition.
         if sorted(reactant.elements) != sorted(product.elements):
             raise ValueError(
-                "Reactant and product must contain the same element composition."
+                "Reactant and product must contain the same element composition. "
+                "While in principle we find nuclear chemistry exciting, it is not yet fully supported in YARP."
             )
 
+        # Check that the reactant and product have the same unique atom-map sets.
         reactant_maps = [
             reactant.atom_info[i]["atom_map"]
             for i in range(len(reactant.elements))
@@ -158,3 +163,43 @@ class reaction:
                 RuntimeWarning,
                 stacklevel=2,
             )
+
+        order = [product_by_map[atom_map] for atom_map in reactant_maps]
+        if order != list(range(len(order))):
+            self._align_product(order)
+
+    def _align_product(self, order):
+        """Apply one atom permutation to the product state and its cached data."""
+        graph = self.product.graph
+        old_to_new = {old: new for new, old in enumerate(order)}
+        matrix_order = np.ix_(order, order)
+        graph._adj_mat = graph.adj_mat[matrix_order]
+        graph._elements = [graph.elements[i] for i in order]
+        for attr in ("_geo", "_masses", "_atom_hashes"):
+            setattr(graph, attr, getattr(graph, attr)[order])
+        graph._atom_info = {i: deepcopy(graph.atom_info[j]) for i, j in enumerate(order)}
+        for info in graph._atom_info.values():
+            bonds = info["stereo"]["bonds"]
+            info["stereo"]["bonds"] = {old_to_new[j]: value for j, value in bonds.items()}
+
+        lewis = graph.lewis
+        lewis._adj_mat = graph._adj_mat
+        lewis._elements = graph._elements
+        lewis._bond_mats = [mat[matrix_order] for mat in lewis._bond_mats]
+        lewis._rings = [[old_to_new[i] for i in ring] for ring in lewis._rings]
+        for attr in ("_e_acceptors", "_e_donors", "_formal_charge"):
+            setattr(lewis, attr, getattr(lewis, attr)[order])
+        lewis._atom_neighbors = [
+            {old_to_new[j] for j in lewis._atom_neighbors[i]} for i in order
+        ]
+        graph._bond_order_dict = {
+            old_to_new[i]: {old_to_new[j]: value for j, value in neighbors.items()}
+            for i, neighbors in graph._bond_order_dict.items()
+        }
+        bem = np.zeros_like(lewis._bond_mats[0])
+        for mat in lewis._bond_mats:
+            bem += mat
+        graph._bem_sum_hash = bmat_hash(bem)
+        initial = self.product.conformers["initial_geom"]
+        initial.geo = graph.geo
+        initial.elements = graph.elements

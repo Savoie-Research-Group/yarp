@@ -145,39 +145,21 @@ def yarpecule_hash(y):
     return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
 
 
-def reaction_hash(rxn, *, _validated=False):
-    """Return a scalar mapping- and direction-invariant reaction hash.
+def reaction_hash(rxn):
+    """Hash a reaction whose product was aligned during construction.
 
-    Align the product to the provided reactant order using arbitrary atom-map
-    labels, sum all endpoint resonance BEMs and mapped atom hashes, then apply
-    the same scalar algebra and rounding as ``yarpecule_hash`` directly. Use
-    ``fsum`` to avoid order-dependent reduction at rounding boundaries. The
-    reaction constructor validates endpoint atom maps before calling this
-    function. Direct calls on reaction objects validate again, since their
-    maps may have changed after construction.
+    Sum all endpoint resonance BEMs and atom hashes in their shared index
+    order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
     """
-    if not _validated and hasattr(rxn, "_validate_reaction"):
-        rxn._validate_reaction()
 
-    anchor, other = rxn.reactant.graph, rxn.product.graph
-    anchor_maps = [
-        anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))
-    ]
-    other_by_map = {
-        other.atom_info[i]["atom_map"]: i for i in range(len(other.elements))
-    }
-    other_order = [other_by_map[atom_map] for atom_map in anchor_maps]
+    combined_bems = list(rxn.reactant.graph.bond_mats)
+    combined_bems.extend(rxn.product.graph.bond_mats)
 
-    combined_bems = list(anchor.bond_mats)
-    combined_bems.extend(
-        np.asarray(bem)[np.ix_(other_order, other_order)]
-        for bem in other.bond_mats
-    )
-    bem = np.zeros_like(combined_bems[0])
+    rxn_bem = np.zeros_like(combined_bems[0])
     for mat in combined_bems:
-        bem += mat
+        rxn_bem += mat
     atom_hashes = (
-        np.asarray(anchor.atom_hashes)
-        + np.asarray(other.atom_hashes)[other_order]
+        np.asarray(rxn.reactant.graph.atom_hashes)
+        + np.asarray(rxn.product.graph.atom_hashes)
     )
-    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((bem*np.outer(atom_hashes, atom_hashes)).flat), 7)
+    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((rxn_bem*np.outer(atom_hashes, atom_hashes)).flat), 7)

@@ -6,6 +6,8 @@ Default output:
 
 Options:
     -i, --ids       Include reaction hashes.
+    -H, --endpoint-hashes
+                    Include reactant and product yarpecule hashes.
     -f, --forward   Include all levels in rxn.barrier.
     -r, --reverse   Include all levels in rxn.reverse_barrier.
     -g, --dg        Include all levels in rxn.dg_rxn.
@@ -18,7 +20,7 @@ Options:
 Short flags can be combined, e.g. -ifrg.
 
 Usage:
-    python read_pkl.py [-ifrgba] [--visualize] yarp.pkl
+    python read_pkl.py [-ifrgbaH] [--visualize] yarp.pkl
 """
 import argparse
 import os
@@ -156,6 +158,9 @@ def main(args):
     headers = ["Reactant", "Product"]
     if args.ids:
         headers.insert(0, "Reaction Hash")
+    if args.endpoint_hashes:
+        insert_at = 1 if args.ids else 0
+        headers[insert_at:insert_at] = ["Reactant Hash", "Product Hash"]
     for direction, _, label, key in columns:
         headers.append(f"{key} {direction} {label}")
     if args.meta:
@@ -169,6 +174,12 @@ def main(args):
         ]
         if args.ids:
             row.insert(0, getattr(rxn, "hash", "none"))
+        if args.endpoint_hashes:
+            insert_at = 1 if args.ids else 0
+            row[insert_at:insert_at] = [
+                getattr(rxn.reactant, "hash", "none"),
+                getattr(rxn.product, "hash", "none"),
+            ]
 
         for _, attr, _, key in columns:
             row.append(_format_optional_value(_reaction_value(rxn, attr, key)))
@@ -188,6 +199,8 @@ def main(args):
 def _add_options(parser):
     parser.add_argument("-i", "--ids", action="store_true",
                         help="Include reaction hashes as the first table column.")
+    parser.add_argument("-H", "--endpoint-hashes", action="store_true",
+                        help="Include reactant and product yarpecule hash columns.")
     parser.add_argument("--visualize", action="store_true",
                         help="Write reactant/product BEM PDFs for each reaction.")
     parser.add_argument("--visual-dir", default="visuals",
@@ -222,6 +235,7 @@ def cli():
 
             Flag summary:
               -i  add reaction hash column
+              -H  add reactant and product yarpecule hash columns
               -f  show all forward barrier columns from rxn.barrier
               -r  show all reverse barrier columns from rxn.reverse_barrier
               -g  show all reaction dG columns from rxn.dg_rxn
@@ -236,6 +250,7 @@ def cli():
             Examples:
               python read_pkl.py yarp.pkl
               python read_pkl.py -i yarp.pkl
+              python read_pkl.py -iH yarp.pkl
               python read_pkl.py -ifrg yarp.pkl
               python read_pkl.py --limit 25 yarp.pkl
               python read_pkl.py -ia --tablefmt github yarp.pkl

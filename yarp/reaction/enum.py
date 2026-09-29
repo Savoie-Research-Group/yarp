@@ -12,72 +12,17 @@ from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
 
-def _reactive_maps_from_react(react):
-    """
-    Convert the public reactive-atoms value to a set of atom-map ids.
-    """
-    if react is None or react == []:
-        return set()
-    if isinstance(react, set):
-        return set(react)
-    if isinstance(react, tuple):
-        return set(react)
-    if isinstance(react, list) and len(react) == 1 and isinstance(react[0], (set, list, tuple)):
-        return set(react[0])
-    return set(react)
 
-
-def atom_map_to_local_index(yarp_like):
-    """
-    Return {atom_map: local_index} for a yarpecule and reject duplicate maps.
-    """
-    by_map = {}
-    for local_idx, info in yarp_like.atom_info.items():
-        atom_map = info.get("atom_map")
-        if atom_map is None:
-            continue
-        if atom_map in by_map:
-            raise ValueError(f"Duplicate atom map {atom_map} found in reactant.")
-        by_map[atom_map] = local_idx
-    return by_map
-
-
-def _resolve_reactive_atoms_for_candidate(yarp_like, react, verbose=False):
-    """
-    Resolve public reactive atom maps to candidate-local atom indices.
-
-    The public YAML/API value is expressed as atom-map IDs because those are the
-    only stable atom identifiers across pickle restarts, product separation, and
-    local atom reordering. The low-level enumeration code still operates on
-    candidate-local atom indices, so every candidate has to resolve the map IDs
-    against its own current atom table immediately before enumeration.
-
-    Missing maps are intentionally not errors. A candidate can be a separated
-    product fragment, or just a molecule that does not contain this depth's
-    requested reactive atom subset. In those cases we use the intersection of
-    requested maps and candidate maps. If the intersection is empty, the caller
-    skips this candidate cleanly by returning no products.
-    """
-    react_maps = _reactive_maps_from_react(react)
-    if not react_maps:
-        return [], [], []
-
-    # ``by_map`` is the bridge from stable user-facing map IDs to the local
-    # integer indices expected by adjacency/bond-matrix enumeration routines.
-    by_map = atom_map_to_local_index(yarp_like)
-    present = sorted(react_maps & set(by_map))
-    missing = sorted(react_maps - set(by_map))
-
-    if not present:
-        if verbose:
-            print("   + Molecule contains no atoms in reactive set; skipping enumeration.")
-        return None, present, missing
-
-    # Preserve the historical internal shape: a list of sets, where each set is
-    # a candidate-local reactive atom group. The public representation remains
-    # atom-map IDs; only enumeration internals see local indices.
-    local_react = [set(by_map[_] for _ in present)]
-    return local_react, present, missing
+from yarp.reaction.enum_support import (
+    apply_legacy_shared_atom_b2f2,
+    legacy_shared_atom_b2f2_changes,
+    return_radicals,
+    return_bondtypes,
+    unique_set_partition_generator,
+    add_bonds,
+    _reactive_maps_from_react,
+    _resolve_reactive_atoms_for_candidate
+)
 
 
 def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
@@ -671,12 +616,31 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 print("Bond matrix after breaking bonds:")
                 print(base_bmat)
 
+            # A repeated B2F2 endpoint can represent the legacy shared-atom
+            # bond/electron rearrangement, so identify it before ordinary
+            # pairing treats the repeated endpoint as a dangling bond.
+            shared_atom_changes = legacy_shared_atom_b2f2_changes(
+                n, formset, radicals, y.lewis.bond_mats[fc_ind], y.elements
+            )
+
             # Loop over all unique ways to pair reactive atoms into new bonds
+            if shared_atom_changes is not None:
+                formation_changes = [
+                    (change.bonds_to_form, change)
+                    for change in shared_atom_changes
+                ]
+            else:
+                formation_changes = [
+                    (formation, None)
+                    for formation in unique_set_partition_generator(formset, 2)
+                ]
+
             if debug:
                 print(f"this is the formset: {formset}")
                 print(f"these are the bond formations we will test: "
-                      f"{list(unique_set_partition_generator(formset, 2))}")
-            for g in unique_set_partition_generator(formset, 2):
+                      f"{[formation for formation, _ in formation_changes]}")
+
+            for g, shared_atom_change in formation_changes:
 
                 # Skip if we would just reform a bond we broke
                 if frozenset(g) in avoid:
@@ -694,10 +658,34 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 if debug:
                     print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
 
-                # Create new adjacency matrix by adding the new bonds
-                adj_mat = copy(base_bmat)
+                if shared_atom_change is not None:
+                    if debug:
+                        print(
+                            "Legacy shared-atom criterion: "
+                            f"{shared_atom_change.criterion}"
+                        )
+                    # Mirror the complete legacy special case at the BEM level:
+                    # account for electrons released/consumed by bond changes,
+                    # then move the donor's electron pair to the shared atom.
+                    product_bmat = apply_legacy_shared_atom_b2f2(
+                        y.lewis.bond_mats[fc_ind],
+                        [bonds[_] for _ in b],
+                        shared_atom_change,
+                    )
+                    if debug:
+                        print("Bond matrix after legacy electron redistribution:")
+                        print(product_bmat)
+                else:
+                    product_bmat = copy(base_bmat)
+                    product_bmat = add_bonds(
+                        product_bmat, [list(_) for _ in g], val=1
+                    )
+
+                # Current YARP constructs a product from connectivity and then
+                # determines its Lewis structures. Convert the redistributed
+                # BEM only after all legacy BEM operations are complete.
+                adj_mat = np.where(product_bmat > 0, 1, 0).astype(int)
                 np.fill_diagonal(adj_mat, 0)
-                adj_mat = add_bonds(adj_mat, [list(_) for _ in g], val=1)
 
                 # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
                 product = yarpecule((
@@ -721,7 +709,10 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                     print(f"New adjacency matrix:\n{product._adj_mat}")
 
                 # Optional: skip products with higher bond matrix scores (worse quality)
-                if lower_score:
+                # The legacy shared-atom route predates the current Lewis-score gate;
+                # applying that gate here removes the intended CO-containing product.
+
+                if lower_score and shared_atom_change is None:
                     if product.lewis._scores[0] > y.lewis._scores[0]:
                         if debug:
                             print(f"Skipping - higher score: "
@@ -747,213 +738,3 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                         print(f"Skipping - product hash already in set: "
                               f"{product._yarpecule_hash}")
 
-
-def unique_set_partition_generator(seq: Iterable, group_size: int):
-    """
-    Yield all unique partitions of `seq` into groups of `group_size`.
-    Generates each partition exactly once, in canonical order,
-    without holding all previous results in memory.
-
-    This function returns the unique partitionings of group_size of the elements of seq. The returned partitions
-    are not distinguishable by ordering within partitions or the ordering between partitions. For example, 
-    if seq = [1,2,3,4] and group_size=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
-    the same partition. This function is used to generate all possible partitions of atoms that can form 
-    bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a 
-    [(3,4),(1,2)] pair of bonds, etc.
-
-    When len(seq) is not divisible by group_size, all possible subsets of size
-    (groups_needed * group_size) are partitioned, so no valid grouping is missed.
-    """
-    seq = tuple(seq)                     # tuple => O(1) index lookup
-    n = len(seq)                         # O(1) lookup
-
-    # Needs to be at least 1 and not larger than seq, otherwise no partition is possible
-    if group_size <= 0 or group_size > n:
-        return
-
-    groups_needed = n // group_size      # number of complete groups we can form
-
-    def helper(available: tuple, accum: tuple):
-        """
-        Recursively build up `accum`, a tuple of grouped index-tuples.
-        Canonical order is enforced by always anchoring the next group on
-        the first element of `available` — there is no choice here, which
-        is what prevents duplicate partitions from being generated.
-        """
-        if len(accum) == groups_needed:   # base case: complete partition
-            # Map indices back to original elements exactly once:
-            yield tuple(frozenset(seq[i] for i in grp) for grp in accum)
-            return
-
-        # Canonical anchor: first available index MUST start the next group
-        first, *rest = available
-        for combo in combinations(rest, group_size - 1):
-            # Build the remaining available indices by excluding the chosen combo
-            remaining = tuple(i for i in rest if i not in combo)
-            yield from helper(remaining, accum + ((first,) + combo,))
-
-    # When n is not divisible by group_size, we iterate over all subsets of
-    # exactly (groups_needed * group_size) elements and partition each one.
-    # This ensures every valid grouping is considered regardless of which
-    # elements are left over.
-    elements_needed = groups_needed * group_size
-    seen = set()                          # tracks yielded partitions to avoid duplicates
-    for subset in combinations(range(n), elements_needed):
-        for partition in helper(subset, ()):
-            # Different subsets can produce identical frozenset partitions,
-            # so we deduplicate before yielding
-            key = frozenset(partition)
-            if key not in seen:
-                seen.add(key)
-                yield partition
-
-
-def return_bondtypes(yarpecules, b_inds=[]):
-    """
-    This function provides a shortcut for enumerating "break m form n" products without generating intermediate 
-    zwitterionic/dangling bond species. The function returns a list of bonds for each yarpecule. Each bond is a tuple
-    of the form (i,j,i_hash,j_hash,bond_order) where i and j are the indices of the atoms in the bond, i_hash and j_hash
-    are the hashes of the atoms, and bond_order is the bond order of the bond taken from the bond_mat at the index supplied
-    by b_inds.
-
-    Parameters
-    ----------
-    yarpecules: list of yarpecules
-                This list holds the yarpecules that should be reacted. 
-
-    b_inds: list of indices
-            This holds the index of the bond_mat that the user wants the return the bond orders for. 
-            By default the first bond_mat is used. 
-    """
-    # Wrap yarpecules in a list if only one is supplied
-    yarpecules = prepare_list(yarpecules)
-
-    # Use the first bond_mat if no indices are supplied
-    if len(b_inds) != len(yarpecules):
-        b_inds = [0 for _ in range(len(yarpecules))]
-
-    # tuple holds: bond between atoms i and j, with their hashes, and the bond order taken from the bond_mat at the index supplied by b_inds. This list of bonds is returned for each yarpecule.
-    return [[(count_i, j, y._atom_hashes[count_i], y._atom_hashes[j], y.lewis.bond_mats[b_inds[count_y]][count_i][j]) for count_i, i in enumerate(return_adjlist(y)) for j in i if count_i <= j] for count_y, y in enumerate(yarpecules)]
-
-
-# GRAB THE BETTER ONE FROM UTILS
-def return_adjlist(yarpecule):
-    return [np.where(i)[0].tolist() for count_i, i in enumerate(yarpecule.adj_mat)]
-
-# def unique_set_partition_generator_old(lst, n):
-#     """
-#     This function returns the unique choose n groupings of the elements of lst. The returned groupings
-#     are not distinguishable by ordering within grouping or the ordering of groupings. For example,
-#     is lst = [1,2,3,4] and n=2, then [(1,2),(3,4)], [(2,1),(4,3)], and [(3,4),(1,2)] would all be considered
-#     the same subgroupings. This function is used to generate all possible groupings of atoms that can form
-#     bonds, so a (1,2) bond is the same as a (2,1) bond and a [(1,2),(3,4)] pair of bonds is the same as a
-#     [(3,4),(1,2)] pair of bonds, etc.
-
-#     Parameters
-#     ----------
-#     lst: list of elements
-#          for efficiency gains the algorithm assumes that the list is sortable.
-
-#     n: float
-#          The number of elements per subgroup
-
-#     Returns
-#     -------
-#     groupings: lst of frozensets
-#          The list of unique unordered groupings is returned in its totality after a recursion. Each grouping is
-#          stored as a frozenset which is used because a hashable set is needed in the algorithm.
-#     """
-
-#     # Return empty list if lst cannot be evenly divided into groups of size n
-#     if len(lst) % n != 0:
-#         return []
-
-#     lst = sorted(lst)
-#     total_groupings = []
-
-#     # Recursive helper function to generate unique groupings
-#     def helper(available_elements, current_partition):
-#         # Base case: if no elements are left, add the current partition to total groupings
-#         if not available_elements:
-#             total_groupings.append(current_partition)
-#             return
-
-#         # Always pick the first element to enforce ordering and avoid duplicates
-#         first_element = available_elements[0]
-#         rest_elements = available_elements[1:]
-
-#         # Generate all combinations of size n-1 from the remaining elements
-#         for comb in combinations(rest_elements, n - 1):
-#             # Form a group by combining the first element with the current combination
-#             group = frozenset([first_element] + list(comb))
-#             # Determine the elements that haven't been grouped yet
-#             remaining_elements = [e for e in rest_elements if e not in comb]
-
-#             # Recursively build groupings with the remaining elements
-#             helper(remaining_elements, current_partition + [group])
-
-#     # Start the recursive process with the full list and an empty partition
-#     helper(lst, [])
-
-#     # Remove duplicates by converting partitions to a sorted tuple of sorted frozensets
-#     unique_groupings_set = set()
-#     for partition in total_groupings:
-#         # Sort groups within the partition and convert them to tuples for hashability
-#         sorted_partition = tuple(sorted([tuple(sorted(group)) for group in partition]))
-#         unique_groupings_set.add(sorted_partition)
-
-#     # Convert back to the desired output format (list of frozensets)
-#     return [list(map(frozenset, grouping)) for grouping in unique_groupings_set]
-
-
-def return_radicals(y, all_bmats=False):
-    """
-    Returns the indices of the atoms that are radicals in the yarpecule.
-    if all_bmats is True then all bond electron matrices are considered else only the first one
-    """
-    if all_bmats:
-        return set([i for bmat in y.lewis.bond_mats for i in range(len(bmat)) if bmat[i][i] % 2 == 1])
-    else:
-        return set([i for i in range(len(y.lewis.bond_mats[0])) if y.lewis.bond_mats[0][i][i] % 2 == 1])
-
-
-def add_bonds(bond_mat, bonds, val=1):
-    """
-    Helper function for bnfn. Modifies the bond_mat in place.
-
-    Parameters
-    ----------
-    bond_mat : numpy array or nested list
-        2D bond matrix to modify
-    bonds : iterable of sequences
-        Each bond should be indexable (list, tuple, etc.) with at least 2 elements
-    val : int or float
-        Value to add to bond matrix elements
-    """
-    for b in bonds:
-        bond_mat[b[0]][b[1]] += val
-        bond_mat[b[1]][b[0]] += val
-    return bond_mat
-
-
-def return_formals(bond_mat, elements):
-    """
-    Returns returns the formal charge on each atom. SHOULD BE IN LEWIS
-
-    Parameters
-    ----------
-    bond_mat : array
-               A numpy array containing bond-orders in off-diagonal positions and unbound electrons along the diagonal.
-               This array is indexed to the elements list. 
-
-    elements : list 
-               Contains elemental information indexed to the supplied adjacency matrix. 
-               Expects a list of lower-case elemental symbols.
-
-    Returns
-    -------
-    formals: array
-             Contains the formal charge for each atom. This array is indexed to the bond-electron matrix.
-
-    """
-    return np.array([el_valence[_] for _ in elements]) - np.sum(bond_mat, axis=1)

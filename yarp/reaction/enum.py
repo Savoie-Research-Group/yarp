@@ -11,7 +11,18 @@ from typing import Iterable, Tuple
 from yarp.yarpecule.lewis.bem_score import return_formals
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.misc import prepare_list, merge_arrays
-from yarp.reaction.enum_support import apply_legacy_shared_atom_b2f2,legacy_shared_atom_b2f2_changes,return_radicals,return_bondtypes,unique_set_partition_generator,add_bonds, _reactive_maps_from_react,_resolve_reactive_atoms_for_candidate, atom_map_to_local_index
+
+
+from yarp.reaction.enum_support import (
+    apply_legacy_shared_atom_b2f2,
+    legacy_shared_atom_b2f2_changes,
+    return_radicals,
+    return_bondtypes,
+    unique_set_partition_generator,
+    add_bonds,
+    _reactive_maps_from_react,
+    _resolve_reactive_atoms_for_candidate
+)
 
 
 def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
@@ -180,12 +191,11 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                             y.q,
                             {
                                 i: {
-                                    **dict(y._atom_info[i]),
-                                    "atom_index": i,
+                                    **dict(y.atom_info[i]),
                                     "formal_charge": None,
                                     "stereo": {"atom": None, "bonds": {}},
                                 }
-                                for i in y._atom_info
+                                for i in y.atom_info
                             },
                         ), canon=False)
                         if product.hash not in hashes:
@@ -209,12 +219,11 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                             y.q,
                             {
                                 i: {
-                                    **dict(y._atom_info[i]),
-                                    "atom_index": i,
+                                    **dict(y.atom_info[i]),
                                     "formal_charge": None,
                                     "stereo": {"atom": None, "bonds": {}},
                                 }
-                                for i in y._atom_info
+                                for i in y.atom_info
                             },
                         ), canon=False)
                         if product.hash not in hashes:
@@ -249,8 +258,7 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     for _, yp in [c[0], c[1]]:
                                         for i in range(len(yp.elements)):
                                             atom_info[offset + i] = {
-                                                **dict(yp._atom_info[i]),
-                                                "atom_index": offset + i,
+                                                **dict(yp.atom_info[i]),
                                                 "formal_charge": None,
                                                 "stereo": {"atom": None, "bonds": {}},
                                             }
@@ -274,8 +282,7 @@ def form_bonds(yarpecules,react=[],hashes=None,inter=False,intra=True,def_only=F
                                     for _, yp in [c[0], c[1]]:
                                         for i in range(len(yp.elements)):
                                             atom_info[offset + i] = {
-                                                **dict(yp._atom_info[i]),
-                                                "atom_index": offset + i,
+                                                **dict(yp.atom_info[i]),
                                                 "formal_charge": None,
                                                 "stereo": {"atom": None, "bonds": {}},
                                             }
@@ -480,12 +487,11 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     y.q,
                     {
                         i: {
-                            **dict(y._atom_info[i]),
-                            "atom_index": i,
+                            **dict(y.atom_info[i]),
                             "formal_charge": None,
                             "stereo": {"atom": None, "bonds": {}},
                         }
-                        for i in y._atom_info
+                        for i in y.atom_info
                     },
                 ), canon=False)
                 # Catch redundancies
@@ -689,12 +695,11 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                     y.q,
                     {
                         i: {
-                            **dict(y._atom_info[i]),
-                            "atom_index": i,
+                            **dict(y.atom_info[i]),
                             "formal_charge": None,
                             "stereo": {"atom": None, "bonds": {}},
                         }
-                        for i in y._atom_info
+                        for i in y.atom_info
                     },
                 ), canon=False)
 

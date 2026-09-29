@@ -1,7 +1,10 @@
 """
 Helper functions related to hash objects associated with determining unique atoms and yarpecules
 """
+from math import fsum
+
 import numpy as np
+
 
 def atom_hash(ind, adj_mat, masses, alpha=100.0, beta=0.1, gens=10):
     """
@@ -143,28 +146,22 @@ def yarpecule_hash(y):
 
 
 def reaction_hash(rxn):
-    """
-    Creates a unique hash value for the reaction object based on the sum of reactant/product
-    yarpecule hashes and the hash of the summed BEM difference matrix.
+    """Hash a reaction whose product was aligned during construction.
 
-    Parameters
-    ----------
-    y : reaction
-        This is the reaction instance that the hash is being calculated for.
-
-    Returns
-    -------
-    hash_value: float
+    Sum all endpoint resonance BEMs and atom hashes in their shared index
+    order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
     """
 
-    r_bem_sum = np.zeros_like(rxn.reactant.bond_mats[0])
-    for rmat in rxn.reactant.bond_mats:
-        r_bem_sum += rmat
-
-    p_bem_sum = np.zeros_like(rxn.product.bond_mats[0])
-    for pmat in rxn.product.bond_mats:
-        p_bem_sum += pmat
-
-    diff_bem = r_bem_sum - p_bem_sum
-
-    return rxn.reactant.hash + rxn.product.hash + bmat_hash(diff_bem)
+    #Combine all endpoint BEMs into a single matrix, then sum them to get a single BEM for the reaction
+    combined_bems = list(rxn.reactant.graph.bond_mats)
+    combined_bems.extend(rxn.product.graph.bond_mats)
+    rxn_bem = np.zeros_like(combined_bems[0])
+    for mat in combined_bems:
+        rxn_bem += mat
+        
+    #Combine all atom hashes from the reactant and product into a single array, then apply the same scalar algebra as ``yarpecule_hash`` directly.
+    atom_hashes = (
+        np.asarray(rxn.reactant.graph.atom_hashes)
+        + np.asarray(rxn.product.graph.atom_hashes)
+    )
+    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((rxn_bem*np.outer(atom_hashes, atom_hashes)).flat), 7)

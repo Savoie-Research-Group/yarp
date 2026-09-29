@@ -109,7 +109,6 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 element_label = element_label_match.group(1)
                 stereo_atom = '@@' if '@@' in token else '@' if '@' in token else None
                 atom_info[atom_counter] = {
-                    "atom_index": atom_counter,
                     "atom_map": atom_mapping,
                     "element": element_label.lower(),
                     "formal_charge": int(formal_charge),
@@ -130,7 +129,6 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
 
         elif re.match(smiles2adjmat.atom_pattern, token):
             atom_info[atom_counter] = {
-                "atom_index": atom_counter,
                 "atom_map": None,
                 "element": token.lower(),
                 "formal_charge": 0,
@@ -554,7 +552,6 @@ def add_hydrogens(adjmat, atom_info, atom_parse_meta):
         for _ in range(num_hydrogens):
             new_adjmat[i, current_index] = new_adjmat[current_index, i] = 1
             atom_info[current_index] = {
-                "atom_index": current_index,
                 "atom_map": None,
                 "element": "h",
                 "formal_charge": 0,
@@ -596,7 +593,6 @@ def reorder_by_mappings(adjmat, atom_info):
     ordered_atom_info = {}
     for new_idx, old_idx in enumerate(idx):
         record = dict(atom_info[old_idx])
-        record["atom_index"] = new_idx
         ordered_atom_info[new_idx] = record
 
     return ordered_adjmat, ordered_atom_info

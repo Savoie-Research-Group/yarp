@@ -116,7 +116,7 @@ class TestJoinYarpecules:
         assert adj[1, 5] == 1
         assert adj[1, 6] == 0
 
-        joined_maps = [joined._atom_info[i]["atom_map"] for i in joined._atom_info]
+        joined_maps = [joined.atom_info[i]["atom_map"] for i in joined.atom_info]
         assert len(joined_maps) == len(set(joined_maps))
         assert adj[1, 7] == 0
         assert adj[1, 8] == 0

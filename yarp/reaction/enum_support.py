@@ -141,7 +141,7 @@ def atom_map_to_local_index(yarp_like):
     Return {atom_map: local_index} for a yarpecule and reject duplicate maps.
     """
     by_map = {}
-    for local_idx, info in yarp_like._atom_info.items():
+    for local_idx, info in yarp_like.atom_info.items():
         atom_map = info.get("atom_map")
         if atom_map is None:
             continue
@@ -224,6 +224,7 @@ def return_bondtypes(yarpecules, b_inds=[]):
 
     # tuple holds: bond between atoms i and j, with their hashes, and the bond order taken from the bond_mat at the index supplied by b_inds. This list of bonds is returned for each yarpecule.
     return [[(count_i, j, y._atom_hashes[count_i], y._atom_hashes[j], y.lewis.bond_mats[b_inds[count_y]][count_i][j]) for count_i, i in enumerate(return_adjlist(y)) for j in i if count_i <= j] for count_y, y in enumerate(yarpecules)]
+
 def unique_set_partition_generator(seq: Iterable, group_size: int):
     """
     Yield all unique partitions of `seq` into groups of `group_size`.

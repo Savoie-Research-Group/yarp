@@ -61,6 +61,9 @@ def generate_rxns(inp):
                 # index-aligned. Relaxing them is the xTB pre-optimization's
                 # job now, at the conformer stage.
                 r2p = reaction(reactant, prod)
+                if r2p.hash in output:
+                    print(f"Skipping duplicate reaction hash {r2p.hash}; keeping the first reaction.")
+                    continue
                 output[r2p.hash] = r2p
 
         # Enumerating from reaction object(s)
@@ -94,7 +97,16 @@ def generate_rxns(inp):
             else:
                 raise RuntimeError("We can only start from a YARP pickle file, a reaction xyz file, a directory of reaction xyz files, or a mapped reaction SMILES file currently, sorry friend!")
 
-            og_rxns_hash = set(og_rxns.keys())
+            # Pickles may contain string, numeric, or mixed hash keys.
+            original = {}
+            for key, rxn in og_rxns.items():
+                hash_key = str(key)
+                if hash_key in original:
+                    print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
+                    continue
+                original[hash_key] = rxn
+            og_rxns = original
+            og_rxns_hash = set(og_rxns)
 
             candidates = filter_enum_candidates(
                 og_rxns, separate_prods=inp.enum.pre_enum_filters.separate_prods,
@@ -126,12 +138,13 @@ def generate_rxns(inp):
                     # See the note in the 'species' branch above: geometry
                     # relaxation has moved to the xTB pre-optimization.
                     r2p = reaction(mol, prod)
-                    p2r = reaction(prod, mol)
+                    hash_key = str(r2p.hash)
 
-                    # Skip reactions already discovered (forward/reverse)
-                    if r2p.hash in og_rxns_hash or p2r.hash in og_rxns_hash:
+                    # The hash is directionless; keep the first existing or new record.
+                    if hash_key in og_rxns_hash or hash_key in new_rxns:
+                        print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
                         continue
-                    new_rxns[r2p.hash] = r2p
+                    new_rxns[hash_key] = r2p
             
             output = og_rxns | new_rxns
 

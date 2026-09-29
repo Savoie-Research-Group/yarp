@@ -77,7 +77,6 @@ CLASS_SCHEMA_GUARDRAIL = {
             "_adj_mat",
             "_atom_hashes",
             "_atom_info",
-            "_mapping",
             "_lewis_struct",
             "_bond_order_dict",
             "_yarpecule_hash",
@@ -297,11 +296,18 @@ def _extract_yarpecule_core(yp):
     geo = _get_attr_any(yp, "_geo", "geo")
     elements = _get_attr_any(yp, "_elements", "elements")
     charge = _get_attr_any(yp, "_q", "q")
+    atom_info = _get_attr_any(yp, "_atom_info", "atom_info")
 
     if adj is None or geo is None or elements is None or charge is None:
         return None
 
-    return deepcopy(adj), deepcopy(geo), list(elements), int(charge)
+    return (
+        deepcopy(adj),
+        deepcopy(geo),
+        list(elements),
+        int(charge),
+        deepcopy(atom_info) if atom_info is not None else {},
+    )
 
 
 def _rebuild_yarpecule(old_yp, memo, stats):
@@ -323,6 +329,7 @@ def _rebuild_yarpecule(old_yp, memo, stats):
         "_q",
         "_masses",
         "_atom_hashes",
+        "_atom_info",
         "_mapping",
         "_lewis_struct",
         "_bond_order_dict",
@@ -434,6 +441,7 @@ def _rebuild_reaction(old_rxn, memo, stats):
     if reactant_inchi and product_inchi:
         new_rxn.id = f"{reactant_inchi}_to_{product_inchi}"
 
+    new_rxn._validate_reaction()
     try:
         hash_mod = _load_hash_module()
         new_rxn.hash = hash_mod.reaction_hash(new_rxn)

@@ -230,7 +230,7 @@ def _reaction_hash_cases(filename, expected_count):
     source = Path(__file__).parent / "pickles" / filename
     with source.open("rb") as stream:
         payload = pickle.load(stream)
-    assert payload["version"] == 1
+    assert payload["version"] == 2
     cases = payload["cases"]
     assert len(cases) == expected_count
     return cases

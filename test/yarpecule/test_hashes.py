@@ -2,7 +2,6 @@
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
 from importlib import import_module
-from copy import deepcopy
 from math import fsum
 from types import SimpleNamespace
 
@@ -157,17 +156,13 @@ class TestRxnHash:
             mapped_reaction = reaction(reactant, product)
         assert isinstance(mapped_reaction.hash, float)
 
-    def test_direct_rehash_revalidates_changed_maps(self):
-        """An existing reaction cannot be rehashed after its maps become ambiguous."""
-        mapped_reaction = reaction(
-            yarpecule("[C:0][O:1]", canon=False),
-            yarpecule("[C:0][O:1]", canon=False),
-        )
-        for graph in (mapped_reaction.reactant.graph, mapped_reaction.product.graph):
-            graph._atom_info[1]["atom_map"] = 0
-
-        with pytest.raises(ValueError, match="identical unique atom-map sets"):
-            reaction_hash(mapped_reaction)
+    def test_reaction_construction_rejects_duplicate_maps(self):
+        """An ambiguous endpoint is rejected before its reaction is hashed."""
+        reactant = yarpecule("[C:0][O:1]", canon=False)
+        product = yarpecule("[C:0][O:1]", canon=False)
+        product._atom_info[1]["atom_map"] = 0
+        with pytest.raises(ValueError, match="Duplicate atom-map indices"):
+            reaction(reactant, product)
 
     def test_reaction_rejects_missing_maps(self):
         reactant = yarpecule("[C:0][O:1]", canon=False)
@@ -260,19 +255,6 @@ class TestRxnHash:
         assert rxn1.hash == rxn2.hash
 
 
-def remap_product(rxn, permutation):
-    """Change product correspondences while keeping both endpoint graphs intact."""
-    variant = deepcopy(rxn)
-    anchor = variant.reactant.graph
-    other = variant.product.graph
-    maps = [anchor.atom_info[i]["atom_map"] for i in range(len(anchor.elements))]
-    by_map = {atom_map: i for i, atom_map in enumerate(maps)}
-    for i in range(len(other.elements)):
-        old_map = other.atom_info[i]["atom_map"]
-        other._atom_info[i]["atom_map"] = maps[permutation[by_map[old_map]]]
-    return variant
-
-
 def reaction_graph(rxn):
     """Independent element/mass/BEM graph oracle, without stereo information."""
     reactant = rxn.reactant.graph
@@ -321,10 +303,11 @@ class TestReactionHashCorpus:
     )
     def test_symmetry_equivalents_share_hash(self, case_index, reaction_hash_symmetry_cases):
         """Symmetry-equivalent correspondences must deduplicate."""
-        original, permutation = reaction_hash_symmetry_cases[case_index]
-        variant = remap_product(original, permutation)
+        original, variant = reaction_hash_symmetry_cases[case_index]
         assert isomorphic(original, variant)
-        assert reaction_hash(original) == reaction_hash(variant)
+        assert original.hash == reaction_hash(original)
+        assert variant.hash == reaction_hash(variant)
+        assert original.hash == variant.hash
 
     @pytest.mark.parametrize(
         "case_index", range(100), ids=[f"nonisomorphic-{i:03d}" for i in range(100)]
@@ -333,21 +316,21 @@ class TestReactionHashCorpus:
         self, case_index, reaction_hash_nonisomorphic_cases
     ):
         """Distinct mapped transformations must retain separate hashes."""
-        original, left, right = reaction_hash_nonisomorphic_cases[case_index]
-        permutation = list(range(len(original.reactant.graph.elements)))
-        permutation[left], permutation[right] = permutation[right], permutation[left]
-        variant = remap_product(original, permutation)
+        original, variant = reaction_hash_nonisomorphic_cases[case_index]
         assert not isomorphic(original, variant)
-        assert reaction_hash(original) != reaction_hash(variant)
+        assert original.hash == reaction_hash(original)
+        assert variant.hash == reaction_hash(variant)
+        assert original.hash != variant.hash
 
     @pytest.mark.parametrize(
         "case_index", range(100), ids=[f"direction-{i:03d}" for i in range(100)]
     )
     def test_forward_reverse_share_hash(self, case_index, reaction_hash_direction_cases):
         """Forward and reverse forms of one transformation share a hash."""
-        forward = reaction_hash_direction_cases[case_index]
-        reverse = SimpleNamespace(reactant=forward.product, product=forward.reactant)
-        assert reaction_hash(forward) == reaction_hash(reverse)
+        forward, reverse = reaction_hash_direction_cases[case_index]
+        assert forward.hash == reaction_hash(forward)
+        assert reverse.hash == reaction_hash(reverse)
+        assert forward.hash == reverse.hash
 
     @pytest.mark.parametrize(
         "case_index", range(5), ids=[f"network-reverse-{i:02d}" for i in range(5)]
@@ -359,7 +342,9 @@ class TestReactionHashCorpus:
         first, later = reaction_hash_network_reverse_cases[case_index]
         reversed_later = SimpleNamespace(reactant=later.product, product=later.reactant)
         assert isomorphic(first, reversed_later)
-        assert reaction_hash(first) == reaction_hash(later)
+        assert first.hash == reaction_hash(first)
+        assert later.hash == reaction_hash(later)
+        assert first.hash == later.hash
 
 
 class TestBemSumHash:

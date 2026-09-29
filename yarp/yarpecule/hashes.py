@@ -152,12 +152,14 @@ def reaction_hash(rxn):
     order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
     """
 
+    #Combine all endpoint BEMs into a single matrix, then sum them to get a single BEM for the reaction
     combined_bems = list(rxn.reactant.graph.bond_mats)
     combined_bems.extend(rxn.product.graph.bond_mats)
-
     rxn_bem = np.zeros_like(combined_bems[0])
     for mat in combined_bems:
         rxn_bem += mat
+        
+    #Combine all atom hashes from the reactant and product into a single array, then apply the same scalar algebra as ``yarpecule_hash`` directly.
     atom_hashes = (
         np.asarray(rxn.reactant.graph.atom_hashes)
         + np.asarray(rxn.product.graph.atom_hashes)

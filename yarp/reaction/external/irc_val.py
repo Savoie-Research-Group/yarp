@@ -41,6 +41,19 @@ class IRCValTask(AsyncYarpCalculator):
         run_dirs = list(self.scratch_dir.glob("irc_run*"))
         return len(run_dirs)
 
+    def _initial_guesses(self) -> list:
+        """
+        The TS-opt conformers to validate, in the order they are written to
+        irc_run1..N.
+
+        Both `generate_input` and `scrape_data` must use this, so that irc_run{i}
+        maps back to the conformer it was started from. The conformer keys
+        (`{run}_tsopt_<lot>_<sw>`) can't be used for that: they carry the TS-opt
+        run index, which has gaps wherever a TS optimization failed.
+        """
+        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
+        return [conf for k, conf in self.rxn.ts_geom.items() if expected_key in k]
+
     def _get_rxn_label(self, forward, backward):
         """
         Classify a given IRC outcome based on how forward/backward
@@ -153,12 +166,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
         self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
-        initial_guesses = []
-        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
-        
-        for k in self.rxn.ts_geom.keys():
-            if expected_key in k: 
-                initial_guesses.append(self.rxn.ts_geom[k])
+        initial_guesses = self._initial_guesses()
 
         # Write inputs for each guess
         for i, conf in enumerate(initial_guesses):
@@ -257,6 +265,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
 
     def scrape_data(self) -> bool:
         # Pull out barriers and outcome labels for all IRC runs
+        initial_guesses = self._initial_guesses()
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
@@ -286,8 +295,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
                 lhs = f_barrier
                 rhs= b_barrier
 
-            target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
-            target_ts = self.rxn.ts_geom.get(target_ts_key, None)
+            target_ts = initial_guesses[i - 1]
             irc_runs[i] = {
                 "outcome": irc_outcome,
                 "ts_geom": target_ts,
@@ -384,12 +392,7 @@ class OrcaIRCValCalculator(IRCValTask):
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):
-        initial_guesses = []
-        expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
-        
-        for k in self.rxn.ts_geom.keys():
-            if expected_key in k: 
-                initial_guesses.append(self.rxn.ts_geom[k])
+        initial_guesses = self._initial_guesses()
 
         # Write inputs for each guess
         for i, conf in enumerate(initial_guesses):
@@ -490,6 +493,7 @@ class OrcaIRCValCalculator(IRCValTask):
         gibbs_r = self.rxn.reactant.conformers[expected_rp].properties['gibbs_free_energy_kcal_per_mol']
         gibbs_p = self.rxn.product.conformers[expected_rp].properties['gibbs_free_energy_kcal_per_mol']
 
+        initial_guesses = self._initial_guesses()
         irc_runs = dict()
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
@@ -499,8 +503,7 @@ class OrcaIRCValCalculator(IRCValTask):
 
             run_dir = self.scratch_dir / f"irc_run{i}"
 
-            target_ts_key = f'{i}' + "_tsopt_" + f'{self.config.lot}_{self.config.software}'
-            target_ts = self.rxn.ts_geom.get(target_ts_key, None)
+            target_ts = initial_guesses[i - 1]
             gibbs_ts = target_ts.properties['gibbs_free_energy_kcal_per_mol']
             f_barrier = gibbs_ts - gibbs_r
             b_barrier = gibbs_ts - gibbs_p

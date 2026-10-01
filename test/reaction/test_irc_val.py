@@ -27,9 +27,15 @@ R_GEO = np.array([[0.0, 0, 0], [0.74, 0, 0], [3.74, 0, 0]])
 P_GEO = np.array([[0.0, 0, 0], [3.0, 0, 0], [3.74, 0, 0]])
 
 
-def make_rxn(lot, software, tsopt_runs):
+ONE_IMAG = np.array([-500.0, 100.0, 200.0])
+NO_IMAG = np.array([50.0, 100.0, 200.0])
+TWO_IMAG = np.array([-500.0, -80.0, 200.0])
+
+
+def make_rxn(lot, software, tsopt_runs, freqs=None):
     """Stub reaction holding TS-opt conformers for the given TS-opt run indices.
-    Conformer k is tagged by x(atom 0) = 10*k and G(TS) = k kcal/mol."""
+    Conformer k is tagged by x(atom 0) = 10*k and G(TS) = k kcal/mol. Each is a
+    valid saddle (one imaginary freq) unless `freqs` gives it other ones."""
     def species(geo):
         conf = conformer()
         conf.elements, conf.geo = list(ELEMENTS), geo.copy()
@@ -43,7 +49,7 @@ def make_rxn(lot, software, tsopt_runs):
         conf = conformer()
         conf.elements = list(ELEMENTS)
         conf.geo = np.array([[10.0 * k, 0, 0], [1.5, 0, 0], [2.5, 0, 0]])
-        conf.vibrational_freqs = np.array([-500.0, 100.0, 200.0])
+        conf.vibrational_freqs = (freqs or {}).get(k, ONE_IMAG).copy()
         conf.properties["gibbs_free_energy_kcal_per_mol"] = float(k)
         conf.type = f"{k}_tsopt_{lot}_{software}"
         rxn.ts_geom[conf.type] = conf
@@ -59,10 +65,10 @@ def tag_of(geo):
     return int(round(geo[0][0] / 10.0))
 
 
-def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path):
+def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None):
     """generate_input -> fabricated successful outputs -> scrape_data.
     Returns the reaction and, per IRC run, the TS-opt index it was fed."""
-    rxn = make_rxn(lot, software, tsopt_runs)
+    rxn = make_rxn(lot, software, tsopt_runs, freqs)
     cfg = IRCValConfig(software=software, lot=lot, charge=0, multiplicity=1)
     calc = cls(SimpleNamespace(config=cfg), rxn, MagicMock(container="docker"))
     calc.set_scratch_dir(tmp_path)
@@ -139,3 +145,26 @@ class TestIRCPairsResultWithItsTS:
 
         irc_runs = spy.call_args.args[1]
         assert {i: tag_of(d["ts_geom"].geo) for i, d in irc_runs.items()} == fed
+
+
+class TestIRCSkipsNonSaddles:
+    """
+    IRC validates only TS-opt results that are first-order saddle points. It
+    used to need just one valid TS to start, then ran every TS-opt result --
+    so a minimum or a higher-order saddle could be run and even become the
+    validated TS.
+    """
+
+    def test_only_valid_saddles_are_run(self, tmp_path):
+        rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2, 3],
+                           pysis_outputs, tmp_path, freqs={1: NO_IMAG, 3: TWO_IMAG})
+
+        assert list(fed.values()) == [2]
+
+    def test_non_saddle_is_never_the_validated_ts(self, tmp_path):
+        # TS-opt result 1 is a minimum. Run through IRC it would be irc_run1,
+        # whose fabricated barrier is the lowest, so it would win.
+        rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2],
+                           pysis_outputs, tmp_path, freqs={1: NO_IMAG})
+
+        assert tag_of(rxn.ts_geom["validated_ts_xtb_pysisyphus"].geo) == 2

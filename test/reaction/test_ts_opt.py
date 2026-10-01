@@ -102,8 +102,7 @@ class TestTSOptSource:
             "2_tsopt_xtb_pysisyphus": ts_conf(2, "2_tsopt_xtb_pysisyphus", TWO_IMAG),
             "1_tsopt_B3LYP def2-SVP_orca": ts_conf(70, "1_tsopt_B3LYP def2-SVP_orca", ONE_IMAG),
         }
-        # IRC runs on every TS opt, saddle point or not, so it can validate one
-        # that isn't. That structure must not count as a starting TS.
+        # IRC should never be performed on a TS that is not a 1st order saddle point
         ts_geom["validated_ts_xtb_pysisyphus"] = ts_geom["1_tsopt_xtb_pysisyphus"]
 
         assert not make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()

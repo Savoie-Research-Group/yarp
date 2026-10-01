@@ -1,9 +1,13 @@
 import shutil
 from pathlib import Path
 
+from rdkit import Chem
+
 from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.yarpecule.input_parsers import xyz_parse
+from yarp.yarpecule.graph.adjacency import compare_adjacency
 from yarp.reaction.conformer import conformer
+from yarp.util.rdkit import yarpecule_to_rdmol
 
 # Conformer key prefix written by the xTB pre-optimization.
 PREOPT_PREFIX = "preopt"
@@ -283,3 +287,155 @@ class CrestConfCalculator(ConfTask):
             confs.append(conf)
 
         return confs
+
+
+class RdkitConfCalculator(ConfTask):
+    """
+    RDKit ETKDG conformer generation, ported from classy_yarp's conf_rdkit().
+
+    The embedding and force-field optimization run in the rdkit_conf container
+    (containers/rdkit_conf/run_conf_gen.py), which writes every conformer
+    lowest energy first. The connectivity filter classy_yarp applied runs here,
+    on the host, in scrape_data.
+    """
+
+    TERMINATION_MSG = "RDKit conformer generation terminated normally."
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_name = "erm42/yarp:rdkit_conf"
+        self.mol_file = "input.mol"
+
+    def generate_input(self):
+        """
+        Write the state's graph as a MOL file for the container to embed.
+
+        The mol comes straight from yarpecule_to_rdmol, so RDKit receives the
+        yarpecule's own bonding, charges and radicals rather than re-deriving
+        them. The pre-optimized geometry is attached for stereo perception;
+        EmbedMultipleConfs discards it when it embeds.
+        """
+        initial_conf = self.preopt_conformer()
+        if initial_conf is None:
+            raise CalculatorInputError(
+                f"No '{PREOPT_PREFIX}_*' conformer on the "
+                f"{'reactant' if 'reactant' in self.task_def.task_type else 'product'}; "
+                "the xTB pre-optimization has not produced a geometry for this species."
+            )
+
+        graph = self.target_species.graph
+        mol = yarpecule_to_rdmol(
+            elements=graph.elements,
+            adj=graph.adj_mat,
+            bond_orders=graph.bond_mats[0],
+            atom_info=graph._atom_info,
+            geo=initial_conf.geo,
+        )
+        Chem.MolToMolFile(mol, str(self.scratch_dir / self.mol_file))
+
+    def write_submission_script(self) -> Path:
+        """Write the bash script that the JobManager will execute."""
+        script_path = self.scratch_dir / "run_rdkit_cmd.sh"
+
+        # The image's entrypoint is run_conf_gen.py, so only its arguments follow.
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir, apptainer_run=True)
+        args = (
+            f"{self.mol_file} --lot {self.config.lot} --n_conf {self.config.n_conf} "
+            f"--prune_rms_thresh {self.config.prune_rms_thresh} --n_threads {self.config.n_cpus}"
+        )
+        if self.config.seed is not None:
+            args += f" --seed {self.config.seed}"
+
+        try:
+            with open(script_path, "w") as f:
+                f.write("#!/bin/bash\n")
+                self.write_scheduler_headers(f)
+                f.write(f"cd {self.scratch_dir}\n")
+                f.write(f"{prefix} {args} > rdkit_run.log 2> rdkit_run.err\n")
+        except PermissionError:
+            raise PermissionError(
+                f"Cannot write submission script to {script_path}. "
+                f"Delete the SCRATCH directory and try again."
+            )
+
+        script_path.chmod(0o755)
+
+        return script_path
+
+    def check_output(self) -> bool:
+        """Verify the container finished and wrote its conformers."""
+        xyz_exists = (self.scratch_dir / "rdkit_conformers.xyz").exists()
+        energies_exists = (self.scratch_dir / "rdkit.energies").exists()
+
+        outfile = self.scratch_dir / "rdkit_run.log"
+        terminated = outfile.exists() and self.TERMINATION_MSG in outfile.read_text(encoding="utf-8")
+
+        if xyz_exists and energies_exists and terminated:
+            return True
+
+        reasons = []
+        if not xyz_exists:
+            reasons.append("missing rdkit_conformers.xyz")
+        if not energies_exists:
+            reasons.append("missing rdkit.energies")
+        if not terminated:
+            reasons.append(f"'{self.TERMINATION_MSG}' not found in rdkit_run.log")
+        print(f"     [RDKit] Output validation failed: {'; '.join(reasons)}")
+
+        # The script exits with a reason on stderr (no conformers embedded, no
+        # force-field parameters, ...), alongside any container errors.
+        errfile = self.scratch_dir / "rdkit_run.err"
+        if errfile.exists():
+            err_lines = errfile.read_text(encoding="utf-8").splitlines()
+            if err_lines:
+                print(f"     [RDKit] Last lines of rdkit_run.err:")
+                for line in err_lines[-10:]:
+                    print(f"       {line}")
+        return False
+
+    def scrape_data(self) -> bool:
+        """
+        Keep the conformers that reproduce the state's bonding, ranked by energy.
+
+        classy_yarp's connectivity filter: perceive bonds from each geometry and
+        drop any conformer that differs from the yarpecule graph. The container
+        already wrote them lowest energy first, so survivors are ranked in file
+        order.
+        """
+        graph = self.target_species.graph
+        elements, geometries = xyz_parse(self.scratch_dir / "rdkit_conformers.xyz", multiple=True)
+
+        rank = 0
+        for conf_elements, geo in zip(elements, geometries):
+            if not compare_adjacency(graph.elements, geo, graph.adj_mat)[0]:
+                continue
+            conf_obj = conformer(calc_type='conf_gen', calc_data={
+                'conf_rank': rank,
+                'elements': conf_elements,
+                'geometry': geo,
+                'lot': self.config.lot,
+                'software': 'rdkit',
+            })
+            self.target_species.conformers[conf_obj.type] = conf_obj
+            rank += 1
+
+        n_dropped = len(geometries) - rank
+        if n_dropped:
+            print(f"     [RDKit] Dropped {n_dropped} of {len(geometries)} conformers that "
+                  f"did not reproduce the {'reactant' if 'reactant' in self.task_def.task_type else 'product'} bonding.")
+        if rank == 0:
+            print("     [RDKit] No conformer reproduced the state's bonding.")
+            return False
+
+        return True
+
+    def cleanup(self):
+        """Keep inputs, outputs and logs; remove anything else in scratch."""
+        keep = {self.mol_file, "rdkit_conformers.xyz", "rdkit.energies",
+                "rdkit_run.log", "rdkit_run.err", "run_rdkit_cmd.sh"}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)

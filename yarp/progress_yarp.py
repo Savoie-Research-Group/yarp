@@ -404,7 +404,10 @@ def progress_yarp(work_dir: Path):
                                 # Access the saved label safely
                                 outcome = getattr(rxn_obj, 'outcome_label', {}).get(outcome_key)
 
-                                if outcome not in ["intended", "inverse_intended"]:
+                                unintended = outcome not in ["intended", "inverse_intended"]
+                                if unintended and not task_def.config.divert_unintended:
+                                    print(f"   * [{rxn_hash}] \tIRC outcome '{outcome}'; keeping reaction (divert_unintended is off).")
+                                elif unintended:
                                     meta["status"] = "filtered_out"
                                     meta["error_log"] = f"IRC validation failed: Outcome was '{outcome}'."
 

@@ -566,8 +566,9 @@ class InputParser:
                 
             elif task_def.task_type == "transition_state_optimization":
                 source = ig.transition_state
-                # CRITICAL: If the user requests 'ts_opt', we must wait for the IRC task 
-                # of that refinement layer, because IRC produces the validated_ts dict!
+                # If the user requests 'ts_opt', wait for the IRC task of that
+                # refinement layer: it is the layer's last step, so this also
+                # waits for every TS optimization the next layer starts from.
                 target_type = "ts_guess" if source.label == "ts_guess" else "irc_validation"
                 
             else:

@@ -56,8 +56,8 @@ def written_tags(calc, tmp_path, prefix="ts_guess"):
 def xtb_refined_rxn():
     """
     ts_geom as it stands after an xTB refine stage: TS-opt run 2 failed (gap),
-    run 4 converged to a minimum, run 5 to a second-order saddle; IRC validated
-    run 3. Plus GSM guesses and another level's TS opt that must not be picked up.
+    run 4 converged to a minimum, run 5 to a second-order saddle. Plus GSM
+    guesses and another level's TS opt that must not be picked up.
     """
     confs = [
         ts_conf(91, "ts_guess_1_xtb_pysisyphus", None),
@@ -69,9 +69,7 @@ def xtb_refined_rxn():
         ts_conf(6, "6_tsopt_xtb_pysisyphus", ONE_IMAG),
         ts_conf(70, "1_tsopt_B3LYP def2-SVP_orca", ONE_IMAG),
     ]
-    ts_geom = {c.type: c for c in confs}
-    ts_geom["validated_ts_xtb_pysisyphus"] = ts_geom["3_tsopt_xtb_pysisyphus"]  # IRC stores the same object
-    return ts_geom
+    return {c.type: c for c in confs}
 
 
 XTB_TS_OPT = GeomSourceConfig(label="ts_opt", lot="xtb", software="pysisyphus")
@@ -86,11 +84,6 @@ class TestTSOptSource:
         # order; 4 and 5 aren't saddles; 70 is another level; 91/92 are guesses.
         assert written_tags(calc, tmp_path) == [1, 3, 6]
 
-    def test_not_only_the_validated_ts(self, tmp_path):
-        calc = make_calc(OrcaTSOptCalculator, xtb_refined_rxn(), XTB_TS_OPT)
-
-        assert len(written_tags(calc, tmp_path)) > 1
-
     def test_ready_when_one_valid_ts_exists(self):
         ts_geom = {"2_tsopt_xtb_pysisyphus": ts_conf(2, "2_tsopt_xtb_pysisyphus", ONE_IMAG)}
 
@@ -102,8 +95,6 @@ class TestTSOptSource:
             "2_tsopt_xtb_pysisyphus": ts_conf(2, "2_tsopt_xtb_pysisyphus", TWO_IMAG),
             "1_tsopt_B3LYP def2-SVP_orca": ts_conf(70, "1_tsopt_B3LYP def2-SVP_orca", ONE_IMAG),
         }
-        # IRC should never be performed on a TS that is not a 1st order saddle point
-        ts_geom["validated_ts_xtb_pysisyphus"] = ts_geom["1_tsopt_xtb_pysisyphus"]
 
         assert not make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()
 

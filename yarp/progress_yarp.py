@@ -291,11 +291,9 @@ def progress_yarp(work_dir: Path):
 
                 # Check if IRC validation has been performed
                 elif task_type == "irc_validation":
-                    val_keys = [key for key in rxn_obj.ts_geom.keys() if "validated_ts" in key]
-                    val_check = any(desired_key in key for key in val_keys)
                     fbar_check = any(desired_key in key for key in rxn_obj.barrier.keys())
                     rbar_check = any(desired_key in key for key in rxn_obj.reverse_barrier.keys())
-                    if val_check and fbar_check and rbar_check:
+                    if fbar_check and rbar_check:
                         already_done = True
 
                 # Execute the fast-forward!

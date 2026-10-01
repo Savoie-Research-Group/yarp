@@ -86,3 +86,7 @@ Each new PR or project gets its own folder under `debug/`:
 
 - **Never edit anything under `tutorials/`,** not even a one-character fix. The
   tutorials are snapshots of past versions. Report problems instead.
+- **Name each test file after the source file it tests.** Tests for
+  `yarp/<pkg>/<module>.py` go in `test/<pkg>/test_<module>.py`; for example,
+  `irc_val.py` is tested in `test_irc_val.py`. Add to the existing file if there
+  is one. Don't create topic-named test files like `test_reaction_barriers.py`.

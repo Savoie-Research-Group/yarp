@@ -334,6 +334,55 @@ class TestIRCDivertFlag:
         assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage2.tsopt"]["status"] == "submitted"
 
 
+class TestIRCFastForward:
+    """
+    PASS 0.2 skips an IRC task whose results are already on the reaction (e.g.
+    a reaction carried over from an earlier run). IRC no longer writes a
+    validated_ts entry, so the barrier keys alone must be enough -- including a
+    None barrier, which is what a reaction with no intended TS carries.
+    """
+
+    def _run(self, tmp_path, mocker, barrier, reverse_barrier):
+        status_tracker = {
+            "input_config": {},
+            "status_output_file": "STATUS.json",
+            "reaction_output_file": "YARP_RXNS.pkl",
+            "reactions": {"rxn_1": {"tasks": {
+                "stage1.irc": {"status": "pending", "job_id": None, "scratch_dir": None},
+            }}},
+        }
+        rxn = MagicMock()
+        rxn.ts_geom = {}
+        rxn.barrier = barrier
+        rxn.reverse_barrier = reverse_barrier
+        mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, {"rxn_1": rxn}))
+        mocker.patch('yarp.progress_yarp.get_job_manager', return_value=MagicMock())
+        mocker.patch('yarp.progress_yarp.get_calculator', return_value=MagicMock())
+
+        inp_mock = MagicMock()
+        inp_mock.job_manager.max_active_jobs = 0  # submit nothing: only PASS 0.2 matters here
+        inp_mock.global_tasks = {}
+        irc_task = MagicMock(task_type="irc_validation", parent_stage="stage1", depends_on=[])
+        irc_task.config = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1)
+        inp_mock.pipeline_tasks = {"stage1.irc": irc_task}
+        mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
+        mocker.patch('yarp.progress_yarp.pickle.dump')
+
+        progress_yarp(tmp_path)
+        return status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.irc"]["status"]
+
+    @pytest.mark.parametrize("value", [12.3, None])
+    def test_barrier_keys_are_enough(self, tmp_path, mocker, value):
+        status = self._run(tmp_path, mocker, {"xtb_pysisyphus": value}, {"xtb_pysisyphus": value})
+
+        assert status == "terminated_normally"
+
+    def test_not_skipped_without_results(self, tmp_path, mocker):
+        status = self._run(tmp_path, mocker, {"egat_rgd1": 50.0}, {"egat_rgd1": 60.0})
+
+        assert status != "terminated_normally"
+
+
 # =====================================================================
 # BATCH 2: PIPELINE PROGRESSION & DAG HAND-OFFS
 # =====================================================================

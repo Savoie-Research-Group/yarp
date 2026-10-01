@@ -162,6 +162,37 @@ class IRCValTask(AsyncYarpCalculator):
             return best_ts, best_label, best_f_bar, best_r_bar
 
 
+    def _save_results(self, irc_runs):
+        """
+        Record every IRC run on the TS conformer it started from, then summarize
+        the reaction at this level of theory.
+
+        Per TS (conformer.properties): 'irc_outcome', and the forward/reverse
+        barriers in kcal/mol, oriented reactant -> product (an inverse_intended
+        run has its IRC sides swapped back in scrape_data).
+
+        Per reaction, keyed '<lot>_<software>': outcome_label is the label of
+        the TS _get_final_results picks (intended > unintended > no reaction).
+        barrier, reverse_barrier and dg_rxn come from that TS only if it is
+        intended or inverse_intended -- i.e. the lowest intended forward
+        barrier -- and are None otherwise.
+        """
+        for data in irc_runs.values():
+            data['ts_geom'].properties['irc_outcome'] = data['outcome']
+            data['ts_geom'].properties['forward_barrier_kcal_per_mol'] = data['lhs_barrier']
+            data['ts_geom'].properties['reverse_barrier_kcal_per_mol'] = data['rhs_barrier']
+
+        _, outcome, f_barrier, b_barrier = self._get_final_results(irc_runs)
+        if outcome not in ("intended", "inverse_intended"):
+            f_barrier = b_barrier = None
+
+        key = f"{self.config.lot}_{self.config.software}"
+        self.rxn.outcome_label[key] = outcome
+        self.rxn.barrier[key] = f_barrier
+        self.rxn.reverse_barrier[key] = b_barrier
+        self.rxn.dg_rxn[key] = None if f_barrier is None else b_barrier - f_barrier
+
+
 class PysisyphusIRCValCalculator(IRCValTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -306,15 +337,7 @@ class PysisyphusIRCValCalculator(IRCValTask):
             }
             print(f"     * TS {i} validated: {irc_outcome} with barrier of {lhs} kcal/mol")
         
-        # Choose final TS opt structure and reaction outcome label to save to reaction object
-        ts, outcome, f_barrier, b_barrier = self._get_final_results(irc_runs)
-
-        self.rxn.ts_geom[f"validated_ts_{self.config.lot}_{self.config.software}"] = ts
-        self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
-        self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
-        self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
-        dg_rxn = b_barrier - f_barrier
-        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
+        self._save_results(irc_runs)
 
         return True
 
@@ -535,15 +558,7 @@ class OrcaIRCValCalculator(IRCValTask):
             }
             print(f"     * TS {i} validated: {irc_outcome} with barrier of {lhs} kcal/mol")
         
-        # Choose final TS opt structure and reaction outcome label to save to reaction object
-        ts, outcome, f_barrier, b_barrier = self._get_final_results(irc_runs)
-
-        self.rxn.ts_geom[f"validated_ts_{self.config.lot}_{self.config.software}"] = ts
-        self.rxn.outcome_label[f"{self.config.lot}_{self.config.software}"] = outcome
-        self.rxn.barrier[f"{self.config.lot}_{self.config.software}"] = f_barrier
-        self.rxn.reverse_barrier[f"{self.config.lot}_{self.config.software}"] = b_barrier
-        dg_rxn = b_barrier - f_barrier
-        self.rxn.dg_rxn[f"{self.config.lot}_{self.config.software}"] = dg_rxn
+        self._save_results(irc_runs)
 
         return True
 

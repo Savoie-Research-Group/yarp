@@ -114,10 +114,11 @@ class TestIRCPairsResultWithItsTS:
         rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus",
                            tsopt_runs, pysis_outputs, tmp_path)
 
-        # irc_run1 has the lowest barrier, so its TS and its barrier must win.
-        validated = rxn.ts_geom["validated_ts_xtb_pysisyphus"]
-        assert validated is not None
-        assert tag_of(validated.geo) == fed[1]
+        # Each TS carries the barrier of the run started from it (10*i kJ/mol);
+        # irc_run1's is the lowest, so it is the reaction's barrier.
+        for i, k in fed.items():
+            props = rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"].properties
+            assert props["forward_barrier_kcal_per_mol"] == pytest.approx(10.0 * i / Constants.kcal2kJ)
         assert rxn.barrier["xtb_pysisyphus"] == pytest.approx(10.0 / Constants.kcal2kJ)
 
     @pytest.mark.parametrize("tsopt_runs", TSOPT_RUN_PATTERNS)
@@ -125,9 +126,11 @@ class TestIRCPairsResultWithItsTS:
         lot = "PBE D3BJ def2-SVP"
         rxn, fed = run_irc(OrcaIRCValCalculator, lot, "orca", tsopt_runs, orca_outputs, tmp_path)
 
-        # Barrier is G(TS) - G(R), so it identifies which conformer was used.
-        validated = rxn.ts_geom[f"validated_ts_{lot}_orca"]
-        assert tag_of(validated.geo) == fed[1]
+        # Barrier is G(TS) - G(R) = k for conformer k, so it identifies which
+        # conformer each result was computed from.
+        for k in fed.values():
+            props = rxn.ts_geom[f"{k}_tsopt_{lot}_orca"].properties
+            assert props["forward_barrier_kcal_per_mol"] == pytest.approx(float(k))
         assert rxn.barrier[f"{lot}_orca"] == pytest.approx(float(fed[1]))
 
     @pytest.mark.parametrize("tsopt_runs", TSOPT_RUN_PATTERNS)
@@ -161,10 +164,89 @@ class TestIRCSkipsNonSaddles:
 
         assert list(fed.values()) == [2]
 
-    def test_non_saddle_is_never_the_validated_ts(self, tmp_path):
+    def test_non_saddle_gets_no_irc_result(self, tmp_path):
         # TS-opt result 1 is a minimum. Run through IRC it would be irc_run1,
         # whose fabricated barrier is the lowest, so it would win.
         rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2],
                            pysis_outputs, tmp_path, freqs={1: NO_IMAG})
 
-        assert tag_of(rxn.ts_geom["validated_ts_xtb_pysisyphus"].geo) == 2
+        assert "irc_outcome" not in rxn.ts_geom["1_tsopt_xtb_pysisyphus"].properties
+        assert rxn.ts_geom["2_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
+
+
+# Endpoints for an IRC that reproduces neither side: forward has an H0-H2 bond,
+# backward has no bonds at all.
+U_FWD_GEO = np.array([[0.0, 0, 0], [3.0, 0, 0], [0.74, 0.0, 0]])
+U_BWD_GEO = np.array([[0.0, 0, 0], [3.0, 0, 0], [6.0, 0, 0]])
+
+
+def pysis_outputs_by_label(labels):
+    """
+    Like pysis_outputs, with irc_run{i} ending as labels[i]: 'intended',
+    'inverse_intended' (IRC sides swapped) or 'unintended'. The log always says
+    Left 0, TS 10*i, Right 5 kJ/mol, so the R->P forward barrier is 10*i for an
+    intended run and 10*i - 5 for an inverse one.
+    """
+    def write(run_dir, i):
+        fwd, bwd = {"intended": (P_GEO, R_GEO), "inverse_intended": (R_GEO, P_GEO),
+                    "unintended": (U_FWD_GEO, U_BWD_GEO)}[labels[i]]
+        write_xyz(run_dir / "forward_end_opt.xyz", fwd)
+        write_xyz(run_dir / "backward_end_opt.xyz", bwd)
+        (run_dir / f"irc_{i}.log").write_text(
+            "Minimum energy of 0.0 at 'Left'.\n"
+            f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
+            "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+    return write
+
+
+def kcal(kj):
+    return pytest.approx(kj / Constants.kcal2kJ)
+
+
+class TestPerTSResults:
+    """
+    Every IRC run is recorded on the TS conformer it started from. The
+    reaction-level entries summarize the lowest intended TS, and are None when
+    no TS is intended. No separate validated_ts copy is written.
+    """
+
+    def _run(self, tmp_path, labels):
+        return run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", list(labels),
+                       pysis_outputs_by_label(labels), tmp_path)
+
+    def test_every_ts_gets_its_label_and_oriented_barriers(self, tmp_path):
+        rxn, _ = self._run(tmp_path, {1: "unintended", 2: "inverse_intended", 3: "intended"})
+        props = {k: rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"].properties for k in (1, 2, 3)}
+
+        assert {k: p["irc_outcome"] for k, p in props.items()} == \
+            {1: "unintended", 2: "inverse_intended", 3: "intended"}
+        # Intended: forward = TS - Left, reverse = TS - Right.
+        assert props[3]["forward_barrier_kcal_per_mol"] == kcal(30.0)
+        assert props[3]["reverse_barrier_kcal_per_mol"] == kcal(25.0)
+        # Inverse: the IRC ran P -> R, so forward (R -> P) = TS - Right.
+        assert props[2]["forward_barrier_kcal_per_mol"] == kcal(15.0)
+        assert props[2]["reverse_barrier_kcal_per_mol"] == kcal(20.0)
+        # Unintended runs keep their barriers too.
+        assert props[1]["forward_barrier_kcal_per_mol"] == kcal(10.0)
+
+    def test_summary_is_lowest_intended_including_inverse(self, tmp_path):
+        # The unintended TS has the lowest barrier of all; it must not win.
+        rxn, _ = self._run(tmp_path, {1: "unintended", 2: "inverse_intended", 3: "intended"})
+
+        assert rxn.outcome_label["xtb_pysisyphus"] == "inverse_intended"
+        assert rxn.barrier["xtb_pysisyphus"] == kcal(15.0)
+        assert rxn.reverse_barrier["xtb_pysisyphus"] == kcal(20.0)
+        assert rxn.dg_rxn["xtb_pysisyphus"] == kcal(5.0)
+
+    def test_summary_is_none_without_an_intended_ts(self, tmp_path):
+        rxn, _ = self._run(tmp_path, {1: "unintended", 2: "unintended"})
+
+        assert rxn.outcome_label["xtb_pysisyphus"] == "unintended"
+        assert rxn.barrier["xtb_pysisyphus"] is None
+        assert rxn.reverse_barrier["xtb_pysisyphus"] is None
+        assert rxn.dg_rxn["xtb_pysisyphus"] is None
+
+    def test_no_validated_ts_copy(self, tmp_path):
+        rxn, _ = self._run(tmp_path, {1: "intended", 2: "unintended"})
+
+        assert not any("validated_ts" in k for k in rxn.ts_geom)

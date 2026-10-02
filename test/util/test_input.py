@@ -338,6 +338,35 @@ class TestMLPropDefaults:
         assert ml.max_runtime == "01:00:00"
 
 
+class TestIRCDivertUnintended:
+    """`divert_unintended` is read per irc_val block and defaults to off."""
+
+    def _irc_config(self, cfg):
+        return InputParser(cfg).pipeline_tasks["ll_refine.irc_validation"].config
+
+    def test_omitted_defaults_to_false(self, enum_egat_llpath_llrefine):
+        assert "divert_unintended" not in enum_egat_llpath_llrefine["ll_refine"]["irc_val"]
+        assert self._irc_config(enum_egat_llpath_llrefine).divert_unintended is False
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_explicit_value_is_honored(self, enum_egat_llpath_llrefine, value):
+        cfg = copy.deepcopy(enum_egat_llpath_llrefine)
+        cfg["ll_refine"]["irc_val"]["divert_unintended"] = value
+
+        assert self._irc_config(cfg).divert_unintended is value
+
+    @pytest.mark.parametrize("value", ["yes", 1, "false"])
+    def test_non_boolean_is_rejected(self, enum_egat_llpath_llrefine, value):
+        cfg = copy.deepcopy(enum_egat_llpath_llrefine)
+        cfg["ll_refine"]["irc_val"]["divert_unintended"] = value
+
+        # Match the type check's own message: the unknown-key error also names
+        # 'divert_unintended', so matching on the key alone passes vacuously
+        # against a parser that doesn't know the key at all.
+        with pytest.raises(ValueError, match="boolean value .* 'divert_unintended'"):
+            InputParser(cfg)
+
+
 class TestStrictnessDoesNotOverreach:
     """Guards against the strict check rejecting things it should accept."""
 

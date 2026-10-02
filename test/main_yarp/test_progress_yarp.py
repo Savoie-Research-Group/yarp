@@ -4,6 +4,7 @@ import json
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 from yarp.progress_yarp import progress_yarp, save_state
+from yarp.util.config import IRCValConfig
 
 @pytest.fixture
 def mock_filesystem(mocker):
@@ -168,7 +169,8 @@ def test_failure_scenario_2_pipeline_task_failed(tmp_path, mocker):
 
 def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
     """
-    Scenario 3: A reaction completes tasks, but IRC filters it out as "unintended".
+    Scenario 3: A reaction completes tasks, but IRC filters it out as "unintended",
+    because the user opted in with `divert_unintended: true`.
     """
     status_tracker = {
         "input_config": {},
@@ -180,9 +182,9 @@ def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
         }
     }
     rxn_unintended = MagicMock()
-    rxn_unintended.outcome_label = {"b3lyp_gaussian": "unintended"}
+    rxn_unintended.outcome_label = {"b3lyp_orca": "unintended"}
     rxn_intended = MagicMock()
-    rxn_intended.outcome_label = {"b3lyp_gaussian": "intended"}
+    rxn_intended.outcome_label = {"b3lyp_orca": "intended"}
     reactions = {"rxn_unintended": rxn_unintended, "rxn_intended": rxn_intended}
 
     mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
@@ -202,9 +204,11 @@ def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
     inp_mock.job_manager.max_active_jobs = 10
     inp_mock.global_tasks = {}
 
+    # A real config, not a MagicMock: a mocked `divert_unintended` would be a
+    # truthy MagicMock and divert regardless of what the code does with it.
     task_mock = MagicMock(task_type="irc_validation", parent_stage="stage1", depends_on=[])
-    task_mock.config.lot = "b3lyp"
-    task_mock.config.software = "gaussian"
+    task_mock.config = IRCValConfig(software="orca", lot="b3lyp", charge=0, multiplicity=1,
+                                    divert_unintended=True)
     inp_mock.pipeline_tasks = {"stage1.irc": task_mock}
     mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
 
@@ -232,6 +236,151 @@ def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
         assert "rxn_unintended" in failed_status
         assert failed_status["rxn_unintended"]["stage1.irc"]["error_log"] == "IRC validation failed: Outcome was 'unintended'."
         assert failed_status["rxn_unintended"]["stage1.irc"]["scratch_dir"] == "/tmp/scratch"
+
+
+NON_INTENDED_OUTCOMES = ["unintended", "reactant_unintended", "product_unintended", "no_adjmat_change", None]
+
+
+class TestIRCDivertFlag:
+    """
+    `irc_val: divert_unintended` decides whether a reaction whose IRC outcome is
+    anything but intended/inverse_intended is routed to failed_rxns. It defaults
+    to off: xTB IRC labels are poor predictors of DFT IRC outcomes, so the
+    reaction should carry on to the next refinement stage.
+    """
+
+    def _run(self, tmp_path, mocker, outcome, **irc_kwargs):
+        """One tick: stage1.irc has just finished with `outcome`; stage2.tsopt waits on it."""
+        status_tracker = {
+            "input_config": {},
+            "status_output_file": "STATUS.json",
+            "reaction_output_file": "YARP_RXNS.pkl",
+            "reactions": {
+                "rxn_1": {"tasks": {
+                    "stage1.irc": {"status": "submitted", "job_id": "201", "scratch_dir": "/tmp/scratch"},
+                    "stage2.tsopt": {"status": "pending", "job_id": None, "scratch_dir": None},
+                }},
+            },
+        }
+        rxn = MagicMock()
+        rxn.outcome_label = {"xtb_pysisyphus": outcome}
+        reactions = {"rxn_1": rxn}
+        mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
+
+        jm_mock = MagicMock()
+        jm_mock.is_running.return_value = False
+        jm_mock.submit.return_value = "301"
+        mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm_mock)
+
+        calc_mock = MagicMock()
+        calc_mock.check_output.return_value = True
+        calc_mock.scrape_data.return_value = True
+        calc_mock.has_prerequisites.return_value = True
+        mocker.patch('yarp.progress_yarp.get_calculator', return_value=calc_mock)
+
+        inp_mock = MagicMock()
+        inp_mock.job_manager.scheduler = "local"
+        inp_mock.job_manager.container = "docker"
+        inp_mock.job_manager.max_active_jobs = 10
+        inp_mock.global_tasks = {}
+        irc_task = MagicMock(task_type="irc_validation", parent_stage="stage1", depends_on=[])
+        irc_task.config = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1,
+                                       **irc_kwargs)
+        tsopt_task = MagicMock(task_type="transition_state_optimization", parent_stage="stage2",
+                               depends_on=["stage1.irc"])
+        inp_mock.pipeline_tasks = {"stage1.irc": irc_task, "stage2.tsopt": tsopt_task}
+        mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
+
+        mocker.patch('yarp.progress_yarp.pickle.dump')
+        mocker.patch('yarp.progress_yarp.pickle.load', return_value={})
+
+        progress_yarp(tmp_path)
+        return status_tracker, reactions
+
+    def test_default_is_off(self):
+        assert IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1).divert_unintended is False
+
+    @pytest.mark.parametrize("outcome", NON_INTENDED_OUTCOMES)
+    def test_flag_omitted_keeps_reaction_and_unblocks_next_stage(self, tmp_path, mocker, outcome):
+        status_tracker, reactions = self._run(tmp_path, mocker, outcome)
+
+        assert "rxn_1" in reactions
+        tasks = status_tracker["reactions"]["rxn_1"]["tasks"]
+        assert tasks["stage1.irc"]["status"] == "terminated_normally"
+        assert tasks["stage2.tsopt"]["status"] == "submitted"
+        assert not (tmp_path / "failed_rxns.pkl").exists()
+
+    @pytest.mark.parametrize("outcome", NON_INTENDED_OUTCOMES)
+    def test_flag_false_keeps_reaction(self, tmp_path, mocker, outcome):
+        status_tracker, reactions = self._run(tmp_path, mocker, outcome, divert_unintended=False)
+
+        assert "rxn_1" in reactions
+        assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.irc"]["status"] == "terminated_normally"
+
+    @pytest.mark.parametrize("outcome", NON_INTENDED_OUTCOMES)
+    def test_flag_true_diverts_reaction(self, tmp_path, mocker, outcome):
+        status_tracker, reactions = self._run(tmp_path, mocker, outcome, divert_unintended=True)
+
+        assert "rxn_1" not in reactions
+        assert "rxn_1" not in status_tracker["reactions"]
+        assert (tmp_path / "failed_rxns.pkl").exists()
+
+    @pytest.mark.parametrize("outcome", ["intended", "inverse_intended"])
+    @pytest.mark.parametrize("divert", [True, False])
+    def test_intended_always_kept(self, tmp_path, mocker, outcome, divert):
+        status_tracker, reactions = self._run(tmp_path, mocker, outcome, divert_unintended=divert)
+
+        assert "rxn_1" in reactions
+        assert status_tracker["reactions"]["rxn_1"]["tasks"]["stage2.tsopt"]["status"] == "submitted"
+
+
+class TestIRCFastForward:
+    """
+    PASS 0.2 skips an IRC task whose results are already on the reaction (e.g.
+    a reaction carried over from an earlier run). IRC no longer writes a
+    validated_ts entry, so the barrier keys alone must be enough -- including a
+    None barrier, which is what a reaction with no intended TS carries.
+    """
+
+    def _run(self, tmp_path, mocker, barrier, reverse_barrier):
+        status_tracker = {
+            "input_config": {},
+            "status_output_file": "STATUS.json",
+            "reaction_output_file": "YARP_RXNS.pkl",
+            "reactions": {"rxn_1": {"tasks": {
+                "stage1.irc": {"status": "pending", "job_id": None, "scratch_dir": None},
+            }}},
+        }
+        rxn = MagicMock()
+        rxn.ts_geom = {}
+        rxn.barrier = barrier
+        rxn.reverse_barrier = reverse_barrier
+        mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, {"rxn_1": rxn}))
+        mocker.patch('yarp.progress_yarp.get_job_manager', return_value=MagicMock())
+        mocker.patch('yarp.progress_yarp.get_calculator', return_value=MagicMock())
+
+        inp_mock = MagicMock()
+        inp_mock.job_manager.max_active_jobs = 0  # submit nothing: only PASS 0.2 matters here
+        inp_mock.global_tasks = {}
+        irc_task = MagicMock(task_type="irc_validation", parent_stage="stage1", depends_on=[])
+        irc_task.config = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1)
+        inp_mock.pipeline_tasks = {"stage1.irc": irc_task}
+        mocker.patch('yarp.progress_yarp.InputParser', return_value=inp_mock)
+        mocker.patch('yarp.progress_yarp.pickle.dump')
+
+        progress_yarp(tmp_path)
+        return status_tracker["reactions"]["rxn_1"]["tasks"]["stage1.irc"]["status"]
+
+    @pytest.mark.parametrize("value", [12.3, None])
+    def test_barrier_keys_are_enough(self, tmp_path, mocker, value):
+        status = self._run(tmp_path, mocker, {"xtb_pysisyphus": value}, {"xtb_pysisyphus": value})
+
+        assert status == "terminated_normally"
+
+    def test_not_skipped_without_results(self, tmp_path, mocker):
+        status = self._run(tmp_path, mocker, {"egat_rgd1": 50.0}, {"egat_rgd1": 60.0})
+
+        assert status != "terminated_normally"
 
 
 # =====================================================================

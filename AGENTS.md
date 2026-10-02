@@ -82,6 +82,20 @@ Each new PR or project gets its own folder under `debug/`:
   where the test actually looks it up; otherwise the revert check passes for the
   wrong reason.
 
+## PR descriptions
+
+- **Draft it in `debug/YYMMDD_<branch>/PR.md`.** The developer reviews, edits
+  and posts it.
+- **Keep it brief.** NOTES.md holds the full record; the PR needs only what a
+  reviewer needs.
+- **Use three sections:**
+  1. **Summary.** A few lines on what the PR changes and why, plus one line on
+     how it was tested.
+  2. **Detailed changes.** One bullet per change, naming the files it touches.
+     End with the behavior changes users will notice, then the tests added.
+  3. **Unresolved items.** Pending checks, known side effects deferred to a
+     future PR, pre-existing bugs left alone, and open questions.
+
 ## Repo rules
 
 - **Never edit anything under `tutorials/`,** not even a one-character fix. The

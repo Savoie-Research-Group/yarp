@@ -429,30 +429,41 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
     # current number of electrons associated with each atom
     e = return_e(bond_mat)
 
+    # Fragment label of each atom (atoms joined by bonds of order >= 1). Move 7 only transfers electrons within a fragment.
+    frag = _fragments(bond_mat)
+
     # Loop over the individual atoms and determine the moves that apply
     for i in reactive:
+
+        # Moves 1, 2, 3, 5: non-local shifts/annihilations/heterolyses along conjugated paths (see conjugated_moves). 
+        # This function handles the extension of old moves 1-3, and 5 to chains of alternating pi bonds.
+        yield from conjugated_moves(bond_mat, elements, reactive, ring_atoms, bridgeheads, sources=[i])
 
         # All of these moves involve forming a double bond with the i atom. Constraints that are common to all of the moves are checked here.
         # These are avoiding forming alkynes/allenes in rings and Bredt's rule (forming double-bonds at bridgeheads)
         if i not in bridgeheads and (i not in ring_atoms or sum([_ for count, _ in enumerate(bond_mat[i]) if count != i and _ > 1]) == 0):
 
-            # Move 1: i is electron deficient and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is turned into a new i-j pi-bond.
-            if e[i]+2 <= el_n_deficient[elements[i]] or el_expand_octet[elements[i]]:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
-                        yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j)]
+            # New conjugated moves should handle cases 1-3.
 
-            # Move 2: i has a radical and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is homolytically broken and a new pi-bond is formed between i and j
-            if bond_mat[i, i] % 2 != 0 and e[i] < el_n_deficient[elements[i]]:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
-                        yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j), (-1, i, i), (1, k, k)]
 
-            # Move 3: i has a lone pair and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is heterolytically broken to form a lone pair on k and a new pi-bond is formed between i and j
-            if bond_mat[i, i] >= 2:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
-                        yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j), (-2, i, i), (2, k, k)]
+
+            # # Move 1: i is electron deficient and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is turned into a new i-j pi-bond.
+            # if e[i]+2 <= el_n_deficient[elements[i]] or el_expand_octet[elements[i]]:
+            #     for j in return_connections(i, bond_mat, inds=reactive):
+            #         for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
+            #             yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j)]
+
+            # # Move 2: i has a radical and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is homolytically broken and a new pi-bond is formed between i and j
+            # if bond_mat[i, i] % 2 != 0 and e[i] < el_n_deficient[elements[i]]:
+            #     for j in return_connections(i, bond_mat, inds=reactive):
+            #         for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
+            #             yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j), (-1, i, i), (1, k, k)]
+
+            # # Move 3: i has a lone pair and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is heterolytically broken to form a lone pair on k and a new pi-bond is formed between i and j
+            # if bond_mat[i, i] >= 2:
+            #     for j in return_connections(i, bond_mat, inds=reactive):
+            #         for k in [_ for _ in return_connections(j, bond_mat, inds=reactive, min_order=2) if _ != i]:
+            #             yield [(1, i, j), (1, j, i), (-1, j, k), (-1, k, j), (-2, i, i), (2, k, k)]
 
             # Patch D (2026-06-12 ZL): removed "move 4-bis" (radical-radical
             # bond formation) to match old-YARP patched behavior
@@ -497,28 +508,38 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
                                     if j not in ring_atoms or sum([_ for count, _ in enumerate(bond_mat[j]) if count != j and _ > 1]) == 0:
                                         yield [(1, i, j), (1, j, i), (-1, i, i), (-2, j, j), (1, k, k)]
 
-            # Move 5: i has a lone pair and a neighbor capable of forming a double bond, then a new pi-bond is formed with the neighbor from the lone pair
-            if bond_mat[i, i] >= 2:
-                for j in return_connections(i, bond_mat, inds=reactive):
-                    # Check ring conditions on j
-                    if j not in bridgeheads and (j not in ring_atoms or sum([_ for count, _ in enumerate(bond_mat[j]) if count != j and _ > 1]) == 0):
-                        # Check octet conditions on j
-                        if el_expand_octet[elements[j]] or e[j]+2 <= el_n_deficient[elements[j]]:
-                            yield [(1, i, j), (1, j, i), (-2, i, i)]
+            # # Move 5: i has a lone pair and a neighbor capable of forming a double bond, then a new pi-bond is formed with the neighbor from the lone pair
+            # if bond_mat[i, i] >= 2:
+            #     for j in return_connections(i, bond_mat, inds=reactive):
+            #         # Check ring conditions on j
+            #         if j not in bridgeheads and (j not in ring_atoms or sum([_ for count, _ in enumerate(bond_mat[j]) if count != j and _ > 1]) == 0):
+            #             # Check octet conditions on j
+            #             if el_expand_octet[elements[j]] or e[j]+2 <= el_n_deficient[elements[j]]:
+            #                 yield [(1, i, j), (1, j, i), (-2, i, i)]
 
         # Move 6: i has a pi bond with j and the electronegativity of i is >= j, or a favorable change in aromaticity occurs, then the pi-bond is turned into a lone pair on i
         for j in return_connections(i, bond_mat, inds=reactive, min_order=2):
             if el_en[elements[i]] > el_en[elements[j]] or delta_aromatic(bond_mat, rings, move=((-1, i, j), (-1, j, i), (2, i, i))) or e[j] > el_n_deficient[elements[i]]:
                 yield [(-1, i, j), (-1, j, i), (2, i, i)]
 
-        # Move 7: i is electron deficient, bonded to j with unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
-                # Note: very similar to move 4 except that a double bond is not formed. This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
+        # # Move 7: i is electron deficient, bonded to j with unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
+        # # Note: very similar to move 4 except that a double bond is not formed. This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
+        # if e[i] < el_n_deficient[elements[i]]:
+        #     for j in return_connections(i, bond_mat, inds=reactive):
+        #         if bond_mat[j, j] > 0 and el_en[elements[i]] > el_en[elements[j]]:
+        #             yield [(-1, j, j), (1, i, i)]
+
+        # Move 7 (updated to allow transfers within fragments): i is electron deficient, j has unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
+        # Note: very similar to move 4 except that a double bond is not formed. This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
+        # j is any reactive atom in the same fragment within the same separation window as Move 8 (any distance when seps is all zeros,
+        # as in the first search pass; within two bonds in the second pass when local_opt=True).
         if e[i] < el_n_deficient[elements[i]]:
-            for j in return_connections(i, bond_mat, inds=reactive):
-                if bond_mat[j, j] > 0 and el_en[elements[i]] > el_en[elements[j]]:
+            for j in reactive:
+                if j != i and frag[i] == frag[j] and seps[i, j] < 3 and bond_mat[j, j] > 0 and el_en[elements[i]] > el_en[elements[j]]:
                     yield [(-1, j, j), (1, i, i)]
 
         # Move 8: i has an expanded octet and unbound electrons, then charge transfer to an atom within three bonds (controlled by local option) that is electron deficient or can expand its octet is attempted.
+        # Note: setting to local because this is only relevant in phase 2. 
         if e[i] > el_n_deficient[elements[i]] and bond_mat[i, i] > 0:
             for j in reactive:
                 if j != i and seps[i, j] < 3 and (el_expand_octet[elements[j]] or e[j] < el_n_deficient[elements[j]]):
@@ -591,6 +612,225 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
                 if move:
                     # print("move9")
                     yield move
+
+def conjugated_moves(bond_mat, elements, reactive, ring_atoms, bridgeheads, sources=None, max_pi=3):
+    """
+    Generator for electron-pushing moves along alternating (conjugated) paths. We used to only use
+    pi bond swaps for neighboring and next-nearest neighbor atoms, but now we use it for all atoms
+    connected by alternating pi bonds. 
+
+    A path i -g- j1 -l- k1 -g- j2 -l- k2 ... alternates "gain" links (g: existing bonds that gain
+    m bond orders) and "loss" links (l: bonds of order >= m+1 that lose m bond orders).
+
+    Parameters
+    ----------
+    bond_mat : array
+               The bond electron matrix that the bond/electron rearrangments are calculated for.
+
+    elements : list
+               list of elements indexed to the bond_mat
+
+    reactive : list
+               List of integers corresponding to the indices of bond_mat where atoms capable of undergoing bond-elctron rearrangments reside.
+
+    ring_atoms: list
+                List of integers corresponding to the indices of bond_mat where the atoms reside in a ring. Used to avoid forming allenes and alkynes within rings.
+
+    bridgeheads: list
+                 List of integers corresponding to the indices of bond_mat where the atoms reside at bridgeheads. Used for respecting Bredt's rule.
+
+    sources: list, default=None
+             List of integers corresponding to the indices of bond_mat where the atoms are the sources of the conjugated paths. 
+             If not provided, all allowed atoms are used as sources. If provided, only the allowed atoms that are in the sources are used.
+
+    max_pi: int, default=3
+            Sets the path length cap of 2*max_pi + 1 links. Moves 10 and 11 can traverse at most max_pi loss links (pi bonds),
+            and Move 12 at most max_pi + 1, since its path starts and ends on a loss link.
+
+    Yields
+    ------
+    move: list of tuples,
+
+          Each tuple in the list is composed of (int, i, j) where int is the value to be added to the ij position of the bond-electron matrix.
+
+    Notes
+    -----
+    (10) push: the path ends on a loss link. The source i spends a lone pair (-2), a radical (-1), or nothing (0, i.e., i is
+         deficient and pulls the pi-bond toward itself) and the terminal atom receives the complement. For m=1 this generalizes
+         Moves 1-3 to arbitrary conjugation lengths (e.g., vinylogous lone-pair pushes). For m=2 it transposes a triple bond
+         (e.g., :C-C#C -> C#C-C: in polyynes).
+    (11) annihilation: the path ends on a gain link, so a net bond forms and both termini spend electrons
+         (radical + radical, lone pair + vacancy, or lone pair + lone pair for m=2). This generalizes Moves 4/5 to
+         conjugated separations (e.g., 1,4-diradicals and remote zwitterions).
+    (12) heterolysis: the reverse of the Move 11 lone pair + vacancy case. The path starts and ends on a loss link, so one net
+         pi bond is broken and its two electrons end as a lone pair on one terminus while the other terminus is left with
+         the vacancy. This generalizes Move 6 to conjugated separations (e.g., a quinoid C=S collapsing so that a benzene
+         ring becomes aromatic and a remote carbon carries the lone pair). Only m=1 and only the heterolytic split are
+         generated; homolysis into a diradical is not.
+    The three-atom (m=1) cases already produced by Moves 1-5 are skipped, as is the one-link heterolysis (Move 6). Moves are only yielded if the octet, ring, and
+    Bredt constraints used by the other moves hold for every atom whose electron count or bond order increases.
+    """
+    # Metal-ligand bonds have zero order during the search, so metals are never part of a path
+    allowed = [_ for _ in reactive if elements[_] not in el_metals]
+    
+    # If sources are provided, only use the allowed atoms that are in the sources
+    if sources is None:
+        srcs = allowed
+    else:
+        srcs = [ _ for _ in sources if _ in allowed ]
+
+    e = return_e(bond_mat) # e[a] = 2 * (sum of bond orders on a) + (unshared electrons on a) i.e., electron counts before the move
+
+    # Diagonal changes that an atom can supply when it is at the end of a path (0: none, -1: radical, -2: lone pair)
+    def spend(ind):
+        return [0] + ([-1] if bond_mat[ind, ind] % 2 != 0 else []) + ([-2] if bond_mat[ind, ind] >= 2 else [])
+
+    # A radical only pushes into a pi-bond if it is short of an octet (same condition as the original Move 2)
+    def rad_source(ind):
+        return e[ind] < el_n_deficient[elements[ind]]
+
+    # Move 1 vs 2 pi-bonds at a time (i.e., m=1 e.g.  :N-C=C  ->  N=C-C:; or m=2 e.g.  :C-C#C  ->  C#C-C: )
+    # Note: mixed step sizes are not supported but Brett hasn't found any cases where it would be useful.
+    for m in (1, 2):
+        # Loop over the allowed atoms
+        for i in srcs:
+            # Loop over the simple paths starting at i that alternate between gain and loss links. 
+            # Note: path is a tuple of atom indices starting with i and ending with the last atom in the path at most 2*max_pi + 1 atoms long.
+            for path in _alt_paths(bond_mat, i, m, allowed, max_pi, first_gain=True):
+                n_links = len(path) - 1 # number of links in the path; parity determines move type below
+                t = path[-1] # path's terminus
+                bonds = [] # This list will hold the bonds that are added to the bond-electron matrix to perform the move
+
+                # Loop over the links in the path
+                for c in range(n_links):
+                    # Add the link to the bonds list (gain or loss determined by even/odd index)
+                    # note that path always starts with a gain link, so links are always alternating
+                    s = m if c % 2 == 0 else -m
+                    bonds += [(s, path[c], path[c+1]), (s, path[c+1], path[c])]
+
+                # Move 10: shift (even number of links and so it ends on a loss link). The three-atom m=1 shifts are Moves 1-3. 
+                if n_links % 2 == 0:
+                    # whatever the source atom i is spending, the terminal atom t is gaining i-j=k becomes i=j-k in the d=0 three atom m=1 case.
+                    #diags = [[(d, i, i), (-d, t, t)] if d else [] for d in spend(i)]
+                    diags = [[(d, i, i), (-d, t, t)] if d else [] for d in spend(i) if d != -1 or rad_source(i)]
+
+                # Move 11: annihilation (ends on a gain link). The adjacent m=1 cases are Moves 4/5.
+                else:
+                    # Both ends enumerate the same path, so only yield from the lower index.
+                    if t < i:
+                        continue
+                    
+                    # This list will hold the diagonal changes that are added to the bond-electron matrix to perform the move
+                    # Only the first and last atoms in the path will undergo diagonal changes. The two spend iterations loop 
+                    # over the different supported combinations of electron changes (source, terminal) = (-2, 0) lone pair from
+                    # source becomes pi bond, terminal particpates in new pi bond, (-1, -1) radical on each end contribute to the
+                    # new pi bond (odd number of links only) etc. 
+                    diags = [[(d, i, i), (-2*m-d, t, t)] for d in spend(i) if -2*m-d in spend(t)]
+                    diags = [[_ for _ in d if _[0]] for d in diags]
+
+                for d in diags:
+                    move = bonds + d
+                    if _conj_valid(bond_mat, move, elements, ring_atoms, bridgeheads, e):
+                        yield move
+
+    # Move 12: heterolysis along a path that starts and ends on a loss link (one net pi bond broken, m=1 only)
+    # typical pattern i=j-k=l becomes (..)i-j=k-l(+)
+    for i in srcs:
+        for path in _alt_paths(bond_mat, i, 1, allowed, max_pi, first_gain=False):
+            n_links = len(path) - 1
+            t = path[-1]
+            # Needs an odd number of links (so the path also ends on a loss link). The one-link case is Move 6.
+            # Both ends enumerate the same path, so only yield from the lower index; both lone pair placements are tried below.
+            if n_links % 2 == 0 or n_links == 1 or t < i:
+                continue
+            bonds = [] # This list will hold the bonds that are added to the bond-electron matrix to perform the move
+
+            # Loop over the links in the path and rearrange pi bonds
+            for c in range(n_links):
+                # This path starts with a loss link, so even links lose and odd links gain
+                s = -1 if c % 2 == 0 else 1
+                bonds += [(s, path[c], path[c+1]), (s, path[c+1], path[c])]
+            # The two released electrons become a lone pair on one terminus; the other terminus keeps the vacancy
+            for d in ([(2, i, i)], [(2, t, t)]):
+                move = bonds + d
+                if _conj_valid(bond_mat, move, elements, ring_atoms, bridgeheads, e):
+                    yield move
+
+
+def _fragments(bond_mat):
+    """
+    Helper for valid_moves. Returns a fragment label for each atom, where fragments are the connected components of the
+    graph formed by bonds of order >= 1 in bond_mat (metal-ligand bonds have order 0 during the search, so ligands are
+    separate fragments). Atoms in the same fragment share a label.
+    """
+    n = len(bond_mat)
+    frag = [-1] * n
+    for start in range(n):
+        if frag[start] != -1:
+            continue
+        frag[start] = start
+        stack = [start]
+        while stack:
+            a = stack.pop()
+            for b in range(n):
+                if b != a and frag[b] == -1 and bond_mat[a, b] >= 1:
+                    frag[b] = start
+                    stack.append(b)
+    return frag
+
+def _alt_paths(bond_mat, i, m, allowed, max_pi, first_gain=True):
+    """
+    Helper for conjugated_moves. Depth-first enumeration of simple paths (no cycles) starting at i whose links alternate between
+    gain links (bond order >= 1) and loss links (bond order >= m+1). Yields tuples of atom indices.
+
+    The first link is a gain link when first_gain=True (Moves 10 and 11) and a loss link when first_gain=False (Move 12).
+    Every valid prefix is yielded, so paths end on either kind of link; the caller interprets the path from its length.
+    Paths are capped at 2*max_pi + 1 links.
+    """
+    max_links = 2*max_pi + 1 # maximum number of links in a path
+    stack = [(i,)] # stack of paths; each path is a tuple of atom indices seeded with the origin atom i
+    while stack:
+        path = stack.pop() # pop the last path off the stack
+        last, gain = path[-1], ((len(path) - 1) % 2 == 0) == first_gain # gain is boolean: True if the next link is a gain link; links alternate starting with a gain link (first_gain=True) or a loss link (first_gain=False)
+        for nb in allowed:
+
+            # skip if the neighbor is already in the path (i.e., a cycle)
+            if nb in path:
+                continue
+
+            # get the order of the bond between the last atom in the path and the neighbor
+            order = bond_mat[last, nb]
+
+            # accept link if it matches the alternating pattern (gain link or loss link)
+            # gain just means it will gain a bond, whether it is allowed isn't checked here
+            # loss just means it will lose m bonds, whether it is allowed isn't checked here
+            if (gain and order >= 1) or (not gain and order >= m + 1):
+                new = path + (nb,)
+                yield new
+                if len(new) - 1 < max_links:
+                    stack.append(new)
+
+
+def _conj_valid(bond_mat, move, elements, ring_atoms, bridgeheads, e):
+    """
+    Helper for conjugated_moves. Applies the same octet, ring (no allenes/alkynes/multiple pi-bonds on atoms in rings < 10),
+    and Bredt constraints as Moves 1-5, evaluated on the post-move bond_mat for every atom that gains electrons or bond order.
+    """
+    tmp = copy(bond_mat)
+    for k in move:
+        tmp[k[1], k[2]] += k[0]
+    if min(tmp[k[1], k[2]] for k in move) < 0:
+        return False
+    e_new = return_e(tmp)
+    gained = {k[1] for k in move if k[0] > 0 and k[1] != k[2]}
+    for a in {k[1] for k in move}:
+        if e_new[a] > e[a] and e_new[a] > el_n_deficient[elements[a]] and not el_expand_octet[elements[a]]:
+            return False
+        if a in gained:
+            n_pi = sum([_ - 1 for count, _ in enumerate(tmp[a]) if count != a and _ > 1])
+            if (a in bridgeheads and n_pi > 0) or (a in ring_atoms and n_pi > 1):
+                return False
+    return True
 
 
 def valid_bonds(ind, bond_mat, elements, reactive, ring_atoms):

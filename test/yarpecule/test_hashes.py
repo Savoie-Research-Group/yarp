@@ -91,7 +91,7 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_direct_hash_uses_all_bems_and_mapped_atom_hashes(
+    def test_direct_hash_uses_adjacency_charges_and_mapped_atom_hashes(
         self, cyclohexane_dehydrogenation, monkeypatch
     ):
         reactant = cyclohexane_dehydrogenation.reactant.graph
@@ -104,13 +104,17 @@ class TestRxnHash:
             product_by_map[reactant.atom_info[i]["atom_map"]]
             for i in range(len(reactant.elements))
         ]
-        combined_bems = list(reactant.bond_mats) + [
-            np.asarray(bem)[np.ix_(product_order, product_order)]
-            for bem in product.bond_mats
-        ]
-        expected_bem = np.zeros_like(combined_bems[0])
-        for bem in combined_bems:
-            expected_bem += bem
+        expected_matrix = (
+            np.asarray(reactant.adj_mat, dtype=float)
+            + np.asarray(product.adj_mat, dtype=float)[
+                np.ix_(product_order, product_order)
+            ]
+        )
+        np.fill_diagonal(
+            expected_matrix,
+            np.asarray(reactant.fc, dtype=float)
+            + np.asarray(product.fc, dtype=float)[product_order],
+        )
         expected_atom_hashes = (
             np.asarray(reactant.atom_hashes)
             + np.asarray(product.atom_hashes)[product_order]
@@ -121,11 +125,11 @@ class TestRxnHash:
             + np.round(
                 fsum(
                     (
-                        expected_bem
+                        expected_matrix
                         * np.outer(expected_atom_hashes, expected_atom_hashes)
                     ).flat
                 ),
-                7,
+                8,
             )
         )
 
@@ -309,7 +313,7 @@ class TestRxnHash:
 
 
 def reaction_graph(rxn):
-    """Independent element/mass/BEM graph oracle, without stereo information."""
+    """Independent adjacency/formal-charge oracle, without stereo."""
     reactant = rxn.reactant.graph
     product = rxn.product.graph
     maps = [reactant.atom_info[i]["atom_map"] for i in range(len(reactant.elements))]
@@ -317,8 +321,6 @@ def reaction_graph(rxn):
         product.atom_info[i]["atom_map"]: i for i in range(len(product.elements))
     }
     order = [product_by_map[atom_map] for atom_map in maps]
-    r_bem = np.sum(np.asarray(reactant.bond_mats), axis=0)
-    p_bem = np.sum(np.asarray(product.bond_mats), axis=0)[np.ix_(order, order)]
     graph = nx.Graph()
     for i, element in enumerate(reactant.elements):
         graph.add_node(
@@ -326,13 +328,16 @@ def reaction_graph(rxn):
             label=(
                 element,
                 round(float(reactant._masses[i]), 6),
-                round(float(r_bem[i, i]), 8),
-                round(float(p_bem[i, i]), 8),
+                round(float(reactant.fc[i]), 8),
+                round(float(product.fc[order[i]]), 8),
             ),
         )
     for i in range(len(reactant.elements)):
         for j in range(i + 1, len(reactant.elements)):
-            label = (round(float(r_bem[i, j]), 8), round(float(p_bem[i, j]), 8))
+            label = (
+                int(reactant.adj_mat[i, j]),
+                int(product.adj_mat[order[i], order[j]]),
+            )
             if label != (0.0, 0.0):
                 graph.add_edge(i, j, label=label)
     return graph
@@ -404,11 +409,10 @@ class TestBemSumHash:
     """
     `bem_sum_hash` is the mapping-DEPENDENT counterpart to the yarpecule hash.
 
-    The yarpecule hash weights the summed bond-electron matrix by
+    The yarpecule hash weights adjacency and formal charge by
     `outer(atom_hashes, atom_hashes)`; atom hashes are graph invariants, so
-    relabelling the atoms leaves it unchanged. That is correct for "same
-    molecule" and wrong for "same molecule, indexed the same way" -- the
-    question anything exchanging index-ordered geometries has to ask.
+    relabelling the atoms leaves it unchanged. `bem_sum_hash` intentionally
+    remains mapping-dependent for index-ordered geometries.
 
     Measured over the KHP cycle-2 collection: 1110 products span 712 distinct
     (graph, mapping) pairs but only 268 distinct yarpecule hashes.

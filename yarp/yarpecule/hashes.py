@@ -117,9 +117,12 @@ def bmat_hash(bond_mat):
 
 
 def yarpecule_hash(y):
-    """ 
-    Creates a unique hash value for the yarpecule object based on the sum of all bond-electron matrices and the atom hashes.
-    Since the atom hashes are sensistive to the masses used for the atoms, the hash of isotopomers will be unique. 
+    """Create a mapping-invariant hash from adjacency and formal charges.
+
+    YARP's Lewis formal-charge vector is stored on the diagonal of a copy of
+    the adjacency matrix, then weighted by the existing atom hashes. Since
+    atom hashes are sensitive to the masses used for the atoms, isotopomers
+    remain distinct.
 
     Parameters
     ----------
@@ -132,36 +135,47 @@ def yarpecule_hash(y):
 
 
     Notes
-    -----            
-    Any method affecting the `bond_mats` or `masses` attributes of the yarpecule instance should also recalculate this hash.  
+    -----
+    Any method affecting ``adj_mat``, ``fc``, or ``masses`` should also
+    recalculate this hash.
     Future work: this path still needs to be updated to source isotope-aware mass information from `atom_info`
     so that isotopomers are actually distinguished when that behavior is enabled in yarpecule construction.
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
-    bem = np.zeros_like(y.bond_mats[0])
-    for mat in y.bond_mats:
-        bem += mat
-
-    return np.round(np.sum(bem*np.outer(y.atom_hashes, y.atom_hashes)), 7)
+    matrix = np.array(y.adj_mat, dtype=float, copy=True)
+    np.fill_diagonal(matrix, np.asarray(y.fc, dtype=float))
+    return np.round(
+        fsum((matrix * np.outer(y.atom_hashes, y.atom_hashes)).flat),
+        8,
+    )
 
 
 def reaction_hash(rxn):
     """Hash a reaction whose product was aligned during construction.
 
-    Sum all endpoint resonance BEMs and atom hashes in their shared index
-    order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
+    Sum the endpoint adjacency/formal-charge matrices and atom hashes in their
+    shared index order, then apply the same scalar algebra as
+    ``yarpecule_hash`` directly.
     """
-
-    #Combine all endpoint BEMs into a single matrix, then sum them to get a single BEM for the reaction
-    combined_bems = list(rxn.reactant.graph.bond_mats)
-    combined_bems.extend(rxn.product.graph.bond_mats)
-    rxn_bem = np.zeros_like(combined_bems[0])
-    for mat in combined_bems:
-        rxn_bem += mat
-        
-    #Combine all atom hashes from the reactant and product into a single array, then apply the same scalar algebra as ``yarpecule_hash`` directly.
-    atom_hashes = (
-        np.asarray(rxn.reactant.graph.atom_hashes)
-        + np.asarray(rxn.product.graph.atom_hashes)
+    reactant = rxn.reactant.graph
+    product = rxn.product.graph
+    rxn_matrix = np.asarray(reactant.adj_mat, dtype=float) + np.asarray(
+        product.adj_mat,
+        dtype=float,
     )
-    return rxn.reactant.hash + rxn.product.hash + np.round(fsum((rxn_bem*np.outer(atom_hashes, atom_hashes)).flat), 7)
+    np.fill_diagonal(
+        rxn_matrix,
+        np.asarray(reactant.fc, dtype=float) + np.asarray(product.fc, dtype=float),
+    )
+    atom_hashes = (
+        np.asarray(reactant.atom_hashes)
+        + np.asarray(product.atom_hashes)
+    )
+    return (
+        rxn.reactant.hash
+        + rxn.product.hash
+        + np.round(
+            fsum((rxn_matrix * np.outer(atom_hashes, atom_hashes)).flat),
+            8,
+        )
+    )

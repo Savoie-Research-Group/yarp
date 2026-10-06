@@ -34,7 +34,7 @@ class TestFFOpt:
         """
         reactant = yp.yarpecule('O=CCO')
         products = enumerate_products(reactant, 2, 2, mode="concerted")
-        target_hash = "768670.27980634"
+        target_hash = "1112172.62884694"
         target_product = next(p for p in products if str(p.hash) == str(target_hash))
 
         opt_geo = rdkit_joint_opt(target_product, target_product.bond_mats[0],

@@ -80,8 +80,8 @@ class yarpecule:
             Lewis structure(s) of the yarpecule. Multiple structures are generated for cases involving resonance.
 
     yarpecule_hash : float
-            A unique identifier for the yarpecule based on atom hashes and bond-electron matrices
-            generated from the Lewis structure(s) of the yarpecule.
+            A unique identifier for the yarpecule based on atom hashes, the adjacency matrix,
+            and the total charge of the yarpecule.
   """
 
     ###############
@@ -170,7 +170,7 @@ class yarpecule:
         matrices.
 
         `hash` (the yarpecule hash) is mapping-independent by design: it weights
-        the summed bond-electron matrix by `outer(atom_hashes, atom_hashes)`,
+        the adjacency matrix by `outer(atom_hashes, atom_hashes)`,
         and atom hashes are graph invariants, so relabelling the atoms leaves it
         unchanged. That is the right answer to "is this the same molecule" and
         the wrong answer to "is this the same molecule, indexed the same way" --

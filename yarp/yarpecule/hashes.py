@@ -117,12 +117,13 @@ def bmat_hash(bond_mat):
 
 
 def yarpecule_hash(y):
-    """Create a mapping-invariant hash from adjacency and formal charges.
+    """Create a mapping-invariant hash from adjacency and total charge.
 
-    YARP's Lewis formal-charge vector is stored on the diagonal of a copy of
-    the adjacency matrix, then weighted by the existing atom hashes. Since
-    atom hashes are sensitive to the masses used for the atoms, isotopomers
-    remain distinct.
+    The adjacency matrix, with ones on the diagonal so isolated atoms still
+    contribute, is weighted by the existing atom hashes, and the total charge
+    is added as a separate term linear in the atom hashes, so it cannot cancel
+    against bond terms. Since atom hashes are sensitive to the masses used for
+    the atoms, isotopomers remain distinct.
 
     Parameters
     ----------
@@ -136,16 +137,16 @@ def yarpecule_hash(y):
 
     Notes
     -----
-    Any method affecting ``adj_mat``, ``fc``, or ``masses`` should also
+    Any method affecting ``adj_mat``, ``q``, or ``masses`` should also
     recalculate this hash.
     Future work: this path still needs to be updated to source isotope-aware mass information from `atom_info`
     so that isotopomers are actually distinguished when that behavior is enabled in yarpecule construction.
     The hash is calculated as a 128-bit number. For use in sets and comparisons this number is hashed by python's hash function.
     """
-    matrix = np.array(y.adj_mat, dtype=float, copy=True)
-    np.fill_diagonal(matrix, np.asarray(y.fc, dtype=float))
+    matrix = np.asarray(y.adj_mat, dtype=float) + np.eye(len(y.adj_mat))
     return np.round(
-        fsum((matrix * np.outer(y.atom_hashes, y.atom_hashes)).flat),
+        fsum((matrix * np.outer(y.atom_hashes, y.atom_hashes)).flat)
+        + y.q * fsum(y.atom_hashes),
         8,
     )
 
@@ -153,19 +154,15 @@ def yarpecule_hash(y):
 def reaction_hash(rxn):
     """Hash a reaction whose product was aligned during construction.
 
-    Sum the endpoint adjacency/formal-charge matrices and atom hashes in their
-    shared index order, then apply the same scalar algebra as
-    ``yarpecule_hash`` directly.
+    Sum the endpoint adjacency matrices and atom hashes in their shared index
+    order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
+    Charge and isolated atoms enter through the endpoint hashes.
     """
     reactant = rxn.reactant.graph
     product = rxn.product.graph
     rxn_matrix = np.asarray(reactant.adj_mat, dtype=float) + np.asarray(
         product.adj_mat,
         dtype=float,
-    )
-    np.fill_diagonal(
-        rxn_matrix,
-        np.asarray(reactant.fc, dtype=float) + np.asarray(product.fc, dtype=float),
     )
     atom_hashes = (
         np.asarray(reactant.atom_hashes)

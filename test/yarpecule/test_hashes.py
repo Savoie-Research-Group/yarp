@@ -91,7 +91,7 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_direct_hash_uses_adjacency_charges_and_mapped_atom_hashes(
+    def test_direct_hash_uses_adjacency_and_mapped_atom_hashes(
         self, cyclohexane_dehydrogenation, monkeypatch
     ):
         reactant = cyclohexane_dehydrogenation.reactant.graph
@@ -109,11 +109,6 @@ class TestRxnHash:
             + np.asarray(product.adj_mat, dtype=float)[
                 np.ix_(product_order, product_order)
             ]
-        )
-        np.fill_diagonal(
-            expected_matrix,
-            np.asarray(reactant.fc, dtype=float)
-            + np.asarray(product.fc, dtype=float)[product_order],
         )
         expected_atom_hashes = (
             np.asarray(reactant.atom_hashes)
@@ -296,6 +291,20 @@ class TestRxnHash:
                 ('[H:10][C@:1]([O:13][C:3](=[O:8])[C:4]([H:7])([H:12])[H:14])([C:5]([H:6])=[O:11])[O:2][H:9]', '[O:13]([C:3](=[C:4]([H:7])[H:14])[O:8][H:12])[C@@:1]([C:5]([H:6])=[O:11])([O:2][H:9])[H:10]'),
                 ('[C:11]([C:9]([H:8])([H:2])[H:6])(=[O:1])[O:14][C@@:12]([O:3][H:10])([H:13])[C:4]([H:5])=[O:7]', '[H:13][C@:12]([C:4](=[O:7])[H:5])([O:3][H:10])[O:14][C:11](=[C:9]([H:6])[H:8])[O:1][H:2]'),
             ],
+            [  # Charged: water addition to the 1-methylallyl cation
+                ('[H:12][C:1]([H:6])=[C:14]([H:3])[C+:2]([H:7])[C:10]([H:11])([H:8])[H:4].[H:13][O:9][H:5]', '[H:7][C:2]([C:14]([H:3])=[C:1]([H:6])[H:12])([C:10]([H:8])([H:11])[H:4])[O+:9]([H:13])[H:5]'),
+                ('[H:8][C:6]([C+:13]([C:4](=[C:5]([H:2])[H:12])[H:1])[H:7])([H:14])[H:9].[O:3]([H:11])[H:10]', '[H:7][C:13]([C:4](=[C:5]([H:2])[H:12])[H:1])([C:6]([H:9])([H:14])[H:8])[O+:3]([H:10])[H:11]'),
+                ('[C+:5]([C:10]([H:13])([H:7])[H:4])([C:6]([H:2])=[C:3]([H:11])[H:12])[H:8].[H:1][O:9][H:14]', '[H:13][C:10]([H:7])([C:5]([O+:9]([H:14])[H:1])([C:6]([H:2])=[C:3]([H:12])[H:11])[H:8])[H:4]'),
+                ('[H:5][C:4]([C+:14]([C:9](=[C:2]([H:12])[H:3])[H:13])[H:1])([H:11])[H:10].[H:7][O:8][H:6]', '[C:14]([C:9](=[C:2]([H:3])[H:12])[H:13])([C:4]([H:10])([H:5])[H:11])([H:1])[O+:8]([H:7])[H:6]'),
+                ('[C+:9]([C:6](=[C:10]([H:4])[H:2])[H:8])([H:14])[C:5]([H:12])([H:13])[H:1].[H:7][O:3][H:11]', '[O+:3]([H:7])([H:11])[C:9]([H:14])([C:6]([H:8])=[C:10]([H:4])[H:2])[C:5]([H:1])([H:12])[H:13]'),
+            ],
+            [  # Zwitterion: azomethine ylide ring closure to 2-methylaziridine
+                ('[C:3]([H:9])([H:1])([H:11])[C:6]([H:5])=[N+:8]([C-:2]([H:7])[H:4])[H:10]', '[H:9][C:3]([H:1])([C:6]1([N:8]([H:10])[C:2]1([H:4])[H:7])[H:5])[H:11]'),
+                ('[N+:2]([C-:6]([H:8])[H:7])([H:10])=[C:11]([H:9])[C:3]([H:5])([H:4])[H:1]', '[C:6]1([H:8])([H:7])[C:11]([H:9])([C:3]([H:5])([H:1])[H:4])[N:2]1[H:10]'),
+                ('[H:2][C:7]([H:3])([C:8]([H:1])=[N+:4]([C-:6]([H:9])[H:10])[H:11])[H:5]', '[H:11][N:4]1[C:8]([C:7]([H:5])([H:3])[H:2])([C:6]1([H:9])[H:10])[H:1]'),
+                ('[N+:8]([C-:11]([H:9])[H:5])(=[C:3]([H:2])[C:6]([H:1])([H:4])[H:7])[H:10]', '[H:10][N:8]1[C:3]([C:6]([H:4])([H:1])[H:7])([C:11]1([H:5])[H:9])[H:2]'),
+                ('[H:4][C:8]([H:11])([H:6])[C:3]([H:7])=[N+:5]([H:1])[C-:9]([H:10])[H:2]', '[H:1][N:5]1[C:9]([C:3]1([C:8]([H:4])([H:11])[H:6])[H:7])([H:2])[H:10]'),
+            ],
         ]
 
         hashes = []
@@ -309,11 +318,11 @@ class TestRxnHash:
             }
             assert len(observed) == 1
             hashes.extend(observed)
-        assert len(set(hashes)) == 5
+        assert len(set(hashes)) == 7
 
 
 def reaction_graph(rxn):
-    """Independent adjacency/formal-charge oracle, without stereo."""
+    """Independent adjacency/total-charge oracle, without stereo."""
     reactant = rxn.reactant.graph
     product = rxn.product.graph
     maps = [reactant.atom_info[i]["atom_map"] for i in range(len(reactant.elements))]
@@ -328,8 +337,8 @@ def reaction_graph(rxn):
             label=(
                 element,
                 round(float(reactant._masses[i]), 6),
-                round(float(reactant.fc[i]), 8),
-                round(float(product.fc[order[i]]), 8),
+                int(reactant.q),
+                int(product.q),
             ),
         )
     for i in range(len(reactant.elements)):

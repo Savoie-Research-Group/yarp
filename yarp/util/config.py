@@ -487,6 +487,10 @@ class IRCValConfig:
     multiplicity: int = None
     max_cycles: int = 300
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
+    # Route reactions whose IRC outcome is anything but intended/inverse_intended
+    # to failed_rxns. Off by default: xTB IRC labels are poor predictors of DFT
+    # IRC outcomes, so an unintended label is not a reason to drop a reaction.
+    divert_unintended: bool = False
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
@@ -495,6 +499,8 @@ class IRCValConfig:
     def __post_init__(self):
         if self.charge == None:
             raise ValueError("Missing required key! Please provide 'charge' in irc_val block!")
+        if not isinstance(self.divert_unintended, bool):
+            raise ValueError("Please provide a boolean value (true/false) to irc_val: 'divert_unintended'")
         if self.multiplicity == None:
             raise ValueError("Missing required key! Please provide 'multiplicity' in irc_val block!")
         if self.software not in ['pysisyphus', 'orca']:

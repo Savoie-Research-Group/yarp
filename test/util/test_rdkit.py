@@ -3,6 +3,7 @@ import numpy as np
 import yarp as yp
 from yarp.reaction.enum import enumerate_products
 from yarp.yarpecule.graph.adjacency import table_generator
+from yarp.yarpecule.hashes import yarpecule_hash
 
 from yarp.util.rdkit import (
     yarpecule_to_rdmol,
@@ -34,7 +35,7 @@ class TestFFOpt:
         """
         reactant = yp.yarpecule('O=CCO')
         products = enumerate_products(reactant, 2, 2, mode="concerted")
-        target_hash = "1034502.7961211"
+        target_hash = yarpecule_hash(yp.yarpecule('O=C1CO1.[H][H]'))
         target_product = next(p for p in products if str(p.hash) == str(target_hash))
 
         opt_geo = rdkit_joint_opt(target_product, target_product.bond_mats[0],

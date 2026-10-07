@@ -270,7 +270,8 @@ class TestLewisStructureGeneration:
     def test_azulene_xyz(self, azulene_xyz):
         yp_mol = ypcule(azulene_xyz, mode='yarp')
         assert_invariants(yp_mol)
-        assert len(yp_mol.bond_mats) == 1
+        assert len(yp_mol.bond_mats) == 2
+        assert yp_mol.bond_mat_scores[0] == yp_mol.bond_mat_scores[1]
         assert yp_mol.rings[0][0] == 0
         assert yp_mol.rings[0][1] == 1
         assert yp_mol.rings[0][2] == 3

@@ -4,7 +4,11 @@ import h5py
 import re
 import numpy as np
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.calc_base import (
+    AsyncYarpCalculator,
+    pysis_image,
+    pysis_xtb_calc_lines,
+)
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.util.constants import Constants
@@ -42,7 +46,7 @@ class TSOptTask(AsyncYarpCalculator):
 class PysisyphusTSOptCalculator(TSOptTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
+        self.image_name = pysis_image(self.config.lot)
 
     def generate_input(self):
         initial_guesses = self._initial_guesses()
@@ -171,7 +175,6 @@ class PysisyphusTSOptCalculator(TSOptTask):
     def _write_pysis_ts_opt_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
         lot = self.config.lot.lower()
-        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
 
         # Write the file! Yay, YAML friend!
         with open(input_path, 'a') as f:
@@ -181,7 +184,8 @@ class PysisyphusTSOptCalculator(TSOptTask):
             # set calc block
             # ERM: I left out the option for solvent,
             # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+            for line in pysis_xtb_calc_lines(lot, self.config):
+                f.write(line)
 
             # set opt block
             f.write(f'tsopt:\n type: rsprfo\n do_hess: True\n hessian_recalc: {self.config.hessian_recalc}\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')

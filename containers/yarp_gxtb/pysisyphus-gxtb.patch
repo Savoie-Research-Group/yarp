@@ -1,0 +1,60 @@
+diff --git a/pysisyphus/calculators/XTB.py b/pysisyphus/calculators/XTB.py
+index 91d5bf78..c346c7e9 100644
+--- a/pysisyphus/calculators/XTB.py
++++ b/pysisyphus/calculators/XTB.py
+@@ -29,6 +29,7 @@ class XTB(Calculator):
+         gbsa="",
+         alpb="",
+         gfn=2,
++        gxtb = False,
+         acc=1.0,
+         iterations=250,
+         etemp=None,
+@@ -78,6 +79,7 @@ class XTB(Calculator):
+         self.gbsa = gbsa
+         self.alpb = alpb
+         self.gfn = gfn
++        self.gxtb = gxtb
+         self.acc = acc
+         self.iterations = iterations
+         self.etemp = etemp
+@@ -181,22 +183,33 @@ class XTB(Calculator):
+             f"--input xcontrol --chrg {self.charge} --uhf {self.uhf} "
+             f"--acc {self.acc} --iterations {self.iterations}".split()
+         )
++
+         if self.etemp:
+             etemp = f"--etemp {self.etemp}".split()
+-            add_args = add_args + etemp
++            add_args.extend(etemp)
+ 
+         # Use solvent model if specified
+         if self.gbsa:
+             gbsa = f"--gbsa {self.gbsa}".split()
+-            add_args = add_args + gbsa
++            add_args.extend(gbsa)
+         elif self.alpb:
+             alpb = f"--alpb {self.alpb}".split()
+-            add_args = add_args + alpb
++            add_args.extend(alpb)
++
+         if self.wavefunction_dump:
+-            add_args = add_args + ["--molden"]
++            add_args.append("--molden")
++
+         # Select parametrization
+-        gfn = ["--gfnff"] if self.gfn == "ff" else f"--gfn {self.gfn}".split()
+-        add_args = add_args + gfn
++        if self.gxtb:
++            add_args.append("--gxtb")
++        else:
++            gfn_args = (
++                ["--gfnff"]
++                if self.gfn == "ff"
++                else f"--gfn {self.gfn}".split()
++            )
++            add_args.extend(gfn_args)
++
+         return add_args
+ 
+     def get_pal_env(self):

@@ -311,8 +311,8 @@ class TSGuessConfig:
             raise ValueError("Missing required key! Please provide 'software' in ts_guess block!")
         if self.software not in ['pysisyphus']:
             raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'pysisyphus'")
-        if self.software == 'pysisyphus' and self.gsm_lot not in ['xtb']:
-            raise ValueError(f"Invalid 'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.gsm_lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid 'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
 
         if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
             raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
@@ -363,8 +363,8 @@ class PreOptConfig:
     def __post_init__(self):
         if self.software not in ['pysisyphus']:
             raise ValueError(f"Invalid pre_opt.'software' provided: '{self.software}'; valid option: 'pysisyphus'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid pre_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid pre_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         if self.opt_type not in ['lbfgs', 'rfo']:
             raise ValueError(f"Invalid pre_opt.'opt_type': '{self.opt_type}'. Valid options are 'lbfgs', 'rfo'")
         if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
@@ -410,8 +410,8 @@ class RPOptConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in rp_opt block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid rp_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         if self.opt_type not in ['rfo', 'lbfgs']:
             raise ValueError(f"Invalid rp_opt.'opt_type': '{self.opt_type}'. Valid options are 'rfo', 'lbfgs'")
@@ -451,8 +451,8 @@ class TSOptConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in ts_opt block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid ts_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid ts_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid ts_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
 
@@ -495,8 +495,8 @@ class IRCValConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in irc_val block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid irc_val.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid irc_val.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid irc_val.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
 

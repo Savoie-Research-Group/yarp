@@ -146,7 +146,7 @@ def yarpecule_hash(y):
     matrix = np.asarray(y.adj_mat, dtype=float) + np.eye(len(y.adj_mat))
     return np.round(
         fsum((matrix * np.outer(y.atom_hashes, y.atom_hashes)).flat)
-        + y.q * fsum(y.atom_hashes),
+        + y.q,
         8,
     )
 
@@ -164,7 +164,7 @@ def reaction_hash(rxn):
         product.adj_mat,
         dtype=float,
     )
-    atom_hashes = (
+    proxy_atom_hashes = (
         np.asarray(reactant.atom_hashes)
         + np.asarray(product.atom_hashes)
     )
@@ -172,7 +172,7 @@ def reaction_hash(rxn):
         rxn.reactant.hash
         + rxn.product.hash
         + np.round(
-            fsum((rxn_matrix * np.outer(atom_hashes, atom_hashes)).flat),
+            fsum((rxn_matrix * np.outer(proxy_atom_hashes, proxy_atom_hashes)).flat),
             8,
         )
     )

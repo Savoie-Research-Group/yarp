@@ -3,7 +3,11 @@ import re
 import shutil
 import fnmatch
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.calc_base import (
+    AsyncYarpCalculator,
+    pysis_image,
+    pysis_xtb_calc_lines,
+)
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
@@ -63,7 +67,7 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
+        self.image_name = pysis_image(self.config.gsm_lot)
         self.n_pairs = self.config.n_conf
         self.pairs_to_run = []
 
@@ -282,7 +286,8 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             # set calc block
             # ERM: I left out the option for solvent,
             # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+            for line in pysis_xtb_calc_lines(lot, self.config):
+                f.write(line)
 
             # set cos block
             f.write(f'cos:\n type: gs\n max_nodes: {self.config.max_gsm_nodes}\n climb: True\n climb_rms: 0.005\n climb_lanczos: False\n reparam_check: rms\n reparam_every: 1\n reparam_every_full: 1\n')

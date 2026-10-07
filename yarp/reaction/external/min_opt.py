@@ -5,7 +5,12 @@ import re
 from pathlib import Path
 import numpy as np
 
-from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
+from yarp.reaction.external.calc_base import (
+    AsyncYarpCalculator,
+    CalculatorInputError,
+    pysis_image,
+    pysis_xtb_calc_lines,
+)
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.conf_sampling.joint_opt import joint_optimize
@@ -228,7 +233,7 @@ class MinOptTask(AsyncYarpCalculator):
 class PysisyphusMinOptCalculator(MinOptTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
+        self.image_name = pysis_image(self.config.lot)
 
     def generate_input(self):
         # The product pre-opt is the one case with no ready-made starting
@@ -346,7 +351,6 @@ class PysisyphusMinOptCalculator(MinOptTask):
     def _write_pysis_rp_opt_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
         lot = self.config.lot.lower()
-        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
 
         # Write the file! Yay, YAML friend!
         with open(input_path, 'a') as f:
@@ -356,7 +360,8 @@ class PysisyphusMinOptCalculator(MinOptTask):
             # set calc block
             # ERM: I left out the option for solvent,
             # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+            for line in pysis_xtb_calc_lines(lot, self.config):
+                f.write(line)
 
             # set opt block
             #

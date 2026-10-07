@@ -1,6 +1,7 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
+from copy import copy
 from importlib import import_module
 from math import fsum
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ import numpy as np
 from yarp.yarpecule.hashes import (
     bmat_hash,
     reaction_hash,
+    yarpecule_hash,
 )
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
@@ -362,6 +364,19 @@ def isomorphic(left, right):
     )
 
 
+def charged_reaction(rxn, charge):
+    """Return a lightweight reaction view with one conserved total charge."""
+    endpoints = []
+    for endpoint in (rxn.reactant, rxn.product):
+        graph = copy(endpoint.graph)
+        graph._q = charge
+        graph._yarpecule_hash = yarpecule_hash(graph)
+        endpoints.append(SimpleNamespace(graph=graph, hash=graph.hash))
+    charged = SimpleNamespace(reactant=endpoints[0], product=endpoints[1])
+    charged.hash = reaction_hash(charged)
+    return charged
+
+
 class TestReactionHashCorpus:
     """Committed cases: 200 symmetry, 100 nonisomorphic, 100 direction, 5 network reverses."""
 
@@ -412,6 +427,45 @@ class TestReactionHashCorpus:
         assert first.hash == reaction_hash(first)
         assert later.hash == reaction_hash(later)
         assert first.hash == later.hash
+
+    def test_artificial_charged_reaction_corpus(
+        self,
+        reaction_hash_symmetry_cases,
+        reaction_hash_nonisomorphic_cases,
+        reaction_hash_direction_cases,
+        reaction_hash_network_reverse_cases,
+    ):
+        """Exercise 405 charged variants without adding generated fixtures."""
+        bases = [
+            pair[0]
+            for cases in (
+                reaction_hash_symmetry_cases,
+                reaction_hash_nonisomorphic_cases,
+                reaction_hash_direction_cases,
+                reaction_hash_network_reverse_cases,
+            )
+            for pair in cases
+        ]
+        charges = (-3, -2, -1, 1, 2, 3)
+        retained = {}
+
+        for index, base in enumerate(bases):
+            charged = charged_reaction(base, charges[index % len(charges)])
+            reverse = SimpleNamespace(
+                reactant=charged.product,
+                product=charged.reactant,
+            )
+
+            assert charged.hash != base.hash
+            assert charged.hash == reaction_hash(reverse)
+
+            prior = retained.get(charged.hash)
+            if prior is None:
+                retained[charged.hash] = charged
+                continue
+            assert isomorphic(prior, charged) or isomorphic(prior, reverse)
+
+        assert len(bases) == 405
 
 
 class TestBemSumHash:

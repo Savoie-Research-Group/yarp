@@ -3,11 +3,8 @@ import shutil
 import re
 import numpy as np
 
-from yarp.reaction.external.calc_base import (
-    AsyncYarpCalculator,
-    pysis_image,
-    pysis_xtb_calc_lines,
-)
+from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.util.constants import Constants

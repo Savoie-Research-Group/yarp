@@ -3,11 +3,8 @@ import re
 import shutil
 import fnmatch
 
-from yarp.reaction.external.calc_base import (
-    AsyncYarpCalculator,
-    pysis_image,
-    pysis_xtb_calc_lines,
-)
+from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.reaction.conformer import conformer
 from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs

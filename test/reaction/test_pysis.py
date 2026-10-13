@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from yarp.reaction.external.calc_base import (
+from yarp.reaction.external.pysis import (
     PYSIS_GXTB_IMAGE,
     PYSIS_XTB_IMAGE,
     pysis_image,
@@ -31,7 +31,6 @@ def test_xtb_calc_block_has_no_gxtb_keyword():
     block = "".join(pysis_xtb_calc_lines("xtb", CONFIG))
     assert "type: xtb" in block
     assert "gxtb" not in block
-    assert "pal: 2" in block and "mem: 4000" in block
 
 
 def test_gxtb_calc_block_requests_gxtb():

@@ -402,3 +402,80 @@ class TestStrictnessDoesNotOverreach:
         # Accepted on the way in, and overwritten on the way out.
         assert inp.enum.ON is True
         assert inp.pipeline_tasks["ll_refine.reactant_optimization"].config.initial_geom.reactant.label == "conf_gen"
+
+# Each block that takes `use_local_scratch`, and the tasks it configures.
+LOCAL_SCRATCH_BLOCKS = [
+    ("egat",              ["egat.ml_predict"]),
+    ("ll_path.pre_opt",   ["ll_path.reactant_pre_opt", "ll_path.product_pre_opt"]),
+    ("ll_path.conf_gen",  ["ll_path.reactant_conformer", "ll_path.product_conformer"]),
+    ("ll_path.ts_guess",  ["ll_path.ts_guess"]),
+    ("ll_refine.rp_opt",  ["ll_refine.reactant_optimization", "ll_refine.product_optimization"]),
+    ("ll_refine.ts_opt",  ["ll_refine.transition_state_optimization"]),
+    ("ll_refine.irc_val", ["ll_refine.irc_validation"]),
+]
+
+
+class TestLocalScratch:
+    """
+    `use_local_scratch` is set per task block and defaults to off. Only SGE
+    implements it: SLURM refuses it at parse time, and the local scheduler
+    ignores it with a warning.
+    """
+
+    def _cfg(self, base, scheduler, *flagged_blocks):
+        cfg = copy.deepcopy(base)
+        cfg["initialize"]["job_manager"]["scheduler"] = scheduler
+        if scheduler != "local":
+            cfg["initialize"]["job_manager"]["queue"] = "long"
+        for path in flagged_blocks:
+            node = cfg
+            for part in path.split("."):
+                node = node.setdefault(part, {})  # pre_opt has no block in the fixture
+            node["use_local_scratch"] = True
+        return cfg
+
+    def _flagged(self, inp):
+        tasks = {**inp.global_tasks, **inp.pipeline_tasks}
+        return {task_id for task_id, task_def in tasks.items() if task_def.config.use_local_scratch}
+
+    def test_off_everywhere_by_default(self, enum_egat_llpath_llrefine):
+        assert self._flagged(InputParser(self._cfg(enum_egat_llpath_llrefine, "sge"))) == set()
+
+    @pytest.mark.parametrize("block, task_ids", LOCAL_SCRATCH_BLOCKS, ids=[b for b, _ in LOCAL_SCRATCH_BLOCKS])
+    def test_each_block_turns_on_only_its_own_tasks(self, enum_egat_llpath_llrefine, block, task_ids):
+        inp = InputParser(self._cfg(enum_egat_llpath_llrefine, "sge", block))
+
+        assert self._flagged(inp) == set(task_ids)
+
+    def test_local_scratch_dir_is_read(self, enum_egat_llpath_llrefine):
+        cfg = copy.deepcopy(enum_egat_llpath_llrefine)
+        cfg["initialize"]["job_manager"]["local_scratch_dir"] = "/scratch/local/$USER"
+
+        assert InputParser(cfg).job_manager.local_scratch_dir == "/scratch/local/$USER"
+
+    def test_sge_accepts_it_silently(self, enum_egat_llpath_llrefine, capsys):
+        InputParser(self._cfg(enum_egat_llpath_llrefine, "sge", "ll_refine.ts_opt"))
+
+        assert "use_local_scratch" not in capsys.readouterr().out
+
+    def test_slurm_refuses_it_and_names_the_tasks(self, enum_egat_llpath_llrefine):
+        cfg = self._cfg(enum_egat_llpath_llrefine, "slurm", "egat", "ll_refine.ts_opt")
+
+        with pytest.raises(NotImplementedError, match="not yet implemented for the 'slurm' scheduler") as exc_info:
+            InputParser(cfg)
+
+        assert "Requested by: egat.ml_predict, ll_refine.transition_state_optimization" in str(exc_info.value)
+
+    def test_slurm_without_it_still_parses(self, enum_egat_llpath_llrefine):
+        InputParser(self._cfg(enum_egat_llpath_llrefine, "slurm"))  # must not raise
+
+    def test_local_ignores_it_with_a_warning(self, enum_egat_llpath_llrefine, capsys):
+        InputParser(self._cfg(enum_egat_llpath_llrefine, "local", "ll_refine.rp_opt"))
+
+        assert ("WARNING: 'use_local_scratch' has no effect with the 'local' scheduler and is ignored for: "
+                "ll_refine.reactant_optimization, ll_refine.product_optimization") in capsys.readouterr().out
+
+    def test_local_without_it_is_silent(self, enum_egat_llpath_llrefine, capsys):
+        InputParser(self._cfg(enum_egat_llpath_llrefine, "local"))
+
+        assert "use_local_scratch" not in capsys.readouterr().out

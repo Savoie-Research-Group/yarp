@@ -271,9 +271,12 @@ class AsyncYarpCalculator:
         that succeeded. Nothing is filtered on the way back; pruning is each
         calculator's `cleanup()`.
 
-        SGE's SIGUSR2 (from `-notify`, at h_rt) becomes a normal exit so the
-        copy-back still runs. SIGUSR1 (before a suspend) copies back and keeps
-        going.
+        With `-notify`, SGE sends SIGUSR2 at h_rt and SIGKILL after the queue's
+        notify time (60 s on the CRC), so the copy-back has to fit in that
+        window. The USR2 trap makes the exit explicit; the EXIT trap does the
+        copy-back. (Bash also runs the EXIT trap when an untrapped USR2 kills
+        it, but the explicit exit doesn't depend on that.) SIGUSR1 (before a
+        suspend) copies back and keeps going.
 
         `yarp_bg` runs the container in the background and waits for it, since
         bash holds a trap until a foreground child exits. It keeps waiting

@@ -210,10 +210,36 @@ class TestOrcaJobScripts:
             f"--pwd /work {sif} bash /work/run_orca_inner.sh\n"
         )
 
-    def test_staged_inner_script_is_unchanged(self, tmp_path):
+    def test_staged_inner_script_logs_to_nfs(self, tmp_path):
+        """ORCA's .out/.err go straight to the NFS run dir, so they can be followed during the run."""
         _, scratch, _ = self._write(tmp_path, staged=True)
 
-        assert (scratch / "run_orca_inner.sh").read_text() == ORCA_INNER_SCRIPT
+        assert (scratch / "run_orca_inner.sh").read_text() == (
+            ORCA_INNER_SCRIPT
+            .replace("> tsopt_1.out 2> tsopt_1.err", "> /nfs/tsopt_run1/tsopt_1.out 2> /nfs/tsopt_run1/tsopt_1.err")
+            .replace("> tsopt_2.out 2> tsopt_2.err", "> /nfs/tsopt_run2/tsopt_2.out 2> /nfs/tsopt_run2/tsopt_2.err")
+        )
+
+
+class TestPysisInnerScriptLogs:
+    @pytest.mark.parametrize("staged", [False, True])
+    def test_log_lines(self, tmp_path, staged):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        (sif_dir / "erm42_yarp_pysis_xtb.sif").touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        calc = make_calc(PysisyphusTSOptCalculator, xtb_refined_rxn(), XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus", job_config=job_config)
+        calc.config.use_local_scratch = staged
+        calc.set_scratch_dir(tmp_path / "SCRATCH" / "abc123_refine.transition_state_optimization")
+        calc.generate_input()
+        calc.write_submission_script()
+
+        lines = (calc.scratch_dir / "run_pysis_inner.sh").read_text().splitlines()
+        for i in (1, 2):
+            log = f"/nfs/tsopt_run{i}/" if staged else ""
+            assert f"pysis tsopt_{i}_input.yaml > {log}tsopt_{i}.log 2> {log}tsopt_{i}.err" in lines
 
 
 ORCA_INNER_SCRIPT = (

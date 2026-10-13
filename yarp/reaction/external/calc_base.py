@@ -57,6 +57,20 @@ class AsyncYarpCalculator:
             return f'{flag} "$YARP_LOCAL_DIR":/work {flag} "$YARP_NFS_DIR":/nfs'
         return f"{flag} {work_dir}:/work"
 
+    def _log_prefix(self, run_dir: str = "") -> str:
+        """
+        Prefix for a log file that a command inside the container redirects
+        to, where `run_dir` is the command's working dir relative to /work.
+
+        Normally "", so the log lands in the command's working dir as before. A
+        staged job writes it through the /nfs mount straight into the NFS task
+        dir instead, so the log can be followed while the job runs and
+        survives a kill that skips the copy-back.
+        """
+        if not self._use_local_scratch():
+            return ""
+        return f"/nfs/{run_dir}/" if run_dir else "/nfs/"
+
     def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False, env_vars: dict = None) -> str:
         """
         The universal toggle for container execution.

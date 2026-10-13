@@ -403,7 +403,7 @@ class TestOrcaJobScript:
         )
 
     def test_staged_submission_script(self, tmp_path, khp_reaction):
-        """Staging adds the staging block and changes the container line; nothing else."""
+        """Staging adds the staging block and changes the container line, which logs through /nfs."""
         script, scratch, sif = self._write(tmp_path, khp_reaction, staged=True)
 
         assert script.read_text() == (
@@ -443,5 +443,5 @@ class TestOrcaJobScript:
             f"cd {scratch}\n"
             f'yarp_bg apptainer exec -e  --bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs '
             f"--pwd /work {sif} "
-            "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'\n"
+            "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > /nfs/min_opt.out 2> /nfs/min_opt.err'\n"
         )

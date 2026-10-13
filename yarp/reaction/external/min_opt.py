@@ -418,7 +418,8 @@ class OrcaMinOptCalculator(MinOptTask):
 
         # Construct the core command
         prefix = self.get_container_prefix(self.image_name, self.scratch_dir)
-        orca_cmd = "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'"
+        log = self._log_prefix()
+        orca_cmd = f"/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > {log}min_opt.out 2> {log}min_opt.err'"
         full_command = f"{prefix} {orca_cmd}"
 
         with open(script_path, "w") as f:

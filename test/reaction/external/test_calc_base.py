@@ -348,3 +348,17 @@ class TestLocalScratch:
         assert written_header(staged) == header(job_config)
         assert "YARP_LOCAL_DIR" not in written_header(staged)
         assert staged.get_container_prefix(HUB_IMAGE, WORK) == plain.get_container_prefix(HUB_IMAGE, WORK)
+
+    def test_log_prefix_points_into_the_nfs_mount(self):
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container="apptainer", queue="long"))
+
+        assert calc._log_prefix() == "/nfs/"
+        assert calc._log_prefix("tsopt_run3") == "/nfs/tsopt_run3/"
+
+    @pytest.mark.parametrize("scheduler, staged", [("sge", False), ("local", True), ("slurm", True)])
+    def test_log_prefix_is_empty_unless_staged(self, scheduler, staged):
+        calc = make_calc(JobManagerConfig(scheduler=scheduler, container="apptainer", queue="long"),
+                         use_local_scratch=staged)
+
+        assert calc._log_prefix() == ""
+        assert calc._log_prefix("tsopt_run3") == ""

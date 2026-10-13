@@ -17,16 +17,16 @@ from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.conf_sampling.joint_opt import joint_optimize
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.min_opt import (
-    MinOptTask, PysisyphusMinOptCalculator, adopt_reactant_preopt_geometry,
+    MinOptTask, OrcaMinOptCalculator, PysisyphusMinOptCalculator, adopt_reactant_preopt_geometry,
 )
-from yarp.util.config import PreOptConfig, RPOptConfig, InitialGeomConfig, GeomSourceConfig
+from yarp.util.config import PreOptConfig, RPOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
 from yarp.util.write_files import xyz_generate_string
 from yarp.yarpecule.graph.adjacency import compare_adjacency
 
 
-def make_calc(rxn, task_type, config, cls=MinOptTask):
+def make_calc(rxn, task_type, config, cls=MinOptTask, job_config=None):
     task_def = SimpleNamespace(task_type=task_type, config=config, task_id=f"s.{task_type}")
-    return cls(task_def, rxn, MagicMock())
+    return cls(task_def, rxn, job_config or MagicMock())
 
 
 @pytest.fixture
@@ -359,3 +359,41 @@ class TestAdoptReactantPreoptGeometry:
 
         assert adopt_reactant_preopt_geometry(reactant)
         assert np.allclose(reactant.graph.geo, reactant.conformers["preopt_b"].geo)
+
+
+class TestOrcaJobScript:
+    """
+    The single script an ORCA R/P optimization writes under SGE + apptainer:
+    the scheduler header, a cd into the task dir, and the container command.
+    """
+
+    def test_submission_script(self, tmp_path, khp_reaction):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        sif = sif_dir / "orca_6.0.1.sif"
+        sif.touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
+        calc = make_calc(khp_reaction, "reactant_optimization", config,
+                         cls=OrcaMinOptCalculator, job_config=job_config)
+        scratch = tmp_path / "SCRATCH" / "abc123_refine.reactant_optimization"
+        calc.set_scratch_dir(scratch)
+
+        script = calc.write_submission_script()
+
+        assert script == scratch / "run_orca_rpopt.sh"
+        assert script.read_text() == (
+            "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
+            "\n"
+            f"cd {scratch}\n"
+            f"apptainer exec -e  --bind {scratch}:/work --pwd /work {sif} "
+            "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'\n"
+        )

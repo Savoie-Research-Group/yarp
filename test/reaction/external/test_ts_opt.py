@@ -16,7 +16,7 @@ import pytest
 
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.ts_opt import OrcaTSOptCalculator, PysisyphusTSOptCalculator
-from yarp.util.config import TSOptConfig, InitialGeomConfig, GeomSourceConfig
+from yarp.util.config import TSOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
 
 ELEMENTS = ["H", "H", "H"]
 HL_LOT = "PBE D3BJ def2-SVP"
@@ -35,11 +35,12 @@ def ts_conf(tag, key, freqs):
     return conf
 
 
-def make_calc(cls, ts_geom, ts_source, lot=HL_LOT, software="orca"):
+def make_calc(cls, ts_geom, ts_source, lot=HL_LOT, software="orca", job_config=None):
     src = GeomSourceConfig(label="rp_opt", lot="xtb", software="pysisyphus")
     cfg = TSOptConfig(software=software, lot=lot, charge=0, multiplicity=1)
     cfg.initial_geom = InitialGeomConfig(reactant=src, product=src, transition_state=ts_source)
-    return cls(SimpleNamespace(config=cfg), SimpleNamespace(ts_geom=ts_geom), MagicMock(container="docker"))
+    return cls(SimpleNamespace(config=cfg), SimpleNamespace(ts_geom=ts_geom),
+               job_config or MagicMock(container="docker"))
 
 
 def written_tags(calc, tmp_path, prefix="ts_guess"):
@@ -118,3 +119,66 @@ class TestTSGuessSourceUnchanged:
 
         assert not make_calc(PysisyphusTSOptCalculator, {guess.type: guess}, XTB_TS_GUESS,
                              lot="xtb", software="pysisyphus").has_prerequisites()
+
+
+class TestOrcaJobScripts:
+    """
+    The two scripts an ORCA TS optimization writes under SGE + apptainer: an
+    outer script that carries the scheduler header and launches the container,
+    and an inner script that runs each tsopt_run{i} in turn inside it.
+    """
+
+    def _write(self, tmp_path):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        sif = sif_dir / "orca_6.0.1.sif"
+        sif.touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        ts_geom = {key: ts_conf(tag, key, ONE_IMAG)
+                   for tag, key in ((1, "1_tsopt_xtb_pysisyphus"), (2, "2_tsopt_xtb_pysisyphus"))}
+
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT, job_config=job_config)
+        scratch = tmp_path / "SCRATCH" / "abc123_refine.transition_state_optimization"
+        calc.set_scratch_dir(scratch)
+        calc.generate_input()
+        return calc.write_submission_script(), scratch, sif
+
+    def test_outer_script(self, tmp_path):
+        submit, scratch, sif = self._write(tmp_path)
+
+        assert submit == str(scratch / "submit_tsopt.sh")
+        assert (scratch / "submit_tsopt.sh").read_text() == (
+            "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
+            "\n"
+            f"apptainer exec -e  --bind {scratch}:/work --pwd /work {sif} bash /work/run_orca_inner.sh\n"
+        )
+
+    def test_inner_script(self, tmp_path):
+        _, scratch, _ = self._write(tmp_path)
+
+        assert (scratch / "run_orca_inner.sh").read_text() == (
+            "#!/bin/bash\n"
+            "\n"
+            "echo 'Starting YARP serial TSOPT execution...'\n"
+            "\n"
+            "echo '--- Running TSOPT 1 ---'\n"
+            "cd /work/tsopt_run1\n"
+            "orca=$(which orca)\n"
+            "$orca tsopt_1.inp > tsopt_1.out 2> tsopt_1.err\n"
+            "echo '--- Finished TSOPT 1 ---'\n"
+            "\n"
+            "echo '--- Running TSOPT 2 ---'\n"
+            "cd /work/tsopt_run2\n"
+            "orca=$(which orca)\n"
+            "$orca tsopt_2.inp > tsopt_2.out 2> tsopt_2.err\n"
+            "echo '--- Finished TSOPT 2 ---'\n"
+            "\n"
+        )

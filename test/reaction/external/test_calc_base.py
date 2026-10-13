@@ -8,6 +8,7 @@ the compute node. These tests pin both as exact text, so any change to the
 scripts shows up here as a deliberate diff.
 """
 import io
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -186,6 +187,7 @@ class TestSchedulerHeaders:
             "#$ -pe smp 4\n"
             "#$ -l h_vmem=8000M\n"
             "#$ -l h_rt=12:00:00\n"
+            "#$ -notify\n"
             "#$ -o /dev/null\n"
             "#$ -e /dev/null\n"
             "\n"
@@ -224,3 +226,117 @@ class TestSchedulerHeaders:
                                       module_container="module load apptainer")
 
         assert header(job_config) == ""
+
+
+
+def staging_block(nfs_dir, local_root="$TMPDIR"):
+    """The staging block a staged SGE job script carries after its header."""
+    return (
+        "# Stage this task in node-local scratch (use_local_scratch)\n"
+        f'YARP_NFS_DIR="{nfs_dir}"\n'
+        f'YARP_LOCAL_DIR=$(mktemp -d "{local_root}/yarp.XXXXXX") || exit 1\n'
+        'yarp_copy_back() { rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/; }\n'
+        'trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n'
+        "trap 'yarp_copy_back' USR1\n"
+        "trap 'exit 140' USR2\n"
+        'cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ || exit 1\n'
+        "yarp_bg() {\n"
+        '    "$@" &\n'
+        "    local pid=$!\n"
+        "    while kill -0 $pid 2>/dev/null; do wait $pid; done\n"
+        "    wait $pid\n"
+        "}\n"
+        "\n"
+    )
+
+
+def staged_calc(job_config):
+    calc = make_calc(job_config, n_cpus=4, mem_per_cpu=2000, max_runtime="12:00:00", use_local_scratch=True)
+    calc.scratch_dir = Path(WORK)  # set directly: set_scratch_dir would create it
+    return calc
+
+
+def written_header(calc):
+    f = io.StringIO()
+    calc.write_scheduler_headers(f)
+    return f.getvalue()
+
+
+SGE_HEADER = (
+    "#$ -N yarp\n"
+    "#$ -q long\n"
+    "#$ -pe smp 4\n"
+    "#$ -l h_vmem=8000M\n"
+    "#$ -l h_rt=12:00:00\n"
+    "#$ -notify\n"
+    "#$ -o /dev/null\n"
+    "#$ -e /dev/null\n"
+    "\n"
+)
+
+
+class TestLocalScratch:
+    """
+    A task with `use_local_scratch` under SGE runs in a fresh dir under
+    `local_scratch_dir`: the header stages the task dir in and sets the
+    copy-back traps, and the prefix runs the container in the background with
+    the local copy as /work and the NFS task dir as /nfs.
+    """
+
+    def test_staged_sge_header(self):
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container="apptainer", queue="long"))
+
+        assert written_header(calc) == SGE_HEADER + staging_block(WORK)
+
+    def test_local_scratch_dir_is_written_verbatim(self):
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                            local_scratch_dir="/scratch/local/$USER"))
+
+        assert written_header(calc) == SGE_HEADER + staging_block(WORK, "/scratch/local/$USER")
+
+    def test_staging_follows_the_module_line(self):
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                            module_container="module load apptainer"))
+
+        assert written_header(calc) == SGE_HEADER + "module load apptainer\n\n" + staging_block(WORK)
+
+    def test_staged_docker_prefix(self, run):
+        run(stdout="0123456789ab\n")
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container="docker", queue="long"))
+
+        assert calc.get_container_prefix(HUB_IMAGE, WORK, env_vars=ENV) == (
+            "yarp_bg docker run --rm -e OMP_NUM_THREADS=4 -e MKL_NUM_THREADS=4  "
+            f'-v "$YARP_LOCAL_DIR":/work -v "$YARP_NFS_DIR":/nfs -w /work {HUB_IMAGE}'
+        )
+
+    @pytest.mark.parametrize("runner", SIF_RUNNERS)
+    def test_staged_sif_prefix(self, runner, tmp_path, run):
+        sif = tmp_path / "erm42_yarp_crest.sif"
+        sif.touch()
+        run()
+        calc = staged_calc(JobManagerConfig(scheduler="sge", container=runner, queue="long",
+                                            sif_location=str(tmp_path)))
+
+        assert calc.get_container_prefix(HUB_IMAGE, WORK) == (
+            f'yarp_bg {runner} exec -e  --bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs '
+            f"--pwd /work {sif}"
+        )
+        assert calc.get_container_prefix(HUB_IMAGE, WORK, apptainer_run=True, env_vars=ENV) == (
+            f"yarp_bg {runner} run -e --env OMP_NUM_THREADS=4 --env MKL_NUM_THREADS=4  "
+            f'--bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs --pwd /work {sif}'
+        )
+
+    @pytest.mark.parametrize("scheduler", ["local", "slurm"])
+    def test_ignored_outside_sge(self, scheduler, tmp_path, run):
+        """The parser refuses slurm and warns on local; calc_base stages under SGE only either way."""
+        sif = tmp_path / "erm42_yarp_crest.sif"
+        sif.touch()
+        run()
+        job_config = JobManagerConfig(scheduler=scheduler, container="apptainer", queue="long",
+                                      sif_location=str(tmp_path))
+        staged, plain = staged_calc(job_config), make_calc(job_config, n_cpus=4, mem_per_cpu=2000,
+                                                           max_runtime="12:00:00")
+
+        assert written_header(staged) == header(job_config)
+        assert "YARP_LOCAL_DIR" not in written_header(staged)
+        assert staged.get_container_prefix(HUB_IMAGE, WORK) == plain.get_container_prefix(HUB_IMAGE, WORK)

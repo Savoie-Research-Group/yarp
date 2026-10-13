@@ -128,7 +128,7 @@ class TestOrcaJobScripts:
     and an inner script that runs each tsopt_run{i} in turn inside it.
     """
 
-    def _write(self, tmp_path):
+    def _write(self, tmp_path, staged=False):
         sif_dir = tmp_path / "sifs"
         sif_dir.mkdir()
         sif = sif_dir / "orca_6.0.1.sif"
@@ -139,6 +139,7 @@ class TestOrcaJobScripts:
                    for tag, key in ((1, "1_tsopt_xtb_pysisyphus"), (2, "2_tsopt_xtb_pysisyphus"))}
 
         calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT, job_config=job_config)
+        calc.config.use_local_scratch = staged
         scratch = tmp_path / "SCRATCH" / "abc123_refine.transition_state_optimization"
         calc.set_scratch_dir(scratch)
         calc.generate_input()
@@ -155,6 +156,7 @@ class TestOrcaJobScripts:
             "#$ -pe smp 1\n"
             "#$ -l h_vmem=4000M\n"
             "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
             "#$ -o /dev/null\n"
             "#$ -e /dev/null\n"
             "\n"
@@ -164,21 +166,63 @@ class TestOrcaJobScripts:
     def test_inner_script(self, tmp_path):
         _, scratch, _ = self._write(tmp_path)
 
-        assert (scratch / "run_orca_inner.sh").read_text() == (
+        assert (scratch / "run_orca_inner.sh").read_text() == ORCA_INNER_SCRIPT
+
+    def test_staged_outer_script(self, tmp_path):
+        """Staging adds the staging block and changes the container line; nothing else."""
+        _, scratch, sif = self._write(tmp_path, staged=True)
+
+        assert (scratch / "submit_tsopt.sh").read_text() == (
             "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
             "\n"
-            "echo 'Starting YARP serial TSOPT execution...'\n"
+            "# Stage this task in node-local scratch (use_local_scratch)\n"
+            f'YARP_NFS_DIR="{scratch}"\n'
+            'YARP_LOCAL_DIR=$(mktemp -d "$TMPDIR/yarp.XXXXXX") || exit 1\n'
+            'yarp_copy_back() { rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/; }\n'
+            'trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n'
+            "trap 'yarp_copy_back' USR1\n"
+            "trap 'exit 140' USR2\n"
+            'cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ || exit 1\n'
+            "yarp_bg() {\n"
+            '    "$@" &\n'
+            "    local pid=$!\n"
+            "    while kill -0 $pid 2>/dev/null; do wait $pid; done\n"
+            "    wait $pid\n"
+            "}\n"
             "\n"
-            "echo '--- Running TSOPT 1 ---'\n"
-            "cd /work/tsopt_run1\n"
-            "orca=$(which orca)\n"
-            "$orca tsopt_1.inp > tsopt_1.out 2> tsopt_1.err\n"
-            "echo '--- Finished TSOPT 1 ---'\n"
-            "\n"
-            "echo '--- Running TSOPT 2 ---'\n"
-            "cd /work/tsopt_run2\n"
-            "orca=$(which orca)\n"
-            "$orca tsopt_2.inp > tsopt_2.out 2> tsopt_2.err\n"
-            "echo '--- Finished TSOPT 2 ---'\n"
-            "\n"
+            f'yarp_bg apptainer exec -e  --bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs '
+            f"--pwd /work {sif} bash /work/run_orca_inner.sh\n"
         )
+
+    def test_staged_inner_script_is_unchanged(self, tmp_path):
+        _, scratch, _ = self._write(tmp_path, staged=True)
+
+        assert (scratch / "run_orca_inner.sh").read_text() == ORCA_INNER_SCRIPT
+
+
+ORCA_INNER_SCRIPT = (
+    "#!/bin/bash\n"
+    "\n"
+    "echo 'Starting YARP serial TSOPT execution...'\n"
+    "\n"
+    "echo '--- Running TSOPT 1 ---'\n"
+    "cd /work/tsopt_run1\n"
+    "orca=$(which orca)\n"
+    "$orca tsopt_1.inp > tsopt_1.out 2> tsopt_1.err\n"
+    "echo '--- Finished TSOPT 1 ---'\n"
+    "\n"
+    "echo '--- Running TSOPT 2 ---'\n"
+    "cd /work/tsopt_run2\n"
+    "orca=$(which orca)\n"
+    "$orca tsopt_2.inp > tsopt_2.out 2> tsopt_2.err\n"
+    "echo '--- Finished TSOPT 2 ---'\n"
+    "\n"
+)

@@ -367,20 +367,23 @@ class TestOrcaJobScript:
     the scheduler header, a cd into the task dir, and the container command.
     """
 
-    def test_submission_script(self, tmp_path, khp_reaction):
+    def _write(self, tmp_path, rxn, staged=False):
         sif_dir = tmp_path / "sifs"
         sif_dir.mkdir()
         sif = sif_dir / "orca_6.0.1.sif"
         sif.touch()
         job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
                                       sif_location=str(sif_dir))
-        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
-        calc = make_calc(khp_reaction, "reactant_optimization", config,
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1,
+                             use_local_scratch=staged)
+        calc = make_calc(rxn, "reactant_optimization", config,
                          cls=OrcaMinOptCalculator, job_config=job_config)
         scratch = tmp_path / "SCRATCH" / "abc123_refine.reactant_optimization"
         calc.set_scratch_dir(scratch)
+        return calc.write_submission_script(), scratch, sif
 
-        script = calc.write_submission_script()
+    def test_submission_script(self, tmp_path, khp_reaction):
+        script, scratch, sif = self._write(tmp_path, khp_reaction)
 
         assert script == scratch / "run_orca_rpopt.sh"
         assert script.read_text() == (
@@ -390,10 +393,47 @@ class TestOrcaJobScript:
             "#$ -pe smp 1\n"
             "#$ -l h_vmem=4000M\n"
             "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
             "#$ -o /dev/null\n"
             "#$ -e /dev/null\n"
             "\n"
             f"cd {scratch}\n"
             f"apptainer exec -e  --bind {scratch}:/work --pwd /work {sif} "
+            "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'\n"
+        )
+
+    def test_staged_submission_script(self, tmp_path, khp_reaction):
+        """Staging adds the staging block and changes the container line; nothing else."""
+        script, scratch, sif = self._write(tmp_path, khp_reaction, staged=True)
+
+        assert script.read_text() == (
+            "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
+            "\n"
+            "# Stage this task in node-local scratch (use_local_scratch)\n"
+            f'YARP_NFS_DIR="{scratch}"\n'
+            'YARP_LOCAL_DIR=$(mktemp -d "$TMPDIR/yarp.XXXXXX") || exit 1\n'
+            'yarp_copy_back() { rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/; }\n'
+            'trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n'
+            "trap 'yarp_copy_back' USR1\n"
+            "trap 'exit 140' USR2\n"
+            'cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ || exit 1\n'
+            "yarp_bg() {\n"
+            '    "$@" &\n'
+            "    local pid=$!\n"
+            "    while kill -0 $pid 2>/dev/null; do wait $pid; done\n"
+            "    wait $pid\n"
+            "}\n"
+            "\n"
+            f"cd {scratch}\n"
+            f'yarp_bg apptainer exec -e  --bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs '
+            f"--pwd /work {sif} "
             "/bin/bash -c 'orca=$(which orca) && $orca min_opt.inp > min_opt.out 2> min_opt.err'\n"
         )

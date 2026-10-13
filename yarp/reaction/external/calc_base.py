@@ -264,15 +264,29 @@ class AsyncYarpCalculator:
         `yarp_bg` runs the container in the background and waits for it, since
         bash holds a trap until a foreground child exits. It keeps waiting
         across a trapped SIGUSR1, and returns the container's exit status.
+
+        The job's own stdout/stderr go to /dev/null, so a failed mkdir,
+        copy-in or copy-back appends its reason to `local_scratch.err` in the
+        task dir. The file only appears when something failed. It is written
+        straight to NFS, never into the local copy, so a copy-back can't
+        overwrite it.
         """
         f.write("# Stage this task in node-local scratch (use_local_scratch)\n")
         f.write(f'YARP_NFS_DIR="{self.scratch_dir}"\n')
-        f.write(f'YARP_LOCAL_DIR=$(mktemp -d "{self.job_manager.local_scratch_dir}/yarp.XXXXXX") || exit 1\n')
-        f.write('yarp_copy_back() { rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/; }\n')
+        f.write('yarp_staging_error() { echo "$(date \'+%F %T\') $(hostname): $*" >> "$YARP_NFS_DIR/local_scratch.err"; }\n')
+        f.write(f'YARP_LOCAL_DIR=$(mktemp -d "{self.job_manager.local_scratch_dir}/yarp.XXXXXX" 2>&1) || '
+                '{ yarp_staging_error "could not create the local scratch dir: $YARP_LOCAL_DIR"; exit 1; }\n')
+        f.write("yarp_copy_back() {\n")
+        f.write("    local out\n")
+        f.write('    out=$(rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/ 2>&1) && return 0\n')
+        f.write('    yarp_staging_error "copy-back failed, local copy kept at $YARP_LOCAL_DIR: $out"\n')
+        f.write("    return 1\n")
+        f.write("}\n")
         f.write('trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n')
         f.write("trap 'yarp_copy_back' USR1\n")
         f.write("trap 'exit 140' USR2\n")
-        f.write('cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ || exit 1\n')
+        f.write('YARP_OUT=$(cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ 2>&1) || '
+                '{ yarp_staging_error "copy-in failed: $YARP_OUT"; exit 1; }\n')
         f.write("yarp_bg() {\n")
         f.write('    "$@" &\n')
         f.write("    local pid=$!\n")

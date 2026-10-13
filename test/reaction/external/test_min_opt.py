@@ -419,12 +419,20 @@ class TestOrcaJobScript:
             "\n"
             "# Stage this task in node-local scratch (use_local_scratch)\n"
             f'YARP_NFS_DIR="{scratch}"\n'
-            'YARP_LOCAL_DIR=$(mktemp -d "$TMPDIR/yarp.XXXXXX") || exit 1\n'
-            'yarp_copy_back() { rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/; }\n'
+            'yarp_staging_error() { echo "$(date \'+%F %T\') $(hostname): $*" >> "$YARP_NFS_DIR/local_scratch.err"; }\n'
+            'YARP_LOCAL_DIR=$(mktemp -d "$TMPDIR/yarp.XXXXXX" 2>&1) || '
+            '{ yarp_staging_error "could not create the local scratch dir: $YARP_LOCAL_DIR"; exit 1; }\n'
+            "yarp_copy_back() {\n"
+            "    local out\n"
+            '    out=$(rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/ 2>&1) && return 0\n'
+            '    yarp_staging_error "copy-back failed, local copy kept at $YARP_LOCAL_DIR: $out"\n'
+            "    return 1\n"
+            "}\n"
             'trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n'
             "trap 'yarp_copy_back' USR1\n"
             "trap 'exit 140' USR2\n"
-            'cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ || exit 1\n'
+            'YARP_OUT=$(cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ 2>&1) || '
+            '{ yarp_staging_error "copy-in failed: $YARP_OUT"; exit 1; }\n'
             "yarp_bg() {\n"
             '    "$@" &\n'
             "    local pid=$!\n"

@@ -27,22 +27,25 @@ def make_calc(job_config, **cfg):
 
 
 class RunRecorder:
-    """Stands in for `subprocess.run`: records every call and returns `stdout`."""
+    """Stands in for `subprocess.run`: records every call, then raises `raises` or returns `stdout`."""
 
-    def __init__(self, stdout=""):
+    def __init__(self, stdout="", raises=None):
         self.stdout = stdout
+        self.raises = raises
         self.calls = []
 
     def __call__(self, cmd, **kwargs):
         self.calls.append((cmd, kwargs))
+        if self.raises:
+            raise self.raises
         return SimpleNamespace(stdout=self.stdout, returncode=0)
 
 
 @pytest.fixture
 def run(monkeypatch):
     """Install a RunRecorder in place of the `subprocess.run` calc_base calls."""
-    def install(stdout=""):
-        recorder = RunRecorder(stdout)
+    def install(stdout="", raises=None):
+        recorder = RunRecorder(stdout, raises)
         monkeypatch.setattr("yarp.reaction.external.calc_base.subprocess.run", recorder)
         return recorder
     return install
@@ -144,6 +147,18 @@ class TestSifPrefix:
         assert recorder.calls == [([runner, "pull", str(sif), f"docker://{HUB_IMAGE}"], {"check": True})]
         assert sif_dir.is_dir()
         assert prefix == f"{runner} exec -e  --bind {WORK}:/work --pwd /work {sif}"
+
+    @pytest.mark.parametrize("os_name, message", [
+        ("Linux", "Could not find '{runner}' on your system"),
+        ("Darwin", "{Runner} is not supported on Darwin"),
+    ], ids=["linux", "darwin"])
+    def test_missing_runner_is_explained(self, runner, os_name, message, tmp_path, run, monkeypatch):
+        """Pulling an image with no apptainer/singularity installed says what to do instead."""
+        run(raises=FileNotFoundError(2, "No such file or directory", runner))
+        monkeypatch.setattr("yarp.reaction.external.calc_base.platform.system", lambda: os_name)
+
+        with pytest.raises(RuntimeError, match=message.format(runner=runner, Runner=runner.capitalize())):
+            self._calc(runner, tmp_path).get_container_prefix(HUB_IMAGE, WORK)
 
 
 def test_unsupported_container_is_rejected():

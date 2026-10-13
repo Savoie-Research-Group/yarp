@@ -154,10 +154,25 @@ class AsyncYarpCalculator:
                 # Ensure the target directory actually exists before pulling
                 sif_path.parent.mkdir(parents=True, exist_ok=True)
                 # 2. Pull the docker image and convert it to a .sif file
-                subprocess.run(
-                    ["singularity", "pull", str(sif_path), f"docker://{image_name}"],
-                    check=True,
-                )
+                try:
+                    subprocess.run(
+                        ["singularity", "pull", str(sif_path), f"docker://{image_name}"],
+                        check=True,
+                    )
+                except FileNotFoundError:
+                    os_name = platform.system()
+                    if os_name in ("Darwin", "Windows"):
+                        msg = (
+                            f"Singularity is not supported on {os_name}. "
+                            "Switch the 'container' field in your input file to 'docker' and ensure Docker Desktop is installed."
+                        )
+                    else:
+                        msg = (
+                            "Could not find 'singularity' on your system. To fix this, either:\n"
+                            "  1. Install SingularityCE (https://docs.sylabs.io/guides/latest/admin-guide/installation.html)\n"
+                            "  2. Switch the 'container' field in your input file to 'docker'"
+                        )
+                    raise RuntimeError(msg) from None
 
             env_flags = ""
             if env_vars:

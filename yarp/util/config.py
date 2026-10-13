@@ -91,8 +91,8 @@ class JobManagerConfig:
         if self.container is not None:
             self.container = self.container.lower()
 
-        # Get the proper location of apptainer containers
-        if self.container == "apptainer" and not self.sif_location:
+        # Get the proper location of apptainer/singularity containers
+        if self.container in ["apptainer", "singularity"] and not self.sif_location:
             # Dynamically resolve the path relative to this file
             # __file__       == base_git_repo/yarp/util/input.py
             # .resolve()     == converts to absolute path resolving any symlinks
@@ -115,7 +115,7 @@ class JobManagerConfig:
             raise ValueError("Please provide an integer value to 'max_active_jobs'")
         if self.sif_location and not isinstance(self.sif_location, str):
             raise ValueError("Please provide a valid string value to 'sif_location'")
-        if self.module_container and not isinstance(self.sif_location, str):
+        if self.module_container and not isinstance(self.module_container, str):
             raise ValueError("Please provide a valid string value to 'module_container'")
 
 @dataclass

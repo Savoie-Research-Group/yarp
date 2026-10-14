@@ -4,7 +4,7 @@ YARP runs Pysisyphus tasks (pre-opt, GSM, R/P opt, TS opt, IRC) in a container
 chosen by the task's level of theory:
 
 - `lot: xtb` uses `erm42/yarp:pysis_xtb` (stock Pysisyphus + conda xtb).
-- `lot: gxtb` uses `erm42/yarp_gxtb:v2`, built from this folder.
+- `lot: gxtb` uses `erm42/yarp_gxtb:v1`, built from this folder.
 
 The mapping is in `yarp/reaction/external/pysis.py` (`pysis_image`,
 `PYSIS_GXTB_IMAGE`).
@@ -22,7 +22,7 @@ Built `FROM erm42/yarp:pysis_xtb`, adding:
 ## Running with g-xTB
 
 Set `lot: gxtb` (or `gsm_lot: gxtb` for `ts_guess`) on the tasks that should
-use it. YARP pulls `erm42/yarp_gxtb:v2` the first time it is needed, with
+use it. YARP pulls `erm42/yarp_gxtb:v1` the first time it is needed, with
 `docker pull` or, on HPC, `apptainer pull` into `job_manager.sif_location`.
 If the image is already present locally, YARP uses it and does not pull.
 
@@ -133,7 +133,7 @@ If the pull fails, build the image yourself as below.
 
 ```bash
 cd containers/yarp_gxtb
-docker build --platform linux/amd64 -t erm42/yarp_gxtb:v2 .
+docker build --platform linux/amd64 -t erm42/yarp_gxtb:v1 .
 ```
 
 Tagging the build with the name in `PYSIS_GXTB_IMAGE` is what lets YARP find
@@ -142,12 +142,12 @@ it locally. If the g-xTB download location changes, add
 
 ### Apptainer (HPC)
 
-YARP looks for `<sif_location>/erm42_yarp_gxtb_v2.sif`. Export the Docker
+YARP looks for `<sif_location>/erm42_yarp_gxtb_v1.sif`. Export the Docker
 build and convert it:
 
 ```bash
-docker save -o yarp_gxtb_v2.tar erm42/yarp_gxtb:v2           # where Docker is
-apptainer build erm42_yarp_gxtb_v2.sif docker-archive://yarp_gxtb_v2.tar   # on the cluster
+docker save -o yarp_gxtb_v1.tar erm42/yarp_gxtb:v1           # where Docker is
+apptainer build erm42_yarp_gxtb_v1.sif docker-archive://yarp_gxtb_v1.tar   # on the cluster
 ```
 
 Then move the `.sif` into `job_manager.sif_location`.
@@ -157,7 +157,7 @@ Then move the `.sif` into `job_manager.sif_location`.
 Docker:
 
 ```bash
-docker run --rm --platform linux/amd64 erm42/yarp_gxtb:v2 bash -c '
+docker run --rm --platform linux/amd64 erm42/yarp_gxtb:v1 bash -c '
   sha256sum /opt/gxtb/bin/xtb      # 1b4e30b68ed4e88b4075f60d97f4756ee440fe92d3294cc20826d53f8121cd26
   python -c "
 from pysisyphus.config import get_cmd
@@ -171,8 +171,8 @@ print(XTB(gxtb=True).prepare_add_args()) # ... --gxtb
 Apptainer (from the folder holding the `.sif`):
 
 ```bash
-apptainer exec erm42_yarp_gxtb_v2.sif sha256sum /opt/gxtb/bin/xtb
-apptainer exec erm42_yarp_gxtb_v2.sif python -c "from pysisyphus.config import get_cmd; print(get_cmd('xtb'))"
+apptainer exec erm42_yarp_gxtb_v1.sif sha256sum /opt/gxtb/bin/xtb
+apptainer exec erm42_yarp_gxtb_v1.sif python -c "from pysisyphus.config import get_cmd; print(get_cmd('xtb'))"
 ```
 
 `get_cmd` must print `/usr/local/bin/xtb-gxtb` in both. Any other path means

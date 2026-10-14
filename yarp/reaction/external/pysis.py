@@ -12,7 +12,7 @@ given level of theory, and the matching `calc:` block for the input YAML.
 # (or an Apptainer .sif) that is missing locally, so re-pushing an existing tag
 # never reaches users who already have it.
 PYSIS_XTB_IMAGE = "erm42/yarp:pysis_xtb"
-PYSIS_GXTB_IMAGE = "erm42/yarp_gxtb:v2"
+PYSIS_GXTB_IMAGE = "erm42/yarp_gxtb:v1"
 PYSIS_IMAGES = {"xtb": PYSIS_XTB_IMAGE, "gxtb": PYSIS_GXTB_IMAGE}
 
 

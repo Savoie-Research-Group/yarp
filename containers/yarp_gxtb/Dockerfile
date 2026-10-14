@@ -11,7 +11,7 @@
 #   3. a pysisyphus config file (PYSISRC) pointing its xtb calculator at xtb-gxtb
 #
 # Build (from this folder):
-#   docker build --platform linux/amd64 -t erm42/yarp_gxtb:v2 .
+#   docker build --platform linux/amd64 -t erm42/yarp_gxtb:v1 .
 # See README.md for how to run, build and check it.
 # ============================================================================
 # For reproducible builds, pin the base by digest, e.g.

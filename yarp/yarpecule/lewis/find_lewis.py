@@ -412,18 +412,27 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
 
     Notes
     -----            
-    Attempted moves on each reactive atom (i) include (in this order): 
-    (1) shifting a pi-bond between a neighbor (j) and next-nearest neighbor (k) of a 2-electron deficient atom (i) to one between i and j.     
+    Historic version --> Attempted moves on each reactive atom (i) included (in this order):
+    (1) shifting a pi-bond between a neighbor (j) and next-nearest neighbor (k) of a 2-electron deficient atom (i) to one between i and j.
     (2) shifting a pi-bond between a neighbor (j) and next-nearest neighbor (k) of a radical 1-electron deficient atom (i) to one between i an j.
     (3) shifting a pi-bond between a neighbor (j) and next-nearest neighbor (k) of a lone-pair containing atom (i) to a lone-pair on k and a new pi-bond between i and j.
-    (4) forming a pi-bond between a radical containing atom (i) and a neighbor (j) with unbound electron(s). This might be accompanied by a charge transfer from j to another atom if required. 
-    (5) forming a pi-bond between an atom with a long pair (i) and a neighbor (j) capable of accepting a pi-bond. 
+    (4) forming a pi-bond between a radical containing atom (i) and a neighbor (j) with unbound electron(s).
+        This might be accompanied by a charge transfer from j to another atom if required.
+    (5) forming a pi-bond between an atom with a long pair (i) and a neighbor (j) capable of accepting a pi-bond.
     (6) turn a pi-bond between i and its neighbor j into a lone pair on i if favored by electronegativity or aromaticity.
     (7) transfer an electron to i from its neighbor j, if i is electron deficient and has a greater electronegativity.
-    (8) transfer a charge from i to another atom if i has an expanded octet and unbound electrons. 
-    (9) shuffle aromatic and anti-aromatic bonds (i.e., change bond alteration along the cycle). 
-    (10) forming a pi-bond between two radicals <-- ERM: Seems like this is no longer present!
-    All of these moves are contingent on the ability of atoms to expand octet, whether they are electron deficient, and whether the move would lead to unphysical ring-strain. 
+    (8) transfer a charge from i to another atom if i has an expanded octet and unbound electrons.
+    (9) shuffle aromatic and anti-aromatic bonds (i.e., change bond alteration along the cycle).
+    All of these moves are contingent on the ability of atoms to expand octet, whether they are electron deficient, and whether the move would lead to unphysical ring-strain.
+
+    Current version --> Attempted moves on each reactive atom (i) included (in this order):
+    (1.1 - 1.3) conjugated moves combine functionality from former moves 1, 2, 3, and 5 and extends to conjugated pi-bond systems
+    (4) forming a pi-bond between a radical containing atom (i) and a neighbor (j) with unbound electron(s).
+        This might be accompanied by a charge transfer from j to another atom if required.
+    (6) turn a pi-bond between i and its neighbor j into a lone pair on i if favored by electronegativity or aromaticity.
+    (7) transfer an electron to i from its neighbor j, if i is electron deficient and has a greater electronegativity.
+    (8) transfer a charge from i to another atom if i has an expanded octet and unbound electrons.
+    (9) shuffle aromatic and anti-aromatic bonds (i.e., change bond alteration along the cycle).
 
     """
     # current number of electrons associated with each atom
@@ -444,8 +453,6 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
         if i not in bridgeheads and (i not in ring_atoms or sum([_ for count, _ in enumerate(bond_mat[i]) if count != i and _ > 1]) == 0):
 
             # New conjugated moves should handle cases 1-3.
-
-
 
             # # Move 1: i is electron deficient and has an adjacent pi-bond between neighbor and next-nearest neighbor atoms, j and k, then the j-k pi-bond is turned into a new i-j pi-bond.
             # if e[i]+2 <= el_n_deficient[elements[i]] or el_expand_octet[elements[i]]:
@@ -522,15 +529,10 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
             if el_en[elements[i]] > el_en[elements[j]] or delta_aromatic(bond_mat, rings, move=((-1, i, j), (-1, j, i), (2, i, i))) or e[j] > el_n_deficient[elements[i]]:
                 yield [(-1, i, j), (-1, j, i), (2, i, i)]
 
-        # # Move 7: i is electron deficient, bonded to j with unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
-        # # Note: very similar to move 4 except that a double bond is not formed. This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
-        # if e[i] < el_n_deficient[elements[i]]:
-        #     for j in return_connections(i, bond_mat, inds=reactive):
-        #         if bond_mat[j, j] > 0 and el_en[elements[i]] > el_en[elements[j]]:
-        #             yield [(-1, j, j), (1, i, i)]
-
-        # Move 7 (updated to allow transfers within fragments): i is electron deficient, j has unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
-        # Note: very similar to move 4 except that a double bond is not formed. This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
+        # Move 7 (updated to allow transfers within fragments):
+        # i is electron deficient, j has unbound electrons, and the electronegativity of i is >= j, then an electron is tranferred from j to i
+        # Note: very similar to move 4 except that a double bond is not formed.
+        # This is sometimes needed when j cannot expand its octet (as required by bond formation) but i still needs a full octet.
         # j is any reactive atom in the same fragment within the same separation window as Move 8 (any distance when seps is all zeros,
         # as in the first search pass; within two bonds in the second pass when local_opt=True).
         if e[i] < el_n_deficient[elements[i]]:
@@ -538,18 +540,13 @@ def valid_moves(bond_mat, elements, reactive, rings, ring_atoms, bridgeheads, se
                 if j != i and frag[i] == frag[j] and seps[i, j] < 3 and bond_mat[j, j] > 0 and el_en[elements[i]] > el_en[elements[j]]:
                     yield [(-1, j, j), (1, i, i)]
 
-        # Move 8: i has an expanded octet and unbound electrons, then charge transfer to an atom within three bonds (controlled by local option) that is electron deficient or can expand its octet is attempted.
+        # Move 8: i has an expanded octet and unbound electrons, then charge transfer to an atom within three bonds
+        # (controlled by local option) that is electron deficient or can expand its octet is attempted.
         # Note: setting to local because this is only relevant in phase 2. 
         if e[i] > el_n_deficient[elements[i]] and bond_mat[i, i] > 0:
             for j in reactive:
                 if j != i and seps[i, j] < 3 and (el_expand_octet[elements[j]] or e[j] < el_n_deficient[elements[j]]):
                     yield [(-1, i, i), (1, j, j)]
-
-        # # Move 9: i has an expanded octet and a bond with a neighbor that can be converted into a lone pair on the neighbor
-        # if e[i] > el_n_deficient[elements[i]]:
-        #     for j in return_connections(i,bond_mat,inds=reactive):
-        #         if bond_mat[i,j] > 0:
-        #             yield [(-1,i,j),(-1,j,i),(2,j,j)]
 
     # Move 9: shuffle aromatic and anti-aromatic bonds
     for i in rings:
@@ -655,20 +652,22 @@ def conjugated_moves(bond_mat, elements, reactive, ring_atoms, bridgeheads, sour
 
     Notes
     -----
-    (10) push: the path ends on a loss link. The source i spends a lone pair (-2), a radical (-1), or nothing (0, i.e., i is
+    (1.1) shift: the path ends on a loss link. The source i spends a lone pair (-2), a radical (-1), or nothing (0, i.e., i is
          deficient and pulls the pi-bond toward itself) and the terminal atom receives the complement. For m=1 this generalizes
          Moves 1-3 to arbitrary conjugation lengths (e.g., vinylogous lone-pair pushes). For m=2 it transposes a triple bond
          (e.g., :C-C#C -> C#C-C: in polyynes).
-    (11) annihilation: the path ends on a gain link, so a net bond forms and both termini spend electrons
+    (1.2) annihilation: the path ends on a gain link, so a net bond forms and both termini spend electrons
          (radical + radical, lone pair + vacancy, or lone pair + lone pair for m=2). This generalizes Moves 4/5 to
          conjugated separations (e.g., 1,4-diradicals and remote zwitterions).
-    (12) heterolysis: the reverse of the Move 11 lone pair + vacancy case. The path starts and ends on a loss link, so one net
+    (1.3) heterolysis: the reverse of the Move 11 lone pair + vacancy case. The path starts and ends on a loss link, so one net
          pi bond is broken and its two electrons end as a lone pair on one terminus while the other terminus is left with
          the vacancy. This generalizes Move 6 to conjugated separations (e.g., a quinoid C=S collapsing so that a benzene
          ring becomes aromatic and a remote carbon carries the lone pair). Only m=1 and only the heterolytic split are
          generated; homolysis into a diradical is not.
-    The three-atom (m=1) cases already produced by Moves 1-5 are skipped, as is the one-link heterolysis (Move 6). Moves are only yielded if the octet, ring, and
-    Bredt constraints used by the other moves hold for every atom whose electron count or bond order increases.
+
+    The three-atom (m=1) cases already produced by Moves 1-5 are skipped, as is the one-link heterolysis (Move 6).
+    Moves are only yielded if the octet, ring, and Bredt constraints used by the other moves hold for
+    every atom whose electron count or bond order increases.
     """
     # Metal-ligand bonds have zero order during the search, so metals are never part of a path
     allowed = [_ for _ in reactive if elements[_] not in el_metals]
@@ -708,13 +707,13 @@ def conjugated_moves(bond_mat, elements, reactive, ring_atoms, bridgeheads, sour
                     s = m if c % 2 == 0 else -m
                     bonds += [(s, path[c], path[c+1]), (s, path[c+1], path[c])]
 
-                # Move 10: shift (even number of links and so it ends on a loss link). The three-atom m=1 shifts are Moves 1-3. 
+                # Move 1.1: shift (even number of links and so it ends on a loss link). The three-atom m=1 shifts are Moves 1-3. 
                 if n_links % 2 == 0:
                     # whatever the source atom i is spending, the terminal atom t is gaining i-j=k becomes i=j-k in the d=0 three atom m=1 case.
                     #diags = [[(d, i, i), (-d, t, t)] if d else [] for d in spend(i)]
                     diags = [[(d, i, i), (-d, t, t)] if d else [] for d in spend(i) if d != -1 or rad_source(i)]
 
-                # Move 11: annihilation (ends on a gain link). The adjacent m=1 cases are Moves 4/5.
+                # Move 1.2: annihilation (ends on a gain link). The adjacent m=1 cases are Moves 4/5.
                 else:
                     # Both ends enumerate the same path, so only yield from the lower index.
                     if t < i:
@@ -733,7 +732,7 @@ def conjugated_moves(bond_mat, elements, reactive, ring_atoms, bridgeheads, sour
                     if _conj_valid(bond_mat, move, elements, ring_atoms, bridgeheads, e):
                         yield move
 
-    # Move 12: heterolysis along a path that starts and ends on a loss link (one net pi bond broken, m=1 only)
+    # Move 1.3: heterolysis along a path that starts and ends on a loss link (one net pi bond broken, m=1 only)
     # typical pattern i=j-k=l becomes (..)i-j=k-l(+)
     for i in srcs:
         for path in _alt_paths(bond_mat, i, 1, allowed, max_pi, first_gain=False):

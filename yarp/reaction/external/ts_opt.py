@@ -11,20 +11,29 @@ from yarp.util.constants import Constants
 
 
 class TSOptTask(AsyncYarpCalculator):
-    def has_prerequisites(self) -> bool:
+    def _initial_guesses(self) -> list:
+        """
+        The TS conformers this optimization starts from, in the order they are
+        written to tsopt_run1..N.
+
+        'ts_guess': every TS guess from GSM.
+        'ts_opt': every converged TS optimization from the source level that is
+        a valid saddle point (exactly one imaginary frequency) -- not just the
+        single TS that IRC validated. IRC labels at a low level of theory are
+        poor predictors of high-level IRC outcomes, so all candidates go on.
+        """
         source = self.config.initial_geom.transition_state
         if source.label == "ts_guess":
-            expected_key = "ts_guess"
+            return [conf for k, conf in self.rxn.ts_geom.items() if "ts_guess" in k]
         elif source.label == "ts_opt":
-            expected_key = f"validated_ts_{source.lot}_{source.software}"
+            expected_key = f"tsopt_{source.lot}_{source.software}"
+            return [conf for k, conf in self.rxn.ts_geom.items()
+                    if expected_key in k and conf.is_valid_ts()]
         else:
             raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
 
-        for k in self.rxn.ts_geom.keys():
-            if expected_key in k and self.rxn.ts_geom[k].geo is not None: 
-                return True
-
-        return False
+    def has_prerequisites(self) -> bool:
+        return any(conf.geo is not None for conf in self._initial_guesses())
 
     def _get_num_runs(self) -> int:
             run_dirs = list(self.scratch_dir.glob("tsopt_run*"))
@@ -36,18 +45,7 @@ class PysisyphusTSOptCalculator(TSOptTask):
         self.image_name = "erm42/yarp:pysis_xtb"
 
     def generate_input(self):
-        source = self.config.initial_geom.transition_state
-        if source.label == "ts_guess":
-            expected_key = "ts_guess"
-        elif source.label == "ts_opt":
-            expected_key = f"validated_ts_{source.lot}_{source.software}"
-        else:
-            raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
-
-        initial_guesses = []
-        for k in self.rxn.ts_geom.keys():
-            if expected_key in k:
-                initial_guesses.append(self.rxn.ts_geom[k])
+        initial_guesses = self._initial_guesses()
 
         # Write inputs for each guess
         for i, conf in enumerate(initial_guesses):
@@ -244,18 +242,7 @@ class OrcaTSOptCalculator(TSOptTask):
             self.image_name = "orca_6.0.1.sif"
 
     def generate_input(self):
-        source = self.config.initial_geom.transition_state
-        if source.label == "ts_guess":
-            expected_key = "ts_guess"
-        elif source.label == "ts_opt":
-            expected_key = f"validated_ts_{source.lot}_{source.software}"
-        else:
-            raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
-
-        initial_guesses = []
-        for k in self.rxn.ts_geom.keys():
-            if expected_key in k:
-                initial_guesses.append(self.rxn.ts_geom[k])
+        initial_guesses = self._initial_guesses()
 
         # Write inputs for each guess
         for i, conf in enumerate(initial_guesses):

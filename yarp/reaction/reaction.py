@@ -35,6 +35,9 @@ class reaction:
 
     barrier : dict
         Energy of activation barrier (dG) of the reaction R --> P (kcal/mol).
+        For a level validated by IRC, this is the lowest barrier among intended
+        TSs, or None if no TS is intended; the per-TS barriers and IRC outcomes
+        live on the TS conformers (see `ts_results` and `min_barrier`).
 
     reverse_barrier : dict
         Energy of activation barrier (dG) of the reaction P --> R (kcal/mol).
@@ -84,6 +87,38 @@ class reaction:
         
         self.outcome_label = dict()
         self.network_meta = dict()
+
+    ####################
+    # Public Functions #
+    ####################
+
+    def ts_results(self, lot_sw):
+        """
+        TS conformers at one level of theory that have an IRC result, keyed as
+        in ts_geom.
+
+        Parameters
+        ----------
+        lot_sw : str
+            '<lot>_<software>', as in the barrier dict (e.g. 'xtb_pysisyphus').
+
+        Each conformer's properties carry 'irc_outcome',
+        'forward_barrier_kcal_per_mol' and 'reverse_barrier_kcal_per_mol'
+        (oriented reactant -> product).
+        """
+        key = f"tsopt_{lot_sw}"
+        return {k: conf for k, conf in self.ts_geom.items()
+                if key in k and conf.properties.get("irc_outcome") is not None}
+
+    def min_barrier(self, lot_sw, labels=("intended", "inverse_intended")):
+        """
+        Lowest forward barrier (kcal/mol) among TSs at `lot_sw` whose IRC
+        outcome is in `labels`, or None if there are none.
+        """
+        barriers = [conf.properties["forward_barrier_kcal_per_mol"]
+                    for conf in self.ts_results(lot_sw).values()
+                    if conf.properties["irc_outcome"] in labels]
+        return min(barriers, default=None)
 
     ######################
     # Internal Functions #

@@ -1,5 +1,5 @@
 # ============================================================================
-# YARP g-xTB container  (published as erm42/yarp_gxtb:<version>)
+# YARP g-xTB container  (image name: erm42/yarp_gxtb:<version>)
 #
 # Used by YARP only for Pysisyphus tasks run with `lot: gxtb`. Ordinary
 # `lot: xtb` tasks keep using erm42/yarp:pysis_xtb (stock pysisyphus + conda xtb).
@@ -8,11 +8,11 @@
 #   1. the g-xTB build of xtb (6.7.1-gxtb, statically linked) as /usr/local/bin/xtb-gxtb
 #   2. pysisyphus at a pinned upstream commit + pysisyphus-gxtb.patch, which adds
 #      XTB(gxtb=True) -> passes --gxtb instead of --gfn <n>
-#   3. a .pysisyphusrc pointing pysisyphus' xtb calculator at xtb-gxtb
+#   3. a pysisyphus config file (PYSISRC) pointing its xtb calculator at xtb-gxtb
 #
 # Build (from this folder):
-#   docker build --platform linux/amd64 -t erm42/yarp_gxtb:v1 .
-# See README.md for tests and publishing.
+#   docker build --platform linux/amd64 -t erm42/yarp_gxtb:v2 .
+# See README.md for how to run, build and check it.
 # ============================================================================
 # For reproducible builds, pin the base by digest, e.g.
 #   FROM erm42/yarp:pysis_xtb@sha256:<digest>
@@ -56,7 +56,13 @@ RUN set -eux; \
 # --- point pysisyphus' xtb calculator at the g-xTB build ---------------------
 # This sets the executable only. The method still comes from YARP's calc block
 # (gxtb: True -> --gxtb); without it the patched calculator passes --gfn 2.
-RUN printf '[xtb]\ncmd=/usr/local/bin/xtb-gxtb\n' > /root/.pysisyphusrc
+# Pysisyphus reads $PYSISRC, else ~/.pysisyphusrc. Docker runs as root, but
+# Apptainer runs as the user with their own home, where /root/.pysisyphusrc is
+# never read. So the file lives in a world-readable place and PYSISRC points to
+# it; Apptainer carries the image's ENV into the container.
+RUN printf '[xtb]\ncmd=/usr/local/bin/xtb-gxtb\n' > /opt/gxtb/pysisyphusrc; \
+    chmod 644 /opt/gxtb/pysisyphusrc
+ENV PYSISRC=/opt/gxtb/pysisyphusrc
 
 LABEL org.opencontainers.image.title="yarp_gxtb" \
       org.opencontainers.image.description="Pysisyphus + g-xTB (xtb 6.7.1-gxtb) for YARP lot: gxtb tasks" \

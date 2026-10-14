@@ -127,7 +127,8 @@ class TestCollapsedConformersAreDropped:
     aligned with this one, rather than a hand-edited adjacency matrix.
     """
 
-    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False)
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False,
+                             gsm_lot="xtb")  # the GSM calculator picks its image from gsm_lot
 
     def _set(self, state, geos):
         """Replace a state's CREST conformers with one per {label: geometry}."""

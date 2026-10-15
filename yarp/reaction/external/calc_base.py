@@ -239,4 +239,3 @@ class AsyncYarpCalculator:
         # Default behavior: nuke the whole folder
         if self.scratch_dir and self.scratch_dir.exists():
             shutil.rmtree(self.scratch_dir)
-

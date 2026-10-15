@@ -3,7 +3,7 @@ import pytest
 import json
 from unittest.mock import MagicMock, patch
 from pathlib import Path
-from yarp.progress_yarp import progress_yarp, save_state
+from yarp.progress_yarp import progress_yarp, save_state, _matches_lot
 from yarp.util.config import IRCValConfig
 
 @pytest.fixture
@@ -381,6 +381,34 @@ class TestIRCFastForward:
         status = self._run(tmp_path, mocker, {"egat_rgd1": 50.0}, {"egat_rgd1": 60.0})
 
         assert status != "terminated_normally"
+
+
+class TestMatchesLot:
+    """
+    Fast-forward finds a stage's stored results by level of theory. Since
+    "xtb_pysisyphus" is a substring of "gxtb_pysisyphus", check that xtb and
+    gxtb results never stand in for each other, for every stage that can run
+    at either level.
+    """
+
+    # The key each stage stores its result under; {lot} is xtb or gxtb.
+    STAGE_KEYS = {
+        "pre_opt": "preopt_{lot}_pysisyphus",
+        "ts_guess": "ts_guess_0_{lot}_pysisyphus",
+        "rp_opt": "rpopt_{lot}_pysisyphus",
+        "ts_opt": "0_tsopt_{lot}_pysisyphus",
+        "irc_barrier": "{lot}_pysisyphus",
+    }
+
+    @pytest.mark.parametrize("stage", STAGE_KEYS)
+    def test_xtb_and_gxtb_do_not_overlap(self, stage):
+        xtb_key = self.STAGE_KEYS[stage].format(lot="xtb")
+        gxtb_key = self.STAGE_KEYS[stage].format(lot="gxtb")
+
+        assert _matches_lot(xtb_key, "xtb_pysisyphus")
+        assert _matches_lot(gxtb_key, "gxtb_pysisyphus")
+        assert not _matches_lot(gxtb_key, "xtb_pysisyphus")
+        assert not _matches_lot(xtb_key, "gxtb_pysisyphus")
 
 
 # =====================================================================

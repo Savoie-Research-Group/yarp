@@ -95,6 +95,17 @@ def synchronize_conformers(reactions):
             if role == "reactant":
                 adopt_reactant_preopt_geometry(species)
 
+def _matches_lot(key: str, desired_key: str) -> bool:
+    """
+    True if a stored data key belongs to the level of theory `desired_key`
+    ("{lot}_{software}"). Keys end in "_{lot}_{software}" (or equal it, for the
+    barrier dicts). A plain substring test is wrong once one level-of-theory
+    name contains another: "xtb_pysisyphus" is a substring of every
+    "gxtb_pysisyphus" key, so xTB tasks were fast-forwarded on g-xTB data.
+    """
+    return key == desired_key or key.endswith(f"_{desired_key}")
+
+
 def load_state(work_dir: Path):
     """
     Load in status tracker and reaction objects from working directory
@@ -262,37 +273,37 @@ def progress_yarp(work_dir: Path):
                 # Check if the xTB pre-optimization has already been run
                 if task_type in ["reactant_pre_opt", "product_pre_opt"]:
                     preopt_keys = [key for key in target_species.conformers.keys() if "preopt" in key]
-                    if target_species and any(desired_key in key for key in preopt_keys):
+                    if target_species and any(_matches_lot(key, desired_key) for key in preopt_keys):
                         already_done = True
 
                 # Check if reactant/product conformers have been generated
                 elif task_type in ["reactant_conformer", "product_conformer"]:
                     conf_gen_keys = [key for key in target_species.conformers.keys() if "conf_gen" in key]
-                    if target_species and any(desired_key in key for key in conf_gen_keys):
+                    if target_species and any(_matches_lot(key, desired_key) for key in conf_gen_keys):
                         already_done = True
 
                 # Check if transition state initial guess conformers have been generated
                 elif task_type == "ts_guess":
                     ts_guess_keys = [key for key in rxn_obj.ts_geom.keys() if "ts_guess" in key]
-                    if any(desired_key in key for key in ts_guess_keys):
+                    if any(_matches_lot(key, desired_key) for key in ts_guess_keys):
                         already_done = True
 
                 # Check if reactant/product conformers have been optimized
                 elif task_type in ["reactant_optimization", "product_optimization"]:
                     rpopt_keys = [key for key in target_species.conformers.keys() if "rpopt" in key]
-                    if target_species and any(desired_key in key for key in rpopt_keys):
+                    if target_species and any(_matches_lot(key, desired_key) for key in rpopt_keys):
                         already_done = True
 
                 # Check if transition state conformers have been optimized
                 elif task_type == "transition_state_optimization":
                     tsopt_keys = [key for key in rxn_obj.ts_geom.keys() if "tsopt" in key]
-                    if any(desired_key in key for key in tsopt_keys):
+                    if any(_matches_lot(key, desired_key) for key in tsopt_keys):
                         already_done = True
 
                 # Check if IRC validation has been performed
                 elif task_type == "irc_validation":
-                    fbar_check = any(desired_key in key for key in rxn_obj.barrier.keys())
-                    rbar_check = any(desired_key in key for key in rxn_obj.reverse_barrier.keys())
+                    fbar_check = any(_matches_lot(key, desired_key) for key in rxn_obj.barrier.keys())
+                    rbar_check = any(_matches_lot(key, desired_key) for key in rxn_obj.reverse_barrier.keys())
                     if fbar_check and rbar_check:
                         already_done = True
 

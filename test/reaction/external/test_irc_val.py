@@ -17,7 +17,7 @@ import pytest
 
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.irc_val import PysisyphusIRCValCalculator, OrcaIRCValCalculator
-from yarp.util.config import IRCValConfig
+from yarp.util.config import IRCValConfig, JobManagerConfig
 from yarp.util.constants import Constants
 from yarp.yarpecule.graph.adjacency import table_generator
 
@@ -250,3 +250,34 @@ class TestPerTSResults:
         rxn, _ = self._run(tmp_path, {1: "intended", 2: "unintended"})
 
         assert not any("validated_ts" in k for k in rxn.ts_geom)
+
+
+IRC_INNER_SCRIPTS = [
+    pytest.param(PysisyphusIRCValCalculator, "pysisyphus", "xtb", "erm42_yarp_pysis_xtb.sif", "run_pysis_inner.sh",
+                 "pysis irc_{i}_input.yaml > {log}irc_{i}.log 2> {log}irc_{i}.err", id="pysis"),
+    pytest.param(OrcaIRCValCalculator, "orca", "B3LYP def2-SVP", "orca_6.0.1.sif", "run_orca_inner.sh",
+                 "$orca irc_{i}.inp > {log}irc_{i}.out 2> {log}irc_{i}.err", id="orca"),
+]
+
+
+class TestInnerScriptLogs:
+    """A staged IRC writes each run's log straight to the NFS run dir; unstaged is unchanged."""
+
+    @pytest.mark.parametrize("staged", [False, True])
+    @pytest.mark.parametrize("cls, software, lot, sif_name, script, line", IRC_INNER_SCRIPTS)
+    def test_log_lines(self, tmp_path, staged, cls, software, lot, sif_name, script, line):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        (sif_dir / sif_name).touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        cfg = IRCValConfig(software=software, lot=lot, charge=0, multiplicity=1, use_local_scratch=staged)
+        calc = cls(SimpleNamespace(config=cfg), make_rxn(lot, software, [1, 2]), job_config)
+        calc.set_scratch_dir(tmp_path / "SCRATCH" / "abc123_refine.irc_validation")
+        calc.generate_input()
+        calc.write_submission_script()
+
+        lines = (calc.scratch_dir / script).read_text().splitlines()
+        for i in (1, 2):
+            log = f"/nfs/irc_run{i}/" if staged else ""
+            assert line.format(i=i, log=log) in lines

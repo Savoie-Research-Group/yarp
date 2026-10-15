@@ -83,6 +83,9 @@ class JobManagerConfig:
     queue: Optional[str] = None
     job_name: str = "yarp"
     account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
+    # Node-local scratch root for tasks with use_local_scratch on. Written into
+    # the job script as-is, so shell variables expand on the compute node.
+    local_scratch_dir: str = "$TMPDIR"
 
     def __post_init__(self):
         # Normalize inputs for easier checking
@@ -91,8 +94,8 @@ class JobManagerConfig:
         if self.container is not None:
             self.container = self.container.lower()
 
-        # Get the proper location of apptainer containers
-        if self.container == "apptainer" and not self.sif_location:
+        # Get the proper location of apptainer/singularity containers
+        if self.container in ["apptainer", "singularity"] and not self.sif_location:
             # Dynamically resolve the path relative to this file
             # __file__       == base_git_repo/yarp/util/input.py
             # .resolve()     == converts to absolute path resolving any symlinks
@@ -115,8 +118,10 @@ class JobManagerConfig:
             raise ValueError("Please provide an integer value to 'max_active_jobs'")
         if self.sif_location and not isinstance(self.sif_location, str):
             raise ValueError("Please provide a valid string value to 'sif_location'")
-        if self.module_container and not isinstance(self.sif_location, str):
+        if self.module_container and not isinstance(self.module_container, str):
             raise ValueError("Please provide a valid string value to 'module_container'")
+        if not isinstance(self.local_scratch_dir, str) or not self.local_scratch_dir.strip():
+            raise ValueError("Please provide a valid string value to 'local_scratch_dir'")
 
 @dataclass
 class PropertyFilterConfig:
@@ -230,6 +235,7 @@ class MLPropConfig:
     n_cpus: int = 8
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if not self.model:
@@ -244,6 +250,8 @@ class MLPropConfig:
             raise ValueError("Please provide an integer value (in MB) to ml_rxn_prop -> 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ml_rxn_prop -> 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ml_rxn_prop -> 'use_local_scratch'")
 
 @dataclass
 class ConformerConfig:
@@ -258,6 +266,7 @@ class ConformerConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
     seed: Optional[int] = 42
 
     def __post_init__(self):
@@ -284,6 +293,8 @@ class ConformerConfig:
             raise ValueError("Please provide an integer value (in MB) to conf_gen: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide conf_gen: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to conf_gen: 'use_local_scratch'")
 
 
 @dataclass
@@ -301,6 +312,7 @@ class TSGuessConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -329,6 +341,8 @@ class TSGuessConfig:
             raise ValueError("Please provide an integer value (in MB) to ts_guess: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'use_local_scratch'")
 
 
 @dataclass
@@ -359,6 +373,7 @@ class PreOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.software not in ['pysisyphus']:
@@ -382,6 +397,8 @@ class PreOptConfig:
             raise ValueError("Please provide an integer value (in MB) to pre_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide pre_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to pre_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -402,6 +419,7 @@ class RPOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -426,6 +444,8 @@ class RPOptConfig:
             raise ValueError("Please provide an integer value (in MB) to rp_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide rp_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to rp_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -443,6 +463,7 @@ class TSOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -466,6 +487,8 @@ class TSOptConfig:
             raise ValueError("Please provide an integer value (in MB) to ts_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ts_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -485,6 +508,7 @@ class IRCValConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -508,3 +532,5 @@ class IRCValConfig:
             raise ValueError("Please provide an integer value (in MB) to irc_val: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide irc_val: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to irc_val: 'use_local_scratch'")

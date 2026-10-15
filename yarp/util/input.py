@@ -191,6 +191,8 @@ class InputParser:
         # Dynamically link inter-stage dependencies for path refinement
         self._link_refine_dependencies()
 
+        self._check_local_scratch()
+
     def __repr__(self):
         return pformat({
             "output": self.out_file,
@@ -602,6 +604,31 @@ class InputParser:
                     f"  - Software: {source.software}\n"
                     f"...but no preceding task in the pipeline matches these criteria."
                 )
+
+    def _check_local_scratch(self):
+        """
+        `use_local_scratch` is only implemented for SGE. Under SLURM it raises,
+        so the run never starts; under the local scheduler there is no node-local
+        scratch to stage to, so it is ignored with a warning.
+
+        `yarp-progress` re-parses the stored YAML on every tick, so the local
+        warning repeats there too.
+        """
+        all_tasks = {**self.global_tasks, **self.pipeline_tasks}
+        requested = [task_id for task_id, task_def in all_tasks.items()
+                     if task_def.config.use_local_scratch]
+        if not requested:
+            return
+
+        scheduler = self.job_manager.scheduler
+        if scheduler == "slurm":
+            raise NotImplementedError(
+                f"'use_local_scratch' is not yet implemented for the 'slurm' scheduler; only 'sge' supports it. "
+                f"Requested by: {', '.join(requested)}"
+            )
+        if scheduler == "local":
+            print(f"WARNING: 'use_local_scratch' has no effect with the 'local' scheduler and is ignored for: "
+                  f"{', '.join(requested)}")
 
     def _normalize_keys(self, d: dict) -> dict:
         """Helper function to convert keys with spaces to underscores, and drop None values"""

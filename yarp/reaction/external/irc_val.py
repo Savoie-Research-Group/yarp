@@ -239,7 +239,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
                 f.write(f"cd /work/irc_run{i}\n") 
                 
                 # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis irc_{i}_input.yaml > irc_{i}.log 2> irc_{i}.err\n")
+                log = self._log_prefix(f"irc_run{i}")
+                f.write(f"pysis irc_{i}_input.yaml > {log}irc_{i}.log 2> {log}irc_{i}.err\n")
                 f.write(f"echo '--- Finished IRC {i} ---'\n\n")
                 
         # Make executable
@@ -456,7 +457,8 @@ class OrcaIRCValCalculator(IRCValTask):
                 
                 # Execute orca within the specific folder, saving logs locally
                 f.write(f"orca=$(which orca)\n")
-                f.write(f"$orca irc_{i}.inp > irc_{i}.out 2> irc_{i}.err\n")
+                log = self._log_prefix(f"irc_run{i}")
+                f.write(f"$orca irc_{i}.inp > {log}irc_{i}.out 2> {log}irc_{i}.err\n")
                 f.write(f"echo '--- Finished IRC {i} ---'\n\n")
                 
         # Make executable

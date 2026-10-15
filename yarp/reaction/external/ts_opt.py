@@ -86,7 +86,8 @@ class PysisyphusTSOptCalculator(TSOptTask):
                 f.write(f"cd /work/tsopt_run{i}\n") 
                 
                 # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis tsopt_{i}_input.yaml > tsopt_{i}.log 2> tsopt_{i}.err\n")
+                log = self._log_prefix(f"tsopt_run{i}")
+                f.write(f"pysis tsopt_{i}_input.yaml > {log}tsopt_{i}.log 2> {log}tsopt_{i}.err\n")
                 f.write(f"echo '--- Finished TSOPT {i} ---'\n\n")
                 
         # Make executable
@@ -282,7 +283,8 @@ class OrcaTSOptCalculator(TSOptTask):
                 
                 # Execute orca within the specific folder, saving logs locally
                 f.write(f"orca=$(which orca)\n")
-                f.write(f"$orca tsopt_{i}.inp > tsopt_{i}.out 2> tsopt_{i}.err\n")
+                log = self._log_prefix(f"tsopt_run{i}")
+                f.write(f"$orca tsopt_{i}.inp > {log}tsopt_{i}.out 2> {log}tsopt_{i}.err\n")
                 f.write(f"echo '--- Finished TSOPT {i} ---'\n\n")
                 
         # Make executable

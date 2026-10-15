@@ -43,11 +43,43 @@ class AsyncYarpCalculator:
         self.scratch_dir = path
         self.scratch_dir.mkdir(parents=True, exist_ok=True)
 
+    def _use_local_scratch(self) -> bool:
+        """Whether this job runs in node-local scratch: the task asks for it, and only SGE implements it."""
+        return self.job_manager.scheduler == "sge" and self.config.use_local_scratch
+
+    def _mounts(self, flag: str, work_dir: str) -> str:
+        """
+        The container's bind mounts. Normally the task dir is /work. A staged
+        job instead mounts its node-local copy as /work and the NFS task dir as
+        /nfs, using the variables `_write_local_scratch_staging` sets.
+        """
+        if self._use_local_scratch():
+            return f'{flag} "$YARP_LOCAL_DIR":/work {flag} "$YARP_NFS_DIR":/nfs'
+        return f"{flag} {work_dir}:/work"
+
+    def _log_prefix(self, run_dir: str = "") -> str:
+        """
+        Prefix for a log file that a command inside the container redirects
+        to, where `run_dir` is the command's working dir relative to /work.
+
+        Normally "", so the log lands in the command's working dir as before. A
+        staged job writes it through the /nfs mount straight into the NFS task
+        dir instead, so the log can be followed while the job runs and
+        survives a kill that skips the copy-back.
+        """
+        if not self._use_local_scratch():
+            return ""
+        return f"/nfs/{run_dir}/" if run_dir else "/nfs/"
+
     def get_container_prefix(self, image_name: str, work_dir: str, *, apptainer_run: bool = False, env_vars: dict = None) -> str:
         """
         The universal toggle for container execution.
         Maps the scratch directory to /work inside the container.
         Automatically checks for and pulls missing images.
+
+        For a job staged in node-local scratch, /work is the local copy instead,
+        and the prefix starts with `yarp_bg` so the container runs in the
+        background (see `_write_local_scratch_staging`).
 
         apptainer_run: If True, use ``apptainer run`` (OCI ENTRYPOINT/CMD, like ``docker run``).
         If False, use ``apptainer exec`` (requires an explicit executable before flags).
@@ -55,6 +87,8 @@ class AsyncYarpCalculator:
         env_vars: Optional dict of environment variables to inject into the container
         (e.g. {"OMP_NUM_THREADS": 4}). Passed via -e for Docker and --env for Apptainer.
         """
+        launch = "yarp_bg " if self._use_local_scratch() else ""
+
         if self.job_manager.container == "docker":
             # 1. Check if the image exists locally.
             # Use `docker images -q` rather than `docker image inspect` because
@@ -72,7 +106,7 @@ class AsyncYarpCalculator:
             env_flags = ""
             if env_vars:
                 env_flags = " ".join(f"-e {k}={v}" for k, v in env_vars.items()) + " "
-            return f"docker run --rm {env_flags} -v {work_dir}:/work -w /work {image_name}"
+            return f"{launch}docker run --rm {env_flags} {self._mounts('-v', work_dir)} -w /work {image_name}"
 
         elif self.job_manager.container == "apptainer":
             # Sanitize the image name so it works as a safe, flat filename
@@ -125,7 +159,7 @@ class AsyncYarpCalculator:
             if env_vars:
                 env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"apptainer {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"{launch}apptainer {verb} -e {env_flags} {self._mounts('--bind', work_dir)} --pwd /work {sif_path}"
 
         elif self.job_manager.container == "singularity":
             # Sanitize the image name so it works as a safe, flat filename
@@ -154,16 +188,31 @@ class AsyncYarpCalculator:
                 # Ensure the target directory actually exists before pulling
                 sif_path.parent.mkdir(parents=True, exist_ok=True)
                 # 2. Pull the docker image and convert it to a .sif file
-                subprocess.run(
-                    ["singularity", "pull", str(sif_path), f"docker://{image_name}"],
-                    check=True,
-                )
+                try:
+                    subprocess.run(
+                        ["singularity", "pull", str(sif_path), f"docker://{image_name}"],
+                        check=True,
+                    )
+                except FileNotFoundError:
+                    os_name = platform.system()
+                    if os_name in ("Darwin", "Windows"):
+                        msg = (
+                            f"Singularity is not supported on {os_name}. "
+                            "Switch the 'container' field in your input file to 'docker' and ensure Docker Desktop is installed."
+                        )
+                    else:
+                        msg = (
+                            "Could not find 'singularity' on your system. To fix this, either:\n"
+                            "  1. Install SingularityCE (https://docs.sylabs.io/guides/latest/admin-guide/installation.html)\n"
+                            "  2. Switch the 'container' field in your input file to 'docker'"
+                        )
+                    raise RuntimeError(msg) from None
 
             env_flags = ""
             if env_vars:
                 env_flags = " ".join(f"--env {k}={v}" for k, v in env_vars.items()) + " "
             verb = "run" if apptainer_run else "exec"
-            return f"singularity {verb} -e {env_flags} --bind {work_dir}:/work --pwd /work {sif_path}"
+            return f"{launch}singularity {verb} -e {env_flags} {self._mounts('--bind', work_dir)} --pwd /work {sif_path}"
 
         else:
             raise ValueError(f"Unsupported container runner: {self.job_manager.container}")
@@ -199,13 +248,68 @@ class AsyncYarpCalculator:
             f.write(f"#$ -pe smp {cpus}\n") # ERM: this might be specific to CRC at ND
             f.write(f"#$ -l h_vmem={mem * cpus}M\n")
             f.write(f"#$ -l h_rt={time}\n")
+            # Warn with SIGUSR2 before the h_rt SIGKILL (and SIGUSR1 before a
+            # suspend), so a job staged in local scratch can copy back first.
+            f.write("#$ -notify\n")
             f.write("#$ -o /dev/null\n")
             f.write("#$ -e /dev/null\n\n")
 
             if self.job_manager.module_container:
                 f.write(f"{self.job_manager.module_container}\n\n")
 
+            if self._use_local_scratch():
+                self._write_local_scratch_staging(f)
+
         # If 'local', we don't need scheduler headers!
+
+    def _write_local_scratch_staging(self, f):
+        """
+        Run the job in node-local scratch instead of the NFS task dir.
+
+        Copies the task dir into a new dir under `local_scratch_dir`, and copies
+        everything back when the script exits, removing the local copy only if
+        that succeeded. Nothing is filtered on the way back; pruning is each
+        calculator's `cleanup()`.
+
+        With `-notify`, SGE sends SIGUSR2 at h_rt and SIGKILL after the queue's
+        notify time (60 s on the CRC), so the copy-back has to fit in that
+        window. The USR2 trap makes the exit explicit; the EXIT trap does the
+        copy-back. (Bash also runs the EXIT trap when an untrapped USR2 kills
+        it, but the explicit exit doesn't depend on that.) SIGUSR1 (before a
+        suspend) copies back and keeps going.
+
+        `yarp_bg` runs the container in the background and waits for it, since
+        bash holds a trap until a foreground child exits. It keeps waiting
+        across a trapped SIGUSR1, and returns the container's exit status.
+
+        The job's own stdout/stderr go to /dev/null, so a failed mkdir,
+        copy-in or copy-back appends its reason to `local_scratch.err` in the
+        task dir. The file only appears when something failed. It is written
+        straight to NFS, never into the local copy, so a copy-back can't
+        overwrite it.
+        """
+        f.write("# Stage this task in node-local scratch (use_local_scratch)\n")
+        f.write(f'YARP_NFS_DIR="{self.scratch_dir}"\n')
+        f.write('yarp_staging_error() { echo "$(date \'+%F %T\') $(hostname): $*" >> "$YARP_NFS_DIR/local_scratch.err"; }\n')
+        f.write(f'YARP_LOCAL_DIR=$(mktemp -d "{self.job_manager.local_scratch_dir}/yarp.XXXXXX" 2>&1) || '
+                '{ yarp_staging_error "could not create the local scratch dir: $YARP_LOCAL_DIR"; exit 1; }\n')
+        f.write("yarp_copy_back() {\n")
+        f.write("    local out\n")
+        f.write('    out=$(rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/ 2>&1) && return 0\n')
+        f.write('    yarp_staging_error "copy-back failed, local copy kept at $YARP_LOCAL_DIR: $out"\n')
+        f.write("    return 1\n")
+        f.write("}\n")
+        f.write('trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n')
+        f.write("trap 'yarp_copy_back' USR1\n")
+        f.write("trap 'exit 140' USR2\n")
+        f.write('YARP_OUT=$(cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ 2>&1) || '
+                '{ yarp_staging_error "copy-in failed: $YARP_OUT"; exit 1; }\n')
+        f.write("yarp_bg() {\n")
+        f.write('    "$@" &\n')
+        f.write("    local pid=$!\n")
+        f.write("    while kill -0 $pid 2>/dev/null; do wait $pid; done\n")
+        f.write("    wait $pid\n")
+        f.write("}\n\n")
 
     # --- Pre-flight Check (Overridden by Task classes) ---
     def has_prerequisites(self) -> bool:

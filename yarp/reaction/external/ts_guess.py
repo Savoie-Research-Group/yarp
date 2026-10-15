@@ -116,7 +116,8 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
                 f.write(f"cd /work/gsm_run{i}\n") 
                 
                 # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis gsm_{i}_input.yaml > gsm_{i}.log 2> gsm_{i}.err\n")
+                log = self._log_prefix(f"gsm_run{i}")
+                f.write(f"pysis gsm_{i}_input.yaml > {log}gsm_{i}.log 2> {log}gsm_{i}.err\n")
                 f.write(f"echo '--- Finished GSM pair {i} ---'\n\n")
                 
         # Make executable

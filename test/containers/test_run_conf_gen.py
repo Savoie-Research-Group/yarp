@@ -1,11 +1,17 @@
 """
-Tests for containers/rdkit_conf/run_conf_gen.py, the RDKit conformer script
-that runs inside the rdkit_conf image.
+Tests for containers/rdkit_conf/run_conf_gen.py, the script that runs inside
+the rdkit_conf image. Given input.mol, it embeds conformers, separates the
+fragments of a multi-species state, optimizes with UFF or MMFF94, removes
+duplicates, and writes rdkit_conformers.xyz and rdkit.energies.
 
-The script has no YARP imports, so it runs here against the host RDKit. The
-image pins an older RDKit (2022.03.5); both showed the same multi-fragment
-failure and the same fix, measured in
-debug/261006_rdkit_conf/checks/11_bimolecular_fix_options/.
+test/reaction/test_conf_gen.py covers the YARP side (what goes into the
+container and what is kept from its output). This file runs the script
+itself.
+
+The script has no YARP imports, so these tests run it with the host's RDKit,
+not the image's pinned 2022.03.5. Both versions were checked by hand during
+development and showed the same multi-fragment failure and the same fix, but
+CI only exercises the host version.
 """
 import importlib.util
 import subprocess
@@ -53,7 +59,12 @@ def _closest_contacts(geo, frag_ids):
 
 
 def _run(species, workdir, *extra):
-    """Write the MOL file as RdkitConfCalculator does, run the script, return the conformers."""
+    """
+    Run the script end to end, as a YARP job would: write input.mol the way
+    RdkitConfCalculator does, call the script with the arguments YARP passes
+    for the KHP test input, check it exits cleanly and prints the line
+    check_output looks for, and return the conformer geometries it wrote.
+    """
     mol = yarpecule_to_rdmol(elements=species.elements, adj=species.adj_mat,
                              bond_orders=species.bond_mats[0],
                              atom_info=species._atom_info, geo=species.geo)
@@ -71,7 +82,15 @@ def _run(species, workdir, *extra):
 
 
 class TestSeparateFragments:
-    """The placement step on its own, on hand-built coordinates."""
+    """
+    separate_fragments on its own, on hand-built water molecules.
+
+    RDKit embeds every fragment of a multi-species state (e.g. C=O.O=CCO)
+    around the same origin, so they overlap. separate_fragments translates
+    them apart, before the force-field step, so that each one sits `contact`
+    A (3.0 by default) from the others: close enough to stay a bimolecular
+    complex, far enough not to be squashed into each other.
+    """
 
     # Three water-like fragments stacked on the same spot, as the embedding leaves them.
     FRAGS = ((0, 1, 2), (3, 4, 5), (6, 7, 8))
@@ -82,12 +101,21 @@ class TestSeparateFragments:
         return np.vstack([self.WATER + offsets[i] for i in range(n_frag)])
 
     def test_single_fragment_is_untouched(self):
+        """Ordinary one-molecule states must come back exactly as embedded."""
         geo = self.WATER.copy()
         assert np.array_equal(run_conf_gen.separate_fragments(geo, ((0, 1, 2),), 3.0), geo)
 
     @pytest.mark.parametrize("n_frag", [2, 3])
     @pytest.mark.parametrize("contact", [3.0, 5.0])
     def test_every_fragment_ends_at_least_contact_from_the_rest(self, n_frag, contact):
+        """
+        Start with 2 or 3 overlapping waters and separate them with a 3.0 or
+        5.0 A target. Fragments are placed one at a time, so check that:
+          - the closest approach between any two fragments is exactly
+            `contact` (none left overlapping, none pushed further than needed);
+          - each fragment after the first touches the ones already placed at
+            exactly `contact`, so the complex stays together as a cluster.
+        """
         frags = self.FRAGS[:n_frag]
         geo = run_conf_gen.separate_fragments(self._overlapping(n_frag), frags, contact)
         labels = np.repeat(np.arange(n_frag), 3)
@@ -100,6 +128,10 @@ class TestSeparateFragments:
             assert dist[np.ix_(frags[k], earlier)].min() == pytest.approx(contact, abs=1e-6)
 
     def test_only_translates_each_fragment(self):
+        """
+        Every atom of a fragment moves by the same vector. So bond lengths,
+        angles and the fragment's internal shape from embedding are unchanged.
+        """
         before = self._overlapping(3)
         after = run_conf_gen.separate_fragments(before, self.FRAGS, 3.0)
         for frag in self.FRAGS:
@@ -107,11 +139,14 @@ class TestSeparateFragments:
             assert np.allclose(shift, shift[0], atol=1e-12)
 
     def test_repeated_calls_are_bit_identical(self):
+        """There is no randomness in the placement, so the same input gives the same output."""
         geo = self._overlapping(3)
         first = run_conf_gen.separate_fragments(geo, self.FRAGS, 3.0)
         assert np.array_equal(first, run_conf_gen.separate_fragments(geo, self.FRAGS, 3.0))
 
 
+# Multi-fragment states: four real KHP depth-1 products (one with free H2,
+# the hardest case for the force field) plus a three-fragment state.
 CASES = ["C=O.O=CCO", "C=C.O=COO", "C1CO1.O=CO", "O=C=CCOO.[H][H]", "C=O.C=O.O"]
 
 
@@ -125,15 +160,24 @@ def species(khp_products):
 
 class TestMultiFragmentConformers:
     """
-    The whole script on multi-fragment states.
+    The whole script on the multi-fragment states in CASES.
 
-    Before fragments were separated ahead of the force-field optimization, these
-    lost most conformers to folded sp2 angles (e.g. both H of CH2=O on one spot)
-    and threw fragments tens of Angstrom apart, which crashed GSM downstream.
+    These tests guard the fix in a716100. Before fragments were separated
+    ahead of the force-field optimization, the force field started from
+    overlapping fragments. Then:
+      - most conformers came out with mangled geometry (e.g. both H of
+        CH2=O on the same spot), so YARP's connectivity check threw them
+        away;
+      - fragments were thrown tens of A apart, which crashed GSM downstream.
     """
 
     @pytest.mark.parametrize("smi", CASES)
     def test_every_conformer_keeps_the_bonding(self, smi, species, tmp_path):
+        """
+        The script writes at least one conformer, and every one of them
+        still has the state's bonding, so none would be dropped by YARP's
+        connectivity filter (TestRdkitScrapeData in test_conf_gen.py).
+        """
         state = species[smi]
         geos = _run(state, tmp_path)
         assert geos
@@ -143,7 +187,11 @@ class TestMultiFragmentConformers:
 
     @pytest.mark.parametrize("smi", CASES)
     def test_fragments_stay_in_contact(self, smi, species, tmp_path):
-        """Measured 2.71-3.20 A after optimization; was up to 72 A before the fix."""
+        """
+        After optimization, every fragment's closest contact with the rest
+        is between 2.5 and 3.5 A: still a complex, neither overlapping nor
+        drifted apart. Measured 2.71-3.20 A with the fix; up to 72 A without.
+        """
         state = species[smi]
         labels = _fragment_ids(state.adj_mat)
         for i, geo in enumerate(_run(state, tmp_path)):
@@ -154,6 +202,11 @@ class TestMultiFragmentConformers:
 
     @pytest.mark.parametrize("smi", ["C=C.O=COO", "C=O.C=O.O"])
     def test_repeated_runs_are_bit_identical(self, smi, species, tmp_path):
+        """
+        Two runs with the same seed (42) write byte-identical conformer and
+        energy files. This is the point of the pinned container: everyone
+        running the same input gets the same conformers.
+        """
         first, second = tmp_path / "first", tmp_path / "second"
         first.mkdir()
         second.mkdir()

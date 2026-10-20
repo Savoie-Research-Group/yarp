@@ -1,18 +1,27 @@
 """
-Tests for the CREST conformer-generation calculator.
+Tests for the conformer-generation calculators.
 
-`CrestConfCalculator` sits between the xTB pre-optimization and GSM. These tests
-pin where it reads its starting geometry from -- the pre-optimized structure,
-never the raw yarpecule graph geometry -- and the MD timestep it requests when a
-fragment is a free diatomic.
+`CrestConfCalculator` and `RdkitConfCalculator` sit between the xTB
+pre-optimization and GSM. These tests pin where CREST reads its starting
+geometry from -- the pre-optimized structure, never the raw yarpecule graph
+geometry -- the MD timestep it requests when a fragment is a free diatomic, and
+how the RDKit calculator hands its graph to the container and filters what
+comes back.
 """
+import numpy as np
 import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from rdkit import Chem
+
 from yarp.reaction.external.calc_base import CalculatorInputError
-from yarp.reaction.external.conf_gen import CrestConfCalculator, DIATOMIC_MD_TIMESTEP_FS
+from yarp.reaction.external.calc_factory import get_calculator
+from yarp.reaction.external.conf_gen import (
+    CrestConfCalculator, RdkitConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
+)
 from yarp.reaction.reaction import reaction
+from yarp.util.config import ConformerConfig
 
 
 def _conf(geo, elements, ctype):
@@ -151,4 +160,223 @@ class TestCrestDiatomicTimestep:
         working but marginal, so the default must stay at or below 1.0.
         """
         assert DIATOMIC_MD_TIMESTEP_FS <= 1.0
+
+
+
+# =====================================================================
+# RDKit as a conf_gen software option
+# =====================================================================
+
+class TestRdkitConformerConfig:
+    """
+    The `conf_gen:` block of the YAML input is parsed into a ConformerConfig.
+    These tests check that YARP accepts a valid RDKit block and rejects a
+    mismatched one at start-up, rather than letting a bad setting reach the
+    container and fail every conformer job hours into a run.
+    """
+
+    def test_rdkit_with_a_force_field_lot_is_accepted(self):
+        """
+        `software: rdkit, lot: uff` is a valid block, and the two RDKit-only
+        settings fall back to their defaults: 50 conformers embedded, and
+        embedded conformers within 0.1 A RMSD of each other pruned.
+        """
+        cfg = ConformerConfig(software="rdkit", lot="uff", charge=0)
+
+        assert cfg.n_conf == 50 and cfg.prune_rms_thresh == 0.1
+
+    def test_rdkit_does_not_need_n_unpaired_electrons(self):
+        """
+        CREST configs must give n_unpaired_electrons (it becomes CREST's --uhf
+        flag). A force field has no electrons to count, so an RDKit block
+        that leaves it out must still load.
+        """
+        ConformerConfig(software="rdkit", lot="mmff94", charge=0)
+
+    def test_rdkit_rejects_a_crest_lot(self):
+        """
+        `lot: gfn2` is an xTB method that RDKit cannot run. Switching
+        `software` to rdkit but forgetting to change `lot` must fail at
+        config load, with an error that names RDKit.
+        """
+        with pytest.raises(ValueError, match="RDKit"):
+            ConformerConfig(software="rdkit", lot="gfn2", charge=0)
+
+    def test_crest_rejects_a_force_field_lot(self):
+        """The reverse mistake: a force-field lot with `software: crest`."""
+        with pytest.raises(ValueError, match="CREST"):
+            ConformerConfig(software="crest", lot="uff", charge=0, n_unpaired_electrons=0)
+
+    def test_unknown_software_is_still_rejected(self):
+        """
+        Adding 'rdkit' to the allowed list must not have loosened the check:
+        any other name (here auto3d, which is not implemented) is refused.
+        """
+        with pytest.raises(ValueError, match="Invalid 'software'"):
+            ConformerConfig(software="auto3d", lot="uff", charge=0)
+
+
+def _rdkit_calc(rxn, task_type, lot="uff"):
+    """An RdkitConfCalculator for one side of `rxn`, with a real ConformerConfig and a mock scheduler."""
+    config = ConformerConfig(software="rdkit", lot=lot, charge=0, n_cpus=2)
+    task_def = SimpleNamespace(task_type=task_type, config=config, task_id=f"s.{task_type}")
+    return RdkitConfCalculator(task_def, rxn, MagicMock())
+
+
+def _add_preopt(state, geo=None):
+    """Store a fake xTB pre-optimized conformer on `state`, as the pre-opt task would."""
+    graph = state.graph
+    geo = graph.geo.copy() if geo is None else geo
+    state.conformers["preopt_xtb_pysisyphus"] = _conf(geo, graph.elements, "preopt_xtb_pysisyphus")
+
+
+def _write_xyz(path, elements, geometries):
+    """Write a multi-frame xyz, standing in for the container's rdkit_conformers.xyz."""
+    with open(path, "w") as f:
+        for geo in geometries:
+            f.write(f"{len(elements)}\n\n")
+            for el, (x, y, z) in zip(elements, geo):
+                f.write(f"{el.capitalize()} {x} {y} {z}\n")
+
+
+class TestRdkitRouting:
+
+    def test_factory_routes_rdkit_to_the_rdkit_calculator(self, khp_reaction):
+        """
+        The task pipeline never names a calculator class; it asks
+        calc_factory.get_calculator for one based on `software`. This checks
+        that `software: rdkit` gets the RDKit calculator, not CREST's.
+        """
+        config = ConformerConfig(software="rdkit", lot="uff", charge=0)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config, task_id="s.r")
+
+        assert isinstance(get_calculator(task_def, khp_reaction, MagicMock()), RdkitConfCalculator)
+
+
+class TestRdkitGenerateInput:
+    """
+    Before submitting, the calculator writes `input.mol`, the only thing the
+    container sees. It is built with yarpecule_to_rdmol from the yarpecule's
+    graph, so RDKit gets YARP's own bonding instead of re-perceiving it.
+
+    Atom order matters: the conformers that come back are matched to the
+    graph atom by atom (see TestRdkitScrapeData), so atom i in the MOL file
+    must be atom i in the graph.
+    """
+
+    def test_mol_file_carries_the_graph_and_the_pre_opt_geometry(self, khp_reaction, tmp_path):
+        """
+        Give the reactant a pre-opt geometry that is the graph geometry
+        shifted by 1.5 A, so the two can be told apart. Then read input.mol
+        back with RDKit and check that it has:
+          - the graph's elements, in the same order;
+          - the graph's bonds (same adjacency matrix);
+          - the shifted coordinates, i.e. the xTB pre-opt geometry, not the
+            raw graph geometry (for a product, that is still the parent's).
+        """
+        graph = khp_reaction.reactant.graph
+        shifted = graph.geo + 1.5
+        _add_preopt(khp_reaction.reactant, geo=shifted)
+
+        calc = _rdkit_calc(khp_reaction, "reactant_conformer")
+        calc.set_scratch_dir(tmp_path)
+        calc.generate_input()
+
+        mol = Chem.MolFromMolFile(str(tmp_path / "input.mol"), removeHs=False)
+        assert [a.GetSymbol().lower() for a in mol.GetAtoms()] == list(graph.elements)
+        assert np.array_equal(Chem.GetAdjacencyMatrix(mol), graph.adj_mat)
+        assert np.allclose(mol.GetConformer().GetPositions(), shifted, atol=1e-4)
+
+    def test_missing_pre_opt_raises_rather_than_writing_nothing(self, khp_reaction, tmp_path):
+        """
+        With no pre-opt conformer on the product, generate_input must raise
+        CalculatorInputError. progress_yarp catches that error and fails just
+        this task; any other failure mode would either crash the whole pass
+        or submit a job with no input file.
+        """
+        calc = _rdkit_calc(khp_reaction, "product_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        with pytest.raises(CalculatorInputError, match="pre-optimization"):
+            calc.generate_input()
+
+    def test_command_passes_the_config_to_the_container(self, khp_reaction, tmp_path):
+        """
+        Write the job script with the container prefix mocked out, and check
+        the command line. Each YAML setting must reach the container's
+        arguments: lot, n_conf and prune_rms_thresh from the config, n_threads
+        from n_cpus (2 here), and the config's default seed of 42, which
+        makes repeated runs give the same conformers.
+        """
+        calc = _rdkit_calc(khp_reaction, "reactant_conformer", lot="mmff94")
+        calc.set_scratch_dir(tmp_path)
+        calc.get_container_prefix = MagicMock(return_value="PREFIX")
+        calc.write_scheduler_headers = MagicMock()
+
+        script = calc.write_submission_script().read_text()
+
+        # The image's entrypoint is the script, so apptainer must use `run`.
+        assert calc.get_container_prefix.call_args.kwargs["apptainer_run"] is True
+        assert ("PREFIX input.mol --lot mmff94 --n_conf 50 --prune_rms_thresh 0.1 "
+                "--n_threads 2 --seed 42") in script
+
+
+class TestRdkitScrapeData:
+    """
+    After the job, scrape_data reads rdkit_conformers.xyz (frames already
+    sorted lowest energy first by the container) and stores the conformers on
+    the state as conf_gen_rank0_uff_rdkit, conf_gen_rank1_uff_rdkit, ...
+
+    The force-field optimization can break or form bonds. So, as classy_yarp
+    did, each frame's bonding is re-perceived from its coordinates and
+    compared with the yarpecule graph; a frame that does not match is
+    dropped. Otherwise GSM would be given an endpoint that is a different
+    molecule from the reaction it is meant to characterize.
+    """
+
+    def _squashed(self, geo):
+        """Pull every atom toward the centroid until bonds form that the graph lacks."""
+        centroid = geo.mean(axis=0)
+        return centroid + 0.3 * (geo - centroid)
+
+    def test_drops_broken_conformers_and_ranks_the_rest_in_order(self, khp_reaction, tmp_path):
+        """
+        Three frames: the graph geometry (good), a squashed copy whose
+        bonding no longer matches (broken), and the graph geometry shifted
+        by 2 A (good; bonding does not depend on position). Expected:
+          - scrape_data reports success;
+          - exactly two conformers are stored, rank0 and rank1;
+          - rank1 is the third frame, so dropping a frame renumbers the
+            survivors with no gap, keeping their energy order;
+          - they are tagged software 'rdkit'.
+        """
+        graph = khp_reaction.reactant.graph
+        good, broken = graph.geo, self._squashed(graph.geo)
+        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements, [good, broken, good + 2.0])
+
+        calc = _rdkit_calc(khp_reaction, "reactant_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert calc.scrape_data()
+        confs = khp_reaction.reactant.conformers
+        assert {k for k in confs if k.startswith("conf_gen")} == {
+            "conf_gen_rank0_uff_rdkit", "conf_gen_rank1_uff_rdkit"}
+        # Rank 1 is the third frame -- the broken second frame left no gap.
+        assert np.allclose(confs["conf_gen_rank1_uff_rdkit"].geo, good + 2.0)
+        assert confs["conf_gen_rank0_uff_rdkit"].software == "rdkit"
+
+    def test_fails_when_no_conformer_keeps_the_bonding(self, khp_reaction, tmp_path):
+        """
+        If every frame is broken, scrape_data returns False, so the task is
+        marked failed, and nothing is stored. A state with no conformers
+        must not look like a finished conformer search.
+        """
+        graph = khp_reaction.reactant.graph
+        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements, [self._squashed(graph.geo)])
+
+        calc = _rdkit_calc(khp_reaction, "reactant_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert not calc.scrape_data()
+        assert not any(k.startswith("conf_gen") for k in khp_reaction.reactant.conformers)
 

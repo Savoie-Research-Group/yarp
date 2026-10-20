@@ -255,6 +255,10 @@ class ConformerConfig:
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
 
+    # RDKit only: EmbedMultipleConfs settings. Defaults are classy_yarp's.
+    n_conf: int = 50
+    prune_rms_thresh: float = 0.1
+
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
@@ -265,12 +269,18 @@ class ConformerConfig:
             raise ValueError("Missing required key! Please provide 'charge' in conf_gen block!")
         if not self.software:
             raise ValueError("Missing required key! Please provide 'software' in conf_gen block!")
-        if self.software not in ['crest']:
-            raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'crest'")
+        if self.software not in ['crest', 'rdkit']:
+            raise ValueError(f"Invalid 'software' provided: '{self.software}' Valid options: 'crest', 'rdkit'")
         if self.software == 'crest' and self.lot not in ['gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff']:
             raise ValueError(f"Invalid 'lot' for CREST software! Valid options: 'gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff'")
         if self.software == 'crest' and self.n_unpaired_electrons == None:
             raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
+        if self.software == 'rdkit' and self.lot not in ['uff', 'mmff94']:
+            raise ValueError(f"Invalid 'lot' for RDKit software! Valid options: 'uff', 'mmff94'")
+        if not isinstance(self.n_conf, int) or self.n_conf < 1:
+            raise ValueError("Please provide a positive integer value to conf_gen: 'n_conf'")
+        if not isinstance(self.prune_rms_thresh, float):
+            raise ValueError("Please provide a float value to conf_gen: 'prune_rms_thresh'")
 
         if not isinstance(self.charge, int):
             raise ValueError("Please provide an integer value to conf_gen: 'charge'")

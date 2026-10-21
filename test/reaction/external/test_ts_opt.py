@@ -1,0 +1,262 @@
+"""
+Tests for where a TS optimization takes its starting structures from.
+
+A refinement stage whose `initial_geom.transition_state` is `label: ts_opt`
+used to start from the single TS that the source level's IRC validated. It now
+starts from every converged TS optimization at the source level that is a valid
+saddle point: low-level IRC labels are poor predictors of high-level IRC
+outcomes, so dropping the other candidates loses TSs the high level could have
+found. `label: ts_guess` is unchanged.
+"""
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
+from yarp.reaction.conformer import conformer
+from yarp.reaction.external.ts_opt import OrcaTSOptCalculator, PysisyphusTSOptCalculator
+from yarp.util.config import TSOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
+
+ELEMENTS = ["H", "H", "H"]
+HL_LOT = "PBE D3BJ def2-SVP"
+ONE_IMAG = np.array([-500.0, 100.0, 200.0])
+NO_IMAG = np.array([50.0, 100.0, 200.0])
+TWO_IMAG = np.array([-500.0, -80.0, 200.0])
+
+
+def ts_conf(tag, key, freqs):
+    """A TS conformer identified by x(atom 0) = 10*tag."""
+    conf = conformer()
+    conf.elements = list(ELEMENTS)
+    conf.geo = np.array([[10.0 * tag, 0, 0], [1.5, 0, 0], [2.5, 0, 0]])
+    conf.vibrational_freqs = None if freqs is None else freqs.copy()
+    conf.type = key
+    return conf
+
+
+def make_calc(cls, ts_geom, ts_source, lot=HL_LOT, software="orca", job_config=None):
+    src = GeomSourceConfig(label="rp_opt", lot="xtb", software="pysisyphus")
+    cfg = TSOptConfig(software=software, lot=lot, charge=0, multiplicity=1)
+    cfg.initial_geom = InitialGeomConfig(reactant=src, product=src, transition_state=ts_source)
+    return cls(SimpleNamespace(config=cfg), SimpleNamespace(ts_geom=ts_geom),
+               job_config or MagicMock(container="docker"))
+
+
+def written_tags(calc, tmp_path, prefix="ts_guess"):
+    """generate_input, then read back which conformer each tsopt_run{i} got."""
+    calc.set_scratch_dir(tmp_path)
+    calc.generate_input()
+    tags = []
+    for i in range(1, calc._get_num_runs() + 1):
+        geo = np.loadtxt(tmp_path / f"tsopt_run{i}" / f"{prefix}_{i}.xyz", skiprows=2, usecols=(1, 2, 3))
+        tags.append(int(round(geo[0][0] / 10.0)))
+    return tags
+
+
+def xtb_refined_rxn():
+    """
+    ts_geom as it stands after an xTB refine stage: TS-opt run 2 failed (gap),
+    run 4 converged to a minimum, run 5 to a second-order saddle. Plus GSM
+    guesses and another level's TS opt that must not be picked up.
+    """
+    confs = [
+        ts_conf(91, "ts_guess_1_xtb_pysisyphus", None),
+        ts_conf(92, "ts_guess_2_xtb_pysisyphus", None),
+        ts_conf(1, "1_tsopt_xtb_pysisyphus", ONE_IMAG),
+        ts_conf(3, "3_tsopt_xtb_pysisyphus", ONE_IMAG),
+        ts_conf(4, "4_tsopt_xtb_pysisyphus", NO_IMAG),
+        ts_conf(5, "5_tsopt_xtb_pysisyphus", TWO_IMAG),
+        ts_conf(6, "6_tsopt_xtb_pysisyphus", ONE_IMAG),
+        ts_conf(70, "1_tsopt_B3LYP def2-SVP_orca", ONE_IMAG),
+    ]
+    return {c.type: c for c in confs}
+
+
+XTB_TS_OPT = GeomSourceConfig(label="ts_opt", lot="xtb", software="pysisyphus")
+XTB_TS_GUESS = GeomSourceConfig(label="ts_guess", lot="xtb", software="pysisyphus")
+
+
+class TestTSOptSource:
+    def test_starts_from_every_valid_source_ts(self, tmp_path):
+        calc = make_calc(OrcaTSOptCalculator, xtb_refined_rxn(), XTB_TS_OPT)
+
+        # 1, 3 and 6 are first-order saddles at xtb/pysisyphus, in insertion
+        # order; 4 and 5 aren't saddles; 70 is another level; 91/92 are guesses.
+        assert written_tags(calc, tmp_path) == [1, 3, 6]
+
+    def test_ready_when_one_valid_ts_exists(self):
+        ts_geom = {"2_tsopt_xtb_pysisyphus": ts_conf(2, "2_tsopt_xtb_pysisyphus", ONE_IMAG)}
+
+        assert make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()
+
+    def test_not_ready_without_a_valid_ts(self):
+        ts_geom = {
+            "1_tsopt_xtb_pysisyphus": ts_conf(1, "1_tsopt_xtb_pysisyphus", NO_IMAG),
+            "2_tsopt_xtb_pysisyphus": ts_conf(2, "2_tsopt_xtb_pysisyphus", TWO_IMAG),
+            "1_tsopt_B3LYP def2-SVP_orca": ts_conf(70, "1_tsopt_B3LYP def2-SVP_orca", ONE_IMAG),
+        }
+
+        assert not make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()
+
+
+class TestTSGuessSourceUnchanged:
+    def test_starts_from_every_guess(self, tmp_path):
+        calc = make_calc(PysisyphusTSOptCalculator, xtb_refined_rxn(), XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus")
+
+        assert written_tags(calc, tmp_path) == [91, 92]
+
+    def test_ready_with_a_guess_geometry(self):
+        ts_geom = {"ts_guess_1_xtb_pysisyphus": ts_conf(91, "ts_guess_1_xtb_pysisyphus", None)}
+
+        assert make_calc(PysisyphusTSOptCalculator, ts_geom, XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus").has_prerequisites()
+
+    def test_not_ready_when_guess_has_no_geometry(self):
+        guess = ts_conf(91, "ts_guess_1_xtb_pysisyphus", None)
+        guess.geo = None
+
+        assert not make_calc(PysisyphusTSOptCalculator, {guess.type: guess}, XTB_TS_GUESS,
+                             lot="xtb", software="pysisyphus").has_prerequisites()
+
+
+class TestOrcaJobScripts:
+    """
+    The two scripts an ORCA TS optimization writes under SGE + apptainer: an
+    outer script that carries the scheduler header and launches the container,
+    and an inner script that runs each tsopt_run{i} in turn inside it.
+    """
+
+    def _write(self, tmp_path, staged=False):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        sif = sif_dir / "orca_6.0.1.sif"
+        sif.touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        ts_geom = {key: ts_conf(tag, key, ONE_IMAG)
+                   for tag, key in ((1, "1_tsopt_xtb_pysisyphus"), (2, "2_tsopt_xtb_pysisyphus"))}
+
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT, job_config=job_config)
+        calc.config.use_local_scratch = staged
+        scratch = tmp_path / "SCRATCH" / "abc123_refine.transition_state_optimization"
+        calc.set_scratch_dir(scratch)
+        calc.generate_input()
+        return calc.write_submission_script(), scratch, sif
+
+    def test_outer_script(self, tmp_path):
+        submit, scratch, sif = self._write(tmp_path)
+
+        assert submit == str(scratch / "submit_tsopt.sh")
+        assert (scratch / "submit_tsopt.sh").read_text() == (
+            "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
+            "\n"
+            f"apptainer exec -e  --bind {scratch}:/work --pwd /work {sif} bash /work/run_orca_inner.sh\n"
+        )
+
+    def test_inner_script(self, tmp_path):
+        _, scratch, _ = self._write(tmp_path)
+
+        assert (scratch / "run_orca_inner.sh").read_text() == ORCA_INNER_SCRIPT
+
+    def test_staged_outer_script(self, tmp_path):
+        """Staging adds the staging block and changes the container line; nothing else."""
+        _, scratch, sif = self._write(tmp_path, staged=True)
+
+        assert (scratch / "submit_tsopt.sh").read_text() == (
+            "#!/bin/bash\n"
+            "#$ -N yarp\n"
+            "#$ -q long\n"
+            "#$ -pe smp 1\n"
+            "#$ -l h_vmem=4000M\n"
+            "#$ -l h_rt=01:00:00\n"
+            "#$ -notify\n"
+            "#$ -o /dev/null\n"
+            "#$ -e /dev/null\n"
+            "\n"
+            "# Stage this task in node-local scratch (use_local_scratch)\n"
+            f'YARP_NFS_DIR="{scratch}"\n'
+            'yarp_staging_error() { echo "$(date \'+%F %T\') $(hostname): $*" >> "$YARP_NFS_DIR/local_scratch.err"; }\n'
+            'YARP_LOCAL_DIR=$(mktemp -d "$TMPDIR/yarp.XXXXXX" 2>&1) || '
+            '{ yarp_staging_error "could not create the local scratch dir: $YARP_LOCAL_DIR"; exit 1; }\n'
+            "yarp_copy_back() {\n"
+            "    local out\n"
+            '    out=$(rsync -a "$YARP_LOCAL_DIR"/ "$YARP_NFS_DIR"/ 2>&1) && return 0\n'
+            '    yarp_staging_error "copy-back failed, local copy kept at $YARP_LOCAL_DIR: $out"\n'
+            "    return 1\n"
+            "}\n"
+            'trap \'yarp_copy_back && rm -rf "$YARP_LOCAL_DIR"\' EXIT\n'
+            "trap 'yarp_copy_back' USR1\n"
+            "trap 'exit 140' USR2\n"
+            'YARP_OUT=$(cp -a "$YARP_NFS_DIR"/. "$YARP_LOCAL_DIR"/ 2>&1) || '
+            '{ yarp_staging_error "copy-in failed: $YARP_OUT"; exit 1; }\n'
+            "yarp_bg() {\n"
+            '    "$@" &\n'
+            "    local pid=$!\n"
+            "    while kill -0 $pid 2>/dev/null; do wait $pid; done\n"
+            "    wait $pid\n"
+            "}\n"
+            "\n"
+            f'yarp_bg apptainer exec -e  --bind "$YARP_LOCAL_DIR":/work --bind "$YARP_NFS_DIR":/nfs '
+            f"--pwd /work {sif} bash /work/run_orca_inner.sh\n"
+        )
+
+    def test_staged_inner_script_logs_to_nfs(self, tmp_path):
+        """ORCA's .out/.err go straight to the NFS run dir, so they can be followed during the run."""
+        _, scratch, _ = self._write(tmp_path, staged=True)
+
+        assert (scratch / "run_orca_inner.sh").read_text() == (
+            ORCA_INNER_SCRIPT
+            .replace("> tsopt_1.out 2> tsopt_1.err", "> /nfs/tsopt_run1/tsopt_1.out 2> /nfs/tsopt_run1/tsopt_1.err")
+            .replace("> tsopt_2.out 2> tsopt_2.err", "> /nfs/tsopt_run2/tsopt_2.out 2> /nfs/tsopt_run2/tsopt_2.err")
+        )
+
+
+class TestPysisInnerScriptLogs:
+    @pytest.mark.parametrize("staged", [False, True])
+    def test_log_lines(self, tmp_path, staged):
+        sif_dir = tmp_path / "sifs"
+        sif_dir.mkdir()
+        (sif_dir / "erm42_yarp_pysis_xtb.sif").touch()
+        job_config = JobManagerConfig(scheduler="sge", container="apptainer", queue="long",
+                                      sif_location=str(sif_dir))
+        calc = make_calc(PysisyphusTSOptCalculator, xtb_refined_rxn(), XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus", job_config=job_config)
+        calc.config.use_local_scratch = staged
+        calc.set_scratch_dir(tmp_path / "SCRATCH" / "abc123_refine.transition_state_optimization")
+        calc.generate_input()
+        calc.write_submission_script()
+
+        lines = (calc.scratch_dir / "run_pysis_inner.sh").read_text().splitlines()
+        for i in (1, 2):
+            log = f"/nfs/tsopt_run{i}/" if staged else ""
+            assert f"pysis tsopt_{i}_input.yaml > {log}tsopt_{i}.log 2> {log}tsopt_{i}.err" in lines
+
+
+ORCA_INNER_SCRIPT = (
+    "#!/bin/bash\n"
+    "\n"
+    "echo 'Starting YARP serial TSOPT execution...'\n"
+    "\n"
+    "echo '--- Running TSOPT 1 ---'\n"
+    "cd /work/tsopt_run1\n"
+    "orca=$(which orca)\n"
+    "$orca tsopt_1.inp > tsopt_1.out 2> tsopt_1.err\n"
+    "echo '--- Finished TSOPT 1 ---'\n"
+    "\n"
+    "echo '--- Running TSOPT 2 ---'\n"
+    "cd /work/tsopt_run2\n"
+    "orca=$(which orca)\n"
+    "$orca tsopt_2.inp > tsopt_2.out 2> tsopt_2.err\n"
+    "echo '--- Finished TSOPT 2 ---'\n"
+    "\n"
+)

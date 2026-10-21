@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
+import pytest
 import yaml
 
 from yarp.initialize_yarp import initialize_from_dict, initialize_yarp, save_state
@@ -73,6 +74,17 @@ def test_happy_path_initialization(enum_egat_llpath_llrefine):
 
     # IRC Validation depends on TS optimization, so it MUST be pending
     assert rxn_tasks["ll_refine.irc_validation"]["status"] == "pending"
+
+
+@pytest.mark.parametrize("runner", ["apptainer", "singularity"])
+def test_missing_sif_location_stops_initialization(enum_min_options, tmp_path, runner):
+    """Both .sif runners need sif_location to be a real directory before any reaction is built."""
+    job_manager = enum_min_options["initialize"]["job_manager"]
+    job_manager["container"] = runner
+    job_manager["sif_location"] = str(tmp_path / "no_such_dir")
+
+    with pytest.raises(FileNotFoundError, match=f"{runner.capitalize()} SIF location does not exist"):
+        initialize_from_dict(enum_min_options)
 
 
 def test_enum_minimal(enum_min_options):

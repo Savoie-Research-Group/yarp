@@ -275,18 +275,19 @@ class AsyncYarpCalculator:
         notify time (60 s on the CRC), so the copy-back has to fit in that
         window. The USR2 trap makes the exit explicit; the EXIT trap does the
         copy-back. (Bash also runs the EXIT trap when an untrapped USR2 kills
-        it, but the explicit exit doesn't depend on that.) SIGUSR1 (before a
-        suspend) copies back and keeps going.
+        it, but the explicit exit doesn't depend on that.)
 
         `yarp_bg` runs the container in the background and waits for it, since
-        bash holds a trap until a foreground child exits. It keeps waiting
-        across a trapped SIGUSR1, and returns the container's exit status.
+        bash holds a trap until a foreground child exits.
 
         The job's own stdout/stderr go to /dev/null, so a failed mkdir,
         copy-in or copy-back appends its reason to `local_scratch.err` in the
         task dir. The file only appears when something failed. It is written
         straight to NFS, never into the local copy, so a copy-back can't
         overwrite it.
+
+        NOTE: The SIGUSR1 feature from a suspended job is untested and
+        may cause unexpected issues with file loss on back transfer.
         """
         f.write("# Stage this task in node-local scratch (use_local_scratch)\n")
         f.write(f'YARP_NFS_DIR="{self.scratch_dir}"\n')

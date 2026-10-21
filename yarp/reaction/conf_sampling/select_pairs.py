@@ -156,12 +156,12 @@ def select_gsm_pairs(rxn, config):
     for ind, p_c in enumerate(p_confs):
 
             # 1. Unaligned Evaluation
-            ind_unaligned = return_indicator(E=r_c.elements, RG=p_c.geo, PG=biased_r[ind].geo)
+            ind_unaligned = return_indicator(E=p_c.elements, RG=p_c.geo, PG=biased_r[ind].geo)
             prob_unaligned = model.predict_proba(ind_unaligned)
 
             # 2. Aligned Evaluation
             aligned_biased_r = align_conformers(p_c, biased_r[ind])
-            ind_aligned = return_indicator(E=r_c.elements, RG=p_c.geo, PG=aligned_biased_r.geo)
+            ind_aligned = return_indicator(E=p_c.elements, RG=p_c.geo, PG=aligned_biased_r.geo)
             prob_aligned = model.predict_proba(ind_aligned)
 
             # 3. The Tournament (keep the higher probability setup)

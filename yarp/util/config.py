@@ -260,10 +260,13 @@ class ConformerConfig:
     lot: str = None
     charge: int = None
     n_unpaired_electrons: int = None
+    # Auto3D only (required there): spin multiplicity of the whole state, passed
+    # to the neural-network potential; the other QM stages take theirs the same way.
+    multiplicity: Optional[int] = None
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
 
-    # RDKit only: EmbedMultipleConfs settings. Defaults are classy_yarp's.
+    # RDKit and Auto3D: EmbedMultipleConfs settings. Defaults are classy_yarp's.
     n_conf: int = 50
     prune_rms_thresh: float = 0.1
 
@@ -278,14 +281,16 @@ class ConformerConfig:
             raise ValueError("Missing required key! Please provide 'charge' in conf_gen block!")
         if not self.software:
             raise ValueError("Missing required key! Please provide 'software' in conf_gen block!")
-        if self.software not in ['crest', 'rdkit']:
-            raise ValueError(f"Invalid 'software' provided: '{self.software}' Valid options: 'crest', 'rdkit'")
+        if self.software not in ['crest', 'rdkit', 'auto3d']:
+            raise ValueError(f"Invalid 'software' provided: '{self.software}' Valid options: 'crest', 'rdkit', 'auto3d'")
         if self.software == 'crest' and self.lot not in ['gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff']:
             raise ValueError(f"Invalid 'lot' for CREST software! Valid options: 'gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff'")
         if self.software == 'crest' and self.n_unpaired_electrons == None:
             raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
         if self.software == 'rdkit' and self.lot not in ['uff', 'mmff94']:
             raise ValueError(f"Invalid 'lot' for RDKit software! Valid options: 'uff', 'mmff94'")
+        if self.software == 'auto3d':
+            self._check_auto3d()
         if not isinstance(self.n_conf, int) or self.n_conf < 1:
             raise ValueError("Please provide a positive integer value to conf_gen: 'n_conf'")
         if not isinstance(self.prune_rms_thresh, float):
@@ -305,6 +310,35 @@ class ConformerConfig:
             raise ValueError("Please provide conf_gen: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to conf_gen: 'use_local_scratch'")
+
+    def _check_auto3d(self):
+        """
+        Auto3D settings, including what each potential can model.
+
+        These are the checks the config alone can answer; which elements a
+        state contains is only known once the species are read.
+        - ANI-2x is trained on neutral molecules only.
+        - Only the spin-aware AIMNet2 (aimnet2-nse) can model an open-shell
+          state. ANI-2x refuses one; the default AIMNet2 runs it as closed-shell
+          with only a warning, which would silently give wrong conformers
+          (measured with Auto3D 3.2.2).
+        """
+        if self.lot not in ['aimnet2', 'aimnet2-nse', 'ani2x']:
+            raise ValueError("Invalid 'lot' for Auto3D software! Valid options: 'aimnet2', 'aimnet2-nse', 'ani2x'")
+        if self.multiplicity is None:
+            raise ValueError("Missing required key! 'multiplicity' field is required for conf_gen with Auto3D!")
+        if not isinstance(self.multiplicity, int) or self.multiplicity < 1:
+            raise ValueError("Please provide a positive integer value to conf_gen: 'multiplicity'")
+        if self.multiplicity > 1 and self.lot != 'aimnet2-nse':
+            raise ValueError(
+                f"conf_gen multiplicity {self.multiplicity} is open-shell, which only the spin-aware "
+                f"AIMNet2 can model: set conf_gen 'lot: aimnet2-nse' (got '{self.lot}')."
+            )
+        if self.lot == 'ani2x' and self.charge != 0:
+            raise ValueError(
+                f"ANI-2x is trained on neutral molecules only, but conf_gen charge is {self.charge}: "
+                "use 'lot: aimnet2' (or 'aimnet2-nse') for charged states."
+            )
 
 
 @dataclass

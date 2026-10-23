@@ -1,0 +1,15 @@
+# pip packages for the auto3d_conf image, installed with --no-deps --require-hashes on top of
+# conda-linux-64.lock (conda provides rdkit, torch, torchani and the other dependencies; a plain
+# `pip install Auto3D` would replace conda's rdkit 2022.09.5 with PyPI's latest rdkit).
+Auto3D==3.2.2 \
+    --hash=sha256:495f7dc404a1aa9664b0a7c784d96265bff7a9d75c4c4cab8e0a05a839c815c3
+    # auto3d-3.2.2-py3-none-any.whl
+aimnet==0.2.0 \
+    --hash=sha256:98b56538f31f781571083e5b1b66be85f26b31647ce743078182298143810264
+    # aimnet-0.2.0-py3-none-any.whl
+nvalchemi-toolkit-ops==0.5.0 \
+    --hash=sha256:85bd1107003ac559698d3cfb2659b7fde6e20ba1c27be285f8995b132288fa36
+    # nvalchemi_toolkit_ops-0.5.0-py3-none-any.whl
+warp-lang==1.18.0 \
+    --hash=sha256:090962bfae7dd22ade0d8e0258f41635e0e58980f15bcc9e7a7d312819dfe440
+    # warp_lang-1.18.0-py3-none-manylinux_2_28_x86_64.whl

@@ -1,6 +1,6 @@
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.reaction.external.ml_predict import EgatMLPredict
-from yarp.reaction.external.conf_gen import CrestConfCalculator, RdkitConfCalculator
+from yarp.reaction.external.conf_gen import CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator
 from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator
 from yarp.reaction.external.min_opt import PysisyphusMinOptCalculator, OrcaMinOptCalculator
 from yarp.reaction.external.ts_opt import PysisyphusTSOptCalculator, OrcaTSOptCalculator
@@ -25,6 +25,8 @@ def get_calculator(task_def, rxn_data, job_config) -> AsyncYarpCalculator:
             return CrestConfCalculator(task_def, rxn_data, job_config)
         elif software == "rdkit":
             return RdkitConfCalculator(task_def, rxn_data, job_config)
+        elif software == "auto3d":
+            return Auto3dConfCalculator(task_def, rxn_data, job_config)
 
     # Task 3: TS Guess
     elif t_type == "ts_guess":

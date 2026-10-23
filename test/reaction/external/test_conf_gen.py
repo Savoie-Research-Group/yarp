@@ -18,8 +18,11 @@ from rdkit import Chem
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.calc_factory import get_calculator
 from yarp.reaction.external.conf_gen import (
-    CrestConfCalculator, RdkitConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
+    CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
+    check_auto3d_compatibility,
 )
+from yarp.reaction.state import state
+import yarp as yp
 from yarp.reaction.reaction import reaction
 from yarp.util.config import ConformerConfig
 
@@ -209,11 +212,11 @@ class TestRdkitConformerConfig:
 
     def test_unknown_software_is_still_rejected(self):
         """
-        Adding 'rdkit' to the allowed list must not have loosened the check:
-        any other name (here auto3d, which is not implemented) is refused.
+        Adding 'rdkit' and 'auto3d' to the allowed list must not have loosened
+        the check: any other name (here openbabel, not implemented) is refused.
         """
         with pytest.raises(ValueError, match="Invalid 'software'"):
-            ConformerConfig(software="auto3d", lot="uff", charge=0)
+            ConformerConfig(software="openbabel", lot="uff", charge=0)
 
 
 def _rdkit_calc(rxn, task_type, lot="uff"):
@@ -379,4 +382,197 @@ class TestRdkitScrapeData:
 
         assert not calc.scrape_data()
         assert not any(k.startswith("conf_gen") for k in khp_reaction.reactant.conformers)
+
+
+
+# =====================================================================
+# Auto3D as a conf_gen software option
+# =====================================================================
+
+class TestAuto3dConformerConfig:
+    """
+    `software: auto3d` runs a neural-network potential, and each one models
+    only some states. The checks the config alone can answer run at config
+    load, before anything is submitted: the multiplicity must be given, an
+    open-shell multiplicity needs the spin-aware AIMNet2, and ANI-2x needs a
+    neutral state. (Which elements a state contains is checked at yarp-init.)
+    """
+
+    def test_closed_shell_aimnet2_is_accepted(self):
+        """The common case: neutral singlet with the default AIMNet2."""
+        cfg = ConformerConfig(software="auto3d", lot="aimnet2", charge=0, multiplicity=1)
+        assert cfg.n_conf == 50 and cfg.prune_rms_thresh == 0.1
+
+    def test_multiplicity_is_required(self):
+        """No silent singlet: like n_unpaired_electrons for CREST, it must be given."""
+        with pytest.raises(ValueError, match="multiplicity"):
+            ConformerConfig(software="auto3d", lot="aimnet2", charge=0)
+
+    def test_rejects_a_force_field_lot(self):
+        """`lot: uff` left over from an RDKit block fails at load, naming Auto3D."""
+        with pytest.raises(ValueError, match="Auto3D"):
+            ConformerConfig(software="auto3d", lot="uff", charge=0, multiplicity=1)
+
+    @pytest.mark.parametrize("lot", ["aimnet2", "ani2x"])
+    def test_open_shell_needs_the_spin_aware_model(self, lot):
+        """
+        Multiplicity 3 with a closed-shell potential is refused. The default
+        AIMNet2 would otherwise run it as closed-shell with only a warning
+        (measured with Auto3D 3.2.2), i.e. wrong conformers
+        with no error.
+        """
+        with pytest.raises(ValueError, match="aimnet2-nse"):
+            ConformerConfig(software="auto3d", lot=lot, charge=0, multiplicity=3)
+
+    def test_open_shell_with_the_spin_aware_model_is_accepted(self):
+        ConformerConfig(software="auto3d", lot="aimnet2-nse", charge=0, multiplicity=3)
+
+    def test_ani2x_rejects_a_charged_state(self):
+        """ANI-2x is trained on neutral molecules; AIMNet2 takes a charge."""
+        with pytest.raises(ValueError, match="neutral"):
+            ConformerConfig(software="auto3d", lot="ani2x", charge=1, multiplicity=1)
+        ConformerConfig(software="auto3d", lot="aimnet2", charge=1, multiplicity=1)
+
+
+def _auto3d_calc(rxn, task_type, lot="aimnet2", multiplicity=1):
+    """An Auto3dConfCalculator for one side of `rxn`, with a real ConformerConfig and a mock scheduler."""
+    config = ConformerConfig(software="auto3d", lot=lot, charge=0, multiplicity=multiplicity, n_cpus=2)
+    task_def = SimpleNamespace(task_type=task_type, config=config, task_id=f"s.{task_type}")
+    return Auto3dConfCalculator(task_def, rxn, MagicMock())
+
+
+class TestAuto3dCalculator:
+    """
+    Auto3dConfCalculator reuses RdkitConfCalculator's lifecycle (MOL handoff,
+    output check, connectivity filter), which TestRdkit* covers. These tests
+    pin what is different: the routing, the image and the command it runs,
+    and the files and names its conformers come back under.
+    """
+
+    def test_factory_routes_auto3d_to_the_auto3d_calculator(self, khp_reaction):
+        """Exactly Auto3D's class -- it subclasses RDKit's, so isinstance alone would not tell."""
+        config = ConformerConfig(software="auto3d", lot="aimnet2", charge=0, multiplicity=1)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config, task_id="s.r")
+
+        assert type(get_calculator(task_def, khp_reaction, MagicMock())) is Auto3dConfCalculator
+
+    def test_command_runs_the_auto3d_image_with_the_multiplicity(self, khp_reaction, tmp_path):
+        """
+        Write the job script with the container prefix mocked out. It must ask
+        for the auto3d_conf image (not rdkit_conf), pass the lot and the
+        multiplicity on top of the RDKit-style embedding arguments, and log to
+        auto3d_run.log / auto3d_run.err.
+        """
+        calc = _auto3d_calc(khp_reaction, "reactant_conformer", lot="aimnet2-nse", multiplicity=3)
+        calc.set_scratch_dir(tmp_path)
+        calc.get_container_prefix = MagicMock(return_value="PREFIX")
+        calc.write_scheduler_headers = MagicMock()
+
+        script = calc.write_submission_script()
+
+        assert script.name == "run_auto3d_cmd.sh"
+        assert calc.get_container_prefix.call_args.args[0] == "erm42/yarp:auto3d_conf"
+        assert calc.get_container_prefix.call_args.kwargs["apptainer_run"] is True
+        assert ("PREFIX input.mol --lot aimnet2-nse --n_conf 50 --prune_rms_thresh 0.1 "
+                "--n_threads 2 --seed 42 --multiplicity 3 > auto3d_run.log 2> auto3d_run.err") in script.read_text()
+
+    def test_output_check_needs_auto3d_files_and_termination_line(self, khp_reaction, tmp_path):
+        """
+        The job counts as finished only with auto3d_conformers.xyz,
+        auto3d.energies and Auto3D's termination line in auto3d_run.log. The
+        container exits without that line when no conformer survives ranking.
+        """
+        calc = _auto3d_calc(khp_reaction, "reactant_conformer")
+        calc.set_scratch_dir(tmp_path)
+        for name in ("auto3d_conformers.xyz", "auto3d.energies"):
+            (tmp_path / name).write_text("x")
+        (tmp_path / "auto3d_run.log").write_text("Embedded 50 conformers\n")
+        assert not calc.check_output()
+
+        (tmp_path / "auto3d_run.log").write_text("Auto3D conformer generation terminated normally.\n")
+        assert calc.check_output()
+
+    def test_scrape_keeps_bonded_conformers_under_auto3d_names(self, khp_reaction, tmp_path):
+        """
+        The same connectivity filter as RDKit's, on auto3d_conformers.xyz: a
+        broken frame is dropped, the survivors are renumbered in order, and
+        they are stored as conf_gen_rank<i>_<lot>_auto3d -- the key that
+        ll_refine's initial_geom (lot: aimnet2-nse, software: auto3d) looks up.
+        """
+        graph = khp_reaction.reactant.graph
+        centroid = graph.geo.mean(axis=0)
+        broken = centroid + 0.3 * (graph.geo - centroid)
+        _write_xyz(tmp_path / "auto3d_conformers.xyz", graph.elements, [broken, graph.geo])
+
+        calc = _auto3d_calc(khp_reaction, "reactant_conformer", lot="aimnet2-nse", multiplicity=3)
+        calc.set_scratch_dir(tmp_path)
+
+        assert calc.scrape_data()
+        confs = {k: c for k, c in khp_reaction.reactant.conformers.items() if k.startswith("conf_gen")}
+        assert list(confs) == ["conf_gen_rank0_aimnet2-nse_auto3d"]
+        assert confs["conf_gen_rank0_aimnet2-nse_auto3d"].software == "auto3d"
+        assert np.allclose(confs["conf_gen_rank0_aimnet2-nse_auto3d"].geo, graph.geo)
+
+
+def _conf_tasks(software="auto3d", lot="aimnet2", multiplicity=1):
+    """The two conf_gen pipeline tasks, as InputParser builds them, sharing one ConformerConfig."""
+    if software == "auto3d":
+        cfg = ConformerConfig(software="auto3d", lot=lot, charge=0, multiplicity=multiplicity)
+    else:
+        cfg = ConformerConfig(software="crest", lot="gfn2", charge=0, n_unpaired_electrons=0)
+    return {f"ll_path.{side}_conformer": SimpleNamespace(
+                task_id=f"ll_path.{side}_conformer", task_type=f"{side}_conformer", config=cfg)
+            for side in ("reactant", "product")}
+
+
+def _reactions(*pairs):
+    """{key: reaction-like object} with real reactant/product states built from SMILES."""
+    return {str(i): SimpleNamespace(reactant=state(yp.yarpecule(r)), product=state(yp.yarpecule(p)))
+            for i, (r, p) in enumerate(pairs)}
+
+
+class TestAuto3dInitCheck:
+    """
+    check_auto3d_compatibility runs in yarp-init, after the reactions are built
+    and before anything is saved or submitted. It checks what needs the
+    species: each potential's trained elements (an error), and radical Lewis
+    structures in a multiplicity-1 run (only a warning: YARP draws O2 as
+    closed-shell O=O, and CREST/RDKit runs treat such states as singlets too).
+    """
+
+    def test_supported_states_pass_silently(self, capsys):
+        """C/H/O chemistry with AIMNet2: no error, no warning."""
+        check_auto3d_compatibility(_reactions(("O=CCCOO", "C=COCOO")), _conf_tasks())
+        assert capsys.readouterr().out == ""
+
+    def test_ani2x_stops_on_an_element_aimnet2_covers(self):
+        """
+        Phosphorus is in AIMNet2's 14 elements but not ANI-2x's 7. The error
+        names the state and the element, and points to AIMNet2.
+        """
+        with pytest.raises(ValueError, match=r"(?s)CP: P.*lot: aimnet2"):
+            check_auto3d_compatibility(_reactions(("O=CCCOO", "CP")), _conf_tasks(lot="ani2x"))
+
+    def test_stops_on_an_element_no_potential_covers(self):
+        """Potassium is in no Auto3D potential: the hint is to use rdkit or crest instead."""
+        with pytest.raises(ValueError, match=r"(?s)\[KH\]: K\n.*software: rdkit"):
+            check_auto3d_compatibility(_reactions(("O=CCCOO", "[KH]")), _conf_tasks())
+
+    def test_other_conformer_software_is_not_checked(self):
+        """The same potassium state with CREST is not Auto3D's business."""
+        check_auto3d_compatibility(_reactions(("O=CCCOO", "[KH]")), _conf_tasks(software="crest"))
+
+    def test_radical_in_a_singlet_run_warns_but_continues(self, capsys):
+        """
+        The ethyl radical's Lewis structure has an unpaired electron, but the
+        run says multiplicity 1: a warning naming it, no error. With the
+        spin-aware model and multiplicity 2 there is nothing to warn about.
+        """
+        rxns = _reactions(("CC", "C[CH2]"))
+        check_auto3d_compatibility(rxns, _conf_tasks())
+        out = capsys.readouterr().out
+        assert "WARNING" in out and "[CH2]C" in out and "product" in out
+
+        check_auto3d_compatibility(rxns, _conf_tasks(lot="aimnet2-nse", multiplicity=2))
+        assert capsys.readouterr().out == ""
 

@@ -165,6 +165,25 @@ class TestCrestDiatomicTimestep:
         assert DIATOMIC_MD_TIMESTEP_FS <= 1.0
 
 
+class TestCrestHasNoSeed:
+    """
+    CREST has no seed option. YARP used to append `--seed <n>` anyway; CREST
+    3.0.2 ignored it, and two runs of the same input gave different conformer
+    sets for every KHP depth-1 reaction. So the flag only suggested a
+    reproducibility CREST does not have.
+    """
+
+    def test_seed_is_not_passed_to_crest(self, khp_reaction):
+        """Even with seed 42 in the config, the CREST command carries no --seed."""
+        config = SimpleNamespace(lot="gfn2", n_cpus=4, charge=0, n_unpaired_electrons=0,
+                                 seed=42, solvent=None)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config,
+                                   task_id="s.reactant_conformer")
+        cmd = CrestConfCalculator(task_def, khp_reaction, MagicMock())._get_crest_command()
+
+        assert "--seed" not in cmd
+
+
 
 # =====================================================================
 # RDKit as a conf_gen software option

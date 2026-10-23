@@ -250,8 +250,9 @@ class CrestConfCalculator(ConfTask):
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"
 
-        if self.config.seed is not None:
-            cmd += f" --seed {self.config.seed}"
+        # No --seed: CREST has no seed option (CREST 3.0.2 silently ignored the
+        # flag), so a CREST search is never reproducible run to run whatever the
+        # config's `seed` says. That setting still pins the thread count above.
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!

@@ -3,9 +3,11 @@ Testing suite for functions contained in yarp/reaction/enum.py
 """
 import pytest
 import numpy as np
+from types import SimpleNamespace
 from yarp.reaction.enum import bnfn, enumerate_products
 from yarp.reaction.enum import _resolve_reactive_atoms_for_candidate
 from yarp.reaction.filters import filter_enum_products
+from yarp.yarpecule.hashes import reaction_hash
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
 import math
@@ -153,6 +155,45 @@ class TestConcertedClosedShell:
             dar_b2f2_hash.add(_.hash)
 
         assert dap.hash not in dar_b2f2_hash
+
+
+def raw_b2f2_cycle(seeds):
+    """Raw b2f2 output for each seed as (seed, product) pairs, with bnfn called as enumerate_products calls it."""
+    return [(s, p) for s in seeds
+            for p in bnfn(s, 2, hashes={s.hash}, hash_filter=False, verbose=False)]
+
+
+def aligned_reaction_hash(r, p):
+    """reaction_hash without building a reaction object; bnfn products already share their reactant's atom order."""
+    end = lambda y: SimpleNamespace(graph=y, hash=y.hash)
+    return reaction_hash(SimpleNamespace(reactant=end(r), product=end(p)))
+
+
+@pytest.fixture(scope="module")
+def khp_two_cycles(khp_parent):
+    """Cycle 1 from KHP, then cycle 2 from the first raw occurrence of each unique cycle-1 species."""
+    cycle_1 = raw_b2f2_cycle([khp_parent])
+    cycle_2 = raw_b2f2_cycle(get_unique_yarpecules([p for _, p in cycle_1]))
+    return {1: cycle_1, 2: cycle_2}
+
+
+class TestKHPTwoCycles:
+    """
+    Pin two cycles of raw b2f2 enumeration from KHP (O=CCCOO): total products,
+    unique species (yarpecule hash) and unique reactions (reaction hash).
+    """
+
+    def _counts(self, pairs):
+        return (len(pairs), # yarpecules enumerated
+                len({p.hash for _, p in pairs}), # unique enumerated species
+                len({aligned_reaction_hash(s, p) for s, p in pairs})) # unique enumerated reactions
+
+    def test_cycle_1(self, khp_two_cycles):
+        assert self._counts(khp_two_cycles[1]) == (62, 38, 43)
+
+    def test_cycle_2(self, khp_two_cycles):
+        assert self._counts(khp_two_cycles[2]) == (2350, 317, 1225)
+
 
 class TestConcertedOpenShell:
     def test_liec_b1f1_all(self):

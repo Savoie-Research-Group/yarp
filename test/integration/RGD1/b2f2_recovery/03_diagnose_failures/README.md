@@ -35,6 +35,7 @@ python. Parsing and hashing are step 02's.
 | `scripts/make_run.py` | Builds `RUN_DIR/rows.csv` from a step 02 run's `rxn_clean_fail.csv`, split into shards |
 | `scripts/run_shard.py` | Runs the three stages on one shard |
 | `scripts/merge.py` | Merges the shards and writes `outputs/<run>/` |
+| `scripts/compare_runs.py` | Optional: compares two runs' step 02 + 03 outputs: persistent failures, cross-run recoveries, what the trials add, and reactions YARP doesn't count as b2f2 (CSV lists for the first and last) |
 | `runs/<run>/` | Working files (not tracked) |
 | `outputs/<run>/` | `rxn_exhaustive_pass.csv`, `rxn_reorder_pass.csv`, `rxn_persist_fail.csv`, `summary.txt` (only `summary.txt` is tracked) |
 
@@ -63,3 +64,11 @@ python scripts/merge.py /path/to/scratch/full_03 --out-dir outputs/full
 ```
 
 50 shards by default. `make_run.py` prints an upper-bound CPU time.
+
+Compare two versions with the command below, which writes
+`outputs/compare_RUN_A_vs_RUN_B/`:
+
+```bash
+python scripts/compare_runs.py --a02 ../02_batch_enum/outputs/RUN_A --a03 outputs/RUN_A \
+    --b02 ../02_batch_enum/outputs/RUN_B --b03 outputs/RUN_B
+```

@@ -157,6 +157,23 @@ def reaction_hash(rxn):
     Sum the endpoint adjacency matrices and atom hashes in their shared index
     order, then apply the same scalar algebra as ``yarpecule_hash`` directly.
     Charge and isolated atoms enter through the endpoint hashes.
+    
+    Parameters
+    ----------
+    rxn : reaction
+        This is the reaction instance that the hash is being calculated for.
+
+    Returns
+    -------
+    hash_value: float
+    
+    
+    Notes
+    -----
+    Any method affecting ``reactant`` or ``product`` adjacency matrices or atom hashes should also recalculate this hash.
+    Currently uses the sum of the reactant and product hashes as endpoint hashes,
+    the summed atom hashes as a proxy for the overall atomic contributions to the reaction hash, and 
+    the sum of the individual species matrices as the reaction matrix.
     """
     reactant = rxn.reactant.graph
     product = rxn.product.graph

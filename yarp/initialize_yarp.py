@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from yarp.util.input import InputParser
 from yarp.reaction.generate_rxns import generate_rxns
+from yarp.reaction.external.conf_gen import check_auto3d_compatibility
 
 def initialize_from_dict(file_dict):
     """
@@ -33,6 +34,9 @@ def initialize_from_dict(file_dict):
             print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
             continue
         reactions[hash_key] = rxn
+
+    # Stop before anything is saved if an Auto3D potential cannot model a state.
+    check_auto3d_compatibility(reactions, inp.pipeline_tasks)
     
     # Initialize the STATUS dictionary
     status_tracker = {

@@ -4,8 +4,8 @@ the per-reaction results that step 03 reads.
 Usage (from 02_batch_enum, in the yarp env):
     python scripts/merge.py RUN_DIR [--out-dir outputs/<RUN_DIR name>]
 Reads RUN_DIR/rows.csv (the inputs) and RUN_DIR/out/shard_*/. Writes
-RUN_DIR/merged/{rows,reactants,smiles}.csv (the shard outputs concatenated,
-read by compare_runs.py) and, in OUT_DIR:
+RUN_DIR/merged/{rows,reactants,smiles}.csv (the shard outputs concatenated)
+and, in OUT_DIR:
     rxn_match.csv        RGD1 reaction recovered by reaction hash
     rxn_clean_fail.csv   not recovered; reactant and product both parsed clean
     rxn_parse_fail.csv   not recovered; an endpoint parsed with a warning,

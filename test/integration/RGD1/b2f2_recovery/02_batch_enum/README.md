@@ -11,7 +11,7 @@ folder (`02_batch_enum`) with the yarp env's python.
 | `scripts/submit.py` | Fills `inputs/cluster_submit_template.sh` into `RUN_DIR/job.sh` (it never runs `qsub`), or runs the shards here with `--local` |
 | `scripts/run_shard.py` | Parses, enumerates and scores one shard (called by `job.sh` or `--local`) |
 | `scripts/merge.py` | Merges the shards and writes `outputs/<run>/` |
-| `scripts/compare_runs.py` | Optional: row-by-row differences between two runs |
+| `scripts/compare_runs.py` | Optional: compares two runs' outputs: recovery counts, and SMILES parsing related failures (a CSV per run) |
 | `inputs/pilot_reactions.csv` | The pilot's 50 reactions: 40 random, plus 10 that hit known parse problems |
 | `inputs/cluster_submit_template.sh` | SGE job-array template; edit it for another cluster |
 | `runs/<run>/` | Working files: `rows.csv`, `job.sh`, `logs/`, `out/`, `merged/` (not tracked) |
@@ -69,4 +69,5 @@ On the full runs, the split is 116,310 / 6,013 / 8,926 (match / clean fail /
 parse fail) on master and 117,764 / 4,605 / 8,880 on the branch.
 
 Compare two versions with
-`python scripts/compare_runs.py RUN_DIR_A RUN_DIR_B --out compare.txt`.
+`python scripts/compare_runs.py --a02 outputs/RUN_A --b02 outputs/RUN_B`, which
+writes `outputs/compare_RUN_A_vs_RUN_B/`.

@@ -1,66 +1,176 @@
-"""Step 02d (optional): compare two merged runs row by row, e.g. a cluster
-pilot vs a local pilot, or two yarp versions on the same rows.csv.
+"""Step 02d (optional): compare the step 02 results of two runs, A and B
+(e.g. two yarp versions on the same RGD1 rows).
 
-Usage (from 02_batch_enum): python scripts/compare_runs.py RUN_A RUN_B [--out FILE]
-Reads RUN_X/merged/{rows,reactants,smiles}.csv. Reports parse-status changes
-per SMILES, category/found changes per RGD1 row, and per-reactant changes in
-bnfn output size, plus the commits/hashes recorded in each run's meta.json.
+Each run is given by its step 02 output folder (what merge.py writes). The
+summary reports:
+  1. recovered vs not recovered RGD1 reactions, per run and per reaction
+     (recovered in both runs, A only, B only, neither). "Recovered" means the
+     exact RGD1 reaction hash was found; species hashes are not used.
+  2. SMILES parsing related failures: reactions not recovered whose reactant
+     or product did not parse clean (it failed, fell back to RDKit, or printed
+     a warning), i.e. the rows of rxn_parse_fail.csv. Per run, and how much
+     the two runs overlap.
+Failures with clean parses on both sides are step 03's input; compare those
+with ../03_diagnose_failures/scripts/compare_runs.py.
+
+Usage (from 02_batch_enum, in the yarp env):
+    python scripts/compare_runs.py --a02 DIR --b02 DIR [--label-a NAME] [--label-b NAME] [--out-dir DIR]
+DIRs are step 02 output folders (e.g. outputs/full). Writes to OUT_DIR
+(default outputs/compare_<A folder>_vs_<B folder>):
+    summary.txt        the readable summary that is also printed
+    parse_fail_A.csv   A's SMILES parsing related failures
+    parse_fail_B.csv   B's
+CSV columns are prefixed A_ / B_ whatever the labels; parse_fail_in says
+whether the reaction is a parsing related failure in both runs or in one.
 """
 import argparse
-import glob
-import json
-import os
+from pathlib import Path
 
 import pandas as pd
 
-ap = argparse.ArgumentParser()
-ap.add_argument("a")
-ap.add_argument("b")
-ap.add_argument("--out", default=None)
-args = ap.parse_args()
-out = open(args.out, "w") if args.out else None
+STEP = Path(__file__).resolve().parents[1]  # 02_batch_enum
+FILES = {"rxn_match": "recovered", "rxn_clean_fail": "clean failure", "rxn_parse_fail": "parsing failure"}
+COLS = ["reaction", "reactant", "product", "category", "status_R", "status_P", "rxn_error"]
+OUTCOMES = list(FILES.values())  # every table lists outcomes in this order
+PARSE_CATEGORY = {  # categories of parsing related failures, in table order
+    "parse_fail_R": "reactant failed to parse (parse_fail_R)",
+    "parse_fail_P": "product failed to parse (parse_fail_P)",
+    "reaction_fail": "both parsed, reaction() failed (reaction_fail)",
+    "missed": "parsed, not clean; RGD1 product not found (missed)",
+    "species_only": "parsed, not clean; product found, other mapping (species_only)",
+}
+
+lines = []
 
 
 def log(m=""):
     print(m)
-    if out:
-        out.write(m + "\n")
+    lines.append(m)
 
 
-load = lambda run, name: pd.read_csv(os.path.join(run, "merged", f"{name}.csv"))
-for tag, run in (("A", args.a), ("B", args.b)):
-    m = json.load(open(sorted(glob.glob(os.path.join(run, "out", "shard_*", "meta.json")))[0]))
-    log(f"{tag}: {os.path.abspath(run)}  commit {m['commit']} branch {m['branch']} rdkit {m['rdkit']} "
-        f"hashes.py {m['sha256']['yarp/yarpecule/hashes.py'][:12]} "
-        f"find_lewis.py {m['sha256']['yarp/yarpecule/lewis/find_lewis.py'][:12]} dirty {len(m['dirty'])}")
+def pct(n, d):
+    return f"{n:,} ({n / d:.1%})" if d else f"{n:,}"
 
-sa, sb = load(args.a, "smiles").drop_duplicates("smiles"), load(args.b, "smiles").drop_duplicates("smiles")
-s = sa[["smiles", "role", "status", "strict_exc_type"]].merge(
-    sb[["smiles", "status", "strict_exc_type"]], on="smiles", how="outer", suffixes=("_A", "_B"))
-d = s[(s.status_A != s.status_B) | (s.strict_exc_type_A.fillna("") != s.strict_exc_type_B.fillna(""))]
-log(f"\nSMILES: {len(s)}; parse status or exception differs: {len(d)}")
-if len(d):
-    log(d.groupby(["role", "status_A", "status_B"], dropna=False).size().to_string())
-    log(d.head(30).to_string(index=False))
 
-cols = ["reaction", "category", "found_rxn", "found_species", "b_bemmin", "f_bemmin"]
-ra, rb = load(args.a, "rows")[cols], load(args.b, "rows")[cols]
-r = ra.merge(rb, on="reaction", how="outer", suffixes=("_A", "_B"))
-log(f"\nrows: A {len(ra)}, B {len(rb)}, in both {int((r.category_A.notna() & r.category_B.notna()).sum())}")
-log("category A (rows) x category B (columns):")
-log(pd.crosstab(r.category_A.fillna("absent"), r.category_B.fillna("absent")).to_string())
-bf = r[(r.b_bemmin_A != r.b_bemmin_B) | (r.f_bemmin_A != r.f_bemmin_B)].dropna(subset=["b_bemmin_A", "b_bemmin_B"])
-log(f"rows whose YARP bemmin (b, f) differs: {len(bf)}")
-flip = r[r.category_A.ne(r.category_B)]
-if len(flip):
-    log("\nrows whose category differs (first 50):")
-    log(flip.head(50).to_string(index=False))
+def counts(s):
+    """Outcome counts of a Series of outcome labels, e.g. 'recovered 12, clean failure 3'."""
+    vc = s.value_counts()
+    return ", ".join(f"{k} {vc[k]:,}" for k in OUTCOMES if k in vc) or "none"
 
-ka = load(args.a, "reactants")[["reactant", "first_reaction", "outcome", "n_bem_R", "n_raw", "n_species", "n_rxn"]]
-kb = load(args.b, "reactants")[["reactant", "outcome", "n_bem_R", "n_raw", "n_species", "n_rxn"]]
-k = ka.merge(kb, on="reactant", how="outer", suffixes=("_A", "_B"))
-ne = lambda c: k[f"{c}_A"].fillna(-1).astype(str) != k[f"{c}_B"].fillna(-1).astype(str)
-kd = k[ne("outcome") | ne("n_raw") | ne("n_rxn") | ne("n_bem_R")]
-log(f"\nreactants: {len(k)}; outcome, BEM count, raw or reaction count differs: {len(kd)}")
-if len(kd):
-    log(kd.drop(columns="reactant").head(50).to_string(index=False))
+
+def table(df):
+    return "  " + df.to_string().replace("\n", "\n  ")
+
+
+def describe(d):
+    """The identifying lines of an output folder's summary.txt (run, commit, hashes, dirty files)."""
+    p = d / "summary.txt"
+    if not p.exists():
+        return ["(no summary.txt)"]
+    return [l for l in p.read_text().splitlines()[:8]
+            if l.startswith(("run:", "commit:", "hashes.py", "dirty files"))]
+
+
+def load_run(d):
+    """One row per RGD1 reaction, with its outcome: recovered / clean failure / parsing failure."""
+    parts = [pd.read_csv(d / f"{f}.csv", usecols=lambda c: c in COLS, low_memory=False).assign(file=o)
+             for f, o in FILES.items()]
+    df = pd.concat(parts, ignore_index=True).set_index("reaction", verify_integrity=True)
+    df = df.reindex(columns=COLS[1:] + ["file"])
+    outcome = pd.Series("parsing failure", index=df.index)  # later assignments win
+    outcome[df.status_R.eq("clean") & df.status_P.eq("clean")] = "clean failure"
+    outcome[df.category.eq("recovered_rxn")] = "recovered"
+    df["outcome"] = outcome
+    return df
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    for x in ("a", "b"):
+        ap.add_argument(f"--{x}02", type=Path, required=True, help=f"run {x.upper()}'s step 02 output folder")
+        ap.add_argument(f"--label-{x}", default=x.upper(), help=f"name for run {x.upper()} in the summary")
+    ap.add_argument("--out-dir", type=Path, default=None)
+    a = ap.parse_args()
+    LA, LB = a.label_a, a.label_b
+    out_dir = a.out_dir or STEP / "outputs" / f"compare_{a.a02.resolve().name}_vs_{a.b02.resolve().name}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    A, B = load_run(a.a02), load_run(a.b02)
+    J = pd.concat([A.add_prefix("A_"), B.add_prefix("B_")], axis=1)
+    w = max(len("in neither run"), len(LA) + 8, len(LB) + 8)  # label width for the 'in ... only' lines
+
+    log(f"Step 02 comparison: {LA} vs {LB}")
+    log("=" * len(lines[-1]))
+    for lab, x, d in ((LA, "A", a.a02), (LB, "B", a.b02)):
+        log(f"\n{x} = {lab}")
+        log(f"  step 02 outputs: {d.resolve()}")
+        for l in describe(d):
+            log(f"    {l}")
+    log('\n"Recovered" = the exact RGD1 reaction hash is among bnfn\'s products (species hashes are not used).')
+
+    log("\n== Checks ==")
+    both = J.A_outcome.notna() & J.B_outcome.notna()
+    log(f"  RGD1 reactions: {LA} {len(A):,}, {LB} {len(B):,}, in both {int(both.sum()):,}")
+    for lab, df in ((LA, A), (LB, B)):
+        log(f"  {lab}: rows whose output file disagrees with their category and parse status: "
+            f"{int(df.file.ne(df.outcome).sum()):,}")
+    diff = both & (J.A_status_R.ne(J.B_status_R) | J.A_status_P.ne(J.B_status_P))
+    log(f"  reactions whose parse status (reactant or product) differs between the runs: {int(diff.sum()):,}")
+
+    # ---------------------------------------------------------------------- 1
+    log("\n== 1. Recovered vs not recovered ==")
+    rows = {}
+    for lab, df in ((LA, A), (LB, B)):
+        n, o = len(df), df.outcome
+        scored = df.category.isin(["recovered_rxn", "species_only", "missed"])
+        rows[lab] = {
+            "RGD1 b2f2 reactions": f"{n:,}",
+            "recovered": pct(int(o.eq("recovered").sum()), n),
+            "not recovered": pct(int(o.ne("recovered").sum()), n),
+            "  both endpoints parse clean (step 03's input)": pct(int(o.eq("clean failure").sum()), n),
+            "  SMILES parsing related (section 2)": pct(int(o.eq("parsing failure").sum()), n),
+            "recovered, of scored reactions*": f"{int(o.eq('recovered').sum()):,} / {int(scored.sum()):,} "
+                                               f"({o.eq('recovered').sum() / scored.sum():.2%})",
+        }
+    log(table(pd.DataFrame(rows)))
+    log("  * scored: both endpoints parsed, reaction() built and bnfn finished (the rate quoted in step 02's summary)")
+    ra, rb = J.A_outcome.eq("recovered") & both, J.B_outcome.eq("recovered") & both
+    log("\n  Per reaction:")
+    log(f"    {'in both runs':<{w}} {int((ra & rb).sum()):>9,}   recovered by both")
+    log(f"    {'in ' + LA + ' only':<{w}} {int((ra & ~rb).sum()):>9,}   {LB}'s outcome for these: {counts(J.B_outcome[ra & ~rb])}")
+    log(f"    {'in ' + LB + ' only':<{w}} {int((rb & ~ra).sum()):>9,}   {LA}'s outcome for these: {counts(J.A_outcome[rb & ~ra])}")
+    log(f"    {'in neither run':<{w}} {int((both & ~ra & ~rb).sum()):>9,}")
+
+    # ---------------------------------------------------------------------- 2
+    log("\n== 2. SMILES parsing related failures ==")
+    log("  Not recovered, and the reactant or product did not parse clean: it failed to parse, fell back")
+    log("  to RDKit, or parsed but printed a warning. Step 03 never sees these.")
+    rows = {}
+    for lab, df in ((LA, A), (LB, B)):
+        pf = df[df.outcome.eq("parsing failure")]
+        rows[lab] = {"parsing related failures": len(pf)}
+        rows[lab].update({f"  {v}": int(pf.category.eq(k).sum()) for k, v in PARSE_CATEGORY.items()})
+        for k in sorted(set(pf.category) - set(PARSE_CATEGORY)):
+            rows[lab][f"  {k}"] = int(pf.category.eq(k).sum())
+    log(table(pd.DataFrame(rows).fillna(0).astype(int).map(lambda v: f"{v:,}")))
+    pa, pb = J.A_outcome.eq("parsing failure") & both, J.B_outcome.eq("parsing failure") & both
+    log("\n  Per reaction:")
+    log(f"    {'in both runs':<{w}} {int((pa & pb).sum()):>9,}")
+    log(f"    {'in ' + LA + ' only':<{w}} {int((pa & ~pb).sum()):>9,}   {LB}'s outcome for these: {counts(J.B_outcome[pa & ~pb])}")
+    log(f"    {'in ' + LB + ' only':<{w}} {int((pb & ~pa).sum()):>9,}   {LA}'s outcome for these: {counts(J.A_outcome[pb & ~pa])}")
+
+    sel = pa | pb
+    P = J[sel].assign(reactant=J.A_reactant.combine_first(J.B_reactant), product=J.A_product.combine_first(J.B_product),
+                      parse_fail_in=["both" if x and y else "A only" if x else "B only" for x, y in zip(pa[sel], pb[sel])])
+    P = P[["reactant", "product", "parse_fail_in", "A_category", "B_category", "A_status_R", "A_status_P",
+           "B_status_R", "B_status_P", "A_rxn_error", "B_rxn_error"]]
+    for x, s in (("A", pa), ("B", pb)):
+        f = out_dir / f"parse_fail_{x}.csv"
+        P[s[P.index]].to_csv(f, index_label="reaction")
+        log(f"  -> list: {f} ({int(s.sum()):,} rows)")
+
+    (out_dir / "summary.txt").write_text("\n".join(lines) + "\n")
+
+
+if __name__ == "__main__":
+    main()

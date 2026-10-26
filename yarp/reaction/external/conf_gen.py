@@ -1,9 +1,14 @@
 import shutil
 from pathlib import Path
 
+from rdkit import Chem
+
 from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
+from yarp.reaction.enum_support import return_radicals
 from yarp.yarpecule.input_parsers import xyz_parse
+from yarp.yarpecule.graph.adjacency import compare_adjacency
 from yarp.reaction.conformer import conformer
+from yarp.util.rdkit import yarpecule_to_rdmol
 
 # Conformer key prefix written by the xTB pre-optimization.
 PREOPT_PREFIX = "preopt"
@@ -25,6 +30,18 @@ PREOPT_PREFIX = "preopt"
 # timestep is strictly more accurate MD, so this buys safety with wall time and
 # nothing else. Evidence: debug/.../implementation_checks/08_crest_h2/.
 DIATOMIC_MD_TIMESTEP_FS = 1.0
+
+# Elements each Auto3D potential is trained on (lowercase, as yarpecule.elements).
+# AIMNet2 and its spin-aware variant: the elements with a trained per-element
+# energy shift in the weights the auto3d_conf image ships (both models, the same
+# 14). ANI-2x: Auto3D 3.2.2's own ANI_ELEMENTS. Evidence:
+# Read from the model weights and Auto3D's source (engines/models/policy.py).
+_AIMNET2_ELEMENTS = frozenset({"h", "b", "c", "n", "o", "f", "si", "p", "s", "cl", "as", "se", "br", "i"})
+AUTO3D_ELEMENTS = {
+    "aimnet2": _AIMNET2_ELEMENTS,
+    "aimnet2-nse": _AIMNET2_ELEMENTS,
+    "ani2x": frozenset({"h", "c", "n", "o", "f", "s", "cl"}),
+}
 
 
 class ConfTask(AsyncYarpCalculator):
@@ -233,8 +250,9 @@ class CrestConfCalculator(ConfTask):
         # molecular descriptors
         cmd += f" --chrg {self.config.charge} --uhf {self.config.n_unpaired_electrons}"
 
-        if self.config.seed is not None:
-            cmd += f" --seed {self.config.seed}"
+        # No --seed: CREST has no seed option (CREST 3.0.2 silently ignored the
+        # flag), so a CREST search is never reproducible run to run whatever the
+        # config's `seed` says. That setting still pins the thread count above.
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!
@@ -283,3 +301,255 @@ class CrestConfCalculator(ConfTask):
             confs.append(conf)
 
         return confs
+
+
+class RdkitConfCalculator(ConfTask):
+    """
+    RDKit ETKDG conformer generation, ported from classy_yarp's conf_rdkit().
+
+    The embedding and force-field optimization run in the rdkit_conf container
+    (containers/rdkit_conf/run_conf_gen.py), which writes every conformer
+    lowest energy first. The connectivity filter classy_yarp applied runs here,
+    on the host, in scrape_data.
+
+    Auto3dConfCalculator runs the same lifecycle on another image; the class
+    attributes below are what it changes.
+    """
+
+    TERMINATION_MSG = "RDKit conformer generation terminated normally."
+    IMAGE_NAME = "erm42/yarp:rdkit_conf"
+    # Output files are <FILE_PREFIX>_conformers.xyz, <FILE_PREFIX>.energies, ...
+    FILE_PREFIX = "rdkit"
+    # Name in log messages, and the conformers' software tag.
+    LABEL = "RDKit"
+    SOFTWARE = "rdkit"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_name = self.IMAGE_NAME
+        self.mol_file = "input.mol"
+        self.xyz_file = f"{self.FILE_PREFIX}_conformers.xyz"
+        self.energies_file = f"{self.FILE_PREFIX}.energies"
+        self.log_file = f"{self.FILE_PREFIX}_run.log"
+        self.err_file = f"{self.FILE_PREFIX}_run.err"
+        self.script_file = f"run_{self.FILE_PREFIX}_cmd.sh"
+
+    def generate_input(self):
+        """
+        Write the state's graph as a MOL file for the container to embed.
+
+        The mol comes straight from yarpecule_to_rdmol, so RDKit receives the
+        yarpecule's own bonding, charges and radicals rather than re-deriving
+        them. The pre-optimized geometry is attached for stereo perception;
+        EmbedMultipleConfs discards it when it embeds.
+        """
+        initial_conf = self.preopt_conformer()
+        if initial_conf is None:
+            raise CalculatorInputError(
+                f"No '{PREOPT_PREFIX}_*' conformer on the "
+                f"{'reactant' if 'reactant' in self.task_def.task_type else 'product'}; "
+                "the xTB pre-optimization has not produced a geometry for this species."
+            )
+
+        graph = self.target_species.graph
+        mol = yarpecule_to_rdmol(
+            elements=graph.elements,
+            adj=graph.adj_mat,
+            bond_orders=graph.bond_mats[0],
+            atom_info=graph._atom_info,
+            geo=initial_conf.geo,
+        )
+        Chem.MolToMolFile(mol, str(self.scratch_dir / self.mol_file))
+
+    def _container_args(self) -> str:
+        """Arguments for the image's entrypoint script (run_conf_gen.py)."""
+        args = (
+            f"{self.mol_file} --lot {self.config.lot} --n_conf {self.config.n_conf} "
+            f"--prune_rms_thresh {self.config.prune_rms_thresh} --n_threads {self.config.n_cpus}"
+        )
+        if self.config.seed is not None:
+            args += f" --seed {self.config.seed}"
+        return args
+
+    def write_submission_script(self) -> Path:
+        """Write the bash script that the JobManager will execute."""
+        script_path = self.scratch_dir / self.script_file
+
+        # The image's entrypoint is run_conf_gen.py, so only its arguments follow.
+        prefix = self.get_container_prefix(self.image_name, self.scratch_dir, apptainer_run=True)
+
+        try:
+            with open(script_path, "w") as f:
+                f.write("#!/bin/bash\n")
+                self.write_scheduler_headers(f)
+                f.write(f"cd {self.scratch_dir}\n")
+                f.write(f"{prefix} {self._container_args()} > {self.log_file} 2> {self.err_file}\n")
+        except PermissionError:
+            raise PermissionError(
+                f"Cannot write submission script to {script_path}. "
+                f"Delete the SCRATCH directory and try again."
+            )
+
+        script_path.chmod(0o755)
+
+        return script_path
+
+    def check_output(self) -> bool:
+        """Verify the container finished and wrote its conformers."""
+        xyz_exists = (self.scratch_dir / self.xyz_file).exists()
+        energies_exists = (self.scratch_dir / self.energies_file).exists()
+
+        outfile = self.scratch_dir / self.log_file
+        terminated = outfile.exists() and self.TERMINATION_MSG in outfile.read_text(encoding="utf-8")
+
+        if xyz_exists and energies_exists and terminated:
+            return True
+
+        reasons = []
+        if not xyz_exists:
+            reasons.append(f"missing {self.xyz_file}")
+        if not energies_exists:
+            reasons.append(f"missing {self.energies_file}")
+        if not terminated:
+            reasons.append(f"'{self.TERMINATION_MSG}' not found in {self.log_file}")
+        print(f"     [{self.LABEL}] Output validation failed: {'; '.join(reasons)}")
+
+        # The script exits with a reason on stderr (no conformers embedded, no
+        # force-field parameters, ...), alongside any container errors.
+        errfile = self.scratch_dir / self.err_file
+        if errfile.exists():
+            err_lines = errfile.read_text(encoding="utf-8").splitlines()
+            if err_lines:
+                print(f"     [{self.LABEL}] Last lines of {self.err_file}:")
+                for line in err_lines[-10:]:
+                    print(f"       {line}")
+        return False
+
+    def scrape_data(self) -> bool:
+        """
+        Keep the conformers that reproduce the state's bonding, ranked by energy.
+
+        classy_yarp's connectivity filter: perceive bonds from each geometry and
+        drop any conformer that differs from the yarpecule graph. The container
+        already wrote them lowest energy first, so survivors are ranked in file
+        order.
+        """
+        graph = self.target_species.graph
+        elements, geometries = xyz_parse(self.scratch_dir / self.xyz_file, multiple=True)
+
+        rank = 0
+        for conf_elements, geo in zip(elements, geometries):
+            if not compare_adjacency(graph.elements, geo, graph.adj_mat)[0]:
+                continue
+            conf_obj = conformer(calc_type='conf_gen', calc_data={
+                'conf_rank': rank,
+                'elements': conf_elements,
+                'geometry': geo,
+                'lot': self.config.lot,
+                'software': self.SOFTWARE,
+            })
+            self.target_species.conformers[conf_obj.type] = conf_obj
+            rank += 1
+
+        n_dropped = len(geometries) - rank
+        if n_dropped:
+            print(f"     [{self.LABEL}] Dropped {n_dropped} of {len(geometries)} conformers that "
+                  f"did not reproduce the {'reactant' if 'reactant' in self.task_def.task_type else 'product'} bonding.")
+        if rank == 0:
+            print(f"     [{self.LABEL}] No conformer reproduced the state's bonding.")
+            return False
+
+        return True
+
+    def cleanup(self):
+        """Keep inputs, outputs and logs; remove anything else in scratch."""
+        keep = {self.mol_file, self.xyz_file, self.energies_file,
+                self.log_file, self.err_file, self.script_file}
+        for item in self.scratch_dir.iterdir():
+            if item.name not in keep:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+
+
+class Auto3dConfCalculator(RdkitConfCalculator):
+    """
+    Auto3D conformer generation: RDKit's embedding, optimized with a
+    neural-network potential (AIMNet2, spin-aware AIMNet2, or ANI-2x).
+
+    The container (containers/auto3d_conf/run_conf_gen.py, Auto3D 3.2.2) embeds
+    and places fragments exactly as the rdkit_conf one does, then optimizes and
+    ranks with Auto3D. So the lifecycle is RdkitConfCalculator's: the same MOL
+    handoff in, the same connectivity filter on what comes back. The one
+    addition is the spin multiplicity, passed explicitly so the conformers are
+    made in the spin state the rest of the run uses, rather than one Auto3D
+    infers from the Lewis structure (which draws O2 as closed-shell O=O).
+    """
+
+    TERMINATION_MSG = "Auto3D conformer generation terminated normally."
+    IMAGE_NAME = "erm42/yarp:auto3d_conf"
+    FILE_PREFIX = "auto3d"
+    LABEL = "Auto3D"
+    SOFTWARE = "auto3d"
+
+    def _container_args(self) -> str:
+        return f"{super()._container_args()} --multiplicity {self.config.multiplicity}"
+
+
+def check_auto3d_compatibility(reactions, pipeline_tasks, max_listed=10):
+    """
+    yarp-init check for every Auto3D conformer task, run before anything is saved or submitted.
+
+    - Elements: every state an Auto3D task will run on must contain only
+      elements its potential is trained on. Otherwise raise ValueError naming
+      the states, so the run stops here instead of failing job by job.
+    - Spin: a state whose Lewis structure has unpaired electrons, in a run
+      with conf_gen multiplicity 1, only gets a warning. Lewis structures are
+      not a reliable guide to spin (YARP draws O2 as closed-shell O=O), and
+      CREST and RDKit runs treat such states as singlets the same way.
+
+    The config-only checks (open-shell needs aimnet2-nse, ANI-2x needs charge 0)
+    already ran when ConformerConfig was built.
+    """
+    for task in pipeline_tasks.values():
+        if task.task_type not in ("reactant_conformer", "product_conformer"):
+            continue
+        cfg = task.config
+        if getattr(cfg, "software", None) != "auto3d":
+            continue
+        side = "reactant" if task.task_type == "reactant_conformer" else "product"
+        allowed = AUTO3D_ELEMENTS[cfg.lot]
+
+        unsupported, radical = {}, set()
+        for rxn in reactions.values():
+            st = getattr(rxn, side)
+            bad = set(st.graph.elements) - allowed
+            if bad:
+                unsupported[st.canon_smi] = bad
+            if cfg.multiplicity == 1 and return_radicals(st.graph):
+                radical.add(st.canon_smi)
+
+        if unsupported:
+            all_bad = set().union(*unsupported.values())
+            if all_bad <= _AIMNET2_ELEMENTS:
+                hint = "AIMNet2 covers them: use 'lot: aimnet2' (or 'aimnet2-nse' for open-shell)."
+            else:
+                hint = ("No Auto3D potential covers them (AIMNet2: "
+                        f"{' '.join(sorted(e.capitalize() for e in _AIMNET2_ELEMENTS))}): "
+                        "use 'software: rdkit' or 'software: crest' for this run.")
+            listed = "\n".join(f"  {smi}: {' '.join(sorted(e.capitalize() for e in els))}"
+                                for smi, els in sorted(unsupported.items())[:max_listed])
+            more = f"\n  ... and {len(unsupported) - max_listed} more" if len(unsupported) > max_listed else ""
+            raise ValueError(
+                f"{task.task_id}: {len(unsupported)} {side} state(s) contain elements Auto3D's "
+                f"{cfg.lot} is not trained on:\n{listed}{more}\n{hint}"
+            )
+
+        if radical:
+            listed = ", ".join(sorted(radical)[:max_listed])
+            more = f", ... ({len(radical)} in total)" if len(radical) > max_listed else ""
+            print(f"WARNING: {task.task_id}: {len(radical)} {side} state(s) have unpaired electrons in "
+                  f"their Lewis structure, but conf_gen multiplicity is 1, so Auto3D will make their "
+                  f"conformers as closed-shell singlets: {listed}{more}. If they are meant to be "
+                  f"open-shell, set the multiplicity and 'lot: aimnet2-nse'.")

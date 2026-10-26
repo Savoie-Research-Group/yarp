@@ -4,6 +4,7 @@ import re
 import numpy as np
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
+from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
 from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.util.constants import Constants
@@ -196,7 +197,7 @@ class IRCValTask(AsyncYarpCalculator):
 class PysisyphusIRCValCalculator(IRCValTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:pysis_xtb"
+        self.image_name = pysis_image(self.config.lot)
 
     def generate_input(self):
         initial_guesses = self._initial_guesses()
@@ -238,7 +239,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
                 f.write(f"cd /work/irc_run{i}\n") 
                 
                 # Execute pysis within the specific folder, saving logs locally
-                f.write(f"pysis irc_{i}_input.yaml > irc_{i}.log 2> irc_{i}.err\n")
+                log = self._log_prefix(f"irc_run{i}")
+                f.write(f"pysis irc_{i}_input.yaml > {log}irc_{i}.log 2> {log}irc_{i}.err\n")
                 f.write(f"echo '--- Finished IRC {i} ---'\n\n")
                 
         # Make executable
@@ -359,7 +361,6 @@ class PysisyphusIRCValCalculator(IRCValTask):
     def _write_pysis_irc_input(self, input_path, input_geo_xyz):
         # Make sure lot is xTB (ERM: We'll make this more robust later! Hopefully!)
         lot = self.config.lot.lower()
-        assert (lot == 'xtb'), "Calculations with Pysisyphus are xTB or bust right now, friend..."
 
         # Write the file! Yay, YAML friend!
         with open(input_path, 'a') as f:
@@ -369,7 +370,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
             # set calc block
             # ERM: I left out the option for solvent,
             # because what I saw in classy YARP didn't make sense to me...
-            f.write(f'calc:\n type: {lot}\n pal: {self.config.n_cpus}\n mem: {self.config.mem_per_cpu}\n charge: {self.config.charge}\n mult: {self.config.multiplicity}\n')
+            for line in pysis_xtb_calc_lines(lot, self.config):
+                f.write(line)
 
             # set irc block
             f.write(f'irc:\n type: eulerpc\n forward: True\n backward: True\n downhill: False\n')
@@ -455,7 +457,8 @@ class OrcaIRCValCalculator(IRCValTask):
                 
                 # Execute orca within the specific folder, saving logs locally
                 f.write(f"orca=$(which orca)\n")
-                f.write(f"$orca irc_{i}.inp > irc_{i}.out 2> irc_{i}.err\n")
+                log = self._log_prefix(f"irc_run{i}")
+                f.write(f"$orca irc_{i}.inp > {log}irc_{i}.out 2> {log}irc_{i}.err\n")
                 f.write(f"echo '--- Finished IRC {i} ---'\n\n")
                 
         # Make executable

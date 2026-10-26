@@ -16,8 +16,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🧪 Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
+        # GitHub's ubuntu-latest image no longer ships a pre-installed conda
+        # ($CONDA is empty), so the action has to install one itself.
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: latest
           auto-update-conda: true
           environment-file: environment.yml
           activate-environment: yarp-again

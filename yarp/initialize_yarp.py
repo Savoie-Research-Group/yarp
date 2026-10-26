@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from yarp.util.input import InputParser
 from yarp.reaction.generate_rxns import generate_rxns
+from yarp.reaction.external.conf_gen import check_auto3d_compatibility
 
 def initialize_from_dict(file_dict):
     """
@@ -18,10 +19,10 @@ def initialize_from_dict(file_dict):
 
     print(f"Full configuration seen here: \n{inp}\n")
 
-    if inp.job_manager.container == "apptainer":
+    if inp.job_manager.container in ["apptainer", "singularity"]:
         sif_path = Path(inp.job_manager.sif_location)
         if not sif_path.exists() or not sif_path.is_dir():
-            raise FileNotFoundError(f"Fatal: The specified Apptainer SIF location does not exist or is not a directory: {sif_path}")
+            raise FileNotFoundError(f"Fatal: The specified {inp.job_manager.container.capitalize()} SIF location does not exist or is not a directory: {sif_path}")
     
     print("Let's generate some initial reaction objects...")
     raw_reactions = generate_rxns(inp)
@@ -33,6 +34,9 @@ def initialize_from_dict(file_dict):
             print(f"Skipping duplicate reaction hash {hash_key}; keeping the first reaction.")
             continue
         reactions[hash_key] = rxn
+
+    # Stop before anything is saved if an Auto3D potential cannot model a state.
+    check_auto3d_compatibility(reactions, inp.pipeline_tasks)
     
     # Initialize the STATUS dictionary
     status_tracker = {

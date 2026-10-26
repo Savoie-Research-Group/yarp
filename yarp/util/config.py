@@ -83,6 +83,9 @@ class JobManagerConfig:
     queue: Optional[str] = None
     job_name: str = "yarp"
     account: Optional[str] = None  # Slurm/SGE billing account (e.g. #SBATCH -A on Anvil)
+    # Node-local scratch root for tasks with use_local_scratch on. Written into
+    # the job script as-is, so shell variables expand on the compute node.
+    local_scratch_dir: str = "$TMPDIR"
 
     def __post_init__(self):
         # Normalize inputs for easier checking
@@ -91,8 +94,8 @@ class JobManagerConfig:
         if self.container is not None:
             self.container = self.container.lower()
 
-        # Get the proper location of apptainer containers
-        if self.container == "apptainer" and not self.sif_location:
+        # Get the proper location of apptainer/singularity containers
+        if self.container in ["apptainer", "singularity"] and not self.sif_location:
             # Dynamically resolve the path relative to this file
             # __file__       == base_git_repo/yarp/util/input.py
             # .resolve()     == converts to absolute path resolving any symlinks
@@ -115,8 +118,10 @@ class JobManagerConfig:
             raise ValueError("Please provide an integer value to 'max_active_jobs'")
         if self.sif_location and not isinstance(self.sif_location, str):
             raise ValueError("Please provide a valid string value to 'sif_location'")
-        if self.module_container and not isinstance(self.sif_location, str):
+        if self.module_container and not isinstance(self.module_container, str):
             raise ValueError("Please provide a valid string value to 'module_container'")
+        if not isinstance(self.local_scratch_dir, str) or not self.local_scratch_dir.strip():
+            raise ValueError("Please provide a valid string value to 'local_scratch_dir'")
 
 @dataclass
 class PropertyFilterConfig:
@@ -230,6 +235,7 @@ class MLPropConfig:
     n_cpus: int = 8
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if not self.model:
@@ -244,6 +250,8 @@ class MLPropConfig:
             raise ValueError("Please provide an integer value (in MB) to ml_rxn_prop -> 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ml_rxn_prop -> 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ml_rxn_prop -> 'use_local_scratch'")
 
 @dataclass
 class ConformerConfig:
@@ -252,12 +260,20 @@ class ConformerConfig:
     lot: str = None
     charge: int = None
     n_unpaired_electrons: int = None
+    # Auto3D only (required there): spin multiplicity of the whole state, passed
+    # to the neural-network potential; the other QM stages take theirs the same way.
+    multiplicity: Optional[int] = None
     energy_window: float = 6.0
     solvent: Optional[Dict[str, str]] = None
+
+    # RDKit and Auto3D: EmbedMultipleConfs settings. Defaults are classy_yarp's.
+    n_conf: int = 50
+    prune_rms_thresh: float = 0.1
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
     seed: Optional[int] = 42
 
     def __post_init__(self):
@@ -265,12 +281,20 @@ class ConformerConfig:
             raise ValueError("Missing required key! Please provide 'charge' in conf_gen block!")
         if not self.software:
             raise ValueError("Missing required key! Please provide 'software' in conf_gen block!")
-        if self.software not in ['crest']:
-            raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'crest'")
+        if self.software not in ['crest', 'rdkit', 'auto3d']:
+            raise ValueError(f"Invalid 'software' provided: '{self.software}' Valid options: 'crest', 'rdkit', 'auto3d'")
         if self.software == 'crest' and self.lot not in ['gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff']:
             raise ValueError(f"Invalid 'lot' for CREST software! Valid options: 'gfn2', 'gfn1', 'gfnff', 'gfn2//gfnff'")
         if self.software == 'crest' and self.n_unpaired_electrons == None:
             raise ValueError(f"Missing required key! 'n_unpaired_electrons' field is required for conf_gen with CREST!")
+        if self.software == 'rdkit' and self.lot not in ['uff', 'mmff94']:
+            raise ValueError(f"Invalid 'lot' for RDKit software! Valid options: 'uff', 'mmff94'")
+        if self.software == 'auto3d':
+            self._check_auto3d()
+        if not isinstance(self.n_conf, int) or self.n_conf < 1:
+            raise ValueError("Please provide a positive integer value to conf_gen: 'n_conf'")
+        if not isinstance(self.prune_rms_thresh, float):
+            raise ValueError("Please provide a float value to conf_gen: 'prune_rms_thresh'")
 
         if not isinstance(self.charge, int):
             raise ValueError("Please provide an integer value to conf_gen: 'charge'")
@@ -284,6 +308,37 @@ class ConformerConfig:
             raise ValueError("Please provide an integer value (in MB) to conf_gen: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide conf_gen: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to conf_gen: 'use_local_scratch'")
+
+    def _check_auto3d(self):
+        """
+        Auto3D settings, including what each potential can model.
+
+        These are the checks the config alone can answer; which elements a
+        state contains is only known once the species are read.
+        - ANI-2x is trained on neutral molecules only.
+        - Only the spin-aware AIMNet2 (aimnet2-nse) can model an open-shell
+          state. ANI-2x refuses one; the default AIMNet2 runs it as closed-shell
+          with only a warning, which would silently give wrong conformers
+          (measured with Auto3D 3.2.2).
+        """
+        if self.lot not in ['aimnet2', 'aimnet2-nse', 'ani2x']:
+            raise ValueError("Invalid 'lot' for Auto3D software! Valid options: 'aimnet2', 'aimnet2-nse', 'ani2x'")
+        if self.multiplicity is None:
+            raise ValueError("Missing required key! 'multiplicity' field is required for conf_gen with Auto3D!")
+        if not isinstance(self.multiplicity, int) or self.multiplicity < 1:
+            raise ValueError("Please provide a positive integer value to conf_gen: 'multiplicity'")
+        if self.multiplicity > 1 and self.lot != 'aimnet2-nse':
+            raise ValueError(
+                f"conf_gen multiplicity {self.multiplicity} is open-shell, which only the spin-aware "
+                f"AIMNet2 can model: set conf_gen 'lot: aimnet2-nse' (got '{self.lot}')."
+            )
+        if self.lot == 'ani2x' and self.charge != 0:
+            raise ValueError(
+                f"ANI-2x is trained on neutral molecules only, but conf_gen charge is {self.charge}: "
+                "use 'lot: aimnet2' (or 'aimnet2-nse') for charged states."
+            )
 
 
 @dataclass
@@ -301,6 +356,7 @@ class TSGuessConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -311,8 +367,8 @@ class TSGuessConfig:
             raise ValueError("Missing required key! Please provide 'software' in ts_guess block!")
         if self.software not in ['pysisyphus']:
             raise ValueError(f"Invalid 'software' provided: '{self.software}' Currently, only option is 'pysisyphus'")
-        if self.software == 'pysisyphus' and self.gsm_lot not in ['xtb']:
-            raise ValueError(f"Invalid 'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.gsm_lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid 'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
 
         if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
             raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
@@ -329,6 +385,8 @@ class TSGuessConfig:
             raise ValueError("Please provide an integer value (in MB) to ts_guess: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'use_local_scratch'")
 
 
 @dataclass
@@ -359,12 +417,13 @@ class PreOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.software not in ['pysisyphus']:
             raise ValueError(f"Invalid pre_opt.'software' provided: '{self.software}'; valid option: 'pysisyphus'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid pre_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid pre_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         if self.opt_type not in ['lbfgs', 'rfo']:
             raise ValueError(f"Invalid pre_opt.'opt_type': '{self.opt_type}'. Valid options are 'lbfgs', 'rfo'")
         if self.bias_lot not in ['uff', 'Ghemical', 'MMFF94']:
@@ -382,6 +441,8 @@ class PreOptConfig:
             raise ValueError("Please provide an integer value (in MB) to pre_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide pre_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to pre_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -402,6 +463,7 @@ class RPOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -410,8 +472,8 @@ class RPOptConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in rp_opt block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid rp_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid rp_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         if self.opt_type not in ['rfo', 'lbfgs']:
             raise ValueError(f"Invalid rp_opt.'opt_type': '{self.opt_type}'. Valid options are 'rfo', 'lbfgs'")
@@ -426,6 +488,8 @@ class RPOptConfig:
             raise ValueError("Please provide an integer value (in MB) to rp_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide rp_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to rp_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -443,6 +507,7 @@ class TSOptConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -451,8 +516,8 @@ class TSOptConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in ts_opt block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid ts_opt.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid ts_opt.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid ts_opt.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
 
@@ -466,6 +531,8 @@ class TSOptConfig:
             raise ValueError("Please provide an integer value (in MB) to ts_opt: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide ts_opt: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'use_local_scratch'")
 
 
 @dataclass
@@ -485,6 +552,7 @@ class IRCValConfig:
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
+    use_local_scratch: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -495,8 +563,8 @@ class IRCValConfig:
             raise ValueError("Missing required key! Please provide 'multiplicity' in irc_val block!")
         if self.software not in ['pysisyphus', 'orca']:
             raise ValueError(f"Invalid irc_val.'software' provided: '{self.software}'; valid options: 'pysisyphus', 'orca'")
-        if self.software == 'pysisyphus' and self.lot not in ['xtb']:
-            raise ValueError(f"Invalid irc_val.'lot' for Pysisyphus software! Valid options: 'xtb'")
+        if self.software == 'pysisyphus' and self.lot not in ['xtb', 'gxtb']:
+            raise ValueError(f"Invalid irc_val.'lot' for Pysisyphus software! Valid options: 'xtb', 'gxtb'")
         # ERM: To-do -> add a valid input check function for ORCA keyword block?
         # ERM: To-do -> look up valid inputs for conv_thresh in xtb!
 
@@ -508,3 +576,5 @@ class IRCValConfig:
             raise ValueError("Please provide an integer value (in MB) to irc_val: 'mem_per_cpu'")
         if not is_valid_time_format(self.max_runtime):
             raise ValueError("Please provide irc_val: 'max_runtime' time in HH:MM:SS!")
+        if not isinstance(self.use_local_scratch, bool):
+            raise ValueError("Please provide a boolean value (true/false) to irc_val: 'use_local_scratch'")

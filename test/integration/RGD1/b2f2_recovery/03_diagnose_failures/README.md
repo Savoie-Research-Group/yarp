@@ -36,6 +36,7 @@ python. Parsing and hashing are step 02's.
 | `scripts/run_shard.py` | Runs the three stages on one shard |
 | `scripts/merge.py` | Merges the shards and writes `outputs/<run>/` |
 | `scripts/compare_runs.py` | Optional: compares two runs' step 02 + 03 outputs: persistent failures, cross-run recoveries, what the trials add, and reactions YARP doesn't count as b2f2 (CSV lists for the first and last) |
+| `scripts/draw_reactions.py` | Optional: draws each reaction of a CSV as `<reaction>.png`: YARP's fewest-change BEM pair, atom maps, changed bonds in red/green |
 | `runs/<run>/` | Working files (not tracked) |
 | `outputs/<run>/` | `rxn_exhaustive_pass.csv`, `rxn_reorder_pass.csv`, `rxn_persist_fail.csv`, `summary.txt` (only `summary.txt` is tracked) |
 
@@ -71,4 +72,12 @@ Compare two versions with the command below, which writes
 ```bash
 python scripts/compare_runs.py --a02 ../02_batch_enum/outputs/RUN_A --a03 outputs/RUN_A \
     --b02 ../02_batch_enum/outputs/RUN_B --b03 outputs/RUN_B
+```
+
+Draw the reactions of any CSV with `reaction`, `reactant` and `product`
+columns, such as a `compare_runs.py` list. The BEMs come from the checked-out
+yarp version. Reactions that don't parse are listed in `skipped.csv`.
+
+```bash
+python scripts/draw_reactions.py outputs/compare_RUN_A_vs_RUN_B/q1_persist_fail_both.csv --out-dir /path/to/figures
 ```

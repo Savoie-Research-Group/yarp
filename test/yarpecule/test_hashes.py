@@ -1,6 +1,7 @@
 """
 Testing suite for functions contained in yarp/yarpecule/hashes.py
 """
+from copy import copy
 from importlib import import_module
 from math import fsum
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ import numpy as np
 from yarp.yarpecule.hashes import (
     bmat_hash,
     reaction_hash,
+    yarpecule_hash,
 )
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.reaction import reaction
@@ -91,7 +93,7 @@ class TestYpHash:
         assert benz.hash != benz_cat.hash
 
 class TestRxnHash:
-    def test_direct_hash_uses_all_bems_and_mapped_atom_hashes(
+    def test_direct_hash_uses_adjacency_and_mapped_atom_hashes(
         self, cyclohexane_dehydrogenation, monkeypatch
     ):
         reactant = cyclohexane_dehydrogenation.reactant.graph
@@ -104,13 +106,12 @@ class TestRxnHash:
             product_by_map[reactant.atom_info[i]["atom_map"]]
             for i in range(len(reactant.elements))
         ]
-        combined_bems = list(reactant.bond_mats) + [
-            np.asarray(bem)[np.ix_(product_order, product_order)]
-            for bem in product.bond_mats
-        ]
-        expected_bem = np.zeros_like(combined_bems[0])
-        for bem in combined_bems:
-            expected_bem += bem
+        expected_matrix = (
+            np.asarray(reactant.adj_mat, dtype=float)
+            + np.asarray(product.adj_mat, dtype=float)[
+                np.ix_(product_order, product_order)
+            ]
+        )
         expected_atom_hashes = (
             np.asarray(reactant.atom_hashes)
             + np.asarray(product.atom_hashes)[product_order]
@@ -121,11 +122,11 @@ class TestRxnHash:
             + np.round(
                 fsum(
                     (
-                        expected_bem
+                        expected_matrix
                         * np.outer(expected_atom_hashes, expected_atom_hashes)
                     ).flat
                 ),
-                7,
+                8,
             )
         )
 
@@ -292,6 +293,20 @@ class TestRxnHash:
                 ('[H:10][C@:1]([O:13][C:3](=[O:8])[C:4]([H:7])([H:12])[H:14])([C:5]([H:6])=[O:11])[O:2][H:9]', '[O:13]([C:3](=[C:4]([H:7])[H:14])[O:8][H:12])[C@@:1]([C:5]([H:6])=[O:11])([O:2][H:9])[H:10]'),
                 ('[C:11]([C:9]([H:8])([H:2])[H:6])(=[O:1])[O:14][C@@:12]([O:3][H:10])([H:13])[C:4]([H:5])=[O:7]', '[H:13][C@:12]([C:4](=[O:7])[H:5])([O:3][H:10])[O:14][C:11](=[C:9]([H:6])[H:8])[O:1][H:2]'),
             ],
+            [  # Charged: water addition to the 1-methylallyl cation
+                ('[H:12][C:1]([H:6])=[C:14]([H:3])[C+:2]([H:7])[C:10]([H:11])([H:8])[H:4].[H:13][O:9][H:5]', '[H:7][C:2]([C:14]([H:3])=[C:1]([H:6])[H:12])([C:10]([H:8])([H:11])[H:4])[O+:9]([H:13])[H:5]'),
+                ('[H:8][C:6]([C+:13]([C:4](=[C:5]([H:2])[H:12])[H:1])[H:7])([H:14])[H:9].[O:3]([H:11])[H:10]', '[H:7][C:13]([C:4](=[C:5]([H:2])[H:12])[H:1])([C:6]([H:9])([H:14])[H:8])[O+:3]([H:10])[H:11]'),
+                ('[C+:5]([C:10]([H:13])([H:7])[H:4])([C:6]([H:2])=[C:3]([H:11])[H:12])[H:8].[H:1][O:9][H:14]', '[H:13][C:10]([H:7])([C:5]([O+:9]([H:14])[H:1])([C:6]([H:2])=[C:3]([H:12])[H:11])[H:8])[H:4]'),
+                ('[H:5][C:4]([C+:14]([C:9](=[C:2]([H:12])[H:3])[H:13])[H:1])([H:11])[H:10].[H:7][O:8][H:6]', '[C:14]([C:9](=[C:2]([H:3])[H:12])[H:13])([C:4]([H:10])([H:5])[H:11])([H:1])[O+:8]([H:7])[H:6]'),
+                ('[C+:9]([C:6](=[C:10]([H:4])[H:2])[H:8])([H:14])[C:5]([H:12])([H:13])[H:1].[H:7][O:3][H:11]', '[O+:3]([H:7])([H:11])[C:9]([H:14])([C:6]([H:8])=[C:10]([H:4])[H:2])[C:5]([H:1])([H:12])[H:13]'),
+            ],
+            [  # Zwitterion: azomethine ylide ring closure to 2-methylaziridine
+                ('[C:3]([H:9])([H:1])([H:11])[C:6]([H:5])=[N+:8]([C-:2]([H:7])[H:4])[H:10]', '[H:9][C:3]([H:1])([C:6]1([N:8]([H:10])[C:2]1([H:4])[H:7])[H:5])[H:11]'),
+                ('[N+:2]([C-:6]([H:8])[H:7])([H:10])=[C:11]([H:9])[C:3]([H:5])([H:4])[H:1]', '[C:6]1([H:8])([H:7])[C:11]([H:9])([C:3]([H:5])([H:1])[H:4])[N:2]1[H:10]'),
+                ('[H:2][C:7]([H:3])([C:8]([H:1])=[N+:4]([C-:6]([H:9])[H:10])[H:11])[H:5]', '[H:11][N:4]1[C:8]([C:7]([H:5])([H:3])[H:2])([C:6]1([H:9])[H:10])[H:1]'),
+                ('[N+:8]([C-:11]([H:9])[H:5])(=[C:3]([H:2])[C:6]([H:1])([H:4])[H:7])[H:10]', '[H:10][N:8]1[C:3]([C:6]([H:4])([H:1])[H:7])([C:11]1([H:5])[H:9])[H:2]'),
+                ('[H:4][C:8]([H:11])([H:6])[C:3]([H:7])=[N+:5]([H:1])[C-:9]([H:10])[H:2]', '[H:1][N:5]1[C:9]([C:3]1([C:8]([H:4])([H:11])[H:6])[H:7])([H:2])[H:10]'),
+            ],
         ]
 
         hashes = []
@@ -305,11 +320,11 @@ class TestRxnHash:
             }
             assert len(observed) == 1
             hashes.extend(observed)
-        assert len(set(hashes)) == 5
+        assert len(set(hashes)) == 7
 
 
 def reaction_graph(rxn):
-    """Independent element/mass/BEM graph oracle, without stereo information."""
+    """Independent adjacency/total-charge oracle, without stereo."""
     reactant = rxn.reactant.graph
     product = rxn.product.graph
     maps = [reactant.atom_info[i]["atom_map"] for i in range(len(reactant.elements))]
@@ -317,8 +332,6 @@ def reaction_graph(rxn):
         product.atom_info[i]["atom_map"]: i for i in range(len(product.elements))
     }
     order = [product_by_map[atom_map] for atom_map in maps]
-    r_bem = np.sum(np.asarray(reactant.bond_mats), axis=0)
-    p_bem = np.sum(np.asarray(product.bond_mats), axis=0)[np.ix_(order, order)]
     graph = nx.Graph()
     for i, element in enumerate(reactant.elements):
         graph.add_node(
@@ -326,13 +339,16 @@ def reaction_graph(rxn):
             label=(
                 element,
                 round(float(reactant._masses[i]), 6),
-                round(float(r_bem[i, i]), 8),
-                round(float(p_bem[i, i]), 8),
+                int(reactant.q),
+                int(product.q),
             ),
         )
     for i in range(len(reactant.elements)):
         for j in range(i + 1, len(reactant.elements)):
-            label = (round(float(r_bem[i, j]), 8), round(float(p_bem[i, j]), 8))
+            label = (
+                int(reactant.adj_mat[i, j]),
+                int(product.adj_mat[order[i], order[j]]),
+            )
             if label != (0.0, 0.0):
                 graph.add_edge(i, j, label=label)
     return graph
@@ -346,6 +362,19 @@ def isomorphic(left, right):
         node_match=nx.algorithms.isomorphism.categorical_node_match("label", None),
         edge_match=nx.algorithms.isomorphism.categorical_edge_match("label", None),
     )
+
+
+def charged_reaction(rxn, charge):
+    """Return a lightweight reaction view with one conserved total charge."""
+    endpoints = []
+    for endpoint in (rxn.reactant, rxn.product):
+        graph = copy(endpoint.graph)
+        graph._q = charge
+        graph._yarpecule_hash = yarpecule_hash(graph)
+        endpoints.append(SimpleNamespace(graph=graph, hash=graph.hash))
+    charged = SimpleNamespace(reactant=endpoints[0], product=endpoints[1])
+    charged.hash = reaction_hash(charged)
+    return charged
 
 
 class TestReactionHashCorpus:
@@ -399,16 +428,54 @@ class TestReactionHashCorpus:
         assert later.hash == reaction_hash(later)
         assert first.hash == later.hash
 
+    def test_artificial_charged_reaction_corpus(
+        self,
+        reaction_hash_symmetry_cases,
+        reaction_hash_nonisomorphic_cases,
+        reaction_hash_direction_cases,
+        reaction_hash_network_reverse_cases,
+    ):
+        """Exercise 405 charged variants without adding generated fixtures."""
+        bases = [
+            pair[0]
+            for cases in (
+                reaction_hash_symmetry_cases,
+                reaction_hash_nonisomorphic_cases,
+                reaction_hash_direction_cases,
+                reaction_hash_network_reverse_cases,
+            )
+            for pair in cases
+        ]
+        charges = (-3, -2, -1, 1, 2, 3)
+        retained = {}
+
+        for index, base in enumerate(bases):
+            charged = charged_reaction(base, charges[index % len(charges)])
+            reverse = SimpleNamespace(
+                reactant=charged.product,
+                product=charged.reactant,
+            )
+
+            assert charged.hash != base.hash
+            assert charged.hash == reaction_hash(reverse)
+
+            prior = retained.get(charged.hash)
+            if prior is None:
+                retained[charged.hash] = charged
+                continue
+            assert isomorphic(prior, charged) or isomorphic(prior, reverse)
+
+        assert len(bases) == 405
+
 
 class TestBemSumHash:
     """
     `bem_sum_hash` is the mapping-DEPENDENT counterpart to the yarpecule hash.
 
-    The yarpecule hash weights the summed bond-electron matrix by
+    The yarpecule hash weights adjacency and formal charge by
     `outer(atom_hashes, atom_hashes)`; atom hashes are graph invariants, so
-    relabelling the atoms leaves it unchanged. That is correct for "same
-    molecule" and wrong for "same molecule, indexed the same way" -- the
-    question anything exchanging index-ordered geometries has to ask.
+    relabelling the atoms leaves it unchanged. `bem_sum_hash` intentionally
+    remains mapping-dependent for index-ordered geometries.
 
     Measured over the KHP cycle-2 collection: 1110 products span 712 distinct
     (graph, mapping) pairs but only 268 distinct yarpecule hashes.

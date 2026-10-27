@@ -1,0 +1,68 @@
+run: /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/02_batch_enum/runs/pilot
+shards: 4/4 done
+commit: ['3103ee4']
+branch: ['conjugated-lewis-moves']
+rdkit: ['2026.03.6']
+hashes.py sha256: ['ae59cd56038f']; find_lewis.py: ['f00b27ec9849']
+dirty files: [0]; args: ['{"rxn_check": 3, "timeout": 900, "self_filter": false}']
+shard wall time (s): min 6, median 7, max 8; sum 0.01 h
+
+== parsing: 136 unique SMILES ==
+status  clean  fail  fallback  warn
+role                               
+P          76     8         2     0
+R          42     6         0     2
+
+strict-parse failures by exception and innermost yarp frame:
+status    strict_exc_type  strict_exc_yarp_frame                              
+fail      OctetError       yarp/yarpecule/graph/smiles.py:542:add_hydrogens        1
+                           yarp/yarpecule/input_parsers.py:555:xyz_from_smiles    11
+          ValueError       yarp/yarpecule/input_parsers.py:592:xyz_from_smiles     2
+fallback  TypeError        yarp/yarpecule/input_parsers.py:643:geo_via_rdkit       2
+
+warn-status messages (first 60 chars, top 10):
+       2  WARNING: ambiguous SMILES provided; interpreted as radical s
+       2  [15:33:41] Explicit valence for atom # 0 N, 4, is greater th
+       2  [15:33:41] Explicit valence for atom # 0 N greater than perm
+       1  WARNING: yarp aromatic SMILES geometry fallback used RDKit f
+       1  [15:33:25] Molecule does not have explicit Hs. Consider call
+map/element vs SMILES text: 122/122 agree
+
+== RGD1 b2f2 rows: 112 (input 112) ==
+category
+recovered_rxn    89
+parse_fail_P      9
+parse_fail_R      8
+missed            3
+reaction_fail     3
+
+scored rows (both endpoints parsed, reaction() built, bnfn finished): 92 (82.1% of rows)
+  all scored: recovered by reaction hash 89/92 (96.74%); species found 89/92 (96.74%)
+  no fallback endpoint: recovered by reaction hash 89/92 (96.74%); species found 89/92 (96.74%)
+
+scored rows: category x YARP bemmin b2f2
+yarp_b2f2      False  True 
+category                   
+missed             1      2
+recovered_rxn      2     87
+
+scored rows not recovered: YARP bemmin (b, f) counts
+b_bemmin  f_bemmin
+2.0       2.0         2
+3.0       3.0         1
+self_species among scored: 3 (recovered 3)
+
+== reactants: 50 ==
+outcome
+ok              44
+parse_fail_R     6
+t_bnfn: sum 0.01 h, median 0.35 s, max 2.2 s
+t_total: sum 0.01 h, median 0.56 s, max 2.5 s
+raw products: sum 8867, median 193, max 701
+full reaction() spot check: 0 mismatches in 132
+
+== exported to /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/02_batch_enum/outputs/pilot ==
+50 reactants -> 112 RGD1 b2f2 reactions; each reaction is one row in exactly one file:
+  rxn_match.csv             89 / 112 reactions ( 79.5%)   recovered_rxn 89
+  rxn_clean_fail.csv         3 / 112 reactions (  2.7%)   missed 3
+  rxn_parse_fail.csv        20 / 112 reactions ( 17.9%)   parse_fail_P 9, parse_fail_R 8, reaction_fail 3

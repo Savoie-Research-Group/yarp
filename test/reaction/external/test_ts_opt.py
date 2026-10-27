@@ -289,6 +289,74 @@ class TestPysisRunConvergence:
         assert list(calc.rxn.ts_geom) == ["1_tsopt_xtb_pysisyphus"]
 
 
+# Per software: a finished tsopt_run1 and a failed tsopt_run2, as {name: text}
+# (a name ending in "/" is a dir), and what cleanup leaves in a run dir it cleans.
+TSOPT_RUNS = {
+    "pysisyphus": dict(
+        cls=PysisyphusTSOptCalculator, lot="xtb",
+        ok={"tsopt_1.log": pysis_opt_log("Converged!"), "ts_final_geometry.xyz": "", "ts_final_hessian.h5": "",
+            "tsopt_1.err": "", "calculator_000.out": ""},
+        failed={"tsopt_2.log": "Crashed input:\n", "tsopt_2.err": "Traceback ...\n",
+                "crashed_calculator_000/": "", "crashed_calculator_000/xtb.out": "SCF not converged\n"},
+        cleaned={1: ["ts_final_geometry.xyz", "tsopt_1.log"], 2: ["tsopt_2.log"]},
+    ),
+    "orca": dict(
+        cls=OrcaTSOptCalculator, lot=HL_LOT,
+        ok={"tsopt_1.out": "THE OPTIMIZATION HAS CONVERGED\nORCA TERMINATED NORMALLY\n",
+            "tsopt_1.xyz": "", "tsopt_1.hess": "", "tsopt_1.gbw": "", "tsopt_1.err": ""},
+        failed={"tsopt_2.out": "ORCA finished by error termination in SCF\n", "tsopt_2.err": "",
+                "tsopt_2.gbw": ""},
+        cleaned={1: ["tsopt_1.out", "tsopt_1.xyz"], 2: ["tsopt_2.out"]},
+    ),
+}
+
+
+def write_files(run_dir, files):
+    for name, text in files.items():
+        if name.endswith("/"):
+            (run_dir / name).mkdir(parents=True, exist_ok=True)
+        else:
+            (run_dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / name).write_text(text)
+
+
+def listing(run_dir):
+    return sorted(str(p.relative_to(run_dir)) for p in run_dir.rglob("*"))
+
+
+@pytest.mark.parametrize("software", TSOPT_RUNS)
+class TestKeepCrashLogs:
+    """
+    A TS optimization is cleaned up when at least one run succeeded, which
+    used to delete the failed runs' stderr and crash dirs too. With
+    keep_crash_logs on, a failed run's dir is left whole; the successful runs
+    are cleaned as before.
+    """
+
+    def _cleanup(self, tmp_path, software, keep_crash_logs):
+        spec = TSOPT_RUNS[software]
+        calc = make_calc(spec["cls"], {}, XTB_TS_OPT, lot=spec["lot"], software=software)
+        calc.config.keep_crash_logs = keep_crash_logs
+        calc.set_scratch_dir(tmp_path)
+        write_files(tmp_path / "tsopt_run1", spec["ok"])
+        write_files(tmp_path / "tsopt_run2", spec["failed"])
+        before = listing(tmp_path / "tsopt_run2")
+        calc.cleanup()
+        return spec, before
+
+    def test_on_keeps_the_failed_run_whole(self, tmp_path, software):
+        spec, before = self._cleanup(tmp_path, software, keep_crash_logs=True)
+
+        assert listing(tmp_path / "tsopt_run2") == before
+        assert listing(tmp_path / "tsopt_run1") == spec["cleaned"][1]
+
+    def test_off_cleans_every_run(self, tmp_path, software):
+        spec, _ = self._cleanup(tmp_path, software, keep_crash_logs=False)
+
+        assert listing(tmp_path / "tsopt_run2") == spec["cleaned"][2]
+        assert listing(tmp_path / "tsopt_run1") == spec["cleaned"][1]
+
+
 ORCA_INNER_SCRIPT = (
     "#!/bin/bash\n"
     "\n"

@@ -329,6 +329,76 @@ class TestPysisMaxCycles:
         assert expected == (300 if max_cycles is None else max_cycles)
 
 
+# Per software: a finished irc_run1 and a failed irc_run2, as {name: text}
+# (a name ending in "/" is a dir), and what cleanup leaves in a run dir it cleans.
+IRC_RUNS = {
+    "pysisyphus": dict(
+        cls=PysisyphusIRCValCalculator, lot="xtb",
+        ok={"irc_1_input.yaml": "", "irc_1.log": pysis_irc_log(1), "forward_end_opt.xyz": "",
+            "backward_end_opt.xyz": "", "irc_1.err": "", "ts_opt_1.xyz": ""},
+        failed={"irc_2_input.yaml": "", "irc_2.log": "Crashed input:\n", "irc_2.err": "Traceback ...\n",
+                "crashed_calculator_000/": "", "crashed_calculator_000/xtb.out": "SCF not converged\n"},
+        cleaned={1: ["backward_end_opt.xyz", "forward_end_opt.xyz", "irc_1.log", "irc_1_input.yaml"],
+                 2: ["irc_2.log", "irc_2_input.yaml"]},
+    ),
+    "orca": dict(
+        cls=OrcaIRCValCalculator, lot="B3LYP def2-SVP",
+        ok={"irc_1.inp": "", "irc_1.out": "THE IRC HAS CONVERGED\nORCA TERMINATED NORMALLY\n",
+            "irc_1_IRC_F.xyz": "", "irc_1_IRC_B.xyz": "", "irc_1.gbw": "", "irc_1.err": ""},
+        failed={"irc_2.inp": "", "irc_2.out": "ORCA finished by error termination in SCF\n",
+                "irc_2.err": "", "irc_2.gbw": ""},
+        cleaned={1: ["irc_1.inp", "irc_1.out", "irc_1_IRC_B.xyz", "irc_1_IRC_F.xyz"],
+                 2: ["irc_2.inp", "irc_2.out"]},
+    ),
+}
+
+
+def write_files(run_dir, files):
+    for name, text in files.items():
+        if name.endswith("/"):
+            (run_dir / name).mkdir(parents=True, exist_ok=True)
+        else:
+            (run_dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / name).write_text(text)
+
+
+def listing(run_dir):
+    return sorted(str(p.relative_to(run_dir)) for p in run_dir.rglob("*"))
+
+
+@pytest.mark.parametrize("software", IRC_RUNS)
+class TestKeepCrashLogs:
+    """
+    IRC validation is cleaned up when at least one run succeeded, which used to
+    delete the failed runs' stderr and crash dirs too. With keep_crash_logs on,
+    a failed run's dir is left whole; the successful runs are cleaned as before.
+    """
+
+    def _cleanup(self, tmp_path, software, keep_crash_logs):
+        spec = IRC_RUNS[software]
+        cfg = IRCValConfig(software=software, lot=spec["lot"], charge=0, multiplicity=1,
+                           keep_crash_logs=keep_crash_logs)
+        calc = spec["cls"](SimpleNamespace(config=cfg), make_rxn(spec["lot"], software, [1, 2]), MagicMock())
+        calc.set_scratch_dir(tmp_path)
+        write_files(tmp_path / "irc_run1", spec["ok"])
+        write_files(tmp_path / "irc_run2", spec["failed"])
+        before = listing(tmp_path / "irc_run2")
+        calc.cleanup()
+        return spec, before
+
+    def test_on_keeps_the_failed_run_whole(self, tmp_path, software):
+        spec, before = self._cleanup(tmp_path, software, keep_crash_logs=True)
+
+        assert listing(tmp_path / "irc_run2") == before
+        assert listing(tmp_path / "irc_run1") == spec["cleaned"][1]
+
+    def test_off_cleans_every_run(self, tmp_path, software):
+        spec, _ = self._cleanup(tmp_path, software, keep_crash_logs=False)
+
+        assert listing(tmp_path / "irc_run2") == spec["cleaned"][2]
+        assert listing(tmp_path / "irc_run1") == spec["cleaned"][1]
+
+
 IRC_INNER_SCRIPTS = [
     pytest.param(PysisyphusIRCValCalculator, "pysisyphus", "xtb", "erm42_yarp_pysis_xtb.sif", "run_pysis_inner.sh",
                  "pysis irc_{i}_input.yaml > {log}irc_{i}.log 2> {log}irc_{i}.err", id="pysis"),

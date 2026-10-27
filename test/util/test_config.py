@@ -84,3 +84,17 @@ class TestUseLocalScratch:
     def test_non_boolean_is_rejected(self, block, value):
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'use_local_scratch'"):
             TASK_CONFIGS[block](use_local_scratch=value)
+
+
+@pytest.mark.parametrize("block", TASK_CONFIGS)
+class TestKeepCrashLogs:
+    def test_defaults_to_false(self, block):
+        assert TASK_CONFIGS[block]().keep_crash_logs is False
+
+    def test_true_is_kept(self, block):
+        assert TASK_CONFIGS[block](keep_crash_logs=True).keep_crash_logs is True
+
+    @pytest.mark.parametrize("value", ["yes", 1, "true"])
+    def test_non_boolean_is_rejected(self, block, value):
+        with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'keep_crash_logs'"):
+            TASK_CONFIGS[block](keep_crash_logs=value)

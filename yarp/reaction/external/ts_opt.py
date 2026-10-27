@@ -162,6 +162,8 @@ class PysisyphusTSOptCalculator(TSOptTask):
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"tsopt_{i}_input.yaml", f"tsopt_{i}.log", "ts_final_geometry.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -369,6 +371,8 @@ class OrcaTSOptCalculator(TSOptTask):
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             if not run_dir.exists():
+                continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
                 continue
             keep = {f"tsopt_{i}.inp", f"tsopt_{i}.out", f"tsopt_{i}.xyz"}
             for item in run_dir.iterdir():

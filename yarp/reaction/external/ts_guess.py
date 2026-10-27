@@ -198,14 +198,11 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
             trj_file = run_dir / "final_geometries.trj"
             xyz_file = run_dir / "splined_hei.xyz"
 
-            # --- SAFEGUARD: Skip failed runs during partial success ---
-            if not (log_file.exists() and trj_file.exists() and xyz_file.exists()):
+            # Skip scraping for this index if the run failed!
+            if not self._is_run_successful(i):
                 continue
             with open(log_file, "r") as f:
                 log_text = f.read()
-            if "Wrote splined HEI" not in log_text:
-                continue
-            # ---------------------------------------------------------
 
             early_stop, hei_barrier_kjmol = _parse_gsm_quality(log_text)
 
@@ -250,12 +247,24 @@ class PysisyphusTSGuessCalculator(TSGuessTask):
         
         return True
 
+    def _is_run_successful(self, i: int) -> bool:
+        """Whether gsm_run{i} wrote its outputs and terminated, as check_output judges it."""
+        run_dir = self.scratch_dir / f"gsm_run{i}"
+        log_file = run_dir / f"gsm_{i}.log"
+        if not (log_file.exists() and (run_dir / "final_geometries.trj").exists()
+                and (run_dir / "splined_hei.xyz").exists()):
+            return False
+        log_text = log_file.read_text()
+        return "Wrote splined HEI" in log_text and "pysisyphus run took" in log_text
+
     def cleanup(self):
         """Per run dir: keep inputs, logs, xyzs, and trajectories; delete xTB calc dirs."""
         num_runs = self._get_num_runs()
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"gsm_run{i}"
             if not run_dir.exists():
+                continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
                 continue
 
             keep_exact = {f"gsm_{i}_input.yaml", f"gsm_{i}.log", "splined_hei.xyz"}

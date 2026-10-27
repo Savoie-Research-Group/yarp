@@ -236,6 +236,10 @@ class MLPropConfig:
     mem_per_cpu: int = 1000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if not self.model:
@@ -252,6 +256,8 @@ class MLPropConfig:
             raise ValueError("Please provide ml_rxn_prop -> 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to ml_rxn_prop -> 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ml_rxn_prop -> 'keep_crash_logs'")
 
 @dataclass
 class ConformerConfig:
@@ -274,6 +280,10 @@ class ConformerConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
     seed: Optional[int] = 42
 
     def __post_init__(self):
@@ -310,6 +320,8 @@ class ConformerConfig:
             raise ValueError("Please provide conf_gen: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to conf_gen: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to conf_gen: 'keep_crash_logs'")
 
     def _check_auto3d(self):
         """
@@ -357,6 +369,10 @@ class TSGuessConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -387,6 +403,8 @@ class TSGuessConfig:
             raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'keep_crash_logs'")
 
 
 @dataclass
@@ -418,6 +436,10 @@ class PreOptConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.software not in ['pysisyphus']:
@@ -443,6 +465,8 @@ class PreOptConfig:
             raise ValueError("Please provide pre_opt: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to pre_opt: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to pre_opt: 'keep_crash_logs'")
 
 
 @dataclass
@@ -464,6 +488,10 @@ class RPOptConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -490,6 +518,8 @@ class RPOptConfig:
             raise ValueError("Please provide rp_opt: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to rp_opt: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to rp_opt: 'keep_crash_logs'")
 
 
 @dataclass
@@ -508,6 +538,10 @@ class TSOptConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -533,6 +567,8 @@ class TSOptConfig:
             raise ValueError("Please provide ts_opt: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'keep_crash_logs'")
 
 
 @dataclass
@@ -553,6 +589,10 @@ class IRCValConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -578,3 +618,5 @@ class IRCValConfig:
             raise ValueError("Please provide irc_val: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to irc_val: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to irc_val: 'keep_crash_logs'")

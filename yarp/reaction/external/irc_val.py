@@ -363,6 +363,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
             run_dir = self.scratch_dir / f"irc_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"irc_{i}_input.yaml", f"irc_{i}.log", "forward_end_opt.xyz", "backward_end_opt.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -585,6 +587,8 @@ class OrcaIRCValCalculator(IRCValTask):
         for i in range(1, num_runs + 1):
             run_dir = self.scratch_dir / f"irc_run{i}"
             if not run_dir.exists():
+                continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
                 continue
             keep = {f"irc_{i}.inp", f"irc_{i}.out", f"irc_{i}_IRC_F.xyz", f"irc_{i}_IRC_B.xyz"}
             for item in run_dir.iterdir():

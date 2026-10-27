@@ -20,6 +20,7 @@ from yarp.reaction.external.min_opt import (
     MinOptTask, OrcaMinOptCalculator, PysisyphusMinOptCalculator, adopt_reactant_preopt_geometry,
 )
 from yarp.util.config import PreOptConfig, RPOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
+from yarp.util.constants import Constants
 from yarp.util.write_files import xyz_generate_string
 from yarp.yarpecule.graph.adjacency import compare_adjacency
 
@@ -401,6 +402,56 @@ class TestAdoptReactantPreoptGeometry:
 
         assert adopt_reactant_preopt_geometry(reactant)
         assert np.allclose(reactant.graph.geo, reactant.conformers["preopt_b"].geo)
+
+
+def orca_thermo_block(h, s, g):
+    """One ORCA thermochemistry block's GIBBS FREE ENERGY section, in Eh, as ORCA prints it."""
+    return ("GIBBS FREE ENERGY\n-------------------\n\nThe Gibbs free energy is G = H - T*S\n\n"
+            f"Total enthalpy                    ...   {h:.8f} Eh \n"
+            f"Total entropy correction          ...     {s:.8f} Eh    -21.63 kcal/mol\n"
+            "-----------------------------------------------------------------------\n"
+            f"Final Gibbs free energy         ...   {g:.8f} Eh\n")
+
+
+# An ORCA opt with Calc_Hess + Recalc_Hess prints one thermochemistry block per
+# exact Hessian, the starting geometry's first; with Freq, the final geometry's
+# last. (H, -T*S, G) per block, from checks/12 of ts_handoff (PBE/def2-SVP
+# R/P opt with Freq, Recalc_Hess 10: Hessians at cycles 1, 11, 21, then the
+# final geometry).
+OPT_THERMO_BLOCKS = [(-342.79708685, -0.03779990, -342.83488676),
+                     (-342.79980324, -0.04084205, -342.84064529),
+                     (-342.80106678, -0.04061653, -342.84168331),
+                     (-342.80106500, -0.04061586, -342.84168086)]
+
+
+class TestOrcaFinalHessian:
+    """
+    The ORCA R/P opt used to read the Hessian and Gibbs energy of the wrong
+    geometry. Its .hess held the last Recalc_Hess Hessian (up to N - 1
+    cycles stale), and _parse_orca_thermo returned the first thermochemistry
+    block, the starting geometry's: +4.2 kcal/mol in the ts_handoff check
+    (PBE/def2-SVP, 17413990 product). Freq adds a Hessian at the final
+    geometry, and the parser returns the last block.
+    """
+
+    def _calc(self, rxn):
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
+        return make_calc(rxn, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+
+    def test_input_requests_a_final_hessian(self, tmp_path, khp_reaction):
+        self._calc(khp_reaction)._write_orca_rp_opt_input(tmp_path / "min_opt.inp", "initial_geom.xyz")
+
+        assert "! OPT Freq" in (tmp_path / "min_opt.inp").read_text().splitlines()
+
+    def test_gibbs_is_the_last_thermochemistry_block(self, tmp_path, khp_reaction):
+        out = tmp_path / "min_opt.out"
+        out.write_text("".join(orca_thermo_block(*b) + "\n...\n" for b in OPT_THERMO_BLOCKS))
+
+        enthalpy, entropy, gibbs = self._calc(khp_reaction)._parse_orca_thermo(out)
+
+        h, s, g = OPT_THERMO_BLOCKS[-1]
+        assert (enthalpy, entropy, gibbs) == pytest.approx(
+            (h * Constants.ha_to_kcalmol, s * Constants.ha_to_kcalmol, g * Constants.ha_to_kcalmol), abs=1e-6)
 
 
 class TestOrcaJobScript:

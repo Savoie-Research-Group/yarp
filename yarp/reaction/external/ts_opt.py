@@ -389,8 +389,10 @@ class OrcaTSOptCalculator(TSOptTask):
             # set keywords for level of theory
             f.write(f'! {self.config.lot}\n\n')
 
-            # set keywords to specify saddle point optimization
-            f.write(f'! OptTS\n\n')
+            # set keywords to specify saddle point optimization; Freq adds a
+            # Hessian at the final geometry, so the .hess and the last
+            # thermochemistry block aren't from the last Recalc_Hess cycle
+            f.write(f'! OptTS Freq\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")
@@ -515,6 +517,10 @@ class OrcaTSOptCalculator(TSOptTask):
         """
         Parses enthalpy, entropy correction, and Gibbs free energy 
         by searching for key phrases and capturing the first float.
+
+        An optimization prints a thermochemistry block for every exact
+        Hessian, the starting geometry's first. The last block is the one
+        returned: with `Freq`, the final geometry's.
         """
         enthalpy = None
         entropy = None
@@ -548,7 +554,5 @@ class OrcaTSOptCalculator(TSOptTask):
                         match = re.search(r"(-?\d+\.\d+)", line)
                         if match:
                             gibbs = float(match.group(1)) * Constants.ha_to_kcalmol
-                            # Once we have the final value, we can stop
-                            break
 
         return enthalpy, entropy, gibbs

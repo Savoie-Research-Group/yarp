@@ -206,6 +206,11 @@ class PysisyphusTSOptCalculator(TSOptTask):
         if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
             return False
 
+        # 3. Convergence check: pysisyphus also writes the final geometry and
+        #    Hessian after hitting max_cycles ("Number of cycles exceeded!").
+        if "Converged!" not in log_text:
+            return False
+
         return True
 
     def _parse_opt_geo(self, xyz_file):

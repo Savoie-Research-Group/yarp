@@ -294,6 +294,11 @@ class PysisyphusMinOptCalculator(MinOptTask):
         if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
             print(f"     * Run failed: Did not find successful termination message in log.")
             success = False
+        # Pysisyphus also writes the final geometry after hitting max_cycles
+        # ("Number of cycles exceeded!").
+        elif "Converged!" not in log_text:
+            print(f"     * Run failed: Optimization did not converge within max_cycles.")
+            success = False
 
         # 3. Did the pre-optimization keep the graph it was given?
         #    Gates the reactant leg, warns on the product leg.

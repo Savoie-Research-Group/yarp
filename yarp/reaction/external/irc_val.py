@@ -195,6 +195,11 @@ class IRCValTask(AsyncYarpCalculator):
 
 
 class PysisyphusIRCValCalculator(IRCValTask):
+    # Messages pysisyphus prints when an IRC direction stops converged
+    # (irc/IRC.py). The other stops -- "Energy increased!", "rms(grad) below
+    # hard threshold." and "IRC steps exceeded. Stopping." -- are not.
+    IRC_CONVERGED_MSGS = ("Integrator indicated convergence!", "rms(grad) converged!", "Energy converged!")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image_name = pysis_image(self.config.lot)
@@ -280,6 +285,14 @@ class PysisyphusIRCValCalculator(IRCValTask):
             log_text = f.read()
 
         if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
+            return False
+
+        # 3. Convergence check: pysisyphus also writes both end geometries when
+        #    an IRC direction or an end optimization stopped unconverged. Both
+        #    directions must stop on a converged message, and both end
+        #    optimizations must print "Converged!".
+        n_irc_converged = sum(log_text.count(msg) for msg in self.IRC_CONVERGED_MSGS)
+        if n_irc_converged < 2 or log_text.count("Converged!") < 2:
             return False
 
         return True
@@ -373,8 +386,9 @@ class PysisyphusIRCValCalculator(IRCValTask):
             for line in pysis_xtb_calc_lines(lot, self.config):
                 f.write(line)
 
-            # set irc block
-            f.write(f'irc:\n type: eulerpc\n forward: True\n backward: True\n downhill: False\n')
+            # set irc block; max_cycles caps the IRC steps here and the end
+            # optimizations below (pysisyphus' own IRC default is 125)
+            f.write(f'irc:\n type: eulerpc\n forward: True\n backward: True\n downhill: False\n max_cycles: {self.config.max_cycles}\n')
 
             # set endopt block
             f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')

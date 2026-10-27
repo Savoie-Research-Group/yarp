@@ -341,6 +341,48 @@ class TestPreOptGraphGeometryWriteback:
         assert np.array_equal(patchable_reaction.reactant.graph.geo, before)
 
 
+def pysis_min_opt_log(outcome):
+    """
+    The lines of a pysisyphus min_opt.log that YARP reads, in order. `outcome`
+    is the optimizer's last word: "Converged!" or "Number of cycles exceeded!".
+    Pysisyphus writes the final geometry either way.
+    """
+    return (f"        {outcome}\n"
+            "        \tenergy: -20.5 hartree\n"
+            "        Wrote final, hopefully optimized, geometry to 'final_geometry.xyz'\n"
+            "pysisyphus run took 0:00:03 h.\n")
+
+
+class TestPysisRunConvergence:
+    """
+    A pysisyphus R/P opt or pre-opt that hit max_cycles used to count as
+    finished: its final geometry was stored as the minimum. Only a converged
+    run counts, as for ORCA, and an unconverged one fails the task.
+    """
+
+    def _check(self, tmp_path, rxn, task_type, config, outcome):
+        graph = rxn.reactant.graph
+        _write_finished_job(tmp_path, graph.elements, graph.geo)
+        (tmp_path / "min_opt.log").write_text(pysis_min_opt_log(outcome))
+        (tmp_path / "final_hessian.h5").touch()
+        calc = make_calc(rxn, task_type, config, cls=PysisyphusMinOptCalculator)
+        calc.set_scratch_dir(tmp_path)
+        return calc.check_output()
+
+    @pytest.mark.parametrize("task_type", ["reactant_optimization", "reactant_pre_opt"])
+    def test_converged_run_succeeds(self, tmp_path, patchable_reaction, rpopt_config, task_type):
+        config = rpopt_config if task_type == "reactant_optimization" else PreOptConfig()
+
+        assert self._check(tmp_path, patchable_reaction, task_type, config, "Converged!")
+
+    @pytest.mark.parametrize("task_type", ["reactant_optimization", "reactant_pre_opt"])
+    def test_run_at_max_cycles_fails(self, tmp_path, patchable_reaction, rpopt_config, task_type, capsys):
+        config = rpopt_config if task_type == "reactant_optimization" else PreOptConfig()
+
+        assert not self._check(tmp_path, patchable_reaction, task_type, config, "Number of cycles exceeded!")
+        assert "did not converge" in capsys.readouterr().out
+
+
 class TestAdoptReactantPreoptGeometry:
     def test_no_pre_opt_leaves_the_graph_alone(self, khp_reaction):
         before = khp_reaction.reactant.graph.geo.copy()

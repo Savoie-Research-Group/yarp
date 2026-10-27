@@ -84,14 +84,29 @@ def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None)
     return rxn, fed
 
 
+def pysis_irc_log(i, forward="rms(grad) converged!", backward="Integrator indicated convergence!",
+                  end_opts=("Converged!", "Converged!")):
+    """
+    The lines of a pysisyphus IRC log that YARP reads, in order: how each IRC
+    direction stopped, how each end optimization ended, the barriers (Left 0,
+    TS 10*i, Right 5 kJ/mol) and the closing lines. Pysisyphus writes the end
+    geometries and these closing lines whether or not anything converged.
+    """
+    fwd_end, bwd_end = end_opts
+    return (f"        {forward}\n"
+            f"        {backward}\n"
+            f"        {fwd_end}\n"
+            f"        {bwd_end}\n"
+            "Minimum energy of 0.0 at 'Left'.\n"
+            f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
+            "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+
+
 def pysis_outputs(run_dir, i):
     """Every run intended; forward barrier 10*i kJ/mol, so irc_run1 is the lowest."""
     write_xyz(run_dir / "forward_end_opt.xyz", P_GEO)
     write_xyz(run_dir / "backward_end_opt.xyz", R_GEO)
-    (run_dir / f"irc_{i}.log").write_text(
-        "Minimum energy of 0.0 at 'Left'.\n"
-        f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
-        "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+    (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i))
 
 
 def orca_outputs(run_dir, i):
@@ -192,10 +207,7 @@ def pysis_outputs_by_label(labels):
                     "unintended": (U_FWD_GEO, U_BWD_GEO)}[labels[i]]
         write_xyz(run_dir / "forward_end_opt.xyz", fwd)
         write_xyz(run_dir / "backward_end_opt.xyz", bwd)
-        (run_dir / f"irc_{i}.log").write_text(
-            "Minimum energy of 0.0 at 'Left'.\n"
-            f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
-            "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+        (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i))
     return write
 
 
@@ -250,6 +262,71 @@ class TestPerTSResults:
         rxn, _ = self._run(tmp_path, {1: "intended", 2: "unintended"})
 
         assert not any("validated_ts" in k for k in rxn.ts_geom)
+
+
+class TestPysisRunConvergence:
+    """
+    Pysisyphus writes both end geometries even when an IRC direction or an end
+    optimization stopped unconverged, and those runs used to be labeled and
+    given barriers. In the ts_handoff step 0.3 runs, 12 of 37 end opts hit
+    max_cycles; one gave a -268 kcal/mol barrier. Now a run counts only if both
+    directions stop on a converged message and both end opts converge.
+    """
+
+    def _run(self, tmp_path, **log_kwargs):
+        """irc_run1 is the run under test; irc_run2 is a converged control."""
+        def write(run_dir, i):
+            write_xyz(run_dir / "forward_end_opt.xyz", P_GEO)
+            write_xyz(run_dir / "backward_end_opt.xyz", R_GEO)
+            (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i, **(log_kwargs if i == 1 else {})))
+        return run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2], write, tmp_path)
+
+    @pytest.mark.parametrize("forward, backward", [
+        ("rms(grad) converged!", "Integrator indicated convergence!"),
+        ("Energy converged!", "rms(grad) converged!"),
+    ])
+    def test_converged_run_counts(self, tmp_path, forward, backward):
+        rxn, _ = self._run(tmp_path, forward=forward, backward=backward)
+
+        assert rxn.ts_geom["1_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
+
+    @pytest.mark.parametrize("log_kwargs", [
+        pytest.param(dict(end_opts=("Converged!", "Number of cycles exceeded!")), id="end_opt_at_max_cycles"),
+        pytest.param(dict(end_opts=("Number of cycles exceeded!",) * 2), id="both_end_opts_at_max_cycles"),
+        pytest.param(dict(forward="Energy increased!"), id="irc_energy_increased"),
+        pytest.param(dict(backward="IRC steps exceeded. Stopping."), id="irc_steps_exceeded"),
+        pytest.param(dict(forward="rms(grad) below hard threshold."), id="irc_below_hard_threshold"),
+    ])
+    def test_unconverged_run_is_dropped(self, tmp_path, log_kwargs):
+        rxn, _ = self._run(tmp_path, **log_kwargs)
+
+        # The dropped run's TS gets no IRC result; irc_run2's TS (barrier 20
+        # kJ/mol) becomes the reaction's, not irc_run1's lower 10.
+        assert "irc_outcome" not in rxn.ts_geom["1_tsopt_xtb_pysisyphus"].properties
+        assert rxn.ts_geom["2_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
+        assert rxn.barrier["xtb_pysisyphus"] == kcal(20.0)
+
+
+class TestPysisMaxCycles:
+    """
+    Check that irc.max_cycles is used in all parts of IRC calculation setup
+    """
+
+    @pytest.mark.parametrize("max_cycles", [None, 100])
+    def test_caps_irc_steps_and_end_opts(self, tmp_path, max_cycles):
+        extra = {} if max_cycles is None else {"max_cycles": max_cycles}
+        cfg = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1, **extra)
+        calc = PysisyphusIRCValCalculator(SimpleNamespace(config=cfg), make_rxn("xtb", "pysisyphus", [1]), MagicMock())
+        path = tmp_path / "irc_1_input.yaml"
+        calc._write_pysis_irc_input(path, "ts_opt_1.xyz")
+        text = path.read_text()
+
+        expected = cfg.max_cycles
+        irc_block = text.split("irc:\n")[1].split("endopt:\n")[0]
+        endopt_block = text.split("endopt:\n")[1]
+        assert f" max_cycles: {expected}\n" in irc_block
+        assert f" max_cycles: {expected}\n" in endopt_block
+        assert expected == (300 if max_cycles is None else max_cycles)
 
 
 IRC_INNER_SCRIPTS = [

@@ -242,6 +242,53 @@ class TestPysisInnerScriptLogs:
             assert f"pysis tsopt_{i}_input.yaml > {log}tsopt_{i}.log 2> {log}tsopt_{i}.err" in lines
 
 
+def pysis_opt_log(outcome):
+    """
+    The lines of a pysisyphus TS-opt log that YARP reads, in order. `outcome`
+    is the optimizer's last word: "Converged!" or "Number of cycles exceeded!".
+    Pysisyphus writes the final geometry and its Hessian either way.
+    """
+    return (f"        {outcome}\n"
+            "        \tenergy: -21.61755730 hartree\n"
+            "        Wrote final, hopefully optimized, geometry to 'ts_final_geometry.xyz'\n"
+            "pysisyphus run took 0:00:30 h.\n")
+
+
+class TestPysisRunConvergence:
+    """
+    A pysisyphus TS optimization that hit max_cycles used to count as a
+    finished run. It was scraped as a TS, and a single imaginary mode made it
+    "valid" for the IRC and the next level (17413990 TS2 in the ts_handoff
+    step 0.3 xtb run: -86 cm-1, below both minima). Only converged runs count.
+    """
+
+    def _calc(self, tmp_path, outcomes):
+        calc = make_calc(PysisyphusTSOptCalculator, {}, XTB_TS_GUESS, lot="xtb", software="pysisyphus")
+        calc.set_scratch_dir(tmp_path)
+        for i, outcome in enumerate(outcomes, start=1):
+            run_dir = tmp_path / f"tsopt_run{i}"
+            run_dir.mkdir()
+            (run_dir / "ts_final_geometry.xyz").write_text("3\n\nH 0 0 0\nH 1.5 0 0\nH 2.5 0 0\n")
+            (run_dir / "ts_final_hessian.h5").touch()
+            (run_dir / f"tsopt_{i}.log").write_text(pysis_opt_log(outcome))
+        return calc
+
+    def test_converged_run_succeeds(self, tmp_path):
+        assert self._calc(tmp_path, ["Converged!"])._is_run_successful(1)
+
+    def test_run_at_max_cycles_fails(self, tmp_path):
+        assert not self._calc(tmp_path, ["Number of cycles exceeded!"])._is_run_successful(1)
+
+    def test_unconverged_run_is_not_scraped(self, tmp_path, monkeypatch):
+        calc = self._calc(tmp_path, ["Converged!", "Number of cycles exceeded!"])
+        monkeypatch.setattr(calc, "_parse_hessian_freq", lambda hess_file: (None, ONE_IMAG.copy()))
+
+        assert calc.check_output()
+        calc.scrape_data()
+
+        assert list(calc.rxn.ts_geom) == ["1_tsopt_xtb_pysisyphus"]
+
+
 ORCA_INNER_SCRIPT = (
     "#!/bin/bash\n"
     "\n"

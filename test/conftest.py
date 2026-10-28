@@ -5,6 +5,9 @@ import yaml
 import pytest
 from pathlib import Path
 import pickle
+import contextlib
+import io
+from collections import Counter
 
 # YAML input files
 @pytest.fixture
@@ -673,3 +676,196 @@ def ec_xyz():
 def ester_xyz():
     """Returns a string object of the absolute path to ester XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "standard" / "ester.xyz")
+
+
+# yarpecule initialization: regression cases for the SMILES parser, ring finder and
+# geometry fallback. Each fixture holds the edge cases of one test; every case targets a
+# fixed regression unless it is marked as a guard.
+class Failures:
+    """
+    Collect the failing cases of one test instead of stopping at the first:
+
+        for case in cases:
+            with failures.case(label):
+                ...asserts...
+        failures.report()
+    """
+
+    def __init__(self):
+        self.messages = []
+
+    @contextlib.contextmanager
+    def case(self, label):
+        try:
+            yield
+        except Exception as e:  # an AssertionError or any error the case raised
+            self.messages.append(f"{label}\n    {type(e).__name__}: {str(e).strip()}")
+
+    def report(self):
+        assert not self.messages, f"{len(self.messages)} case(s) failed:\n" + "\n".join(self.messages)
+
+
+@pytest.fixture
+def failures():
+    """Returns a Failures collector, so a test can report every failing case at once."""
+    return Failures()
+
+
+@pytest.fixture
+def quiet():
+    """Returns a function that calls f(*args, **kwargs) with stdout/stderr captured, returning (result, stdout)."""
+    def _quiet(f, *args, **kwargs):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            result = f(*args, **kwargs)
+        return result, out.getvalue()
+    return _quiet
+
+
+@pytest.fixture
+def formula():
+    """Returns a function giving the formula string (e.g. 'C6ClH5') of a list of element labels."""
+    def _formula(elements):
+        counts = Counter(_.capitalize() for _ in elements)
+        return "".join(f"{el}{counts[el] if counts[el] > 1 else ''}" for el in sorted(counts))
+    return _formula
+
+
+CYCLIC_CUMULENE = "[C:1]([C:2]1=[N:5][C:3]([H:8])=[C:6]=[C:7]=[C:4]1[H:9])([H:10])([H:11])[H:12]"
+
+
+@pytest.fixture
+def smiles2adjmat_cases():
+    """
+    (smiles, formula, {(map_i, map_j): bond order}) for smiles2adjmat. Branch bookkeeping
+    (a `)` followed by `(` left close_flag set), multi-letter element tokens, two-letter
+    bracket aromatics, and H-led element symbols.
+    """
+    return [
+        # N4=H5 on master (OctetError)
+        ("[C:1]([H:2])([H:3])(=[N:4][H:5])", "CH3N", {(1, 4): 2, (4, 5): 1}),
+        # RGD1 MR_20770_1 reactant fragment: N16=H19 on master
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", "C3H6N2",
+         {(14, 16): 2, (16, 19): 1, (12, 15): 2}),
+        # RGD1 species read "clean" on master, with C5#C6 as a double bond
+        ("[C:1](\\[C:2]([H:10])([H:11])[H:12])(=[C:3](\\[N:4]([C:5]#[C:6][H:13])[H:8])[H:9])[H:7]", "C5H7N",
+         {(5, 6): 3}),
+        # unmapped: the wrong order also changed the inferred H count (master: 8 H)
+        ("CC(C)(=NC)", "C4H9N", {}),
+        # Kaden: `Clc` / `Brc` read as one unknown element
+        ("Clc1ccccc1", "C6ClH5", {}),
+        ("Brc1ccc(Br)cc1", "Br2C6H4", {}),
+        # `Sc` read as scandium, `In` as indium (silently)
+        ("CSc1ccccc1", "C7H8S", {}),
+        ("In1cccc1", "C4H4IN", {}),
+        # `[se]` read as sulfur (silently)
+        ("c1cc[se]c1", "C4H4Se", {}),
+        # the H of He counted as a hydrogen (OctetError)
+        ("[He]", "He", {}),
+    ]
+
+
+@pytest.fixture
+def aromatic_double_bond_cases():
+    """
+    (smiles, needs a ring double bond?) for needs_aromatic_double_bond, one bool per
+    aromatic atom in input order. Lone-pair donors (pyrrole-type n, ring o/s, c-) and
+    atoms with an exocyclic double bond must say False.
+    """
+    return [
+        ("c1ccccc1", [True] * 6),                                       # guard
+        ("c1ccncc1", [True] * 6),                                       # guard: pyridine n
+        ("c1cc[nH]c1", [True, True, True, False, True]),               # pyrrole
+        ("c1ccoc1", [True, True, True, False, True]),                  # furan
+        ("c1ccsc1", [True, True, True, False, True]),                  # thiophene
+        ("C[n+]1ccccc1", [True] * 6),                                   # pyridinium: n+ with 3 neighbours
+        ("O=c1cc[nH]cc1", [False, True, True, False, True, True]),     # 4-pyridone: exocyclic =O and [nH]
+        ("[n:1]1([H:8])[c:2](=[O:7])[n:6][c:3]([N:4]([H:9])[H:10])[o:5]1",   # RGD1 species
+         [False, False, True, True, False]),
+        ("[cH-]1cccc1", [False, True, True, True, True]),              # cyclopentadienide
+    ]
+
+
+@pytest.fixture
+def ring_cases():
+    """
+    (smiles, ring sizes) for return_rings(remove_fused=False). The first atom of the fused
+    ones is a fusion atom whose lowest ring neighbour is across the shared bond (master
+    raised), or master returned a path that does not close.
+    """
+    return [
+        ("c12c(occ1)cccc2", [5, 6, 9]),                                 # benzofuran (master raised)
+        ("c12c([nH]cc1)cccc2", [5, 6, 9]),                              # indole (master raised)
+        ("[n:1]12[n:2]([n:3]1[H:6])[c:4]2=[O:5]", [3, 3, 4]),           # RGD1 species (master raised)
+        ("c1cccc2sc(cc12)O", [5, 6, 9]),                                # master: non-closing 9-atom path
+        ("c1ccc2ccccc2c1", [6, 6, 10]),                                 # guard: naphthalene
+        ("C1CC2CCC1C2", [5, 5, 6]),                                     # guard: norbornane
+        ("C1CCC2(C1)CC2", [3, 5]),                                      # guard: spiro
+    ]
+
+
+@pytest.fixture
+def obabel_embed_cases():
+    """
+    (smiles, bond lengths checked?) for obabel_embed, built from RDKit's kekulized graph.
+    The strained ones are RDKit embedding failures from RGD1; UFF does not always keep
+    their bonds, so only the geometry itself is checked there.
+    """
+    return [
+        ("CCO", True),
+        ("c1ccccc1", True),
+        ("[NH4+]", True),                       # charge
+        ("[CH3]", True),                        # radical
+        ("C[Sc](C)C", True),                    # metal
+        ("O=C=C=C=O", True),                    # cumulene chain
+        ("C1=NC=C=C=C1", False),                # cyclic cumulene (RDKit cannot embed)
+        ("[C-]1=[N+]=C(C)CO1", False),          # nitrile-ylide ring (RDKit cannot embed)
+    ]
+
+
+@pytest.fixture
+def geo_via_obabel_cases():
+    """SMILES whose rdkit molecule (explicit H) rdkit cannot embed, plus two it can (guards)."""
+    return [
+        "C1=NC=C=C=C1",                         # RGD1-type cyclic cumulene
+        "CC1=NC=C=C=C1",
+        "[C-]1=[N+]=C(C)CO1",                   # nitrile-ylide ring
+        "C1=C=C=NN1C",
+        "c1ccccc1",                             # guard: aromatic bonds are kekulized for Open Babel
+        "CCO",                                  # guard
+    ]
+
+
+@pytest.fixture
+def xyz_from_smiles_cases():
+    """
+    (smiles, mode, expected) for xyz_from_smiles with its default strict=True: "geometry"
+    (a finite geometry, never None) or the exception raised.
+    """
+    return [
+        (CYCLIC_CUMULENE, "yarp", "geometry"),                          # master: ValueError Bad Conformer Id
+        (CYCLIC_CUMULENE, "rdkit", "geometry"),                         # master: geometry None
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "yarp", "geometry"),  # master: TypeError
+        ("[C:1]=[O:4].[C:2](#[N:3])[H:5]", "yarp", "geometry"),         # master: embedded as formaldehyde
+        ("[C:1]([H:2])[H:3]", "yarp", "geometry"),                      # master: carbene embedded as methane
+        ("c1ccccc1[N](C)(C)C", "yarp", "OctetError"),                   # master: tried the RDKit geometry fallback
+        ("CCO", "yarp", "geometry"),                                    # guard
+        ("CCO", "rdkit", "geometry"),                                   # guard
+    ]
+
+
+@pytest.fixture
+def yarpecule_cases():
+    """
+    (smiles, formula) that the default yarpecule() must build in yarp mode, without any
+    RDKit fallback. Master's defaults sent each through a fallback, or failed.
+    """
+    return [
+        ("Clc1ccccc1", "C6ClH5"),                                       # master: RDKit mode
+        ("c1ccoc1", "C4H4O"),                                           # master: RDKit geometry fallback
+        ("c12c(occ1)cccc2", "C8H6O"),                                   # master: RDKit geometry fallback
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", "C3H6N2"),  # master: OctetError
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "C2H3N3"),  # master: TypeError
+        (CYCLIC_CUMULENE, "C6H5N"),                                     # master: ValueError
+        ("CCO", "C2H6O"),                                               # guard
+    ]

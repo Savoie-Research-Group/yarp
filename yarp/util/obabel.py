@@ -1,7 +1,11 @@
+import json
 import os
+import subprocess
+import sys
 import numpy as np
 from openbabel import pybel, openbabel as ob
 
+from yarp.util.properties import el_to_an
 from yarp.util.write_files import mol_write_yp
 
 # A 3-atom molecule used only to invalidate the force field's cached setup.
@@ -57,6 +61,54 @@ def _ensure_setup_needed(mol, lot):
 
     ff.Setup(_sentinel.OBMol)
     return ff.IsSetupNeeded(mol.OBMol)
+
+def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
+    '''
+    Generate a 3D geometry for a molecular graph using Open Babel.
+
+    This is the fallback for molecules that RDKit cannot embed (e.g., strained
+    rings with cumulated double bonds). Each call runs the build in a fresh
+    process (`obabel_build.py`) with Open Babel's random seed fixed, so the same
+    graph always gets the same geometry, independent of earlier builds.
+
+    Parameters
+    ----------
+    elements : list
+        element labels, indexed to the atoms of the molecule
+
+    bond_mat : nd array (N x N)
+        bond orders on the off-diagonal (a bond-electron matrix works)
+
+    fc : list
+        formal charge of each atom
+
+    lot : string
+        Force field used to relax the built geometry
+
+    maxiter : int
+        Maximum number of optimization steps
+
+    seed : int
+        Seed for Open Babel's builder (set through the OB_RANDOM_SEED environment variable)
+
+    Returns
+    -------
+    geo : nd array (N x 3)
+        generated geometry, indexed to `elements`
+    '''
+    payload = {"atomic_numbers": [el_to_an[_.lower()] for _ in elements],
+               "bond_mat": np.asarray(bond_mat).tolist(),
+               "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter}
+
+    # -I: isolated mode, so the worker's own folder (which holds yarp/util/rdkit.py) is not on its path
+    proc = subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(__file__), "obabel_build.py")],
+                          input=json.dumps(payload), capture_output=True, text=True,
+                          env={**os.environ, "OB_RANDOM_SEED": str(seed)})
+    if proc.returncode != 0:
+        raise RuntimeError(f"Open Babel could not build a geometry: {proc.stderr.strip().splitlines()[-1]}")
+
+    return np.array(json.loads(proc.stdout.strip().splitlines()[-1])["geo"])
+
 
 def obabel_joint_opt(source, target_bem, target_adj, lot="uff", maxiter=500):
     '''

@@ -34,14 +34,14 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     """
 
     if not hasattr(smiles2adjmat, 'aromatics'):
-        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s"}
-        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z](?:[a-z]+)?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
+        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s", "se", "as", "te"}
+        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z][a-z]?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
         smiles2adjmat.atom_pattern = r'([A-Z](?:[a-z]+)?|[a-z])'
         smiles2adjmat.ring_pattern = re.compile(r'^(%\d{2}|\d)$')
         smiles2adjmat.isotope_pattern = re.compile(r'^\[(\d+)')
         smiles2adjmat.charge_pattern = re.compile(r'(\+\d+|-\d+|\++(?!\d)|-+(?!\d))')
         smiles2adjmat.hydrogen_pattern = re.compile(r'(H\d+|H+)')
-        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z](?:[a-z]+)?|[a-z])')
+        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z][a-z]?|se|as|te|[a-z])')
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
         smiles2adjmat.valid_elements = {
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
@@ -57,7 +57,10 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
     final_tokens = []
     for token in preliminary_tokens:
-        if len(token) == 2 and token not in smiles2adjmat.valid_elements and not token.startswith("%"):
+        # Split two letters that are not an element, or that are an organic-subset atom bonded
+        # to an aromatic atom (e.g., `Sc` in CSc1ccccc1 is S and c, not scandium)
+        if len(token) == 2 and not token.startswith("%") and (
+                token not in smiles2adjmat.valid_elements or (token[0] in "BCNOPSFI" and token[1] in smiles2adjmat.aromatics)):
             final_tokens.extend(list(token))
         else:
             final_tokens.append(token)
@@ -88,7 +91,9 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 else:
                     formal_charge = charge_str.count('+') - charge_str.count('-')
 
-            hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token)
+            # hydrogens are counted after the element label, so the H of e.g. [Hg] is not one
+            label_match = smiles2adjmat.element_label_pattern.search(token)
+            hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token, label_match.end()) if label_match else None
             if verbose:
                 print(f"{token=} {hydrogen_match=}")
             if hydrogen_match:
@@ -178,6 +183,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 branch_close_atom_indices.append(sequential_atom_counter)
             if open_flag:
                 open_flag = False
+                close_flag = False  # after `)(` this atom opens a branch, so the close is spent
                 branch_open_atom_indices.append(sequential_atom_counter)
 
             if pending_atom_stereo_owner is not None and pending_atom_stereo_owner in atom_info:
@@ -321,13 +327,15 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             for component in fused_components:
                 component = sorted(component)
                 component_set = set(component)
+                # only atoms with an unpaired electron left can take a ring double bond
+                needs_double = [i for i in component if needs_aromatic_double_bond(i, adjmat, atom_info, atom_parse_meta)]
                 component_edges = []
-                for count_i, i in enumerate(component):
-                    for j in component[count_i + 1:]:
+                for count_i, i in enumerate(needs_double):
+                    for j in needs_double[count_i + 1:]:
                         if adjmat[i, j] == 1 and can_promote_aromatic_edge(i, j, component_set, adjmat):
                             component_edges.append((i, j))
 
-                target_size = len(component) // 2
+                target_size = len(needs_double) // 2
                 promoted_edges, best_partial = choose_aromatic_matching(component_edges, target_size)
                 if promoted_edges is None:
                     ambiguous_aromatic_assignment = True
@@ -454,6 +462,32 @@ def bemat_to_smiles(bond_electron_mat, atom_info):
         return Chem.MolToSmiles(Chem.RemoveHs(mol), canonical=True, kekuleSmiles=True)
     except Exception:
         return Chem.MolToSmiles(mol, canonical=True, kekuleSmiles=True)
+
+
+def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
+    """
+    Decide whether an aromatic atom takes a ring double bond in the kekulized structure.
+
+    The electrons left on the atom are counted after its formal charge, its current bonds
+    (including exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add.
+    An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n).
+    An even count means the atom donates a lone pair or nothing to the ring
+    (e.g., pyrrole-type n, ring o/s, or a c with an exocyclic =O).
+    """
+    element = atom_info[atom]["element"]
+    bonded = [i for i in range(len(atom_info)) if adjmat[atom, i] > 0]
+
+    # hydrogens follow the same rules as add_hydrogens()
+    if atom_parse_meta[atom]["should_infer_hydrogens"]:
+        target_neighbors = 2 if element in ['n', 'o', 's'] else 3
+        hydrogens = max(0, target_neighbors - len(bonded))
+    elif any(atom_info[i]["element"] == 'h' for i in bonded):
+        hydrogens = 0
+    else:
+        hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
+
+    electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
+    return electrons % 2 == 1
 
 
 def can_promote_aromatic_edge(i, j, component_atoms, adjmat):

@@ -4,6 +4,7 @@ Testing suite for the yarpecule class
 import pytest
 import numpy as np
 from yarp.yarpecule.yarpecule import yarpecule as ypcule
+import inspect
 
 
 class TestYarpeculeFromSMILES:
@@ -162,3 +163,22 @@ class TestSeparateYarpecules:
 
         assert sep_mols[0].adj_mat.shape == (6, 6)
         assert sep_mols[1].adj_mat.shape == (3, 3)
+
+
+class TestStrictDefault:
+    def test_strict_default(self, yarpecule_cases, quiet, formula, failures):
+        """
+        strict=True by default, and each case builds in yarp mode with no RDKit fallback
+        (master's defaults sent each through one, or failed).
+        """
+        with failures.case("strict default"):
+            assert inspect.signature(ypcule.__init__).parameters["strict"].default is True
+        for smiles, expected_formula in yarpecule_cases:
+            with failures.case(smiles):
+                y, printed = quiet(ypcule, smiles)
+
+                assert formula(y.elements) == expected_formula
+                assert "falling back to RDKit" not in printed and "geometry fallback used RDKit" not in printed, \
+                    "used an RDKit fallback"
+                assert y.geo is not None, "geometry is None"
+        failures.report()

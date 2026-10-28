@@ -11,6 +11,8 @@ from yarp.yarpecule.hashes import yarpecule_hash
 from yarp.util.write_files import mol_write_yp
 
 from yarp.util.obabel import obabel_joint_opt, _ensure_setup_needed
+from yarp.util.obabel import obabel_embed
+from rdkit import Chem
 
 class TestFFOpt:
     def test_haa_2_ring(self):
@@ -202,3 +204,38 @@ class TestVerdictStability:
                 f"({n_mismatch} mismatches); coordinates may vary run to run "
                 f"but the verdict may not"
             )
+
+
+def kekule_graph(smiles):
+    """Elements, kekulized bond orders and formal charges from RDKit, explicit H included."""
+    mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+    Chem.Kekulize(mol, clearAromaticFlags=True)
+    bond_mat = np.zeros([mol.GetNumAtoms(), mol.GetNumAtoms()])
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        bond_mat[i, j] = bond_mat[j, i] = bond.GetBondTypeAsDouble()
+    return [_.GetSymbol() for _ in mol.GetAtoms()], bond_mat, [_.GetFormalCharge() for _ in mol.GetAtoms()]
+
+
+class TestObabelEmbed:
+    def test_graphs(self, obabel_embed_cases, quiet, failures):
+        """
+        A finite geometry in the order of the given atoms, with no two atoms on top of each
+        other, identical when built again (Open Babel's builder is random unless each build
+        is a fresh, seeded process); bond lengths sane where UFF keeps the bonds.
+        """
+        for smiles, check_bonds in obabel_embed_cases:
+            with failures.case(smiles):
+                elements, bond_mat, fc = kekule_graph(smiles)
+
+                geo, _ = quiet(obabel_embed, elements, bond_mat, fc)
+                again, _ = quiet(obabel_embed, elements, bond_mat, fc)
+
+                assert geo.shape == (len(elements), 3) and np.isfinite(geo).all(), "geometry shape or values"
+                assert np.array_equal(geo, again), "a second build gave a different geometry"
+                dist = np.linalg.norm(geo[:, None] - geo[None], axis=-1) + 10 * np.eye(len(elements))
+                assert dist.min() > 0.5, "overlapping atoms"
+                if check_bonds:
+                    bonded = dist[np.triu(bond_mat, 1) > 0]
+                    assert ((bonded > 0.9) & (bonded < 2.4)).all(), f"bond lengths {bonded.round(2)}"
+        failures.report()

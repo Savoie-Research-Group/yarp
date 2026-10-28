@@ -44,6 +44,10 @@ class yarpecule:
             is passed through another method besides SMILES.
             Thoughts on renaming this to smi_mode? - ERM
 
+    strict : bool, default=True
+            Controls whether a failed in-house SMILES parse raises an error (True) or falls back
+            to rdkit (False). Only used when parsing SMILES in 'yarp' mode.
+
     Attributes:
     -----------
     geo : numpy.ndarray
@@ -88,7 +92,7 @@ class yarpecule:
     # Constructor #
     ###############
 
-    def __init__(self, mol, mode='yarp', canon=True, strict=False):
+    def __init__(self, mol, mode='yarp', canon=True, strict=True):
         self._geo = None
         self._elements = None
         self._q = 0
@@ -241,7 +245,7 @@ class yarpecule:
     # Internal Functions #
     ######################
 
-    def _read_structure(self, mol, mode, strict=False):
+    def _read_structure(self, mol, mode, strict=True):
         """
         Read in an externally provided molecular structure and update
         core attributes of the yarpecule object.
@@ -313,7 +317,7 @@ class yarpecule:
         else:
             try:
                 self._elements, self._geo, self._adj_mat, self._q, self._atom_info = xyz_from_smiles(
-                    mol, mode=mode)
+                    mol, mode=mode, strict=strict)
             except ValueError:
                 raise
             except Exception as e:

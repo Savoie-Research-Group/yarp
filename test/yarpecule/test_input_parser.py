@@ -14,6 +14,11 @@ from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
 from yarp.yarpecule.input_parsers import xyz_from_smiles
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.write_files import xyz_generate_string
+import importlib
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+parsers_mod = importlib.import_module("yarp.yarpecule.input_parsers")
 
 
 class TestXYZParser:
@@ -650,3 +655,45 @@ class TestAtomMapIngestion:
         assert reactant_maps == set(self.maps(scrambled.product.graph))
         assert reactant_maps == {211, 212, 321, 322, 323, 324}
         assert scrambled.hash == original.hash
+
+
+class TestGeoViaObabel:
+    def test_fallback(self, geo_via_obabel_cases, quiet, failures):
+        """An Open Babel geometry in the atom order of the rdkit molecule, with a warning."""
+        for smiles in geo_via_obabel_cases:
+            with failures.case(smiles):
+                mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+
+                geo, printed = quiet(parsers_mod.geo_via_obabel, mol, smiles)
+
+                assert geo.shape == (mol.GetNumAtoms(), 3) and np.isfinite(geo).all(), "geometry shape or values"
+                assert "using Open Babel" in printed, "no warning printed"
+        failures.report()
+
+
+class TestXyzFromSmilesRegressions:
+    def test_regressions(self, xyz_from_smiles_cases, monkeypatch, quiet, failures):
+        """
+        A geometry (never None) or the expected error; in yarp mode the RDKit molecule
+        handed to the embedder carries no implicit hydrogens.
+        """
+        implicit_h = []
+        real = AllChem.EmbedMolecule
+
+        def spy(mol, *args, **kwargs):
+            implicit_h.append(sum(_.GetNumImplicitHs() for _ in mol.GetAtoms()))
+            return real(mol, *args, **kwargs)
+
+        monkeypatch.setattr(parsers_mod.AllChem, "EmbedMolecule", spy)  # where xyz_from_smiles looks it up
+        for smiles, mode, expected in xyz_from_smiles_cases:
+            with failures.case(f"{smiles} (mode={mode})"):
+                implicit_h.clear()
+                try:
+                    (elements, geo, _, _, _), _ = quiet(xyz_from_smiles, smiles, mode=mode)
+                    outcome = "geometry" if geo is not None and np.isfinite(geo).all() else f"geometry {geo}"
+                except Exception as e:
+                    outcome = type(e).__name__
+                assert outcome == expected
+                if expected == "geometry" and mode == "yarp":
+                    assert implicit_h == [0], f"implicit H on the embedded molecule: {implicit_h}"
+        failures.report()

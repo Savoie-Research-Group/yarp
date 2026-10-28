@@ -101,6 +101,43 @@ class TestTSOptSource:
         assert not make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()
 
 
+# A soft saddle (ts_handoff check 18: KHP 16610336 TS2, -35.5 cm-1, became a
+# -25 cm-1 DFT "TS"), and a stiff TS with a small extra imaginary mode (KHP
+# 17011678 TS3: -628 and -17.5 cm-1).
+SOFT_IMAG = np.array([-35.0, 100.0, 200.0])
+STIFF_PLUS_NOISE = np.array([-628.0, -17.5, 200.0])
+
+
+class TestMinImagFreq:
+    """
+    ts_opt.min_imag_freq (cm-1) sets which source-level TSs a TS optimization
+    starts from: exactly one mode below -min_imag_freq. Smaller imaginary modes
+    are ignored as noise. The default, 0.01, is the old rule.
+    """
+
+    def _calc(self, min_imag_freq=None):
+        ts_geom = {c.type: c for c in (ts_conf(1, "1_tsopt_xtb_pysisyphus", ONE_IMAG),
+                                       ts_conf(2, "2_tsopt_xtb_pysisyphus", SOFT_IMAG),
+                                       ts_conf(3, "3_tsopt_xtb_pysisyphus", STIFF_PLUS_NOISE))}
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT)
+        if min_imag_freq is not None:
+            calc.config.min_imag_freq = min_imag_freq
+        return calc
+
+    def test_default_keeps_the_old_rule(self, tmp_path):
+        assert written_tags(self._calc(), tmp_path) == [1, 2]
+
+    def test_cutoff_drops_the_soft_ts_and_ignores_a_small_extra_mode(self, tmp_path):
+        assert written_tags(self._calc(50.0), tmp_path) == [1, 3]
+
+    def test_not_ready_when_every_source_ts_is_soft(self):
+        ts_geom = {"1_tsopt_xtb_pysisyphus": ts_conf(1, "1_tsopt_xtb_pysisyphus", SOFT_IMAG)}
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT)
+        calc.config.min_imag_freq = 50.0
+
+        assert not calc.has_prerequisites()
+
+
 class TestTSGuessSourceUnchanged:
     def test_starts_from_every_guess(self, tmp_path):
         calc = make_calc(PysisyphusTSOptCalculator, xtb_refined_rxn(), XTB_TS_GUESS,

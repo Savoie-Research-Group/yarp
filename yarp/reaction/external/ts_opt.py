@@ -19,7 +19,7 @@ class TSOptTask(AsyncYarpCalculator):
 
         'ts_guess': every TS guess from GSM.
         'ts_opt': every converged TS optimization from the source level that is
-        a valid saddle point (exactly one imaginary frequency) -- not just the
+        a valid saddle point (exactly one mode below -min_imag_freq) -- not just the
         single TS that IRC validated. IRC labels at a low level of theory are
         poor predictors of high-level IRC outcomes, so all candidates go on.
         """
@@ -29,7 +29,7 @@ class TSOptTask(AsyncYarpCalculator):
         elif source.label == "ts_opt":
             expected_key = f"tsopt_{source.lot}_{source.software}"
             return [conf for k, conf in self.rxn.ts_geom.items()
-                    if expected_key in k and conf.is_valid_ts()]
+                    if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)]
         else:
             raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
 

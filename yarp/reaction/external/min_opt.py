@@ -180,6 +180,17 @@ class MinOptTask(AsyncYarpCalculator):
 
         return patched
 
+    def _warn_if_not_minimum(self, conf):
+        """
+        Warn if an R/P optimization stopped at a structure with imaginary modes
+        (below -0.01 cm^-1). Warning only: the conformer is still kept.
+        """
+        if conf.vibrational_freqs is None or conf.is_valid_minimum():
+            return
+        imag = np.sort(conf.vibrational_freqs[conf.vibrational_freqs < -1e-2])
+        print(f"     ! {self.side.capitalize()} optimization is not a minimum: {len(imag)} imaginary "
+              f"mode(s), lowest {imag[0]:.1f} cm^-1. Keeping it anyway.")
+
     def _check_preopt_adjacency(self, elements, geo) -> bool:
         """
         Compare a finished pre-optimization against the graph it should have.
@@ -326,6 +337,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
             hess, freq = self._parse_hessian_freq()
             conf.vibrational_freqs = freq
             conf.hessian = hess
+            self._warn_if_not_minimum(conf)
 
         self.node.conformers[conf.type] = conf
 
@@ -483,6 +495,7 @@ class OrcaMinOptCalculator(MinOptTask):
         hess, freq = self._parse_hessian_freq(hess_file)
         conf.vibrational_freqs = freq
         conf.hessian = hess
+        self._warn_if_not_minimum(conf)
 
         self.node.conformers[conf.type] = conf
 

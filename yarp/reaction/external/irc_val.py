@@ -19,7 +19,7 @@ class IRCValTask(AsyncYarpCalculator):
         ts_keys = self.rxn.ts_geom.keys()
         expected_ts = f"tsopt_{self.config.lot}_{self.config.software}"
         for k in ts_keys:
-            if expected_ts in k and self.rxn.ts_geom[k].is_valid_ts():
+            if expected_ts in k and self.rxn.ts_geom[k].is_valid_ts(tolerance=-self.config.min_imag_freq):
                 found_ts = True
 
         found_r = False
@@ -45,8 +45,9 @@ class IRCValTask(AsyncYarpCalculator):
     def _initial_guesses(self) -> list:
         """
         The TS-opt conformers to validate, in the order they are written to
-        irc_run1..N: only valid first-order saddle points, so a structure that
-        isn't a TS can't be run through IRC or chosen as the validated TS.
+        irc_run1..N: only valid first-order saddle points (exactly one mode below
+        -min_imag_freq), so a structure that isn't a TS can't be run through IRC
+        or chosen as the validated TS.
 
         Both `generate_input` and `scrape_data` must use this, so that irc_run{i}
         maps back to the conformer it was started from. The conformer keys
@@ -55,7 +56,7 @@ class IRCValTask(AsyncYarpCalculator):
         """
         expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
         return [conf for k, conf in self.rxn.ts_geom.items()
-                if expected_key in k and conf.is_valid_ts()]
+                if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)]
 
     def _get_rxn_label(self, forward, backward):
         """

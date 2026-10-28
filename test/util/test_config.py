@@ -98,3 +98,18 @@ class TestKeepCrashLogs:
     def test_non_boolean_is_rejected(self, block, value):
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'keep_crash_logs'"):
             TASK_CONFIGS[block](keep_crash_logs=value)
+
+
+@pytest.mark.parametrize("block", ["ts_opt", "irc_val"])
+class TestMinImagFreq:
+    def test_defaults_to_the_old_tolerance(self, block):
+        assert TASK_CONFIGS[block]().min_imag_freq == 0.01
+
+    @pytest.mark.parametrize("value", [50, 50.0, 0.01])
+    def test_positive_number_is_kept(self, block, value):
+        assert TASK_CONFIGS[block](min_imag_freq=value).min_imag_freq == value
+
+    @pytest.mark.parametrize("value", [0, -50.0, "50", True, None])
+    def test_non_positive_or_non_number_is_rejected(self, block, value):
+        with pytest.raises(ValueError, match=f"positive number .* to {block}: 'min_imag_freq'"):
+            TASK_CONFIGS[block](min_imag_freq=value)

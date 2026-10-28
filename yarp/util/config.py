@@ -532,6 +532,11 @@ class TSOptConfig:
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
+    # A TS counts as valid only if exactly one of its modes is below
+    # -min_imag_freq (cm^-1); smaller imaginary modes are ignored as noise.
+    # Picks the source level's TSs that this TS opt starts from. The default,
+    # 0.01, keeps the old behavior.
+    min_imag_freq: float = 0.01
     initial_geom: Optional[InitialGeomConfig] = None
 
     n_cpus: int = 1
@@ -559,6 +564,9 @@ class TSOptConfig:
             raise ValueError("Please provide an integer value to ts_opt: 'hessian_recalc'")
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to ts_opt: 'max_cycles'")
+        if isinstance(self.min_imag_freq, bool) or not isinstance(self.min_imag_freq, (int, float)) \
+                or self.min_imag_freq <= 0:
+            raise ValueError("Please provide a positive number (cm^-1) to ts_opt: 'min_imag_freq'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ts_opt: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
@@ -580,6 +588,11 @@ class IRCValConfig:
     multiplicity: int = None
     max_cycles: int = 300
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
+    # A TS counts as valid only if exactly one of its modes is below
+    # -min_imag_freq (cm^-1); smaller imaginary modes are ignored as noise.
+    # Picks the TSs this IRC validates. The default, 0.01, keeps the old
+    # behavior.
+    min_imag_freq: float = 0.01
     # Route reactions whose IRC outcome is anything but intended/inverse_intended
     # to failed_rxns. Off by default: xTB IRC labels are poor predictors of DFT
     # IRC outcomes, so an unintended label is not a reason to drop a reaction.
@@ -610,6 +623,9 @@ class IRCValConfig:
 
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to irc_val: 'max_cycles'")
+        if isinstance(self.min_imag_freq, bool) or not isinstance(self.min_imag_freq, (int, float)) \
+                or self.min_imag_freq <= 0:
+            raise ValueError("Please provide a positive number (cm^-1) to irc_val: 'min_imag_freq'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to irc_val: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):

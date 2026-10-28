@@ -384,6 +384,51 @@ class TestPysisRunConvergence:
         assert "did not converge" in capsys.readouterr().out
 
 
+class TestMinimumWarning:
+    """
+    An R/P optimization whose final Hessian has imaginary modes (below -0.01
+    cm-1) is not a minimum. 7 of 70 KHP DFT minima were (ts_handoff check 10,
+    from stale Hessians). For now this only warns; the conformer is kept.
+    """
+
+    def _scrape(self, tmp_path, monkeypatch, rxn, software, freqs):
+        graph = rxn.reactant.graph
+        if software == "pysisyphus":
+            source = GeomSourceConfig(label="conf_gen", lot="gfn2", software="crest")
+            config = RPOptConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1)
+            config.initial_geom = InitialGeomConfig(reactant=source, product=source, transition_state=
+                                                    GeomSourceConfig(label="ts_guess", lot="xtb", software="pysisyphus"))
+            calc = make_calc(rxn, "reactant_optimization", config, cls=PysisyphusMinOptCalculator)
+            _write_finished_job(tmp_path, graph.elements, graph.geo)
+            monkeypatch.setattr(calc, "_parse_hessian_freq", lambda: (None, freqs))
+        else:
+            config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
+            calc = make_calc(rxn, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+            monkeypatch.setattr(calc, "_parse_opt_geo", lambda f: (graph.elements, graph.geo))
+            monkeypatch.setattr(calc, "_parse_energy", lambda f: -1.0)
+            monkeypatch.setattr(calc, "_parse_orca_thermo", lambda f: (None, None, None))
+            monkeypatch.setattr(calc, "_parse_hessian_freq", lambda f: (None, freqs))
+        calc.set_scratch_dir(tmp_path)
+        calc.scrape_data()
+        return calc
+
+    @pytest.mark.parametrize("software", ["pysisyphus", "orca"])
+    def test_imaginary_modes_warn_and_keep_the_conformer(self, tmp_path, monkeypatch, capsys,
+                                                         patchable_reaction, software):
+        freqs = np.array([-355.0, -123.0, 52.0, 100.0])
+        calc = self._scrape(tmp_path, monkeypatch, patchable_reaction, software, freqs)
+
+        out = capsys.readouterr().out
+        assert "Reactant optimization is not a minimum: 2 imaginary mode(s), lowest -355.0 cm^-1" in out
+        assert calc.output_key() in patchable_reaction.reactant.conformers
+
+    @pytest.mark.parametrize("software", ["pysisyphus", "orca"])
+    def test_a_minimum_is_quiet(self, tmp_path, monkeypatch, capsys, patchable_reaction, software):
+        self._scrape(tmp_path, monkeypatch, patchable_reaction, software, np.array([52.0, 100.0]))
+
+        assert "not a minimum" not in capsys.readouterr().out
+
+
 class TestAdoptReactantPreoptGeometry:
     def test_no_pre_opt_leaves_the_graph_alone(self, khp_reaction):
         before = khp_reaction.reactant.graph.geo.copy()

@@ -189,6 +189,38 @@ class TestIRCSkipsNonSaddles:
         assert rxn.ts_geom["2_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
 
 
+# A soft saddle (ts_handoff check 18: KHP 16610336 TS2, -35.5 cm-1), and a
+# stiff TS with a small extra imaginary mode (KHP 17011678 TS3: -628, -17.5).
+SOFT_IMAG = np.array([-35.0, 100.0, 200.0])
+STIFF_PLUS_NOISE = np.array([-628.0, -17.5, 200.0])
+
+
+class TestMinImagFreq:
+    """
+    irc_val.min_imag_freq (cm-1) sets which TSs an IRC validates: exactly one
+    mode below -min_imag_freq. Smaller imaginary modes are ignored as noise.
+    The default, 0.01, is the old rule.
+    """
+
+    def _calc(self, freqs, min_imag_freq=None):
+        extra = {} if min_imag_freq is None else {"min_imag_freq": min_imag_freq}
+        cfg = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1, **extra)
+        rxn = make_rxn("xtb", "pysisyphus", list(freqs), freqs)
+        return PysisyphusIRCValCalculator(SimpleNamespace(config=cfg), rxn, MagicMock())
+
+    FREQS = {1: ONE_IMAG, 2: SOFT_IMAG, 3: STIFF_PLUS_NOISE}
+
+    def test_default_keeps_the_old_rule(self):
+        assert [tag_of(c.geo) for c in self._calc(self.FREQS)._initial_guesses()] == [1, 2]
+
+    def test_cutoff_drops_the_soft_ts_and_ignores_a_small_extra_mode(self):
+        assert [tag_of(c.geo) for c in self._calc(self.FREQS, 50.0)._initial_guesses()] == [1, 3]
+
+    def test_not_ready_when_every_ts_is_soft(self):
+        assert self._calc({1: SOFT_IMAG}).has_prerequisites()
+        assert not self._calc({1: SOFT_IMAG}, 50.0).has_prerequisites()
+
+
 # Endpoints for an IRC that reproduces neither side: forward has an H0-H2 bond,
 # backward has no bonds at all.
 U_FWD_GEO = np.array([[0.0, 0, 0], [3.0, 0, 0], [0.74, 0.0, 0]])

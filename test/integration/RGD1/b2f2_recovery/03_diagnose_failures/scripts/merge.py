@@ -5,9 +5,9 @@ Usage (from 03_diagnose_failures, in the yarp env):
     python scripts/merge.py RUN_DIR [--out-dir outputs/<RUN_DIR name>]
 Reads RUN_DIR/rows.csv (the inputs) and RUN_DIR/out/shard_*/. Writes
 RUN_DIR/merged/{rows,reactants}.csv and, in OUT_DIR:
-    rxn_exhaustive_pass.csv  recovered by bnfn_exhaustive (reactant keeps > 1 BEM)
-    rxn_reorder_pass.csv     not recovered by that, but by bnfn_exhaustive after
-                             an atom-map relabelling (reorder_k says which)
+    rxn_exhaustive_pass.csv  recovered by bnfn(exhaustive=True) (reactant keeps > 1 BEM)
+    rxn_reorder_pass.csv     not recovered by that, but by bnfn(exhaustive=True)
+                             after an atom-map relabelling (reorder_k says which)
     rxn_persist_fail.csv     neither (outcome persist_fail, or parse_fail_now /
                              reaction_fail_now if the row no longer parses)
     summary.txt              the readable summary that is also printed
@@ -24,10 +24,8 @@ import pandas as pd
 
 STEP = Path(__file__).resolve().parents[1]  # 03_diagnose_failures
 LEAD = ["reaction", "reactant", "product", "outcome", "category_02", "n_bem", "fc_ind", "exhaustive_tried",
-        "exhaustive_bems", "exhaustive_found_by_fc_bem", "exhaustive_bem_sum_fc", "reorder_k", "reorder_n_bem",
-        "reorder_bems", "lp_insertion", "lp_atoms", "n_adj_break", "n_adj_form", "b_bemmin", "f_bemmin"]
+        "reorder_k", "reorder_n_bem", "lp_insertion", "lp_atoms", "n_adj_break", "n_adj_form", "b_bemmin", "f_bemmin"]
 FILES = {"rxn_exhaustive_pass": ["exhaustive_pass"], "rxn_reorder_pass": ["reorder_pass"]}
-LISTS = {c: str for c in ("exhaustive_bems", "exhaustive_bem_sum_fc", "reorder_bems")}  # space-separated
 
 
 def main():
@@ -63,7 +61,7 @@ def main():
     os.makedirs(mdir, exist_ok=True)
     tables = {}
     for name in ("rows", "reactants"):
-        parts = [pd.read_csv(p, low_memory=False, dtype=LISTS) for s in done
+        parts = [pd.read_csv(p, low_memory=False) for s in done
                  if os.path.exists(p := os.path.join(a.run, "out", f"shard_{s:04d}", f"{name}.csv"))
                  and os.path.getsize(p) > 1]
         tables[name] = pd.concat(parts, ignore_index=True)
@@ -89,14 +87,6 @@ def main():
             continue
         log(f"  {o:<16} {frac(int(sel.sum()), n):>24} {int((sel & ~multi).sum()):>14,} {int((sel & multi).sum()):>14,}")
 
-    ex = df[df.outcome.eq("exhaustive_pass")]
-    if len(ex):
-        by_fc = ex.exhaustive_found_by_fc_bem.astype(bool)
-        zw = ex.exhaustive_bem_sum_fc.astype(str).map(lambda s: any(int(v) > 0 for v in s.split()))
-        log("\n== exhaustive passes ==")
-        log(f"  found on bnfn's own BEM (fc_ind), so only the union of radicals changed: {frac(int(by_fc.sum()), len(ex))}")
-        log(f"  found only on another kept BEM: {frac(int((~by_fc).sum()), len(ex))}")
-        log(f"  a recovering BEM has formal charges (sum |fc| > 0): {frac(int(zw.sum()), len(ex))}")
     ro = df[df.outcome.eq("reorder_pass")]
     if len(ro):
         log("\n== reorder passes ==")

@@ -47,7 +47,8 @@ def generate_rxns(inp):
 
             raw_products = enumerate_products(
                     r_yp=reactant, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, exhaustive=inp.enum.exhaustive,
+                    verbose=verbose
                 )
 
             clean_products = filter_enum_products(
@@ -125,7 +126,8 @@ def generate_rxns(inp):
                 # local atom index order.
                 raw_products = enumerate_products(
                     r_yp=mol, n_break=inp.enum.n_break, n_form=inp.enum.n_form,
-                    react=inp.enum.react_atoms, mode=inp.enum.mode, verbose=verbose,
+                    react=inp.enum.react_atoms, mode=inp.enum.mode, exhaustive=inp.enum.exhaustive,
+                    verbose=verbose,
                 )
 
                 clean_products = filter_enum_products(

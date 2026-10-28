@@ -90,6 +90,7 @@ initialize:
     mode: concerted
     n_break: 2
     n_form: 2
+    exhaustive: False         # concerted only: also enumerate off every kept Lewis structure, not just the one with the fewest formal charges (default = False)
 
 # PART 2: Characterization of reactions
 stages:

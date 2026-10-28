@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from yarp.reaction.enum import bnfn, enumerate_products
 from yarp.reaction.enum import _resolve_reactive_atoms_for_candidate
 from yarp.reaction.filters import filter_enum_products
+from yarp.reaction.reaction import reaction
 from yarp.yarpecule.hashes import reaction_hash
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.reaction.enum import unique_set_partition_generator
@@ -193,6 +194,67 @@ class TestKHPTwoCycles:
 
     def test_cycle_2(self, khp_two_cycles):
         assert self._counts(khp_two_cycles[2]) == (2350, 317, 1225)
+
+
+# RGD1 b2f2 reactions that bnfn only reaches from a kept reactant BEM other than
+# fc_ind (the one with the fewest formal charges), as (reaction, reactant, product).
+RGD1_OTHER_BEM = [
+    # 2 kept BEMs, fc_ind 0: a methyl azirinone loses CO to give acetonitrile
+    ("MR_646795_1", "[C:1]([c:3]1[c:2](=[O:5])[n:4]1)([H:6])([H:7])[H:8]",
+     "[C-:2]#[O+:5].[C:1]([C:3]#[N:4])([H:6])([H:7])[H:8]"),
+    # 2 kept BEMs, fc_ind 0: ring closure to an aziridinone, the nitrile moving to O as a cyanate
+    ("MR_505992_0", "[N:1]([C:2]([O:4][H:9])=[O:6])([C:3]([C:5]#[N:8])=[O:7])[H:10]",
+     "[N:1]1([H:10])[C:2]([O:4][H:9])([O:6][C:5]#[N:8])[C:3]1=[O:7]"),
+    # 3 kept BEMs, fc_ind 1: an N-nitroso amide splits into isocyanic acid and nitrosoformic acid
+    ("MR_465454_1", "[N:1]([C:3]([C:2]([O:4][H:9])=[O:7])=[O:8])([N:5][O:6])[H:10]",
+     "[C:2]([O:4][H:9])([N:5]=[O:6])=[O:7].[N:1](=[C:3]=[O:8])[H:10]"),
+]
+
+
+@pytest.fixture(scope="module", params=RGD1_OTHER_BEM, ids=[_[0] for _ in RGD1_OTHER_BEM])
+def rgd1_other_bem(request):
+    """Reactant, RGD1 reaction hash, and bnfn's default and exhaustive b2f2 products, computed once."""
+    _, r_smi, p_smi = request.param
+    r = yarpecule(r_smi, canon=False)
+    p = yarpecule(p_smi, canon=False)
+    return SimpleNamespace(
+        r=r, rxn_hash=reaction(r, p).hash,
+        default=list(bnfn(r, 2, hashes={r.hash}, verbose=False)),
+        exhaustive=list(bnfn(r, 2, hashes={r.hash}, verbose=False, exhaustive=True)),
+    )
+
+
+class TestExhaustive:
+    """bnfn(exhaustive=True) breaks and forms bonds on every kept BEM, not only fc_ind."""
+
+    def _adj(self, products):
+        return [p.adj_mat.astype(int).tobytes() for p in products]
+
+    def _rxn_hashes(self, r, products):
+        return {aligned_reaction_hash(r, p) for p in products}
+
+    def test_single_bem_matches_default(self):
+        """With one kept BEM, exhaustive and default yield the same products, in the same order."""
+        haa = yarpecule('CC=O')
+        assert len(haa.bond_mats) == 1
+        default = list(bnfn(haa, 2, hashes={haa.hash}, verbose=False))
+        exhaustive = list(bnfn(haa, 2, hashes={haa.hash}, verbose=False, exhaustive=True))
+        assert self._adj(exhaustive) == self._adj(default)
+
+    def test_contains_default(self, rgd1_other_bem):
+        default, exhaustive = self._adj(rgd1_other_bem.default), self._adj(rgd1_other_bem.exhaustive)
+        assert set(default) <= set(exhaustive)
+        assert len(exhaustive) > len(default)
+
+    def test_recovers_reaction_default_misses(self, rgd1_other_bem):
+        r = rgd1_other_bem.r
+        assert rgd1_other_bem.rxn_hash not in self._rxn_hashes(r, rgd1_other_bem.default)
+        assert rgd1_other_bem.rxn_hash in self._rxn_hashes(r, rgd1_other_bem.exhaustive)
+
+    def test_enumerate_products_passes_exhaustive(self, rgd1_other_bem):
+        r = rgd1_other_bem.r
+        products = enumerate_products(r, n_break=2, n_form=2, mode="concerted", exhaustive=True)
+        assert rgd1_other_bem.rxn_hash in self._rxn_hashes(r, products)
 
 
 class TestConcertedOpenShell:

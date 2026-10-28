@@ -1,0 +1,57 @@
+RGD1 b2f2 ground truth
+======================
+
+Inputs
+  RGD1CHNO_AMsmiles.csv     176,898 rows   md5 66aa145ff7f2419b2d2f51ee27ae159d
+  Freaction_features.csv    176,992 rows   md5 b66e9a9261ae1f697481c44ecf4c5be4
+
+Join on reaction ID
+  duplicate IDs in RGD1CHNO_AMsmiles.csv           0
+  duplicate IDs in Freaction_features.csv          0
+  IDs in both files                         176,898
+  IDs with SMILES but no label                    0
+  IDs with a label but no SMILES                 94
+
+RGD1 labels over the joined reactions (rows: N_bond_break, columns: N_bond_form)
+  N_bond_form      0     1       2      3     4   5  6     all
+  N_bond_break                                                
+  1             1230   891       0      0     0   0  0    2121
+  2                0  8087  131249      0     0   0  0  139336
+  3                0     0    2013  31529     0   0  0   33542
+  4                0     0       0    293  1542   0  0    1835
+  5                0     0       0      0     8  55  0      63
+  6                0     0       0      0     0   0  1       1
+  all           1230  8978  133262  31822  1550  55  1  176898
+
+b2f2 ground truth (N_bond_break == 2 and N_bond_form == 2)
+  rows                                      131,249   (74.2% of joined)
+  unique reactant SMILES (atom maps kept)    86,332   (one bnfn call each in step 02)
+  unique product SMILES                     104,401
+  unique SMILES, both endpoints             180,040   (parsed in step 02)
+
+  Reactants grouped by how many b2f2 rows share them
+  (step 02 runs bnfn once per reactant and scores all of that reactant's rows against it)
+    rows per reactant  reactants     rows
+                    1     60,657   60,657
+                    2     15,704   31,408
+                    3      5,666   16,998
+                    4      2,095    8,380
+                    5      1,025    5,125
+                    6        522    3,132
+                    7        296    2,072
+                    8        155    1,240
+                    9         85      765
+                   10         54      540
+                   11         24      264
+                   12         18      216
+                   13          9      117
+                   14          8      112
+                   15          7      105
+                   16          4       64
+                   17          1       17
+                   18          1       18
+                   19          1       19
+                total     86,332  131,249
+
+  Atoms per reactant SMILES (hydrogens included)
+    min 4, median 18, mean 17.7, max 33; 90% 23, 99% 27

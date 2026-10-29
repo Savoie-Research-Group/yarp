@@ -5,9 +5,6 @@ import yaml
 import pytest
 from pathlib import Path
 import pickle
-import contextlib
-import io
-from collections import Counter
 
 # YAML input files
 @pytest.fixture
@@ -681,56 +678,6 @@ def ester_xyz():
 # yarpecule initialization: regression cases for the SMILES parser, ring finder and
 # geometry fallback. Each fixture holds the edge cases of one test; every case targets a
 # fixed regression unless it is marked as a guard.
-class Failures:
-    """
-    Collect the failing cases of one test instead of stopping at the first:
-
-        for case in cases:
-            with failures.case(label):
-                ...asserts...
-        failures.report()
-    """
-
-    def __init__(self):
-        self.messages = []
-
-    @contextlib.contextmanager
-    def case(self, label):
-        try:
-            yield
-        except Exception as e:  # an AssertionError or any error the case raised
-            self.messages.append(f"{label}\n    {type(e).__name__}: {str(e).strip()}")
-
-    def report(self):
-        assert not self.messages, f"{len(self.messages)} case(s) failed:\n" + "\n".join(self.messages)
-
-
-@pytest.fixture
-def failures():
-    """Returns a Failures collector, so a test can report every failing case at once."""
-    return Failures()
-
-
-@pytest.fixture
-def quiet():
-    """Returns a function that calls f(*args, **kwargs) with stdout/stderr captured, returning (result, stdout)."""
-    def _quiet(f, *args, **kwargs):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            result = f(*args, **kwargs)
-        return result, out.getvalue()
-    return _quiet
-
-
-@pytest.fixture
-def formula():
-    """Returns a function giving the formula string (e.g. 'C6ClH5') of a list of element labels."""
-    def _formula(elements):
-        counts = Counter(_.capitalize() for _ in elements)
-        return "".join(f"{el}{counts[el] if counts[el] > 1 else ''}" for el in sorted(counts))
-    return _formula
-
-
 CYCLIC_CUMULENE = "[C:1]([C:2]1=[N:5][C:3]([H:8])=[C:6]=[C:7]=[C:4]1[H:9])([H:10])([H:11])[H:12]"
 
 
@@ -821,6 +768,15 @@ def obabel_embed_cases():
         ("C1=NC=C=C=C1", False),                # cyclic cumulene (RDKit cannot embed)
         ("[C-]1=[N+]=C(C)CO1", False),          # nitrile-ylide ring (RDKit cannot embed)
     ]
+
+
+@pytest.fixture
+def obabel_worker_shadows():
+    """
+    Files in the current directory that would shadow the imports of obabel_embed's worker
+    process if it ran without isolation (an old yarp checkout, a local json.py or numpy.py).
+    """
+    return ["yarp/__init__.py", "json.py", "numpy.py"]
 
 
 @pytest.fixture

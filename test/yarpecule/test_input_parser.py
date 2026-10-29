@@ -658,24 +658,28 @@ class TestAtomMapIngestion:
 
 
 class TestGeoViaObabel:
-    def test_fallback(self, geo_via_obabel_cases, quiet, failures):
+    def test_fallback(self, geo_via_obabel_cases, capsys):
         """An Open Babel geometry in the atom order of the rdkit molecule, with a warning."""
+        failed = []
         for smiles in geo_via_obabel_cases:
-            with failures.case(smiles):
+            try:
                 mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
-
-                geo, printed = quiet(parsers_mod.geo_via_obabel, mol, smiles)
-
-                assert geo.shape == (mol.GetNumAtoms(), 3) and np.isfinite(geo).all(), "geometry shape or values"
-                assert "using Open Babel" in printed, "no warning printed"
-        failures.report()
+                geo = parsers_mod.geo_via_obabel(mol, smiles)
+                got = (geo.shape == (mol.GetNumAtoms(), 3) and bool(np.isfinite(geo).all()),
+                       "using Open Babel" in capsys.readouterr().out)
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != (True, True):
+                failed.append(f"{smiles}\n    expected (finite geometry in atom order, warning printed) (True, True)\n    got {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
 
 
 class TestXyzFromSmilesRegressions:
-    def test_regressions(self, xyz_from_smiles_cases, monkeypatch, quiet, failures):
+    def test_regressions(self, xyz_from_smiles_cases, monkeypatch):
         """
         A geometry (never None) or the expected error; in yarp mode the RDKit molecule
-        handed to the embedder carries no implicit hydrogens.
+        handed to the embedder carries no implicit hydrogens. Every case is checked; all
+        failing cases are reported together.
         """
         implicit_h = []
         real = AllChem.EmbedMolecule
@@ -685,15 +689,16 @@ class TestXyzFromSmilesRegressions:
             return real(mol, *args, **kwargs)
 
         monkeypatch.setattr(parsers_mod.AllChem, "EmbedMolecule", spy)  # where xyz_from_smiles looks it up
+        failed = []
         for smiles, mode, expected in xyz_from_smiles_cases:
-            with failures.case(f"{smiles} (mode={mode})"):
-                implicit_h.clear()
-                try:
-                    (elements, geo, _, _, _), _ = quiet(xyz_from_smiles, smiles, mode=mode)
-                    outcome = "geometry" if geo is not None and np.isfinite(geo).all() else f"geometry {geo}"
-                except Exception as e:
-                    outcome = type(e).__name__
-                assert outcome == expected
-                if expected == "geometry" and mode == "yarp":
-                    assert implicit_h == [0], f"implicit H on the embedded molecule: {implicit_h}"
-        failures.report()
+            implicit_h.clear()
+            try:
+                _, geo, _, _, _ = xyz_from_smiles(smiles, mode=mode)
+                outcome = "geometry" if geo is not None and np.isfinite(geo).all() else f"geometry {geo}"
+            except Exception as e:
+                outcome = type(e).__name__
+            got = (outcome, implicit_h[:1] if mode == "yarp" and expected == "geometry" else [])
+            want = (expected, [0] if mode == "yarp" and expected == "geometry" else [])
+            if got != want:
+                failed.append(f"{smiles} (mode={mode})\n    expected (outcome, implicit H on the embedded molecule) {want}\n    got {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)

@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import subprocess
@@ -68,8 +69,8 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
 
     This is the fallback for molecules that RDKit cannot embed (e.g., strained
     rings with cumulated double bonds). Each call runs the build in a fresh
-    process (`obabel_build.py`) with Open Babel's random seed fixed, so the same
-    graph always gets the same geometry, independent of earlier builds.
+    process (`_obabel_embed_worker()`) with Open Babel's random seed fixed, so the
+    same graph always gets the same geometry, independent of earlier builds.
 
     Parameters
     ----------
@@ -100,14 +101,51 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
                "bond_mat": np.asarray(bond_mat).tolist(),
                "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter}
 
-    # -I: isolated mode, so the worker's own folder (which holds yarp/util/rdkit.py) is not on its path
-    proc = subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(__file__), "obabel_build.py")],
+    # Open Babel's builder draws from one random generator per process, seeded once from
+    # OB_RANDOM_SEED; a fresh process per build makes each build that generator's first use.
+    # The worker runs from its own source in isolated mode (-I), so modules in the current
+    # directory cannot shadow its imports, and yarp itself is not imported.
+    worker = inspect.getsource(_obabel_embed_worker) + "\n_obabel_embed_worker()\n"
+    proc = subprocess.run([sys.executable, "-I", "-c", worker],
                           input=json.dumps(payload), capture_output=True, text=True,
                           env={**os.environ, "OB_RANDOM_SEED": str(seed)})
     if proc.returncode != 0:
-        raise RuntimeError(f"Open Babel could not build a geometry: {proc.stderr.strip().splitlines()[-1]}")
+        # a worker that dies without a traceback (e.g., killed) leaves stderr empty
+        error = (proc.stderr.strip().splitlines() or [f"worker exited with code {proc.returncode}"])[-1]
+        raise RuntimeError(f"Open Babel could not build a geometry: {error}")
 
     return np.array(json.loads(proc.stdout.strip().splitlines()[-1])["geo"])
+
+
+def _obabel_embed_worker():
+    '''
+    Run one Open Babel build for `obabel_embed()` in its own process: reads the graph as
+    JSON on stdin and writes the geometry as JSON on the last line of stdout.
+    Self-contained (its own imports, no yarp), since `obabel_embed()` runs it from its source.
+    '''
+    import json
+    import sys
+    from openbabel import openbabel as ob, pybel
+
+    payload = json.loads(sys.stdin.read())
+
+    mol = pybel.Molecule(ob.OBMol())
+    for count_i, i in enumerate(payload["atomic_numbers"]):
+        atom = mol.OBMol.NewAtom()
+        atom.SetAtomicNum(i)
+        atom.SetFormalCharge(payload["fc"][count_i])
+    for i in range(len(payload["atomic_numbers"])):
+        for j in range(i + 1, len(payload["atomic_numbers"])):
+            if payload["bond_mat"][i][j] > 0:
+                mol.OBMol.AddBond(i + 1, j + 1, int(payload["bond_mat"][i][j]))
+
+    if not ob.OBBuilder().Build(mol.OBMol):
+        raise RuntimeError("Open Babel could not build a geometry.")
+
+    # A fresh process has no cached force field, so _ensure_setup_needed() is not needed here
+    mol.localopt(forcefield=payload["lot"], steps=payload["maxiter"])
+
+    print(json.dumps({"geo": [atom.coords for atom in mol.atoms]}))
 
 
 def obabel_joint_opt(source, target_bem, target_adj, lot="uff", maxiter=500):

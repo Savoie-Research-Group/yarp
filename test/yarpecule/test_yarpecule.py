@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 from yarp.yarpecule.yarpecule import yarpecule as ypcule
 import inspect
+from collections import Counter
 
 
 class TestYarpeculeFromSMILES:
@@ -165,20 +166,30 @@ class TestSeparateYarpecules:
         assert sep_mols[1].adj_mat.shape == (3, 3)
 
 
+def _formula(elements):
+    counts = Counter(_.capitalize() for _ in elements)
+    return "".join(f"{el}{counts[el] if counts[el] > 1 else ''}" for el in sorted(counts))
+
+
 class TestStrictDefault:
-    def test_strict_default(self, yarpecule_cases, quiet, formula, failures):
+    def test_strict_default(self, yarpecule_cases, capsys):
         """
         strict=True by default, and each case builds in yarp mode with no RDKit fallback
-        (master's defaults sent each through one, or failed).
+        (master's defaults sent each through one, or failed). Every case is checked; all
+        failing cases are reported together.
         """
-        with failures.case("strict default"):
-            assert inspect.signature(ypcule.__init__).parameters["strict"].default is True
+        failed = []
+        if inspect.signature(ypcule.__init__).parameters["strict"].default is not True:
+            failed.append("yarpecule(..., strict=...) does not default to True")
         for smiles, expected_formula in yarpecule_cases:
-            with failures.case(smiles):
-                y, printed = quiet(ypcule, smiles)
-
-                assert formula(y.elements) == expected_formula
-                assert "falling back to RDKit" not in printed and "geometry fallback used RDKit" not in printed, \
-                    "used an RDKit fallback"
-                assert y.geo is not None, "geometry is None"
-        failures.report()
+            try:
+                y = ypcule(smiles)
+                printed = capsys.readouterr().out
+                got = (_formula(y.elements), "falling back to RDKit" in printed or "geometry fallback used RDKit" in printed,
+                       y.geo is None)
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != (expected_formula, False, False):
+                failed.append(f"{smiles}\n    expected (formula, used an RDKit fallback, geometry None) "
+                              f"{(expected_formula, False, False)}\n    got {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)

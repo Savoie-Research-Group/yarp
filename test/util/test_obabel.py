@@ -218,24 +218,60 @@ def kekule_graph(smiles):
 
 
 class TestObabelEmbed:
-    def test_graphs(self, obabel_embed_cases, quiet, failures):
+    def test_graphs(self, obabel_embed_cases):
         """
         A finite geometry in the order of the given atoms, with no two atoms on top of each
         other, identical when built again (Open Babel's builder is random unless each build
-        is a fresh, seeded process); bond lengths sane where UFF keeps the bonds.
+        is a fresh, seeded process); bond lengths sane where UFF keeps the bonds. Every case
+        is checked; all failing cases are reported together.
         """
+        failed = []
         for smiles, check_bonds in obabel_embed_cases:
-            with failures.case(smiles):
+            try:
                 elements, bond_mat, fc = kekule_graph(smiles)
-
-                geo, _ = quiet(obabel_embed, elements, bond_mat, fc)
-                again, _ = quiet(obabel_embed, elements, bond_mat, fc)
-
-                assert geo.shape == (len(elements), 3) and np.isfinite(geo).all(), "geometry shape or values"
-                assert np.array_equal(geo, again), "a second build gave a different geometry"
+                geo = obabel_embed(elements, bond_mat, fc)
+                again = obabel_embed(elements, bond_mat, fc)
                 dist = np.linalg.norm(geo[:, None] - geo[None], axis=-1) + 10 * np.eye(len(elements))
-                assert dist.min() > 0.5, "overlapping atoms"
-                if check_bonds:
-                    bonded = dist[np.triu(bond_mat, 1) > 0]
-                    assert ((bonded > 0.9) & (bonded < 2.4)).all(), f"bond lengths {bonded.round(2)}"
-        failures.report()
+                bonded = dist[np.triu(bond_mat, 1) > 0]
+                problems = [msg for bad, msg in [
+                    (geo.shape != (len(elements), 3) or not np.isfinite(geo).all(), "geometry shape or values"),
+                    (not np.array_equal(geo, again), "a second build gave a different geometry"),
+                    (dist.min() <= 0.5, "overlapping atoms"),
+                    (check_bonds and not ((bonded > 0.9) & (bonded < 2.4)).all(), f"bond lengths {bonded.round(2)}"),
+                ] if bad]
+            except Exception as e:
+                problems = [f"{type(e).__name__}: {e}"]
+            if problems:
+                failed.append(f"{smiles}: {'; '.join(problems)}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+
+    def test_isolated_worker(self, obabel_worker_shadows, tmp_path, monkeypatch):
+        """
+        The worker process imports nothing from the current directory: with each shadowing
+        file there, the build is the same as without it. A worker that dies without a
+        traceback raises RuntimeError. Every case is checked; all failing cases are reported together.
+        """
+        elements, bond_mat, fc = kekule_graph("CCO")
+        expected = obabel_embed(elements, bond_mat, fc)
+        failed = []
+        for shadow in obabel_worker_shadows:
+            folder = tmp_path / shadow.replace("/", "_")
+            (folder / shadow).parent.mkdir(parents=True, exist_ok=True)
+            (folder / shadow).write_text(f"raise ImportError('{shadow} was imported from the current directory')\n")
+            monkeypatch.chdir(folder)
+            try:
+                got = np.array_equal(obabel_embed(elements, bond_mat, fc), expected)
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got is not True:
+                failed.append(f"{shadow} in the current directory: {got}")
+
+        monkeypatch.setattr("sys.executable", "/bin/false")
+        try:
+            obabel_embed(elements, bond_mat, fc)
+            failed.append("worker that exits without a traceback: no error raised")
+        except RuntimeError:
+            pass
+        except Exception as e:
+            failed.append(f"worker that exits without a traceback: {type(e).__name__}: {e}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)

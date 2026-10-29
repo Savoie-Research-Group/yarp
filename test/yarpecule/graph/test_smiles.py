@@ -4,6 +4,7 @@ Testing suite for functions contained in yarp/yarpecule/graph/smiles.py
 import pytest
 from yarp.yarpecule.graph.smiles import smiles2adjmat
 import importlib
+from collections import Counter
 
 import numpy as np
 
@@ -425,62 +426,77 @@ class TestSmi2Adj:
         assert bemat.shape == (15, 15)
 
 
+def _formula(elements):
+    counts = Counter(_.capitalize() for _ in elements)
+    return "".join(f"{el}{counts[el] if counts[el] > 1 else ''}" for el in sorted(counts))
+
+
 class TestSmi2AdjRegressions:
-    def test_regressions(self, smiles2adjmat_cases, quiet, formula, failures):
+    def test_regressions(self, smiles2adjmat_cases):
         """
         Branch bookkeeping (a `)` followed by `(` left close_flag set), element tokens and
-        bracket atoms: the parsed elements, the named bond orders, and no radicals on heavy atoms.
+        bracket atoms: the parsed elements, the named bond orders, and no radicals on heavy
+        atoms. Every case is checked; all failing cases are reported together.
         """
+        failed = []
         for smiles, expected_formula, expected_orders in smiles2adjmat_cases:
-            with failures.case(smiles):
-                (_, bemat, atom_info), _ = quiet(smiles2adjmat, smiles)
+            expected = (expected_formula, expected_orders, [])
+            try:
+                _, bemat, atom_info = smiles2adjmat(smiles)
                 idx = {atom_info[i]["atom_map"]: i for i in atom_info}
-
-                assert formula(atom_info[i]["element"] for i in atom_info) == expected_formula
-                for (map_i, map_j), order in expected_orders.items():
-                    assert bemat[idx[map_i], idx[map_j]] == order, f"bond {map_i}-{map_j}"
-                radicals = [i for i in atom_info if atom_info[i]["element"] != "h" and int(bemat[i, i]) % 2]
-                assert radicals == [], "heavy-atom radicals"
-        failures.report()
+                got = (_formula(atom_info[i]["element"] for i in atom_info),
+                       {pair: bemat[idx[pair[0]], idx[pair[1]]] for pair in expected_orders},
+                       [i for i in atom_info if atom_info[i]["element"] != "h" and int(bemat[i, i]) % 2])
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != expected:
+                failed.append(f"{smiles}\n    expected (formula, bond orders, radicals) {expected}\n    got {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
 
 
 class TestNeedsAromaticDoubleBond:
-    def test_lone_pair_donors(self, aromatic_double_bond_cases, monkeypatch, quiet, failures):
+    def test_lone_pair_donors(self, aromatic_double_bond_cases, monkeypatch):
         """
         The decision for every aromatic atom of the parse, recorded where smiles2adjmat calls
         the function: lone-pair donors and atoms with an exocyclic double bond say False.
         """
+        real = smiles_mod.needs_aromatic_double_bond
+        decisions = {}
+
+        def spy(atom, *args):
+            decisions[atom] = real(atom, *args)
+            return decisions[atom]
+
+        monkeypatch.setattr(smiles_mod, "needs_aromatic_double_bond", spy)
+        failed = []
         for smiles, expected in aromatic_double_bond_cases:
-            with failures.case(smiles):
-                real = smiles_mod.needs_aromatic_double_bond
-                decisions = {}
-
-                def spy(atom, *args):
-                    decisions[atom] = real(atom, *args)
-                    return decisions[atom]
-
-                monkeypatch.setattr(smiles_mod, "needs_aromatic_double_bond", spy)
-                quiet(smiles2adjmat, smiles, reorder_mapped=False)
-                monkeypatch.undo()
-                assert [decisions[i] for i in sorted(decisions)] == expected
-        failures.report()
+            decisions.clear()
+            try:
+                smiles2adjmat(smiles, reorder_mapped=False)
+                got = [decisions[i] for i in sorted(decisions)]
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != expected:
+                failed.append(f"{smiles}\n    expected {expected}\n    got      {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
 
 
 class TestReturnRings:
-    def test_fused_rings(self, ring_cases, quiet, failures):
+    def test_fused_rings(self, ring_cases):
         """
         return_rings (yarp/yarpecule/graph/fragment.py; tested here, where its bug showed):
         every ring is found, and every returned path closes back to its first atom.
         """
+        failed = []
         for smiles, expected_sizes in ring_cases:
-            with failures.case(smiles):
-                (adj_mat, _, _), _ = quiet(smiles2adjmat, smiles)
+            try:
+                adj_mat, _, _ = smiles2adjmat(smiles)
                 adj_list = [set(np.nonzero(row)[0]) for row in adj_mat]
-
                 rings = return_rings(adj_list, max_size=10, remove_fused=False)
-
-                assert sorted(len(_) for _ in rings) == expected_sizes
-                for ring in rings:
-                    assert all(ring[(k + 1) % len(ring)] in adj_list[ring[k]] for k in range(len(ring))), \
-                        f"ring {ring} does not close"
-        failures.report()
+                got = (sorted(len(_) for _ in rings),
+                       [r for r in rings if not all(r[(k + 1) % len(r)] in adj_list[r[k]] for k in range(len(r)))])
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != (expected_sizes, []):
+                failed.append(f"{smiles}\n    expected (ring sizes, rings that do not close) {(expected_sizes, [])}\n    got {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)

@@ -684,31 +684,31 @@ CYCLIC_CUMULENE = "[C:1]([C:2]1=[N:5][C:3]([H:8])=[C:6]=[C:7]=[C:4]1[H:9])([H:10
 @pytest.fixture
 def smiles2adjmat_cases():
     """
-    (smiles, formula, {(map_i, map_j): bond order}) for smiles2adjmat. Branch bookkeeping
+    (smiles, element counts, {(map_i, map_j): bond order}) for smiles2adjmat. Branch bookkeeping
     (a `)` followed by `(` left close_flag set), multi-letter element tokens, two-letter
     bracket aromatics, and H-led element symbols.
     """
     return [
         # N4=H5 on master (OctetError)
-        ("[C:1]([H:2])([H:3])(=[N:4][H:5])", "CH3N", {(1, 4): 2, (4, 5): 1}),
+        ("[C:1]([H:2])([H:3])(=[N:4][H:5])", {"c": 1, "h": 3, "n": 1}, {(1, 4): 2, (4, 5): 1}),
         # RGD1 MR_20770_1 reactant fragment: N16=H19 on master
-        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", "C3H6N2",
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2},
          {(14, 16): 2, (16, 19): 1, (12, 15): 2}),
         # RGD1 species read "clean" on master, with C5#C6 as a double bond
-        ("[C:1](\\[C:2]([H:10])([H:11])[H:12])(=[C:3](\\[N:4]([C:5]#[C:6][H:13])[H:8])[H:9])[H:7]", "C5H7N",
+        ("[C:1](\\[C:2]([H:10])([H:11])[H:12])(=[C:3](\\[N:4]([C:5]#[C:6][H:13])[H:8])[H:9])[H:7]", {"c": 5, "h": 7, "n": 1},
          {(5, 6): 3}),
         # unmapped: the wrong order also changed the inferred H count (master: 8 H)
-        ("CC(C)(=NC)", "C4H9N", {}),
+        ("CC(C)(=NC)", {"c": 4, "h": 9, "n": 1}, {}),
         # Kaden: `Clc` / `Brc` read as one unknown element
-        ("Clc1ccccc1", "C6ClH5", {}),
-        ("Brc1ccc(Br)cc1", "Br2C6H4", {}),
+        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}, {}),
+        ("Brc1ccc(Br)cc1", {"br": 2, "c": 6, "h": 4}, {}),
         # `Sc` read as scandium, `In` as indium (silently)
-        ("CSc1ccccc1", "C7H8S", {}),
-        ("In1cccc1", "C4H4IN", {}),
+        ("CSc1ccccc1", {"c": 7, "h": 8, "s": 1}, {}),
+        ("In1cccc1", {"c": 4, "h": 4, "i": 1, "n": 1}, {}),
         # `[se]` read as sulfur (silently)
-        ("c1cc[se]c1", "C4H4Se", {}),
+        ("c1cc[se]c1", {"c": 4, "h": 4, "se": 1}, {}),
         # the H of He counted as a hydrogen (OctetError)
-        ("[He]", "He", {}),
+        ("[He]", {"he": 1}, {}),
     ]
 
 
@@ -734,9 +734,9 @@ def hydrogen_count_cases():
 @pytest.fixture
 def aromatic_double_bond_cases():
     """
-    (smiles, needs a ring double bond?) for needs_aromatic_double_bond, one bool per
-    aromatic atom in input order. Lone-pair donors (pyrrole-type n, ring o/s, c-) and
-    atoms with an exocyclic double bond must say False; a neutral sigma-radical c, True.
+    (smiles, ring double bond?) for needs_aromatic_double_bond, one bool per aromatic atom
+    in input order. Lone-pair donors (pyrrole-type n, ring o/s, c-) and atoms with an
+    exocyclic double bond get none; a neutral sigma-radical c gets one.
     """
     return [
         ("[c]1ccccc1", [True] * 6),                                     # phenyl radical (master: radical on c6)
@@ -777,7 +777,7 @@ def ring_cases():
 @pytest.fixture
 def obabel_embed_cases():
     """
-    (smiles, bond lengths checked?) for obabel_embed, built from RDKit's kekulized graph.
+    (smiles, bond lengths checked?) for obabel_embed, built from the yarpecule's graph.
     The strained ones are RDKit embedding failures from RGD1; UFF does not always keep
     their bonds, so only the geometry itself is checked there.
     """
@@ -836,15 +836,15 @@ def xyz_from_smiles_cases():
 @pytest.fixture
 def yarpecule_cases():
     """
-    (smiles, formula) that the default yarpecule() must build in yarp mode, without any
+    (smiles, element counts) that the default yarpecule() must build in yarp mode, without any
     RDKit fallback. Master's defaults sent each through a fallback, or failed.
     """
     return [
-        ("Clc1ccccc1", "C6ClH5"),                                       # master: RDKit mode
-        ("c1ccoc1", "C4H4O"),                                           # master: RDKit geometry fallback
-        ("c12c(occ1)cccc2", "C8H6O"),                                   # master: RDKit geometry fallback
-        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", "C3H6N2"),  # master: OctetError
-        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "C2H3N3"),  # master: TypeError
-        (CYCLIC_CUMULENE, "C6H5N"),                                     # master: ValueError
-        ("CCO", "C2H6O"),                                               # guard
+        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}),                      # master: RDKit mode
+        ("c1ccoc1", {"c": 4, "h": 4, "o": 1}),                          # master: RDKit geometry fallback
+        ("c12c(occ1)cccc2", {"c": 8, "h": 6, "o": 1}),                  # master: RDKit geometry fallback
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2}),  # master: OctetError
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", {"c": 2, "h": 3, "n": 3}),  # master: TypeError
+        (CYCLIC_CUMULENE, {"c": 6, "h": 5, "n": 1}),                    # master: ValueError
+        ("CCO", {"c": 2, "h": 6, "o": 1}),                              # guard
     ]

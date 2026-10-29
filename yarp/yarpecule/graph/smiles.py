@@ -57,8 +57,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
     final_tokens = []
     for token in preliminary_tokens:
-        # Split two letters that are not an element, or that are an organic-subset atom bonded
-        # to an aromatic atom (e.g., `Sc` in CSc1ccccc1 is S and c, not scandium)
+        # Split two-letter tokens that are not elements. Also split an organic-subset atom followed
+        # by an aromatic atom, so the `Sc` in CSc1ccccc1 is read as S and c, not scandium.
         if len(token) == 2 and not token.startswith("%") and (
                 token not in smiles2adjmat.valid_elements or (token[0] in "BCNOPSFI" and token[1] in smiles2adjmat.aromatics)):
             final_tokens.extend(list(token))
@@ -91,7 +91,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 else:
                     formal_charge = charge_str.count('+') - charge_str.count('-')
 
-            # hydrogens are counted after the element label, so the H of e.g. [Hg] is not one
+            # Look for hydrogens after the element label, so the H in [Hg] or [He] is not counted as a hydrogen
             label_match = smiles2adjmat.element_label_pattern.search(token)
             hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token, label_match.end()) if label_match else None
             if verbose:
@@ -183,7 +183,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 branch_close_atom_indices.append(sequential_atom_counter)
             if open_flag:
                 open_flag = False
-                close_flag = False  # after `)(` this atom opens a branch, so the close is spent
+                close_flag = False  # After `)(` this atom opens a new branch, so reset the close flag
                 branch_open_atom_indices.append(sequential_atom_counter)
 
             if pending_atom_stereo_owner is not None and pending_atom_stereo_owner in atom_info:
@@ -327,7 +327,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             for component in fused_components:
                 component = sorted(component)
                 component_set = set(component)
-                # only atoms with an unpaired electron left can take a ring double bond
+                # Only pair up the atoms that need a ring double bond (see needs_aromatic_double_bond)
                 needs_double = [i for i in component if needs_aromatic_double_bond(i, adjmat, atom_info, atom_parse_meta)]
                 component_edges = []
                 for count_i, i in enumerate(needs_double):
@@ -466,20 +466,20 @@ def bemat_to_smiles(bond_electron_mat, atom_info):
 
 def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
     """
-    Decide whether an aromatic atom takes a ring double bond in the kekulized structure.
+    Decide whether an aromatic atom gets a ring double bond when the input is kekulized.
 
-    The electrons left on the atom are counted after its formal charge, its current bonds
-    (including exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add
-    (`hydrogen_count()`). An odd count leaves one electron for a ring double bond (e.g., ring c,
-    pyridine-type n). An even count means the atom donates a lone pair or nothing to the ring
-    (e.g., pyrrole-type n, ring o/s, or a c with an exocyclic =O), except for a neutral c with
-    two electrons left, a sigma radical (e.g., [c]1ccccc1) that keeps one electron in the ring.
+    Counts the electrons left on the atom after its formal charge, its current bonds (including
+    exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add (`hydrogen_count()`).
+    An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n). An even
+    count means the atom gives the ring a lone pair or nothing (e.g., pyrrole-type n, ring o/s, or a
+    c with an exocyclic =O). The exception is a neutral c with two electrons left, which is a sigma
+    radical (e.g., [c]1ccccc1) and still gets a ring double bond.
     """
     element = atom_info[atom]["element"]
     hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
     electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
 
-    # only a carbanion (e.g., [cH-]) donates its two electrons to the ring as a lone pair
+    # A neutral c with two electrons left is a sigma radical. Only a carbanion like [cH-] gives the ring a lone pair.
     if element == 'c' and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
         return True
     return electrons % 2 == 1
@@ -502,10 +502,13 @@ def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
 
 def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
     """
-    Return the number of hydrogens `add_hydrogens()` adds to `atom`, an element with a known
-    valence that is not a metal. A bracket atom gets its written count, or none if hydrogen
-    atoms are already bonded to it. Otherwise the count is inferred: aromatic atoms are filled
-    to three neighbors (c) or two (b, n, o, p, s), the rest to an octet adjusted for charge.
+    Return the number of hydrogens `add_hydrogens()` adds to `atom` (an element with a known
+    valence that is not a metal). Used by both `add_hydrogens()` and `needs_aromatic_double_bond()`,
+    so the two always agree.
+
+    A bracket atom gets the count written in the SMILES, or none if hydrogen atoms are already
+    bonded to it. Otherwise the count is inferred: aromatic atoms are filled up to three neighbors
+    (c) or two (b, n, o, p, s), and everything else up to an octet, adjusted for formal charge.
     """
     info = atom_info[atom]
     element = info["element"]
@@ -522,7 +525,7 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
         return 0
 
     if info["aromatic_input"]:
-        # aromatic b and p have three valence electrons like n: two ring bonds and a ring double bond
+        # Aromatic b and p have three valence electrons like n, so they get two ring bonds, a ring double bond, and no H
         bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
         target_neighbors = 2 if element in ['b', 'n', 'o', 'p', 's'] else 3
         return max(0, target_neighbors - bonded_neighbors)

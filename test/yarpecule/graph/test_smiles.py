@@ -2,15 +2,10 @@
 Testing suite for functions contained in yarp/yarpecule/graph/smiles.py
 """
 import pytest
-from yarp.yarpecule.graph.smiles import smiles2adjmat
-import importlib
-from collections import Counter
-
 import numpy as np
-
+from collections import Counter
+from yarp.yarpecule.graph.smiles import smiles2adjmat
 from yarp.yarpecule.graph.fragment import return_rings
-
-smiles_mod = importlib.import_module("yarp.yarpecule.graph.smiles")
 
 
 class TestSmi2Adj:
@@ -426,97 +421,56 @@ class TestSmi2Adj:
         assert bemat.shape == (15, 15)
 
 
-def _formula(elements):
-    counts = Counter(_.capitalize() for _ in elements)
-    return "".join(f"{el}{counts[el] if counts[el] > 1 else ''}" for el in sorted(counts))
-
-
 class TestSmi2AdjRegressions:
     def test_regressions(self, smiles2adjmat_cases):
         """
-        Branch bookkeeping (a `)` followed by `(` left close_flag set), element tokens and
-        bracket atoms: the parsed elements, the named bond orders, and no radicals on heavy
-        atoms. Every case is checked; all failing cases are reported together.
+        Branch bookkeeping, element tokens and bracket atoms: the right elements, the named
+        bond orders, and no radicals.
         """
-        failed = []
-        for smiles, expected_formula, expected_orders in smiles2adjmat_cases:
-            expected = (expected_formula, expected_orders, [])
-            try:
-                _, bemat, atom_info = smiles2adjmat(smiles)
-                idx = {atom_info[i]["atom_map"]: i for i in atom_info}
-                got = (_formula(atom_info[i]["element"] for i in atom_info),
-                       {pair: bemat[idx[pair[0]], idx[pair[1]]] for pair in expected_orders},
-                       [i for i in atom_info if atom_info[i]["element"] != "h" and int(bemat[i, i]) % 2])
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got != expected:
-                failed.append(f"{smiles}\n    expected (formula, bond orders, radicals) {expected}\n    got {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+        for smiles, elements, bond_orders in smiles2adjmat_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles)
+            index = {atom_info[i]["atom_map"]: i for i in atom_info}
+            assert Counter(atom_info[i]["element"] for i in atom_info) == elements, smiles
+            for (i, j), order in bond_orders.items():
+                assert bemat[index[i], index[j]] == order, smiles
+            assert all(bemat[i, i] % 2 == 0 for i in atom_info), smiles
 
 
 class TestNeedsAromaticDoubleBond:
-    def test_lone_pair_donors(self, aromatic_double_bond_cases, monkeypatch):
+    def test_lone_pair_donors(self, aromatic_double_bond_cases):
         """
-        The decision for every aromatic atom of the parse, recorded where smiles2adjmat calls
-        the function: lone-pair donors and atoms with an exocyclic double bond say False.
+        Which aromatic atoms get a ring double bond: lone-pair donors and atoms with an
+        exocyclic double bond do not, a sigma-radical c does.
         """
-        real = smiles_mod.needs_aromatic_double_bond
-        decisions = {}
-
-        def spy(atom, *args):
-            decisions[atom] = real(atom, *args)
-            return decisions[atom]
-
-        monkeypatch.setattr(smiles_mod, "needs_aromatic_double_bond", spy)
-        failed = []
         for smiles, expected in aromatic_double_bond_cases:
-            decisions.clear()
-            try:
-                smiles2adjmat(smiles, reorder_mapped=False)
-                got = [decisions[i] for i in sorted(decisions)]
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got != expected:
-                failed.append(f"{smiles}\n    expected {expected}\n    got      {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+            adjmat, bemat, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+            aromatic = [i for i in atom_info if atom_info[i]["aromatic_input"]]
+            assert [any(bemat[i, j] == 2 for j in aromatic if j != i) for i in aromatic] == expected, smiles
 
 
 class TestHydrogenCount:
     def test_hydrogens(self, hydrogen_count_cases):
         """
-        The hydrogens on each heavy atom of the parse (hydrogen_count is shared by
-        add_hydrogens and needs_aromatic_double_bond). Every case is checked; all failing
-        cases are reported together.
+        The hydrogens on each heavy atom (hydrogen_count is shared by add_hydrogens and
+        needs_aromatic_double_bond).
         """
-        failed = []
         for smiles, expected in hydrogen_count_cases:
-            try:
-                adj_mat, _, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
-                got = [sum(atom_info[j]["element"] == "h" for j in np.nonzero(adj_mat[i])[0])
-                       for i in atom_info if atom_info[i]["element"] != "h"]
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got != expected:
-                failed.append(f"{smiles}\n    expected {expected}\n    got      {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+            adjmat, bemat, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+            hydrogens = [sum(atom_info[j]["element"] == "h" for j in np.nonzero(adjmat[i])[0])
+                         for i in atom_info if atom_info[i]["element"] != "h"]
+            assert hydrogens == expected, smiles
 
 
 class TestReturnRings:
     def test_fused_rings(self, ring_cases):
         """
-        return_rings (yarp/yarpecule/graph/fragment.py; tested here, where its bug showed):
-        every ring is found, and every returned path closes back to its first atom.
+        return_rings (yarp/yarpecule/graph/fragment.py) finds every ring, and every ring it
+        returns closes back on its first atom.
         """
-        failed = []
-        for smiles, expected_sizes in ring_cases:
-            try:
-                adj_mat, _, _ = smiles2adjmat(smiles)
-                adj_list = [set(np.nonzero(row)[0]) for row in adj_mat]
-                rings = return_rings(adj_list, max_size=10, remove_fused=False)
-                got = (sorted(len(_) for _ in rings),
-                       [r for r in rings if not all(r[(k + 1) % len(r)] in adj_list[r[k]] for k in range(len(r)))])
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got != (expected_sizes, []):
-                failed.append(f"{smiles}\n    expected (ring sizes, rings that do not close) {(expected_sizes, [])}\n    got {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+        for smiles, sizes in ring_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles)
+            adj_list = [set(np.nonzero(row)[0]) for row in adjmat]
+            rings = return_rings(adj_list, max_size=10, remove_fused=False)
+            assert sorted(len(ring) for ring in rings) == sizes, smiles
+            for ring in rings:
+                assert all(ring[k - 1] in adj_list[ring[k]] for k in range(len(ring))), smiles

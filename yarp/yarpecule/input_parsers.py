@@ -480,8 +480,9 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
     """
     A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
     Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
-    and an rdkit option. In either case, the generation of 3D geometries is handled by rdkit,
-    with an Open Babel fallback for molecules rdkit cannot embed (`geo_via_obabel()`).
+    and an rdkit option. In yarp mode, rdkit embeds the graph from `smiles2adjmat()`; in rdkit mode,
+    rdkit parses and embeds the SMILES. If rdkit cannot embed the molecule, Open Babel builds the
+    geometry instead (`geo_via_obabel()`).
 
     Parameters
     ----------
@@ -494,8 +495,9 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
            The default is to use the in-house SMILES parser.
 
     strict : bool
-           Only used in 'yarp' mode. If True (the default), octet violations raise an `OctetError`.
-           If False, aromatic SMILES that fail the octet check use the rdkit geometry fallback.
+           Only used in 'yarp' mode. If True (the default), the in-house parser is the only parser and
+           octet violations raise an `OctetError`. If False, aromatic SMILES that fail the octet check
+           keep the in-house graph and take their geometry from rdkit (`geo_via_rdkit()`).
 
 
     Returns
@@ -566,8 +568,8 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
         mol = rdchem.RWMol(mol)
         mol.RemoveAtom(0)
 
-        # add atoms (no implicit hydrogens: the graph already holds every atom, and rdkit
-        # would otherwise add hydrogens to under-bonded atoms before embedding)
+        # Add atoms with implicit hydrogens turned off. The graph already has every hydrogen, and rdkit
+        # would otherwise add hydrogens to under-bonded atoms (e.g., carbenes) before embedding.
         for _ in elements:
             atom = Atom(el_to_an[_.lower()])
             atom.SetNoImplicit(True)
@@ -620,13 +622,13 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
 def geo_via_obabel(mol, smiles):
     """
     Generate a geometry with Open Babel for an rdkit molecule that rdkit could not embed
-    (e.g., strained rings with cumulated double bonds). The geometry follows the atom
-    ordering of `mol`, and a warning is printed if it does not reproduce the connectivity.
+    (e.g., strained rings with cumulated double bonds). The geometry follows the atom order
+    of `mol`. A warning is printed if the geometry does not reproduce the connectivity.
     """
     print(f"WARNING: RDKit could not embed a geometry for {smiles}; using Open Babel.")
     elements = [_.lower() for _ in el_from_rdmol(mol)]
 
-    # bond orders from a kekulized copy, so aromatic bonds come out as 1 or 2
+    # Take the bond orders from a kekulized copy, so aromatic bonds come out as 1 or 2
     kekule = rdchem.Mol(mol)
     Kekulize(kekule, clearAromaticFlags=True)
     bond_mat = np.zeros([len(elements), len(elements)])
@@ -645,9 +647,9 @@ def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     Generate a geometry with RDKit and align it to the atom ordering used by
     the in-house SMILES parser.
 
-    This is used as a fallback for aromatic systems where the in-house parser
-    identifies the correct graph but its bond-electron matrix is too crude to
-    survive octet validation.
+    Only used with strict=False, as the fallback for aromatic SMILES that fail the
+    octet check in `xyz_from_smiles()`: the in-house graph is kept and only the
+    geometry comes from rdkit (or from Open Babel, if rdkit cannot embed it).
     """
     m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
     AllChem.EmbedMolecule(m, randomSeed=0xf00d)

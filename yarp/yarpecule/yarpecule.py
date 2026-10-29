@@ -33,7 +33,7 @@ class yarpecule:
           The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding
           (adj_mat, geo, elements, charge, atom_info),  or one or more filenames. (<-- ERM: CAN it handle multiple files?)
           For strings the extension is used to determine which parser to use (e.g., .xyz etc),
-          otherwise the constructor will attempt to parse the input as a smiles string using rdkit.
+          otherwise the constructor will attempt to parse the input as a smiles string (see `mode`).
 
     canon : bool, default=True
             Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
@@ -45,8 +45,11 @@ class yarpecule:
             Thoughts on renaming this to smi_mode? - ERM
 
     strict : bool, default=True
-            Controls whether a failed in-house SMILES parse raises an error (True) or falls back
-            to rdkit (False). Only used when parsing SMILES in 'yarp' mode.
+            Only used when parsing SMILES in 'yarp' mode. If True, the in-house parser is the only
+            parser and any parsing error is raised. If False, an aromatic SMILES that fails the octet
+            check takes its geometry from rdkit, and other parsing errors (except ValueErrors, such as
+            OctetError) fall back to rdkit mode. Either way, rdkit generates the geometry, with Open
+            Babel as the fallback when rdkit cannot embed the molecule.
 
     Attributes:
     -----------
@@ -257,6 +260,10 @@ class yarpecule:
 
         mode : str
                 Mode to control SMILES parsing.
+
+        strict : bool
+                Whether a failed in-house SMILES parse is raised (True) or can fall back to rdkit
+                (False). See `strict` in the class docstring.
 
         Updated Attributes:
         ------------------

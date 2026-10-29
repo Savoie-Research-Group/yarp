@@ -130,7 +130,7 @@ def ring_path(adj_list, ring, path=None):
     """
 
     # Initialize the loop starting from the minimum index, with the traversal direction set by min bonded index.
-    # The other directions are tried if that fails: in a fused ring the first bond can be the shared bond.
+    # If that direction fails, try the other neighbors. In a fused ring the first bond can be the shared bond.
     if path is None:
         for second in sorted(adj_list[min(ring)].intersection(ring)):
             try:
@@ -148,7 +148,7 @@ def ring_path(adj_list, ring, path=None):
             pass
 
     # Eventually the recursions will reach the end of a cycle (i.e., for i in []: for the above loop) and hit this.
-    # If the path is shorter than the full cycle, or does not close, then it is invalid (i.e., the wrong branch was followed somewhere)
+    # If the path is shorter than the full cycle, or its two ends are not bonded, then it is invalid (i.e., the wrong branch was followed somewhere)
     if len(path) == len(ring) and path[0] in adj_list[path[-1]]:
         return path
     else:

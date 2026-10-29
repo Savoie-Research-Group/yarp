@@ -12,13 +12,11 @@ from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory
 from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file
 from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
 from yarp.yarpecule.input_parsers import xyz_from_smiles
+from yarp.yarpecule.input_parsers import geo_via_obabel
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.write_files import xyz_generate_string
-import importlib
 from rdkit import Chem
 from rdkit.Chem import AllChem
-
-parsers_mod = importlib.import_module("yarp.yarpecule.input_parsers")
 
 
 class TestXYZParser:
@@ -660,45 +658,35 @@ class TestAtomMapIngestion:
 class TestGeoViaObabel:
     def test_fallback(self, geo_via_obabel_cases, capsys):
         """An Open Babel geometry in the atom order of the rdkit molecule, with a warning."""
-        failed = []
         for smiles in geo_via_obabel_cases:
-            try:
-                mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
-                geo = parsers_mod.geo_via_obabel(mol, smiles)
-                got = (geo.shape == (mol.GetNumAtoms(), 3) and bool(np.isfinite(geo).all()),
-                       "using Open Babel" in capsys.readouterr().out)
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got != (True, True):
-                failed.append(f"{smiles}\n    expected (finite geometry in atom order, warning printed) (True, True)\n    got {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+            mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+            geo = geo_via_obabel(mol, smiles)
+            assert geo.shape == (mol.GetNumAtoms(), 3) and np.isfinite(geo).all(), smiles
+            assert "using Open Babel" in capsys.readouterr().out, smiles
 
 
 class TestXyzFromSmilesRegressions:
     def test_regressions(self, xyz_from_smiles_cases, monkeypatch):
         """
-        A geometry (never None) or the expected error; in yarp mode the RDKit molecule
-        handed to the embedder carries no implicit hydrogens. Every case is checked; all
-        failing cases are reported together.
+        A geometry (never None) or the expected error. In yarp mode the RDKit molecule handed
+        to the embedder carries no implicit hydrogens.
         """
         implicit_h = []
-        real = AllChem.EmbedMolecule
+        embed = AllChem.EmbedMolecule
 
         def spy(mol, *args, **kwargs):
-            implicit_h.append(sum(_.GetNumImplicitHs() for _ in mol.GetAtoms()))
-            return real(mol, *args, **kwargs)
+            implicit_h.append(sum(atom.GetNumImplicitHs() for atom in mol.GetAtoms()))
+            return embed(mol, *args, **kwargs)
 
-        monkeypatch.setattr(parsers_mod.AllChem, "EmbedMolecule", spy)  # where xyz_from_smiles looks it up
-        failed = []
+        monkeypatch.setattr(AllChem, "EmbedMolecule", spy)
         for smiles, mode, expected in xyz_from_smiles_cases:
             implicit_h.clear()
-            try:
-                _, geo, _, _, _ = xyz_from_smiles(smiles, mode=mode)
-                outcome = "geometry" if geo is not None and np.isfinite(geo).all() else f"geometry {geo}"
-            except Exception as e:
-                outcome = type(e).__name__
-            got = (outcome, implicit_h[:1] if mode == "yarp" and expected == "geometry" else [])
-            want = (expected, [0] if mode == "yarp" and expected == "geometry" else [])
-            if got != want:
-                failed.append(f"{smiles} (mode={mode})\n    expected (outcome, implicit H on the embedded molecule) {want}\n    got {got}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+            if expected == "geometry":
+                elements, geo, adj_mat, q, atom_info = xyz_from_smiles(smiles, mode=mode)
+                assert geo is not None and np.isfinite(geo).all(), smiles
+                if mode == "yarp":
+                    assert implicit_h[0] == 0, smiles
+            else:
+                with pytest.raises(Exception) as error:
+                    xyz_from_smiles(smiles, mode=mode)
+                assert type(error.value).__name__ == expected, smiles

@@ -68,9 +68,9 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
     Generate a 3D geometry for a molecular graph using Open Babel.
 
     This is the fallback for molecules that RDKit cannot embed (e.g., strained
-    rings with cumulated double bonds). Each call runs the build in a fresh
-    process (`_obabel_embed_worker()`) with Open Babel's random seed fixed, so the
-    same graph always gets the same geometry, independent of earlier builds.
+    rings with cumulated double bonds). Each build runs in a fresh process
+    (`_obabel_embed_worker()`) with Open Babel's random seed fixed, so the same
+    graph always gets the same geometry, no matter what was built before it.
 
     Parameters
     ----------
@@ -101,16 +101,15 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
                "bond_mat": np.asarray(bond_mat).tolist(),
                "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter}
 
-    # Open Babel's builder draws from one random generator per process, seeded once from
-    # OB_RANDOM_SEED; a fresh process per build makes each build that generator's first use.
-    # The worker runs from its own source in isolated mode (-I), so modules in the current
-    # directory cannot shadow its imports, and yarp itself is not imported.
+    # Open Babel's builder seeds its random number generator once per process (from OB_RANDOM_SEED),
+    # so every build gets its own process to come out the same each time. The worker runs from its
+    # own source in isolated mode (-I), so files in the current directory can't shadow its imports.
     worker = inspect.getsource(_obabel_embed_worker) + "\n_obabel_embed_worker()\n"
     proc = subprocess.run([sys.executable, "-I", "-c", worker],
                           input=json.dumps(payload), capture_output=True, text=True,
                           env={**os.environ, "OB_RANDOM_SEED": str(seed)})
     if proc.returncode != 0:
-        # a worker that dies without a traceback (e.g., killed) leaves stderr empty
+        # A worker that dies without a traceback (e.g., killed) leaves stderr empty
         error = (proc.stderr.strip().splitlines() or [f"worker exited with code {proc.returncode}"])[-1]
         raise RuntimeError(f"Open Babel could not build a geometry: {error}")
 
@@ -119,9 +118,9 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
 
 def _obabel_embed_worker():
     '''
-    Run one Open Babel build for `obabel_embed()` in its own process: reads the graph as
-    JSON on stdin and writes the geometry as JSON on the last line of stdout.
-    Self-contained (its own imports, no yarp), since `obabel_embed()` runs it from its source.
+    Run one Open Babel build for `obabel_embed()` in its own process. Reads the graph as JSON
+    from stdin and prints the geometry as JSON on the last line of stdout. It does all of its
+    own imports (and imports nothing from yarp), since `obabel_embed()` runs it from its source.
     '''
     import json
     import sys

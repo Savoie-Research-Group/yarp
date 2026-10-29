@@ -10,9 +10,7 @@ from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.hashes import yarpecule_hash
 from yarp.util.write_files import mol_write_yp
 
-from yarp.util.obabel import obabel_joint_opt, _ensure_setup_needed
-from yarp.util.obabel import obabel_embed
-from rdkit import Chem
+from yarp.util.obabel import obabel_joint_opt, _ensure_setup_needed, obabel_embed
 
 class TestFFOpt:
     def test_haa_2_ring(self):
@@ -206,72 +204,39 @@ class TestVerdictStability:
             )
 
 
-def kekule_graph(smiles):
-    """Elements, kekulized bond orders and formal charges from RDKit, explicit H included."""
-    mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
-    Chem.Kekulize(mol, clearAromaticFlags=True)
-    bond_mat = np.zeros([mol.GetNumAtoms(), mol.GetNumAtoms()])
-    for bond in mol.GetBonds():
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        bond_mat[i, j] = bond_mat[j, i] = bond.GetBondTypeAsDouble()
-    return [_.GetSymbol() for _ in mol.GetAtoms()], bond_mat, [_.GetFormalCharge() for _ in mol.GetAtoms()]
-
-
 class TestObabelEmbed:
     def test_graphs(self, obabel_embed_cases):
         """
         A finite geometry in the order of the given atoms, with no two atoms on top of each
         other, identical when built again (Open Babel's builder is random unless each build
-        is a fresh, seeded process); bond lengths sane where UFF keeps the bonds. Every case
-        is checked; all failing cases are reported together.
+        is a fresh, seeded process), and sane bond lengths where UFF keeps the bonds.
         """
-        failed = []
         for smiles, check_bonds in obabel_embed_cases:
-            try:
-                elements, bond_mat, fc = kekule_graph(smiles)
-                geo = obabel_embed(elements, bond_mat, fc)
-                again = obabel_embed(elements, bond_mat, fc)
-                dist = np.linalg.norm(geo[:, None] - geo[None], axis=-1) + 10 * np.eye(len(elements))
-                bonded = dist[np.triu(bond_mat, 1) > 0]
-                problems = [msg for bad, msg in [
-                    (geo.shape != (len(elements), 3) or not np.isfinite(geo).all(), "geometry shape or values"),
-                    (not np.array_equal(geo, again), "a second build gave a different geometry"),
-                    (dist.min() <= 0.5, "overlapping atoms"),
-                    (check_bonds and not ((bonded > 0.9) & (bonded < 2.4)).all(), f"bond lengths {bonded.round(2)}"),
-                ] if bad]
-            except Exception as e:
-                problems = [f"{type(e).__name__}: {e}"]
-            if problems:
-                failed.append(f"{smiles}: {'; '.join(problems)}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+            mol = yp.yarpecule(smiles)
+            geo = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+            assert geo.shape == (len(mol.elements), 3) and np.isfinite(geo).all(), smiles
+            assert np.array_equal(geo, obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)), smiles
+
+            dist = np.linalg.norm(geo[:, None] - geo[None], axis=-1) + 10 * np.eye(len(geo))
+            assert dist.min() > 0.5, smiles
+            if check_bonds:
+                bonded = dist[mol.adj_mat == 1]
+                assert ((bonded > 0.9) & (bonded < 2.4)).all(), smiles
 
     def test_isolated_worker(self, obabel_worker_shadows, tmp_path, monkeypatch):
         """
-        The worker process imports nothing from the current directory: with each shadowing
-        file there, the build is the same as without it. A worker that dies without a
-        traceback raises RuntimeError. Every case is checked; all failing cases are reported together.
+        The worker process imports nothing from the current directory, so each shadowing file
+        there leaves the build unchanged. A worker that dies without a traceback raises RuntimeError.
         """
-        elements, bond_mat, fc = kekule_graph("CCO")
-        expected = obabel_embed(elements, bond_mat, fc)
-        failed = []
+        mol = yp.yarpecule("CCO")
+        expected = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
         for shadow in obabel_worker_shadows:
             folder = tmp_path / shadow.replace("/", "_")
-            (folder / shadow).parent.mkdir(parents=True, exist_ok=True)
+            (folder / shadow).parent.mkdir(parents=True)
             (folder / shadow).write_text(f"raise ImportError('{shadow} was imported from the current directory')\n")
             monkeypatch.chdir(folder)
-            try:
-                got = np.array_equal(obabel_embed(elements, bond_mat, fc), expected)
-            except Exception as e:
-                got = f"{type(e).__name__}: {e}"
-            if got is not True:
-                failed.append(f"{shadow} in the current directory: {got}")
+            assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), shadow
 
         monkeypatch.setattr("sys.executable", "/bin/false")
-        try:
-            obabel_embed(elements, bond_mat, fc)
-            failed.append("worker that exits without a traceback: no error raised")
-        except RuntimeError:
-            pass
-        except Exception as e:
-            failed.append(f"worker that exits without a traceback: {type(e).__name__}: {e}")
-        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+        with pytest.raises(RuntimeError):
+            obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)

@@ -4,15 +4,9 @@ Testing suite for functions contained in yarp/yarpecule/input_parser.py
 from collections import Counter
 import numpy as np
 import pytest
-from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.yarpecule.input_parsers import xyz_q_parse
-from yarp.yarpecule.input_parsers import mol_parse
-from yarp.yarpecule.input_parsers import reaction_xyz_parse
-from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory
-from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file
-from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
-from yarp.yarpecule.input_parsers import xyz_from_smiles
-from yarp.yarpecule.input_parsers import geo_via_obabel
+from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, reaction_xyz_parse
+from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory, load_reaction_from_xyz_file
+from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file, xyz_from_smiles, geo_via_obabel
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.write_files import xyz_generate_string
 from rdkit import Chem

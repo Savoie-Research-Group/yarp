@@ -607,7 +607,7 @@ class OrcaIRCValCalculator(IRCValTask):
             f.write(f'! {self.config.lot}\n\n')
 
             # set keywords to specify IRC calculation
-            f.write(f'! Freq IRC\n\n')
+            f.write(f'! IRC\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")

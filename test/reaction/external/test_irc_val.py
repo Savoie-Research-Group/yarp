@@ -361,6 +361,27 @@ class TestPysisMaxCycles:
         assert expected == (300 if max_cycles is None else max_cycles)
 
 
+class TestOrcaIRCHessian:
+    """
+    The ORCA IRC computed two analytic Hessians at the TS: one for `! Freq`,
+    which nothing reads, and the IRC's own (`InitHess calc_anfreq`). Without
+    Freq, the ts_handoff check (PBE/def2-SVP, 17311254 TS1) gave the same
+    endpoints with one Hessian.
+    """
+
+    def test_input_requests_one_hessian(self, tmp_path):
+        lot = "PBE D3BJ def2-SVP"
+        cfg = IRCValConfig(software="orca", lot=lot, charge=0, multiplicity=1)
+        calc = OrcaIRCValCalculator(SimpleNamespace(config=cfg), make_rxn(lot, "orca", [1]), MagicMock())
+        path = tmp_path / "irc_1.inp"
+        calc._write_orca_irc_input(path, "ts_opt_1.xyz")
+        text = path.read_text()
+
+        assert "! IRC\n" in text
+        assert "Freq" not in text
+        assert "  InitHess calc_anfreq\n" in text
+
+
 # Per software: a finished irc_run1 and a failed irc_run2, as {name: text}
 # (a name ending in "/" is a dir), and what cleanup leaves in a run dir it cleans.
 IRC_RUNS = {

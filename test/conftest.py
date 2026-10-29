@@ -713,13 +713,36 @@ def smiles2adjmat_cases():
 
 
 @pytest.fixture
+def hydrogen_count_cases():
+    """
+    (smiles, hydrogens on each heavy atom in input order) for hydrogen_count, read from the
+    parsed graph. Aromatic b and p take two ring neighbors, like n.
+    """
+    return [
+        ("c1ccbcc1", [1, 1, 1, 0, 1, 1]),                               # borabenzene (master: BH, then OctetError)
+        ("c1ccpcc1", [1, 1, 1, 0, 1, 1]),                               # phosphinine (master: PH, silently)
+        ("Cc1ccpcc1", [3, 0, 1, 1, 0, 1, 1]),
+        ("b1nbnbn1", [0] * 6),
+        ("[bH]1[nH][bH][nH][bH][nH]1", [1] * 6),                        # guard: bracket counts
+        ("c1cc[nH]c1", [1] * 5),                                        # guard
+        ("CCO", [3, 2, 1]),                                             # guard: octet
+        ("C[NH3+]", [3, 3]),                                            # guard: charge
+        ("[C:1]([H:2])([H:3])([H:4])[H:5]", [4]),                      # guard: explicit hydrogen atoms
+    ]
+
+
+@pytest.fixture
 def aromatic_double_bond_cases():
     """
     (smiles, needs a ring double bond?) for needs_aromatic_double_bond, one bool per
     aromatic atom in input order. Lone-pair donors (pyrrole-type n, ring o/s, c-) and
-    atoms with an exocyclic double bond must say False.
+    atoms with an exocyclic double bond must say False; a neutral sigma-radical c, True.
     """
     return [
+        ("[c]1ccccc1", [True] * 6),                                     # phenyl radical (master: radical on c6)
+        ("[c:1]1[c:2]([H:7])[c:3]([H:8])[c:4]([H:9])[c:5]([H:10])[c:6]1[H:11]", [True] * 6),
+        ("c1ccbcc1", [True] * 6),                                       # ring b and p: one ring double bond
+        ("c1ccpcc1", [True] * 6),
         ("c1ccccc1", [True] * 6),                                       # guard
         ("c1ccncc1", [True] * 6),                                       # guard: pyridine n
         ("c1cc[nH]c1", [True, True, True, False, True]),               # pyrrole

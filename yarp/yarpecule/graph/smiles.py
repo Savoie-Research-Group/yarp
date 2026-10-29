@@ -469,24 +469,19 @@ def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
     Decide whether an aromatic atom takes a ring double bond in the kekulized structure.
 
     The electrons left on the atom are counted after its formal charge, its current bonds
-    (including exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add.
-    An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n).
-    An even count means the atom donates a lone pair or nothing to the ring
-    (e.g., pyrrole-type n, ring o/s, or a c with an exocyclic =O).
+    (including exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add
+    (`hydrogen_count()`). An odd count leaves one electron for a ring double bond (e.g., ring c,
+    pyridine-type n). An even count means the atom donates a lone pair or nothing to the ring
+    (e.g., pyrrole-type n, ring o/s, or a c with an exocyclic =O), except for a neutral c with
+    two electrons left, a sigma radical (e.g., [c]1ccccc1) that keeps one electron in the ring.
     """
     element = atom_info[atom]["element"]
-    bonded = [i for i in range(len(atom_info)) if adjmat[atom, i] > 0]
-
-    # hydrogens follow the same rules as add_hydrogens()
-    if atom_parse_meta[atom]["should_infer_hydrogens"]:
-        target_neighbors = 2 if element in ['n', 'o', 's'] else 3
-        hydrogens = max(0, target_neighbors - len(bonded))
-    elif any(atom_info[i]["element"] == 'h' for i in bonded):
-        hydrogens = 0
-    else:
-        hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
-
+    hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
     electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
+
+    # only a carbanion (e.g., [cH-]) donates its two electrons to the ring as a lone pair
+    if element == 'c' and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
+        return True
     return electrons % 2 == 1
 
 
@@ -505,27 +500,64 @@ def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
     return True
 
 
+def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
+    """
+    Return the number of hydrogens `add_hydrogens()` adds to `atom`, an element with a known
+    valence that is not a metal. A bracket atom gets its written count, or none if hydrogen
+    atoms are already bonded to it. Otherwise the count is inferred: aromatic atoms are filled
+    to three neighbors (c) or two (b, n, o, p, s), the rest to an octet adjusted for charge.
+    """
+    info = atom_info[atom]
+    element = info["element"]
+    formal_charge = info["formal_charge"]
+    explicit_hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
+    bonds = sum(adjmat[atom])
+
+    if explicit_hydrogens is not None:
+        if any(atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0 for i in range(len(atom_info))):
+            return 0
+        return explicit_hydrogens
+
+    if not atom_parse_meta[atom]["should_infer_hydrogens"]:
+        return 0
+
+    if info["aromatic_input"]:
+        # aromatic b and p have three valence electrons like n: two ring bonds and a ring double bond
+        bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
+        target_neighbors = 2 if element in ['b', 'n', 'o', 'p', 's'] else 3
+        return max(0, target_neighbors - bonded_neighbors)
+
+    desired_electrons = 8 if element not in ['h', 'he'] else 2
+    current_electrons = int(el_valence[element] + bonds)
+    needed_hydrogens = max(0, desired_electrons - current_electrons)
+
+    if formal_charge > 0:
+        e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
+        if (formal_charge - int(e / 2)) <= 0:
+            needed_hydrogens += formal_charge
+        else:
+            needed_hydrogens -= formal_charge
+    elif formal_charge < 0:
+        e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
+        if (needed_hydrogens + formal_charge) >= 0:
+            needed_hydrogens += formal_charge
+        else:
+            needed_hydrogens -= formal_charge
+
+    return needed_hydrogens
+
+
 def add_hydrogens(adjmat, atom_info, atom_parse_meta):
     """
     Add hydrogens to atoms based on either the explicit number of hydrogens designation or
     an inference algorithm based on formal charge and number of bonds.
     """
     hydrogens_to_add = []
-    bonded_hydrogens = []
 
     for atom in range(len(atom_info)):
-        h_count = sum(1 for i in range(len(atom_info)) if atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0)
-        bonded_hydrogens.append(h_count)
+        element = atom_info[atom]["element"]
 
-    for atom in range(len(atom_info)):
-        info = atom_info[atom]
-        element = info["element"]
-        formal_charge = info["formal_charge"]
-        explicit_hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
-        should_infer_hydrogens = atom_parse_meta[atom]["should_infer_hydrogens"]
-        valence_electrons = el_valence.get(element, None)
-
-        if valence_electrons is None:
+        if el_valence.get(element, None) is None:
             print(f"Warning: Element '{element}' is not recognized or has an undefined valence.")
             hydrogens_to_add.append(0)
             continue
@@ -534,41 +566,7 @@ def add_hydrogens(adjmat, atom_info, atom_parse_meta):
             continue
 
         bonds = sum(adjmat[atom])
-
-        if explicit_hydrogens is not None:
-            if bonded_hydrogens[atom] > 0:
-                needed_hydrogens = 0
-            else:
-                needed_hydrogens = explicit_hydrogens
-        elif should_infer_hydrogens:
-            if info["aromatic_input"]:
-                bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
-                if element in ['c', 'b', 'p']:
-                    target_neighbors = 3
-                elif element in ['n', 'o', 's']:
-                    target_neighbors = 2
-                else:
-                    target_neighbors = 3
-                needed_hydrogens = max(0, target_neighbors - bonded_neighbors)
-            else:
-                desired_electrons = 8 if element not in ['h', 'he'] else 2
-                current_electrons = int(valence_electrons + bonds)
-                needed_hydrogens = max(0, desired_electrons - current_electrons)
-
-                if formal_charge > 0:
-                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
-                    if (formal_charge - int(e / 2)) <= 0:
-                        needed_hydrogens += formal_charge
-                    else:
-                        needed_hydrogens -= formal_charge
-                elif formal_charge < 0:
-                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
-                    if (needed_hydrogens + formal_charge) >= 0:
-                        needed_hydrogens += formal_charge
-                    else:
-                        needed_hydrogens -= formal_charge
-        else:
-            needed_hydrogens = 0
+        needed_hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
 
         if needed_hydrogens < 0:
             print("Warning: add_hydrogens() was unable to satisfy formal charge specification with hydrogens.")

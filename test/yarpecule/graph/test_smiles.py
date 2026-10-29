@@ -481,6 +481,26 @@ class TestNeedsAromaticDoubleBond:
         assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
 
 
+class TestHydrogenCount:
+    def test_hydrogens(self, hydrogen_count_cases):
+        """
+        The hydrogens on each heavy atom of the parse (hydrogen_count is shared by
+        add_hydrogens and needs_aromatic_double_bond). Every case is checked; all failing
+        cases are reported together.
+        """
+        failed = []
+        for smiles, expected in hydrogen_count_cases:
+            try:
+                adj_mat, _, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+                got = [sum(atom_info[j]["element"] == "h" for j in np.nonzero(adj_mat[i])[0])
+                       for i in atom_info if atom_info[i]["element"] != "h"]
+            except Exception as e:
+                got = f"{type(e).__name__}: {e}"
+            if got != expected:
+                failed.append(f"{smiles}\n    expected {expected}\n    got      {got}")
+        assert not failed, f"{len(failed)} case(s) failed:\n" + "\n".join(failed)
+
+
 class TestReturnRings:
     def test_fused_rings(self, ring_cases):
         """

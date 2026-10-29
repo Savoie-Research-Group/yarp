@@ -65,10 +65,13 @@ def tag_of(geo):
     return int(round(geo[0][0] / 10.0))
 
 
-def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None):
+def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None, setup=None):
     """generate_input -> fabricated successful outputs -> scrape_data.
-    Returns the reaction and, per IRC run, the TS-opt index it was fed."""
+    Returns the reaction and, per IRC run, the TS-opt index it was fed.
+    `setup(rxn)`, if given, edits the stub reaction first."""
     rxn = make_rxn(lot, software, tsopt_runs, freqs)
+    if setup is not None:
+        setup(rxn)
     cfg = IRCValConfig(software=software, lot=lot, charge=0, multiplicity=1)
     calc = cls(SimpleNamespace(config=cfg), rxn, MagicMock(container="docker"))
     calc.set_scratch_dir(tmp_path)
@@ -294,6 +297,34 @@ class TestPerTSResults:
         rxn, _ = self._run(tmp_path, {1: "intended", 2: "unintended"})
 
         assert not any("validated_ts" in k for k in rxn.ts_geom)
+
+
+class TestIRCSkipsDuplicates:
+    """
+    TSs that are the same structure (conformer.is_duplicate_of) get one IRC,
+    run from the lowest-energy copy; the others are marked duplicate_of and get
+    no IRC result. Each run's result still lands on the TS it started from.
+    """
+
+    @staticmethod
+    def _duplicates(rxn):
+        # TS 3 is TS 1 again (same geometry, tag 1), 1e-6 Eh lower; TS 2 is distinct.
+        ts1, ts2, ts3 = (rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"] for k in (1, 2, 3))
+        ts3.geo = ts1.geo.copy()
+        for conf, energy in ((ts1, -1.0), (ts2, -2.0), (ts3, -1.0 - 1e-6)):
+            conf.properties["internal_energy_Eh"] = energy
+
+    def test_one_irc_per_structure_from_the_lowest_copy(self, tmp_path):
+        rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2, 3],
+                           pysis_outputs, tmp_path, setup=self._duplicates)
+        ts1, ts2, ts3 = (rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"].properties for k in (1, 2, 3))
+
+        assert fed == {1: 2, 2: 1}
+        assert ts1["duplicate_of"] == "3_tsopt_xtb_pysisyphus"
+        assert "irc_outcome" not in ts1
+        # irc_run{i} has a forward barrier of 10*i kJ/mol.
+        assert ts2["forward_barrier_kcal_per_mol"] == kcal(10.0)
+        assert ts3["forward_barrier_kcal_per_mol"] == kcal(20.0)
 
 
 class TestPysisRunConvergence:

@@ -7,7 +7,7 @@ import numpy as np
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.reaction.conformer import conformer
+from yarp.reaction.conformer import conformer, unique_ts
 from yarp.util.constants import Constants
 
 
@@ -22,14 +22,15 @@ class TSOptTask(AsyncYarpCalculator):
         a valid saddle point (exactly one mode below -min_imag_freq) -- not just the
         single TS that IRC validated. IRC labels at a low level of theory are
         poor predictors of high-level IRC outcomes, so all candidates go on.
+        Duplicates are dropped (conformer.unique_ts).
         """
         source = self.config.initial_geom.transition_state
         if source.label == "ts_guess":
             return [conf for k, conf in self.rxn.ts_geom.items() if "ts_guess" in k]
         elif source.label == "ts_opt":
             expected_key = f"tsopt_{source.lot}_{source.software}"
-            return [conf for k, conf in self.rxn.ts_geom.items()
-                    if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)]
+            return unique_ts([(k, conf) for k, conf in self.rxn.ts_geom.items()
+                              if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)])
         else:
             raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
 

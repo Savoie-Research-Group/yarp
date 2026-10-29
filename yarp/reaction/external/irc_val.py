@@ -3,6 +3,7 @@ import shutil
 import re
 import numpy as np
 
+from yarp.reaction.conformer import unique_ts
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
@@ -47,7 +48,8 @@ class IRCValTask(AsyncYarpCalculator):
         The TS-opt conformers to validate, in the order they are written to
         irc_run1..N: only valid first-order saddle points (exactly one mode below
         -min_imag_freq), so a structure that isn't a TS can't be run through IRC
-        or chosen as the validated TS.
+        or chosen as the validated TS. Duplicates are dropped
+        (conformer.unique_ts).
 
         Both `generate_input` and `scrape_data` must use this, so that irc_run{i}
         maps back to the conformer it was started from. The conformer keys
@@ -55,8 +57,8 @@ class IRCValTask(AsyncYarpCalculator):
         run index, which has gaps wherever a TS optimization failed.
         """
         expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
-        return [conf for k, conf in self.rxn.ts_geom.items()
-                if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)]
+        return unique_ts([(k, conf) for k, conf in self.rxn.ts_geom.items()
+                          if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)])
 
     def _get_rxn_label(self, forward, backward):
         """

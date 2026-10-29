@@ -138,6 +138,35 @@ class TestMinImagFreq:
         assert not calc.has_prerequisites()
 
 
+class TestDuplicateSourceTSs:
+    """
+    Source TSs that are the same structure (conformer.is_duplicate_of) start
+    one TS optimization, from the lowest-energy copy; the others are marked
+    duplicate_of. GSM guesses are never deduplicated.
+    """
+
+    def test_ts_opt_source_runs_one_copy(self, tmp_path):
+        # TS 3 is TS 1 again (same geometry, tag 1), 1e-6 Eh lower; TS 2 is distinct.
+        confs = [ts_conf(1, "1_tsopt_xtb_pysisyphus", ONE_IMAG),
+                 ts_conf(2, "2_tsopt_xtb_pysisyphus", ONE_IMAG),
+                 ts_conf(1, "3_tsopt_xtb_pysisyphus", ONE_IMAG)]
+        for conf, energy in zip(confs, (-1.0, -2.0, -1.0 - 1e-6)):
+            conf.properties["internal_energy_Eh"] = energy
+        calc = make_calc(OrcaTSOptCalculator, {c.type: c for c in confs}, XTB_TS_OPT)
+
+        assert written_tags(calc, tmp_path) == [2, 1]
+        assert confs[0].properties["duplicate_of"] == "3_tsopt_xtb_pysisyphus"
+
+    def test_ts_guess_source_keeps_every_guess(self, tmp_path):
+        guesses = [ts_conf(91, f"ts_guess_{i}_xtb_pysisyphus", None) for i in (1, 2)]
+        for guess in guesses:
+            guess.properties["internal_energy_Eh"] = -1.0
+        calc = make_calc(PysisyphusTSOptCalculator, {g.type: g for g in guesses}, XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus")
+
+        assert written_tags(calc, tmp_path) == [91, 91]
+
+
 class TestTSGuessSourceUnchanged:
     def test_starts_from_every_guess(self, tmp_path):
         calc = make_calc(PysisyphusTSOptCalculator, xtb_refined_rxn(), XTB_TS_GUESS,

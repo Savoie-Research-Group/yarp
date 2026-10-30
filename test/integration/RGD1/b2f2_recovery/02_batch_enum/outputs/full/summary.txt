@@ -1,11 +1,11 @@
-run: /groups/bsavoie2/emille35/yarp_baselines/conjugated_lewis_da3a1ae/full
+run: /groups/bsavoie2/emille35/yarp_baselines/exhaust_enum_fedf73a/full
 shards: 200/200 done
-commit: ['0b87143']
-branch: ['conjugated-lewis-moves']
+commit: ['fedf73a']
+branch: ['exhaust_enum']
 rdkit: ['2025.09.5']
-hashes.py sha256: ['ae59cd56038f']; find_lewis.py: ['f00b27ec9849']
+hashes.py sha256: ['0064d93626f3']; find_lewis.py: ['f00b27ec9849']
 dirty files: [0]; args: ['{"rxn_check": 3, "timeout": 900, "self_filter": false}']
-shard wall time (s): min 368, median 597, max 789; sum 32.69 h
+shard wall time (s): min 370, median 458, max 703; sum 29.09 h
 
 == parsing: 180040 unique SMILES ==
 status  clean  fail  fallback  warn
@@ -23,35 +23,35 @@ fallback  TypeError        yarp/yarpecule/input_parsers.py:643:geo_via_rdkit    
 warn-status messages (first 60 chars, top 10):
     2476  WARNING: ambiguous SMILES provided; interpreted as radical s
     1226  WARNING: yarp aromatic SMILES geometry fallback used RDKit f
-      14  [16:15:14] Explicit valence for atom # 0 N, 4, is greater th
-      14  [16:20:23] Explicit valence for atom # 0 N, 4, is greater th
-      14  [16:20:33] Explicit valence for atom # 0 N, 4, is greater th
-      12  [16:14:06] Explicit valence for atom # 0 N, 4, is greater th
-      12  [16:20:13] Explicit valence for atom # 0 N, 4, is greater th
-      11  [16:12:07] Explicit valence for atom # 1 N, 4, is greater th
-      10  [16:12:29] Explicit valence for atom # 1 N, 4, is greater th
-      10  [16:20:23] Explicit valence for atom # 0 N greater than perm
+      15  [14:38:41] Explicit valence for atom # 0 N, 4, is greater th
+      14  [14:38:55] Explicit valence for atom # 0 N, 4, is greater th
+      14  [14:41:12] Explicit valence for atom # 0 N, 4, is greater th
+      12  [14:38:57] Explicit valence for atom # 0 N, 4, is greater th
+      12  [14:41:23] Explicit valence for atom # 0 N, 4, is greater th
+      12  [14:37:51] Explicit valence for atom # 1 N, 4, is greater th
+      12  [14:46:25] Explicit valence for atom # 0 N, 4, is greater th
+      11  [14:38:41] Explicit valence for atom # 0 N greater than perm
 map/element vs SMILES text: 172962/172962 agree
 
 == RGD1 b2f2 rows: 131249 (input 131249) ==
 category
 recovered_rxn    117766
-missed             4811
+missed             4812
 parse_fail_R       4783
 parse_fail_P       3588
-species_only        293
+species_only        292
 reaction_fail         8
 
 scored rows (both endpoints parsed, reaction() built, bnfn finished): 122870 (93.6% of rows)
-  all scored: recovered by reaction hash 117766/122870 (95.85%); species found 118059/122870 (96.08%)
-  no fallback endpoint: recovered by reaction hash 117766/122870 (95.85%); species found 118059/122870 (96.08%)
+  all scored: recovered by reaction hash 117766/122870 (95.85%); species found 118058/122870 (96.08%)
+  no fallback endpoint: recovered by reaction hash 117766/122870 (95.85%); species found 118058/122870 (96.08%)
 
 scored rows: category x YARP bemmin b2f2
 yarp_b2f2      False   True 
 category                    
-missed          1173    3638
+missed          1174    3638
 recovered_rxn   1781  115985
-species_only     226      67
+species_only     225      67
 
 scored rows not recovered: YARP bemmin (b, f) counts
 b_bemmin  f_bemmin
@@ -61,9 +61,9 @@ b_bemmin  f_bemmin
           2.0           36
 2.0       1.0           12
           2.0         3705
-          3.0           33
+          3.0           32
 3.0       2.0           15
-          3.0          648
+          3.0          649
           4.0           13
 4.0       3.0           11
           4.0          162
@@ -73,13 +73,13 @@ self_species among scored: 5876 (recovered 5834)
 outcome
 ok              82766
 parse_fail_R     3566
-t_bnfn: sum 30.03 h, median 1.09 s, max 9.5 s
-t_total: sum 32.65 h, median 1.21 s, max 9.9 s
+t_bnfn: sum 26.60 h, median 0.95 s, max 8.9 s
+t_total: sum 29.03 h, median 1.05 s, max 9.3 s
 raw products: sum 18500054, median 202, max 1071
 full reaction() spot check: 0 mismatches in 248296
 
-== exported to /users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/02_batch_enum/outputs/full ==
+== exported to outputs/full ==
 86,332 reactants -> 131,249 RGD1 b2f2 reactions; each reaction is one row in exactly one file:
   rxn_match.csv        117,766 / 131,249 reactions ( 89.7%)   recovered_rxn 117,766
-  rxn_clean_fail.csv     4,604 / 131,249 reactions (  3.5%)   missed 4,349, species_only 255
-  rxn_parse_fail.csv     8,879 / 131,249 reactions (  6.8%)   parse_fail_R 4,783, parse_fail_P 3,588, missed 462, species_only 38, reaction_fail 8
+  rxn_clean_fail.csv     4,603 / 131,249 reactions (  3.5%)   missed 4,349, species_only 254
+  rxn_parse_fail.csv     8,880 / 131,249 reactions (  6.8%)   parse_fail_R 4,783, parse_fail_P 3,588, missed 463, species_only 38, reaction_fail 8

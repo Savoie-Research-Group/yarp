@@ -9,7 +9,7 @@ import pytest
 import yarp.util.config
 from yarp.util.config import (
     JobManagerConfig, MLPropConfig, PreOptConfig, ConformerConfig, TSGuessConfig,
-    RPOptConfig, TSOptConfig, IRCValConfig,
+    RPOptConfig, TSOptConfig, IRCValConfig, EnumerationConfig,
 )
 
 DEFAULT_SIF_DIR = str(Path(yarp.util.config.__file__).resolve().parents[2] / "containers")
@@ -84,3 +84,25 @@ class TestUseLocalScratch:
     def test_non_boolean_is_rejected(self, block, value):
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'use_local_scratch'"):
             TASK_CONFIGS[block](use_local_scratch=value)
+
+
+class TestEnumerationExhaustive:
+    """`exhaustive` is a boolean, and only concerted enumeration accepts it."""
+
+    def test_defaults_to_false(self):
+        assert EnumerationConfig().exhaustive is False
+
+    def test_true_is_kept_for_concerted(self):
+        assert EnumerationConfig(mode="concerted", exhaustive=True).exhaustive is True
+
+    @pytest.mark.parametrize("value", ["yes", 1, "true"])
+    def test_non_boolean_is_rejected(self, value):
+        with pytest.raises(ValueError, match="boolean value .* to 'exhaustive'"):
+            EnumerationConfig(exhaustive=value)
+
+    def test_true_is_rejected_for_sequential(self):
+        with pytest.raises(ValueError, match="'exhaustive' is only available for concerted"):
+            EnumerationConfig(mode="sequential", exhaustive=True)
+
+    def test_false_is_accepted_for_sequential(self):
+        assert EnumerationConfig(mode="sequential", exhaustive=False).exhaustive is False

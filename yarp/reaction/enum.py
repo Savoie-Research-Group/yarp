@@ -25,7 +25,7 @@ from yarp.reaction.enum_support import (
 )
 
 
-def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbose=False, debug=False):
+def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", exhaustive=False, verbose=False, debug=False):
     """
     Master wrapper function for all enumeration routines
 
@@ -51,7 +51,11 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
     mode : string
         Toggle between the two available product enumeration modes:
         concerted (default) and sequential enumeration.
-    
+
+    exhaustive : bool (default = False)
+        Concerted mode only: enumerate off every kept bond-electron matrix of
+        r_yp instead of only the one with the fewest formal charges (see bnfn).
+
     Returns:
     --------
     products : list of yarpecule objects
@@ -105,7 +109,8 @@ def enumerate_products(r_yp, n_break, n_form, react=[], mode="concerted", verbos
             print(f"   + Returning total {len(products)} potential products")
 
     elif mode == "concerted":
-        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=local_react, verbose=verbose, debug=debug))
+        products = list(bnfn(r_yp, n=n_break, hashes={r_yp.hash}, react=local_react, verbose=verbose, debug=debug,
+                             exhaustive=exhaustive))
         if verbose:
             print(f"   + Enumerated {len(products)} products")
 
@@ -503,7 +508,7 @@ def break_bonds(yarpecules,n=1,react=[],hashes=None,break_higher_order=False,rem
                     yield tmp
 
 
-def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=False, keep_symmetric=True, verbose=True, debug=False):
+def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=False, keep_symmetric=True, verbose=True, debug=False, exhaustive=False):
     """
     This function provides a shortcut for enumerating "break n form n" products without generating intermediate 
     zwitterionic/dangling bond species
@@ -538,8 +543,14 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                  During the enumeration it is common to form species that have poor Lewis structures that cost a time to 
                  perform enumeration on. These are often thrown away after enumeration, but they can cost a lot of time to
                  perform enumeration on if a multi-bond enumeration is being done. When this option is True, structures are 
-                 only retained if they result in a bond-electron matrix that has a score that is less than or equal to the 
-                 inputted yarpecule. 
+                 only retained if they result in a bond-electron matrix that has a score that is less than or equal to the
+                 inputted yarpecule.
+
+    exhaustive: bool, default=False
+                By default, bonds are broken and formed on a single bond-electron matrix, the one with the lowest sum of
+                absolute formal charges. When True, this is repeated on every bond-electron matrix kept for the yarpecule,
+                which can yield products that the default misses (and more redundant products). The radical sites are
+                those of the first bond-electron matrix in both cases.
 
     Yields
     ------
@@ -551,7 +562,7 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
 
     # Wrap yarpecules in a list if only one is supplied
     yarpecules = prepare_list(yarpecules)
-    
+
     if verbose:
         print(f"Enumerating break {n} form {n} products for {len(yarpecules)} yarpecules.")
         print(f"Reactive atoms defined as: {react}")
@@ -571,170 +582,175 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
         fc_ind = [sum(abs(x) for x in return_formals(_, y.elements))
                   for _ in y.lewis.bond_mats]
         fc_ind = fc_ind.index(min(fc_ind))
-
-        # Return the bonds available to break (the use of the atom hash is to avoid redundant bond formations)
-        # returns all bonds, with their atomic hashes and bond orders
-        bonds = return_bondtypes(y, b_inds=[fc_ind])[0]
-        # only keep the bonds that involve atoms in the react list
-        bonds = [_ for _ in bonds if (
-            _[0] in react[count_y] and _[1] in react[count_y])]
         radicals = list(return_radicals(y))
 
-        # Loop over combinations of bonds to break (m bonds at a time)
-        for b in combinations(list(range(len(bonds))), n):
+        # Exhaustive mode breaks and forms bonds on every kept bond mat instead of only fc_ind.
+        # All bond mats share the radical sites above (those of bond_mats[0]).
+        b_inds = range(len(y.lewis.bond_mats)) if exhaustive else [fc_ind]
+        for b_ind in b_inds:
 
-            # Create set to avoid reforming the exact same bonds we just broke
-            # You read this as set(frozenset(bonds we just broke)). We use frozensets so that they are
-            # order independent (like sets) but hashable (like tuples) so that they can be used as keys in a set
-            # for rapid lookup.
-            avoid = set(
-                {frozenset([frozenset([bonds[_][0], bonds[_][1]]) for _ in b])})
-            # Assemble list of reactive atoms: atoms from broken bonds + radical sites
-            # Get atoms from bonds being broken (first 2 elements of each bond via bonds[j][:2])
-            formset = [i for j in b for i in bonds[j][:2]]
+            # Return the bonds available to break (the use of the atom hash is to avoid redundant bond formations)
+            # returns all bonds, with their atomic hashes and bond orders
+            bonds = return_bondtypes(y, b_inds=[b_ind])[0]
+            # only keep the bonds that involve atoms in the react list
+            bonds = [_ for _ in bonds if (
+                _[0] in react[count_y] and _[1] in react[count_y])]
 
-            # Add radical atoms that can form new bonds
-            formset += radicals
+            # Loop over combinations of bonds to break (m bonds at a time)
+            for b in combinations(list(range(len(bonds))), n):
 
-            # Debug output
-            if debug:
-                print(f"Breaking bonds at indices: {b}")
-                print(f"Reactive atom set: {formset}")
-                print(f"Bonds to avoid reforming: {[y.describe_bond_pattern(_) for _ in avoid]}")
-                print(f"Number of reactive atoms: {n * 2}")
-                print(f"Breaking bonds: {[y.describe_bond_tuple(bonds[_]) for _ in b]}")
+                # Create set to avoid reforming the exact same bonds we just broke
+                # You read this as set(frozenset(bonds we just broke)). We use frozensets so that they are
+                # order independent (like sets) but hashable (like tuples) so that they can be used as keys in a set
+                # for rapid lookup.
+                avoid = set(
+                    {frozenset([frozenset([bonds[_][0], bonds[_][1]]) for _ in b])})
+                # Assemble list of reactive atoms: atoms from broken bonds + radical sites
+                # Get atoms from bonds being broken (first 2 elements of each bond via bonds[j][:2])
+                formset = [i for j in b for i in bonds[j][:2]]
 
-            # Start with copy of original bond matrix
-            base_bmat = copy(y.lewis.bond_mats[fc_ind])
-            if debug:
-                print("Original bond matrix:")
-                print(base_bmat)
+                # Add radical atoms that can form new bonds
+                formset += radicals
 
-            # Break the selected bonds (subtract 1 from bond order)
-            base_bmat = add_bonds(base_bmat, [bonds[_] for _ in b], val=-1)
-            if debug:
-                print("Bond matrix after breaking bonds:")
-                print(base_bmat)
-
-            # A repeated B2F2 endpoint can represent the legacy shared-atom
-            # bond/electron rearrangement, so identify it before ordinary
-            # pairing treats the repeated endpoint as a dangling bond.
-            shared_atom_changes = legacy_shared_atom_b2f2_changes(
-                n, formset, radicals, y.lewis.bond_mats[fc_ind], y.elements
-            )
-
-            # Loop over all unique ways to pair reactive atoms into new bonds
-            if shared_atom_changes is not None:
-                formation_changes = [
-                    (change.bonds_to_form, change)
-                    for change in shared_atom_changes
-                ]
-            else:
-                formation_changes = [
-                    (formation, None)
-                    for formation in unique_set_partition_generator(formset, 2)
-                ]
-
-            if debug:
-                print(f"this is the formset: {formset}")
-                print(f"these are the bond formations we will test: "
-                      f"{[formation for formation, _ in formation_changes]}")
-
-            for g, shared_atom_change in formation_changes:
-
-                # Skip if we would just reform a bond we broke
-                if frozenset(g) in avoid:
-                    if debug:
-                        print(f"Skipping - would reform broken bond: {g}")
-                    continue
-
-                # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
-                if any([len(_) < 2 for _ in g]):
-                    avoid.update(frozenset(g))
-                    if debug:
-                        print(f"Skipping - would form dangling bond: {g}")
-                    continue
-
+                # Debug output
                 if debug:
-                    print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
+                    print(f"Breaking bonds at indices: {b}")
+                    print(f"Reactive atom set: {formset}")
+                    print(f"Bonds to avoid reforming: {[y.describe_bond_pattern(_) for _ in avoid]}")
+                    print(f"Number of reactive atoms: {n * 2}")
+                    print(f"Breaking bonds: {[y.describe_bond_tuple(bonds[_]) for _ in b]}")
 
-                if shared_atom_change is not None:
-                    if debug:
-                        print(
-                            "Legacy shared-atom criterion: "
-                            f"{shared_atom_change.criterion}"
-                        )
-                    # Mirror the complete legacy special case at the BEM level:
-                    # account for electrons released/consumed by bond changes,
-                    # then move the donor's electron pair to the shared atom.
-                    product_bmat = apply_legacy_shared_atom_b2f2(
-                        y.lewis.bond_mats[fc_ind],
-                        [bonds[_] for _ in b],
-                        shared_atom_change,
-                    )
-                    if debug:
-                        print("Bond matrix after legacy electron redistribution:")
-                        print(product_bmat)
+                # Start with copy of original bond matrix
+                base_bmat = copy(y.lewis.bond_mats[b_ind])
+                if debug:
+                    print("Original bond matrix:")
+                    print(base_bmat)
+
+                # Break the selected bonds (subtract 1 from bond order)
+                base_bmat = add_bonds(base_bmat, [bonds[_] for _ in b], val=-1)
+                if debug:
+                    print("Bond matrix after breaking bonds:")
+                    print(base_bmat)
+
+                # A repeated B2F2 endpoint can represent the legacy shared-atom
+                # bond/electron rearrangement, so identify it before ordinary
+                # pairing treats the repeated endpoint as a dangling bond.
+                shared_atom_changes = legacy_shared_atom_b2f2_changes(
+                    n, formset, radicals, y.lewis.bond_mats[b_ind], y.elements
+                )
+
+                # Loop over all unique ways to pair reactive atoms into new bonds
+                if shared_atom_changes is not None:
+                    formation_changes = [
+                        (change.bonds_to_form, change)
+                        for change in shared_atom_changes
+                    ]
                 else:
-                    product_bmat = copy(base_bmat)
-                    product_bmat = add_bonds(
-                        product_bmat, [list(_) for _ in g], val=1
-                    )
+                    formation_changes = [
+                        (formation, None)
+                        for formation in unique_set_partition_generator(formset, 2)
+                    ]
 
-                # Current YARP constructs a product from connectivity and then
-                # determines its Lewis structures. Convert the redistributed
-                # BEM only after all legacy BEM operations are complete.
-                adj_mat = np.where(product_bmat > 0, 1, 0).astype(int)
-                np.fill_diagonal(adj_mat, 0)
-
-                # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
-                product = yarpecule((
-                    np.where(adj_mat > 0, 1, 0).astype(int),
-                    y.geo.copy(),
-                    y.elements,
-                    y.q,
-                    {
-                        i: {
-                            **dict(y.atom_info[i]),
-                            "formal_charge": None,
-                            "stereo": {"atom": None, "bonds": {}},
-                        }
-                        for i in y.atom_info
-                    },
-                ), canon=False)
-
-                # Debug: show the transformation
                 if debug:
-                    print(f"Original adjacency matrix:\n{y._adj_mat}")
-                    print(f"New adjacency matrix:\n{product._adj_mat}")
+                    print(f"this is the formset: {formset}")
+                    print(f"these are the bond formations we will test: "
+                          f"{[formation for formation, _ in formation_changes]}")
 
-                # Optional: skip products with higher bond matrix scores (worse quality)
-                # The legacy shared-atom route predates the current Lewis-score gate;
-                # applying that gate here removes the intended CO-containing product.
+                for g, shared_atom_change in formation_changes:
 
-                if lower_score and shared_atom_change is None:
-                    if product.lewis._scores[0] > y.lewis._scores[0]:
+                    # Skip if we would just reform a bond we broke
+                    if frozenset(g) in avoid:
                         if debug:
-                            print(f"Skipping - higher score: "
-                                  f"{product.lewis._scores[0]} > {y.lewis._scores[0]}")
+                            print(f"Skipping - would reform broken bond: {g}")
                         continue
 
-                # PROPOSAL: if keep_symmetric is True, then we can't just check the hash, because it is mapping independent (by design).
-                # instead, we need to check the bmat hash. I'm not sure if this is currently stored as an attribute of the yarpecule object.
+                    # Skip if there will be a dangling bond owing to one of the atoms being involved in multiple bonds that were broken
+                    if any([len(_) < 2 for _ in g]):
+                        avoid.update(frozenset(g))
+                        if debug:
+                            print(f"Skipping - would form dangling bond: {g}")
+                        continue
 
-                # This will avoid duplicates that are symmetrically equivalent (so distinct mappings will get collapsed, which isn't usually what we want)
-                if product._yarpecule_hash not in hashes:
-                    if hash_filter:
-                        hashes.add(product._yarpecule_hash)
+                    if debug:
+                        print(f"Forming bonds: {[y.describe_atom_pair(_) for _ in g]}")
 
-                    # Yield new product
+                    if shared_atom_change is not None:
+                        if debug:
+                            print(
+                                "Legacy shared-atom criterion: "
+                                f"{shared_atom_change.criterion}"
+                            )
+                        # Mirror the complete legacy special case at the BEM level:
+                        # account for electrons released/consumed by bond changes,
+                        # then move the donor's electron pair to the shared atom.
+                        product_bmat = apply_legacy_shared_atom_b2f2(
+                            y.lewis.bond_mats[b_ind],
+                            [bonds[_] for _ in b],
+                            shared_atom_change,
+                        )
+                        if debug:
+                            print("Bond matrix after legacy electron redistribution:")
+                            print(product_bmat)
+                    else:
+                        product_bmat = copy(base_bmat)
+                        product_bmat = add_bonds(
+                            product_bmat, [list(_) for _ in g], val=1
+                        )
+
+                    # Current YARP constructs a product from connectivity and then
+                    # determines its Lewis structures. Convert the redistributed
+                    # BEM only after all legacy BEM operations are complete.
+                    adj_mat = np.where(product_bmat > 0, 1, 0).astype(int)
+                    np.fill_diagonal(adj_mat, 0)
+
+                    # Create new yarpecule product. The np.where is used to convert the bond matrix to an adjacency matrix.
+                    product = yarpecule((
+                        np.where(adj_mat > 0, 1, 0).astype(int),
+                        y.geo.copy(),
+                        y.elements,
+                        y.q,
+                        {
+                            i: {
+                                **dict(y.atom_info[i]),
+                                "formal_charge": None,
+                                "stereo": {"atom": None, "bonds": {}},
+                            }
+                            for i in y.atom_info
+                        },
+                    ), canon=False)
+
+                    # Debug: show the transformation
                     if debug:
-                        print(f"Yielding new product with hash: "
-                              f"{product._yarpecule_hash}")
-                    yield product
-                # KMH: Added error message to let user know why some products were skipped
-                else:
-                    if debug:
-                        print(f"Skipping - product hash already in set: "
-                              f"{product._yarpecule_hash}")
+                        print(f"Original adjacency matrix:\n{y._adj_mat}")
+                        print(f"New adjacency matrix:\n{product._adj_mat}")
+
+                    # Optional: skip products with higher bond matrix scores (worse quality)
+                    # The legacy shared-atom route predates the current Lewis-score gate;
+                    # applying that gate here removes the intended CO-containing product.
+
+                    if lower_score and shared_atom_change is None:
+                        if product.lewis._scores[0] > y.lewis._scores[0]:
+                            if debug:
+                                print(f"Skipping - higher score: "
+                                      f"{product.lewis._scores[0]} > {y.lewis._scores[0]}")
+                            continue
+
+                    # PROPOSAL: if keep_symmetric is True, then we can't just check the hash, because it is mapping independent (by design).
+                    # instead, we need to check the bmat hash. I'm not sure if this is currently stored as an attribute of the yarpecule object.
+
+                    # This will avoid duplicates that are symmetrically equivalent (so distinct mappings will get collapsed, which isn't usually what we want)
+                    if product._yarpecule_hash not in hashes:
+                        if hash_filter:
+                            hashes.add(product._yarpecule_hash)
+
+                        # Yield new product
+                        if debug:
+                            print(f"Yielding new product with hash: "
+                                  f"{product._yarpecule_hash}")
+                        yield product
+                    # KMH: Added error message to let user know why some products were skipped
+                    else:
+                        if debug:
+                            print(f"Skipping - product hash already in set: "
+                                  f"{product._yarpecule_hash}")
 

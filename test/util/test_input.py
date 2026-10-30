@@ -39,6 +39,11 @@ class TestEnumHappyPath:
         ]
         assert all(hasattr(inp, name) for name in expected_attrs)
 
+    def test_exhaustive_is_read(self, enum_full_options):
+        cfg = copy.deepcopy(enum_full_options)
+        cfg["initialize"]["enumeration"]["exhaustive"] = True
+        assert InputParser(cfg).enum.exhaustive is True
+
 
 def _block(cfg, path):
     """Walk a dotted block path (e.g. 'initialize.job_manager') down to its dict."""

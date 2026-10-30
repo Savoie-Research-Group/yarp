@@ -1,9 +1,9 @@
 run: /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/02_batch_enum/runs/pilot
 shards: 4/4 done
-commit: ['3103ee4']
-branch: ['conjugated-lewis-moves']
+commit: ['fedf73a']
+branch: ['exhaust_enum']
 rdkit: ['2026.03.6']
-hashes.py sha256: ['ae59cd56038f']; find_lewis.py: ['f00b27ec9849']
+hashes.py sha256: ['0064d93626f3']; find_lewis.py: ['f00b27ec9849']
 dirty files: [0]; args: ['{"rxn_check": 3, "timeout": 900, "self_filter": false}']
 shard wall time (s): min 6, median 7, max 8; sum 0.01 h
 
@@ -22,10 +22,10 @@ fallback  TypeError        yarp/yarpecule/input_parsers.py:643:geo_via_rdkit    
 
 warn-status messages (first 60 chars, top 10):
        2  WARNING: ambiguous SMILES provided; interpreted as radical s
-       2  [15:33:41] Explicit valence for atom # 0 N, 4, is greater th
-       2  [15:33:41] Explicit valence for atom # 0 N greater than perm
+       2  [14:25:01] Explicit valence for atom # 0 N, 4, is greater th
+       2  [14:25:01] Explicit valence for atom # 0 N greater than perm
        1  WARNING: yarp aromatic SMILES geometry fallback used RDKit f
-       1  [15:33:25] Molecule does not have explicit Hs. Consider call
+       1  [14:24:45] Molecule does not have explicit Hs. Consider call
 map/element vs SMILES text: 122/122 agree
 
 == RGD1 b2f2 rows: 112 (input 112) ==

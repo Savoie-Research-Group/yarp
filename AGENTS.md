@@ -37,8 +37,11 @@ The 3.0.X versions overhaul earlier code in two ways:
 3. **Present design choices; don't make them.** When there is a design decision,
    measure first, then lay out the options with a recommendation. Never choose
    silently.
-4. **Never commit or push.** Leave changes in the working tree. The developer
-   reviews, approves, and commits them.
+4. **Never commit or push, even when asked.** Leave changes in the working
+   tree. The developer reviews, approves, and runs every `git commit` and
+   `git push` themselves. If asked to "commit" or "push", prepare the work
+   instead: list the files to stage, draft the commit message, and give the
+   exact commands for the developer to run.
 
 ## Debug workspace
 

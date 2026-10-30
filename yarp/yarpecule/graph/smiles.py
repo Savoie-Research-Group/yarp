@@ -34,14 +34,14 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     """
 
     if not hasattr(smiles2adjmat, 'aromatics'):
-        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s"}
-        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z](?:[a-z]+)?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
+        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s", "se", "as", "te"}
+        smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z][a-z]?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
         smiles2adjmat.atom_pattern = r'([A-Z](?:[a-z]+)?|[a-z])'
         smiles2adjmat.ring_pattern = re.compile(r'^(%\d{2}|\d)$')
         smiles2adjmat.isotope_pattern = re.compile(r'^\[(\d+)')
         smiles2adjmat.charge_pattern = re.compile(r'(\+\d+|-\d+|\++(?!\d)|-+(?!\d))')
         smiles2adjmat.hydrogen_pattern = re.compile(r'(H\d+|H+)')
-        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z](?:[a-z]+)?|[a-z])')
+        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z][a-z]?|se|as|te|[a-z])')
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
         smiles2adjmat.valid_elements = {
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
@@ -57,7 +57,10 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
     final_tokens = []
     for token in preliminary_tokens:
-        if len(token) == 2 and token not in smiles2adjmat.valid_elements and not token.startswith("%"):
+        # Split two-letter tokens that are not elements. Also split an organic-subset atom followed
+        # by an aromatic atom, so the `Sc` in CSc1ccccc1 is read as S and c, not scandium.
+        if len(token) == 2 and not token.startswith("%") and (
+                token not in smiles2adjmat.valid_elements or (token[0] in "BCNOPSFI" and token[1] in smiles2adjmat.aromatics)):
             final_tokens.extend(list(token))
         else:
             final_tokens.append(token)
@@ -88,7 +91,9 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 else:
                     formal_charge = charge_str.count('+') - charge_str.count('-')
 
-            hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token)
+            # Look for hydrogens after the element label, so the H in [Hg] or [He] is not counted as a hydrogen
+            label_match = smiles2adjmat.element_label_pattern.search(token)
+            hydrogen_match = smiles2adjmat.hydrogen_pattern.search(token, label_match.end()) if label_match else None
             if verbose:
                 print(f"{token=} {hydrogen_match=}")
             if hydrogen_match:
@@ -178,6 +183,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 branch_close_atom_indices.append(sequential_atom_counter)
             if open_flag:
                 open_flag = False
+                close_flag = False  # After `)(` this atom opens a new branch, so reset the close flag
                 branch_open_atom_indices.append(sequential_atom_counter)
 
             if pending_atom_stereo_owner is not None and pending_atom_stereo_owner in atom_info:
@@ -321,13 +327,15 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             for component in fused_components:
                 component = sorted(component)
                 component_set = set(component)
+                # Only pair up the atoms that need a ring double bond (see needs_aromatic_double_bond)
+                needs_double = [i for i in component if needs_aromatic_double_bond(i, adjmat, atom_info, atom_parse_meta)]
                 component_edges = []
-                for count_i, i in enumerate(component):
-                    for j in component[count_i + 1:]:
+                for count_i, i in enumerate(needs_double):
+                    for j in needs_double[count_i + 1:]:
                         if adjmat[i, j] == 1 and can_promote_aromatic_edge(i, j, component_set, adjmat):
                             component_edges.append((i, j))
 
-                target_size = len(component) // 2
+                target_size = len(needs_double) // 2
                 promoted_edges, best_partial = choose_aromatic_matching(component_edges, target_size)
                 if promoted_edges is None:
                     ambiguous_aromatic_assignment = True
@@ -456,6 +464,27 @@ def bemat_to_smiles(bond_electron_mat, atom_info):
         return Chem.MolToSmiles(mol, canonical=True, kekuleSmiles=True)
 
 
+def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
+    """
+    Decide whether an aromatic atom gets a ring double bond when the input is kekulized.
+
+    Counts the electrons left on the atom after its formal charge, its current bonds (including
+    exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add (`hydrogen_count()`).
+    An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n). An even
+    count means the atom gives the ring a lone pair or nothing (e.g., pyrrole-type n, ring o/s, or a
+    c with an exocyclic =O). The exception is a neutral c with two electrons left, which is a sigma
+    radical (e.g., [c]1ccccc1) and still gets a ring double bond.
+    """
+    element = atom_info[atom]["element"]
+    hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
+    electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
+
+    # A neutral c with two electrons left is a sigma radical. Only a carbanion like [cH-] gives the ring a lone pair.
+    if element == 'c' and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
+        return True
+    return electrons % 2 == 1
+
+
 def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
     """
     Guard aromatic promotion against ring atoms that already carry an exocyclic
@@ -471,27 +500,67 @@ def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
     return True
 
 
+def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
+    """
+    Return the number of hydrogens `add_hydrogens()` adds to `atom` (an element with a known
+    valence that is not a metal). Used by both `add_hydrogens()` and `needs_aromatic_double_bond()`,
+    so the two always agree.
+
+    A bracket atom gets the count written in the SMILES, or none if hydrogen atoms are already
+    bonded to it. Otherwise the count is inferred: aromatic atoms are filled up to three neighbors
+    (c) or two (b, n, o, p, s), and everything else up to an octet, adjusted for formal charge.
+    """
+    info = atom_info[atom]
+    element = info["element"]
+    formal_charge = info["formal_charge"]
+    explicit_hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
+    bonds = sum(adjmat[atom])
+
+    if explicit_hydrogens is not None:
+        if any(atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0 for i in range(len(atom_info))):
+            return 0
+        return explicit_hydrogens
+
+    if not atom_parse_meta[atom]["should_infer_hydrogens"]:
+        return 0
+
+    if info["aromatic_input"]:
+        # Aromatic b and p have three valence electrons like n, so they get two ring bonds, a ring double bond, and no H
+        bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
+        target_neighbors = 2 if element in ['b', 'n', 'o', 'p', 's'] else 3
+        return max(0, target_neighbors - bonded_neighbors)
+
+    desired_electrons = 8 if element not in ['h', 'he'] else 2
+    current_electrons = int(el_valence[element] + bonds)
+    needed_hydrogens = max(0, desired_electrons - current_electrons)
+
+    if formal_charge > 0:
+        e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
+        if (formal_charge - int(e / 2)) <= 0:
+            needed_hydrogens += formal_charge
+        else:
+            needed_hydrogens -= formal_charge
+    elif formal_charge < 0:
+        e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
+        if (needed_hydrogens + formal_charge) >= 0:
+            needed_hydrogens += formal_charge
+        else:
+            needed_hydrogens -= formal_charge
+
+    return needed_hydrogens
+
+
 def add_hydrogens(adjmat, atom_info, atom_parse_meta):
     """
     Add hydrogens to atoms based on either the explicit number of hydrogens designation or
     an inference algorithm based on formal charge and number of bonds.
     """
     hydrogens_to_add = []
-    bonded_hydrogens = []
 
     for atom in range(len(atom_info)):
-        h_count = sum(1 for i in range(len(atom_info)) if atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0)
-        bonded_hydrogens.append(h_count)
+        element = atom_info[atom]["element"]
 
-    for atom in range(len(atom_info)):
-        info = atom_info[atom]
-        element = info["element"]
-        formal_charge = info["formal_charge"]
-        explicit_hydrogens = atom_parse_meta[atom]["explicit_hydrogens"]
-        should_infer_hydrogens = atom_parse_meta[atom]["should_infer_hydrogens"]
-        valence_electrons = el_valence.get(element, None)
-
-        if valence_electrons is None:
+        if el_valence.get(element, None) is None:
             print(f"Warning: Element '{element}' is not recognized or has an undefined valence.")
             hydrogens_to_add.append(0)
             continue
@@ -500,41 +569,7 @@ def add_hydrogens(adjmat, atom_info, atom_parse_meta):
             continue
 
         bonds = sum(adjmat[atom])
-
-        if explicit_hydrogens is not None:
-            if bonded_hydrogens[atom] > 0:
-                needed_hydrogens = 0
-            else:
-                needed_hydrogens = explicit_hydrogens
-        elif should_infer_hydrogens:
-            if info["aromatic_input"]:
-                bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
-                if element in ['c', 'b', 'p']:
-                    target_neighbors = 3
-                elif element in ['n', 'o', 's']:
-                    target_neighbors = 2
-                else:
-                    target_neighbors = 3
-                needed_hydrogens = max(0, target_neighbors - bonded_neighbors)
-            else:
-                desired_electrons = 8 if element not in ['h', 'he'] else 2
-                current_electrons = int(valence_electrons + bonds)
-                needed_hydrogens = max(0, desired_electrons - current_electrons)
-
-                if formal_charge > 0:
-                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
-                    if (formal_charge - int(e / 2)) <= 0:
-                        needed_hydrogens += formal_charge
-                    else:
-                        needed_hydrogens -= formal_charge
-                elif formal_charge < 0:
-                    e = desired_electrons - 2 * needed_hydrogens - 2 * bonds
-                    if (needed_hydrogens + formal_charge) >= 0:
-                        needed_hydrogens += formal_charge
-                    else:
-                        needed_hydrogens -= formal_charge
-        else:
-            needed_hydrogens = 0
+        needed_hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
 
         if needed_hydrogens < 0:
             print("Warning: add_hydrogens() was unable to satisfy formal charge specification with hydrogens.")

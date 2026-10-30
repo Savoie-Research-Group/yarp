@@ -4,16 +4,13 @@ Testing suite for functions contained in yarp/yarpecule/input_parser.py
 from collections import Counter
 import numpy as np
 import pytest
-from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.yarpecule.input_parsers import xyz_q_parse
-from yarp.yarpecule.input_parsers import mol_parse
-from yarp.yarpecule.input_parsers import reaction_xyz_parse
-from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory
-from yarp.yarpecule.input_parsers import load_reaction_from_xyz_file
-from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file
-from yarp.yarpecule.input_parsers import xyz_from_smiles
+from yarp.yarpecule.input_parsers import xyz_parse, xyz_q_parse, mol_parse, reaction_xyz_parse
+from yarp.yarpecule.input_parsers import load_reactions_from_xyz_directory, load_reaction_from_xyz_file
+from yarp.yarpecule.input_parsers import load_reactions_from_smiles_file, xyz_from_smiles, geo_via_obabel
 from yarp.yarpecule.yarpecule import yarpecule
 from yarp.util.write_files import xyz_generate_string
+from rdkit import Chem
+from rdkit.Chem import AllChem
 
 
 class TestXYZParser:
@@ -650,3 +647,40 @@ class TestAtomMapIngestion:
         assert reactant_maps == set(self.maps(scrambled.product.graph))
         assert reactant_maps == {211, 212, 321, 322, 323, 324}
         assert scrambled.hash == original.hash
+
+
+class TestGeoViaObabel:
+    def test_fallback(self, geo_via_obabel_cases, capsys):
+        """An Open Babel geometry in the atom order of the rdkit molecule, with a warning."""
+        for smiles in geo_via_obabel_cases:
+            mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+            geo = geo_via_obabel(mol, smiles)
+            assert geo.shape == (mol.GetNumAtoms(), 3) and np.isfinite(geo).all(), smiles
+            assert "using Open Babel" in capsys.readouterr().out, smiles
+
+
+class TestXyzFromSmilesRegressions:
+    def test_regressions(self, xyz_from_smiles_cases, monkeypatch):
+        """
+        A geometry (never None) or the expected error. In yarp mode the RDKit molecule handed
+        to the embedder carries no implicit hydrogens.
+        """
+        implicit_h = []
+        embed = AllChem.EmbedMolecule
+
+        def spy(mol, *args, **kwargs):
+            implicit_h.append(sum(atom.GetNumImplicitHs() for atom in mol.GetAtoms()))
+            return embed(mol, *args, **kwargs)
+
+        monkeypatch.setattr(AllChem, "EmbedMolecule", spy)
+        for smiles, mode, expected in xyz_from_smiles_cases:
+            implicit_h.clear()
+            if expected == "geometry":
+                elements, geo, adj_mat, q, atom_info = xyz_from_smiles(smiles, mode=mode)
+                assert geo is not None and np.isfinite(geo).all(), smiles
+                if mode == "yarp":
+                    assert implicit_h[0] == 0, smiles
+            else:
+                with pytest.raises(Exception) as error:
+                    xyz_from_smiles(smiles, mode=mode)
+                assert type(error.value).__name__ == expected, smiles

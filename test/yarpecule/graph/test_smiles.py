@@ -2,7 +2,10 @@
 Testing suite for functions contained in yarp/yarpecule/graph/smiles.py
 """
 import pytest
+import numpy as np
+from collections import Counter
 from yarp.yarpecule.graph.smiles import smiles2adjmat
+from yarp.yarpecule.graph.fragment import return_rings
 
 
 class TestSmi2Adj:
@@ -416,3 +419,58 @@ class TestSmi2Adj:
         assert elements == ['O', 'C', 'N', 'C', 'C', 'C', 'O', 'N', 'C', 'H', 'H', 'H', 'H', 'H', 'H']
         assert adjmat.shape == (15, 15)
         assert bemat.shape == (15, 15)
+
+
+class TestSmi2AdjRegressions:
+    def test_regressions(self, smiles2adjmat_cases):
+        """
+        Branch bookkeeping, element tokens and bracket atoms: the right elements, the named
+        bond orders, and no radicals.
+        """
+        for smiles, elements, bond_orders in smiles2adjmat_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles)
+            index = {atom_info[i]["atom_map"]: i for i in atom_info}
+            assert Counter(atom_info[i]["element"] for i in atom_info) == elements, smiles
+            for (i, j), order in bond_orders.items():
+                assert bemat[index[i], index[j]] == order, smiles
+            assert all(bemat[i, i] % 2 == 0 for i in atom_info), smiles
+
+
+class TestNeedsAromaticDoubleBond:
+    def test_lone_pair_donors(self, aromatic_double_bond_cases):
+        """
+        Which aromatic atoms get a ring double bond: lone-pair donors and atoms with an
+        exocyclic double bond do not, a sigma-radical c does.
+        """
+        for smiles, expected in aromatic_double_bond_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+            aromatic = [i for i in atom_info if atom_info[i]["aromatic_input"]]
+            assert [any(bemat[i, j] == 2 for j in aromatic if j != i) for i in aromatic] == expected, smiles
+
+
+class TestHydrogenCount:
+    def test_hydrogens(self, hydrogen_count_cases):
+        """
+        The hydrogens on each heavy atom (hydrogen_count is shared by add_hydrogens and
+        needs_aromatic_double_bond).
+        """
+        for smiles, expected in hydrogen_count_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles, reorder_mapped=False)
+            hydrogens = [sum(atom_info[j]["element"] == "h" for j in np.nonzero(adjmat[i])[0])
+                         for i in atom_info if atom_info[i]["element"] != "h"]
+            assert hydrogens == expected, smiles
+
+
+class TestReturnRings:
+    def test_fused_rings(self, ring_cases):
+        """
+        return_rings (yarp/yarpecule/graph/fragment.py) finds every ring, and every ring it
+        returns closes back on its first atom.
+        """
+        for smiles, sizes in ring_cases:
+            adjmat, bemat, atom_info = smiles2adjmat(smiles)
+            adj_list = [set(np.nonzero(row)[0]) for row in adjmat]
+            rings = return_rings(adj_list, max_size=10, remove_fused=False)
+            assert sorted(len(ring) for ring in rings) == sizes, smiles
+            for ring in rings:
+                assert all(ring[k - 1] in adj_list[ring[k]] for k in range(len(ring))), smiles

@@ -476,7 +476,10 @@ class RPOptConfig:
     lot: str = None
     charge: int = None
     multiplicity: int = None
-    hessian_recalc: int = 3
+    # Exact Hessian every N opt cycles. Unset, pysisyphus uses 3 and ORCA none:
+    # ORCA then uses its model Hessian, with one exact Hessian from Freq at the
+    # end (the ts_handoff E3 benchmark: same minima in about half the time).
+    hessian_recalc: Optional[int] = None
     max_cycles: int = 300
     # Was hardcoded to 'rfo' in the pysisyphus input writer. Exposed so the
     # refine stage can also escape the free-diatomic problem; default unchanged.
@@ -506,7 +509,9 @@ class RPOptConfig:
         if self.opt_type not in ['rfo', 'lbfgs']:
             raise ValueError(f"Invalid rp_opt.'opt_type': '{self.opt_type}'. Valid options are 'rfo', 'lbfgs'")
 
-        if not isinstance(self.hessian_recalc, int):
+        if self.hessian_recalc is None and self.software == 'pysisyphus':
+            self.hessian_recalc = 3
+        if self.hessian_recalc is not None and not isinstance(self.hessian_recalc, int):
             raise ValueError("Please provide an integer value to rp_opt: 'hessian_recalc'")
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to rp_opt: 'max_cycles'")

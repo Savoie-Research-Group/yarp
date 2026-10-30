@@ -100,6 +100,26 @@ class TestKeepCrashLogs:
             TASK_CONFIGS[block](keep_crash_logs=value)
 
 
+class TestRPOptHessianRecalc:
+    """Unset, pysisyphus keeps its old 3; ORCA runs no Hessian recalcs (min_opt.py)."""
+
+    @pytest.mark.parametrize("software, lot, expected", [
+        ("pysisyphus", "xtb", 3),
+        ("orca", "B3LYP def2-SVP", None),
+    ])
+    def test_default_per_software(self, software, lot, expected):
+        assert RPOptConfig(software=software, lot=lot, charge=0, multiplicity=1).hessian_recalc == expected
+
+    @pytest.mark.parametrize("software, lot", [("pysisyphus", "xtb"), ("orca", "B3LYP def2-SVP")])
+    def test_set_value_is_kept(self, software, lot):
+        assert RPOptConfig(software=software, lot=lot, charge=0, multiplicity=1,
+                           hessian_recalc=5).hessian_recalc == 5
+
+    def test_non_integer_is_rejected(self):
+        with pytest.raises(ValueError, match="integer value to rp_opt: 'hessian_recalc'"):
+            TASK_CONFIGS["rp_opt"](hessian_recalc="3")
+
+
 @pytest.mark.parametrize("block", ["ts_opt", "irc_val"])
 class TestMinImagFreq:
     def test_defaults_to_the_old_tolerance(self, block):

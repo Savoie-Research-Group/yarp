@@ -533,7 +533,9 @@ class OrcaMinOptCalculator(MinOptTask):
             # set geom opt block
             f.write('%geom\n')
             f.write(f'  MaxIter {self.config.max_cycles}\n')
-            f.write(f'  Calc_Hess true\n  Recalc_Hess {self.config.hessian_recalc}\n')
+            # Exact Hessians during the opt only if rp_opt.hessian_recalc is set
+            if self.config.hessian_recalc is not None:
+                f.write(f'  Calc_Hess true\n  Recalc_Hess {self.config.hessian_recalc}\n')
             f.write('end\n\n')
 
             # set XYZ input file

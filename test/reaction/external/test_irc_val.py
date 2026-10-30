@@ -112,11 +112,18 @@ def pysis_outputs(run_dir, i):
     (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i))
 
 
+# ORCA prints the first line once per IRC direction; a direction stopped at
+# MaxIter prints the second instead, and the run still terminates normally.
+ORCA_IRC_CONVERGED = "THE IRC HAS CONVERGED\n"
+ORCA_IRC_MAXITER = "MAXIMUM NUMBER OF ITERATIONS REACHED - STOPPING IRC RUN\n"
+ORCA_IRC_LOG = 2 * ORCA_IRC_CONVERGED + "ORCA TERMINATED NORMALLY\n"
+
+
 def orca_outputs(run_dir, i):
     """Every run intended; barrier is G(TS) - G(R) = TS-opt index of the conformer."""
     write_xyz(run_dir / f"irc_{i}_IRC_F.xyz", P_GEO)
     write_xyz(run_dir / f"irc_{i}_IRC_B.xyz", R_GEO)
-    (run_dir / f"irc_{i}.out").write_text("THE IRC HAS CONVERGED\nORCA TERMINATED NORMALLY\n")
+    (run_dir / f"irc_{i}.out").write_text(ORCA_IRC_LOG)
 
 
 TSOPT_RUN_PATTERNS = [
@@ -370,6 +377,43 @@ class TestPysisRunConvergence:
         assert rxn.barrier["xtb_pysisyphus"] == kcal(20.0)
 
 
+class TestOrcaRunConvergence:
+    """
+    The ORCA IRC counted as converged once "THE IRC HAS CONVERGED" appeared,
+    but ORCA prints it once per direction. In the ts_handoff E3 trial
+    (13453614 TS2) the backward direction stopped at MaxIter 200 while still
+    falling (max|G| 0.049), and the run was labeled and given barriers. Now
+    both directions must converge.
+    """
+    LOT = "PBE D3BJ def2-SVP"
+
+    def _run(self, tmp_path, log):
+        """irc_run1 is the run under test; irc_run2 is a converged control."""
+        def write(run_dir, i):
+            orca_outputs(run_dir, i)
+            if i == 1:
+                (run_dir / "irc_1.out").write_text(log)
+        return run_irc(OrcaIRCValCalculator, self.LOT, "orca", [1, 2], write, tmp_path)
+
+    def test_converged_run_counts(self, tmp_path):
+        rxn, _ = self._run(tmp_path, ORCA_IRC_LOG)
+
+        assert rxn.ts_geom[f"1_tsopt_{self.LOT}_orca"].properties["irc_outcome"] == "intended"
+
+    @pytest.mark.parametrize("log", [
+        pytest.param(ORCA_IRC_CONVERGED + ORCA_IRC_MAXITER + "ORCA TERMINATED NORMALLY\n", id="backward_at_max_iter"),
+        pytest.param(ORCA_IRC_MAXITER + ORCA_IRC_CONVERGED + "ORCA TERMINATED NORMALLY\n", id="forward_at_max_iter"),
+    ])
+    def test_half_converged_run_is_dropped(self, tmp_path, log):
+        rxn, _ = self._run(tmp_path, log)
+
+        # The dropped run's TS gets no IRC result; irc_run2's TS (barrier 2)
+        # becomes the reaction's, not irc_run1's lower 1.
+        assert "irc_outcome" not in rxn.ts_geom[f"1_tsopt_{self.LOT}_orca"].properties
+        assert rxn.ts_geom[f"2_tsopt_{self.LOT}_orca"].properties["irc_outcome"] == "intended"
+        assert rxn.barrier[f"{self.LOT}_orca"] == pytest.approx(2.0)
+
+
 class TestPysisMaxCycles:
     """
     Check that irc.max_cycles is used in all parts of IRC calculation setup
@@ -427,7 +471,7 @@ IRC_RUNS = {
     ),
     "orca": dict(
         cls=OrcaIRCValCalculator, lot="B3LYP def2-SVP",
-        ok={"irc_1.inp": "", "irc_1.out": "THE IRC HAS CONVERGED\nORCA TERMINATED NORMALLY\n",
+        ok={"irc_1.inp": "", "irc_1.out": ORCA_IRC_LOG,
             "irc_1_IRC_F.xyz": "", "irc_1_IRC_B.xyz": "", "irc_1.gbw": "", "irc_1.err": ""},
         failed={"irc_2.inp": "", "irc_2.out": "ORCA finished by error termination in SCF\n",
                 "irc_2.err": "", "irc_2.gbw": ""},

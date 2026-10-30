@@ -245,6 +245,7 @@ class TestPysisInputBlock:
 
         assert "type: rfo" in text
         assert "do_hess: True" in text
+        assert " hessian_recalc: 3\n" in text
 
     def test_optimizer_is_configurable(self, tmp_path, khp_reaction):
         calc = make_calc(khp_reaction, "reactant_pre_opt", PreOptConfig(opt_type="rfo"),
@@ -497,6 +498,34 @@ class TestOrcaFinalHessian:
         h, s, g = OPT_THERMO_BLOCKS[-1]
         assert (enthalpy, entropy, gibbs) == pytest.approx(
             (h * Constants.ha_to_kcalmol, s * Constants.ha_to_kcalmol, g * Constants.ha_to_kcalmol), abs=1e-6)
+
+
+class TestOrcaHessianRecalc:
+    """
+    The ORCA R/P opt always ran Calc_Hess + Recalc_Hess. In the ts_handoff E3
+    benchmark (B3LYP/6-31+G*, 4 structures) dropping them gave the same minima
+    in 52% of the time, with 4 instead of 24 exact Hessians. Exact Hessians
+    during the opt are now off unless rp_opt.hessian_recalc is set; Freq still
+    gives one at the final geometry.
+    """
+
+    def _input(self, tmp_path, khp_reaction, **extra):
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1, **extra)
+        calc = make_calc(khp_reaction, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+        calc._write_orca_rp_opt_input(tmp_path / "min_opt.inp", "initial_geom.xyz")
+        return (tmp_path / "min_opt.inp").read_text()
+
+    def test_off_by_default(self, tmp_path, khp_reaction):
+        text = self._input(tmp_path, khp_reaction)
+
+        assert "Calc_Hess" not in text
+        assert "Recalc_Hess" not in text
+        assert "! OPT Freq" in text.splitlines()
+
+    def test_on_when_set(self, tmp_path, khp_reaction):
+        text = self._input(tmp_path, khp_reaction, hessian_recalc=3)
+
+        assert "%geom\n  MaxIter 300\n  Calc_Hess true\n  Recalc_Hess 3\nend\n" in text
 
 
 class TestOrcaJobScript:

@@ -515,7 +515,9 @@ class OrcaIRCValCalculator(IRCValTask):
         with open(log_file, "r") as f:
             log_text = f.read()
 
-        if "THE IRC HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
+        # ORCA prints the message once per direction, and a direction stopped
+        # at MaxIter still terminates normally, so both must be there
+        if log_text.count("THE IRC HAS CONVERGED") < 2 or "ORCA TERMINATED NORMALLY" not in log_text:
             return False
 
         return True

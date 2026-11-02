@@ -553,8 +553,9 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 those of the first bond-electron matrix in both cases.
 
     Lone pairs: after the plain pass on a bond-electron matrix, the pass is repeated once per atom with a lone pair
-    on that matrix (diagonal >= 2, not a radical, in `react`), with that atom added to the reactive atoms as if it
-    were a radical. This lets carbenes, anions and other lone pair donors form bonds. A lone pair pass skips any
+    on that matrix (diagonal >= 2, not a radical, in `react`) that also has a formal charge or isn't an octet
+    (e.g., carbenes, anions), with that atom added to the reactive atoms as if it were a radical. Neutral octet atoms
+    (e.g., amine N, ether O, a C-I iodine) don't donate, which keeps the enumeration cost down. A lone pair pass skips any
     product whose adjacency matrix was already built for the same yarpecule (by any pass), so it never yields
     an identical copy of an earlier product.
 
@@ -603,10 +604,15 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
             bonds = [_ for _ in bonds if (
                 _[0] in react[count_y] and _[1] in react[count_y])]
 
-            # Atoms with a lone pair on this bond mat can donate it to form a bond (e.g., carbenes, anions).
+            # Atoms with a lone pair on this bond mat can donate it to form a bond (e.g., carbenes, anions) if they
+            # carry a formal charge or don't have an octet (lone electrons + 2 x bond orders != 8, hydrogens excepted).
             # Each one in turn joins the reactive atoms as if it were a radical; None is the plain bnfn pass.
+            bmat = y.lewis.bond_mats[b_ind]
+            formals = return_formals(bmat, y.elements)
+            octet = [bmat[i][i] + 2 * (sum(bmat[i]) - bmat[i][i]) for i in range(len(bmat))]
             lone_pairs = [i for i in sorted(react[count_y])
-                          if y.lewis.bond_mats[b_ind][i][i] >= 2 and i not in radicals]
+                          if bmat[i][i] >= 2 and i not in radicals
+                          and (formals[i] != 0 or (y.elements[i].lower() != 'h' and octet[i] != 8))]
 
             # Loop over combinations of bonds to break (m bonds at a time), first without and then with each lone pair
             for donor, b in iproduct([None] + lone_pairs, list(combinations(list(range(len(bonds))), n))):

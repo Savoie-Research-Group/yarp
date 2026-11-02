@@ -5,7 +5,7 @@ This module contains functions and classes used to perform reaction/product enum
 import numpy as np
 from yarp.util.properties import el_valence
 from copy import copy
-from itertools import combinations
+from itertools import combinations, product as iproduct
 from numpy import vstack
 from typing import Iterable, Tuple
 from yarp.yarpecule.lewis.bem_score import return_formals
@@ -552,6 +552,10 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 which can yield products that the default misses (and more redundant products). The radical sites are
                 those of the first bond-electron matrix in both cases.
 
+    Lone pairs: after the plain pass on a bond-electron matrix, the pass is repeated once per atom with a lone pair
+    on that matrix (diagonal >= 2, not a radical, in `react`), with that atom added to the reactive atoms as if it
+    were a radical. This lets carbenes, anions and other lone pair donors form bonds.
+
     Yields
     ------
 
@@ -596,8 +600,14 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
             bonds = [_ for _ in bonds if (
                 _[0] in react[count_y] and _[1] in react[count_y])]
 
-            # Loop over combinations of bonds to break (m bonds at a time)
-            for b in combinations(list(range(len(bonds))), n):
+            # Atoms with a lone pair on this bond mat can donate it to form a bond (e.g., carbenes, anions).
+            # Each one in turn joins the reactive atoms as if it were a radical; None is the plain bnfn pass.
+            lone_pairs = [i for i in sorted(react[count_y])
+                          if y.lewis.bond_mats[b_ind][i][i] >= 2 and i not in radicals]
+
+            # Loop over combinations of bonds to break (m bonds at a time), first without and then with each lone pair
+            for donor, b in iproduct([None] + lone_pairs, list(combinations(list(range(len(bonds))), n))):
+                reactive = radicals if donor is None else radicals + [donor]
 
                 # Create set to avoid reforming the exact same bonds we just broke
                 # You read this as set(frozenset(bonds we just broke)). We use frozensets so that they are
@@ -609,8 +619,8 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 # Get atoms from bonds being broken (first 2 elements of each bond via bonds[j][:2])
                 formset = [i for j in b for i in bonds[j][:2]]
 
-                # Add radical atoms that can form new bonds
-                formset += radicals
+                # Add radical atoms (and the lone pair donor) that can form new bonds
+                formset += reactive
 
                 # Debug output
                 if debug:
@@ -636,7 +646,7 @@ def bnfn(yarpecules, n, react=[], hashes=None, hash_filter=False, lower_score=Fa
                 # bond/electron rearrangement, so identify it before ordinary
                 # pairing treats the repeated endpoint as a dangling bond.
                 shared_atom_changes = legacy_shared_atom_b2f2_changes(
-                    n, formset, radicals, y.lewis.bond_mats[b_ind], y.elements
+                    n, formset, reactive, y.lewis.bond_mats[b_ind], y.elements
                 )
 
                 # Loop over all unique ways to pair reactive atoms into new bonds

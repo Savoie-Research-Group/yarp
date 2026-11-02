@@ -689,15 +689,15 @@ def smiles2adjmat_cases():
     bracket aromatics, and H-led element symbols.
     """
     return [
-        # N4=H5 on master (OctetError)
+        # N4=H5 pre-patch (OctetError)
         ("[C:1]([H:2])([H:3])(=[N:4][H:5])", {"c": 1, "h": 3, "n": 1}, {(1, 4): 2, (4, 5): 1}),
-        # RGD1 MR_20770_1 reactant fragment: N16=H19 on master
+        # RGD1 MR_20770_1 reactant fragment: N16=H19 pre-patch
         ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2},
          {(14, 16): 2, (16, 19): 1, (12, 15): 2}),
-        # RGD1 species read "clean" on master, with C5#C6 as a double bond
+        # RGD1 species read "clean" pre-patch, with C5#C6 as a double bond
         ("[C:1](\\[C:2]([H:10])([H:11])[H:12])(=[C:3](\\[N:4]([C:5]#[C:6][H:13])[H:8])[H:9])[H:7]", {"c": 5, "h": 7, "n": 1},
          {(5, 6): 3}),
-        # unmapped: the wrong order also changed the inferred H count (master: 8 H)
+        # unmapped: the wrong order also changed the inferred H count (pre-patch: 8 H)
         ("CC(C)(=NC)", {"c": 4, "h": 9, "n": 1}, {}),
         # Kaden: `Clc` / `Brc` read as one unknown element
         ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}, {}),
@@ -707,6 +707,8 @@ def smiles2adjmat_cases():
         ("In1cccc1", {"c": 4, "h": 4, "i": 1, "n": 1}, {}),
         # `[se]` read as sulfur (silently)
         ("c1cc[se]c1", {"c": 4, "h": 4, "se": 1}, {}),
+        # `[siH]` read as sulfur (silently); RDKit writes silabenzene this way
+        ("c1cc[siH]cc1", {"c": 5, "h": 6, "si": 1}, {}),
         # the H of He counted as a hydrogen (OctetError)
         ("[He]", {"he": 1}, {}),
     ]
@@ -719,8 +721,8 @@ def hydrogen_count_cases():
     parsed graph. Aromatic b and p take two ring neighbors, like n.
     """
     return [
-        ("c1ccbcc1", [1, 1, 1, 0, 1, 1]),                               # borabenzene (master: BH, then OctetError)
-        ("c1ccpcc1", [1, 1, 1, 0, 1, 1]),                               # phosphinine (master: PH, silently)
+        ("c1ccbcc1", [1, 1, 1, 0, 1, 1]),                               # borabenzene (pre-patch: BH, then OctetError)
+        ("c1ccpcc1", [1, 1, 1, 0, 1, 1]),                               # phosphinine (pre-patch: PH, silently)
         ("Cc1ccpcc1", [3, 0, 1, 1, 0, 1, 1]),
         ("b1nbnbn1", [0] * 6),
         ("[bH]1[nH][bH][nH][bH][nH]1", [1] * 6),                        # guard: bracket counts
@@ -739,7 +741,7 @@ def aromatic_double_bond_cases():
     exocyclic double bond get none; a neutral sigma-radical c gets one.
     """
     return [
-        ("[c]1ccccc1", [True] * 6),                                     # phenyl radical (master: radical on c6)
+        ("[c]1ccccc1", [True] * 6),                                     # phenyl radical (pre-patch: radical on c6)
         ("[c:1]1[c:2]([H:7])[c:3]([H:8])[c:4]([H:9])[c:5]([H:10])[c:6]1[H:11]", [True] * 6),
         ("c1ccbcc1", [True] * 6),                                       # ring b and p: one ring double bond
         ("c1ccpcc1", [True] * 6),
@@ -760,14 +762,14 @@ def aromatic_double_bond_cases():
 def ring_cases():
     """
     (smiles, ring sizes) for return_rings(remove_fused=False). The first atom of the fused
-    ones is a fusion atom whose lowest ring neighbour is across the shared bond (master
-    raised), or master returned a path that does not close.
+    ones is a fusion atom whose lowest ring neighbour is across the shared bond (the
+    pre-patch version raised), or the pre-patch version returned a path that does not close.
     """
     return [
-        ("c12c(occ1)cccc2", [5, 6, 9]),                                 # benzofuran (master raised)
-        ("c12c([nH]cc1)cccc2", [5, 6, 9]),                              # indole (master raised)
-        ("[n:1]12[n:2]([n:3]1[H:6])[c:4]2=[O:5]", [3, 3, 4]),           # RGD1 species (master raised)
-        ("c1cccc2sc(cc12)O", [5, 6, 9]),                                # master: non-closing 9-atom path
+        ("c12c(occ1)cccc2", [5, 6, 9]),                                 # benzofuran (pre-patch raised)
+        ("c12c([nH]cc1)cccc2", [5, 6, 9]),                              # indole (pre-patch raised)
+        ("[n:1]12[n:2]([n:3]1[H:6])[c:4]2=[O:5]", [3, 3, 4]),           # RGD1 species (pre-patch raised)
+        ("c1cccc2sc(cc12)O", [5, 6, 9]),                                # pre-patch: non-closing 9-atom path
         ("c1ccc2ccccc2c1", [6, 6, 10]),                                 # guard: naphthalene
         ("C1CC2CCC1C2", [5, 5, 6]),                                     # guard: norbornane
         ("C1CCC2(C1)CC2", [3, 5]),                                      # guard: spiro
@@ -822,12 +824,12 @@ def xyz_from_smiles_cases():
     (a finite geometry, never None) or the exception raised.
     """
     return [
-        (CYCLIC_CUMULENE, "yarp", "geometry"),                          # master: ValueError Bad Conformer Id
-        (CYCLIC_CUMULENE, "rdkit", "geometry"),                         # master: geometry None
-        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "yarp", "geometry"),  # master: TypeError
-        ("[C:1]=[O:4].[C:2](#[N:3])[H:5]", "yarp", "geometry"),         # master: embedded as formaldehyde
-        ("[C:1]([H:2])[H:3]", "yarp", "geometry"),                      # master: carbene embedded as methane
-        ("c1ccccc1[N](C)(C)C", "yarp", "OctetError"),                   # master: tried the RDKit geometry fallback
+        (CYCLIC_CUMULENE, "yarp", "geometry"),                          # pre-patch: ValueError Bad Conformer Id
+        (CYCLIC_CUMULENE, "rdkit", "geometry"),                         # pre-patch: geometry None
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "yarp", "geometry"),  # pre-patch: TypeError
+        ("[C:1]=[O:4].[C:2](#[N:3])[H:5]", "yarp", "geometry"),         # pre-patch: embedded as formaldehyde
+        ("[C:1]([H:2])[H:3]", "yarp", "geometry"),                      # pre-patch: carbene embedded as methane
+        ("c1ccccc1[N](C)(C)C", "yarp", "OctetError"),                   # pre-patch: tried the RDKit geometry fallback
         ("CCO", "yarp", "geometry"),                                    # guard
         ("CCO", "rdkit", "geometry"),                                   # guard
     ]
@@ -840,11 +842,11 @@ def yarpecule_cases():
     RDKit fallback. Master's defaults sent each through a fallback, or failed.
     """
     return [
-        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}),                      # master: RDKit mode
-        ("c1ccoc1", {"c": 4, "h": 4, "o": 1}),                          # master: RDKit geometry fallback
-        ("c12c(occ1)cccc2", {"c": 8, "h": 6, "o": 1}),                  # master: RDKit geometry fallback
-        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2}),  # master: OctetError
-        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", {"c": 2, "h": 3, "n": 3}),  # master: TypeError
-        (CYCLIC_CUMULENE, {"c": 6, "h": 5, "n": 1}),                    # master: ValueError
+        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}),                      # pre-patch: RDKit mode
+        ("c1ccoc1", {"c": 4, "h": 4, "o": 1}),                          # pre-patch: RDKit geometry fallback
+        ("c12c(occ1)cccc2", {"c": 8, "h": 6, "o": 1}),                  # pre-patch: RDKit geometry fallback
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2}),  # pre-patch: OctetError
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", {"c": 2, "h": 3, "n": 3}),  # pre-patch: TypeError
+        (CYCLIC_CUMULENE, {"c": 6, "h": 5, "n": 1}),                    # pre-patch: ValueError
         ("CCO", {"c": 2, "h": 6, "o": 1}),                              # guard
     ]

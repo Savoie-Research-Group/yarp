@@ -170,7 +170,7 @@ class TestStrictDefault:
     def test_strict_default(self, yarpecule_cases, capsys):
         """
         strict=True by default, and each case builds in yarp mode with a geometry and no
-        RDKit fallback (master's defaults sent each through one, or failed).
+        RDKit fallback (the pre-patch defaults sent each through one, or failed).
         """
         assert inspect.signature(ypcule.__init__).parameters["strict"].default is True
         for smiles, elements in yarpecule_cases:

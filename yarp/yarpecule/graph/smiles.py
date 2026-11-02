@@ -34,14 +34,14 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     """
 
     if not hasattr(smiles2adjmat, 'aromatics'):
-        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s", "se", "as", "te"}
+        smiles2adjmat.aromatics = {"b", "c", "n", "o", "p", "s", "se", "as", "te", "si"}
         smiles2adjmat.token_pattern = r'(\[[^\]]*\]|%\d{2}|[A-Z][a-z]?|[a-z]|\d{1}|[=#+\-\\\/.@:()])'
         smiles2adjmat.atom_pattern = r'([A-Z](?:[a-z]+)?|[a-z])'
         smiles2adjmat.ring_pattern = re.compile(r'^(%\d{2}|\d)$')
         smiles2adjmat.isotope_pattern = re.compile(r'^\[(\d+)')
         smiles2adjmat.charge_pattern = re.compile(r'(\+\d+|-\d+|\++(?!\d)|-+(?!\d))')
         smiles2adjmat.hydrogen_pattern = re.compile(r'(H\d+|H+)')
-        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z][a-z]?|se|as|te|[a-z])')
+        smiles2adjmat.element_label_pattern = re.compile(r'([A-Z][a-z]?|[a-z][a-z]?)')
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
         smiles2adjmat.valid_elements = {
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
@@ -112,6 +112,9 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             element_label_match = smiles2adjmat.element_label_pattern.search(token)
             if element_label_match:
                 element_label = element_label_match.group(1)
+                # Only the aromatic set may be lowercase, so e.g. [sn] is not read as sulfur
+                if element_label.islower() and element_label not in smiles2adjmat.aromatics:
+                    raise ValueError(f"Unknown aromatic element '{element_label}' in {token}; write it in Kekule form.")
                 stereo_atom = '@@' if '@@' in token else '@' if '@' in token else None
                 atom_info[atom_counter] = {
                     "atom_map": atom_mapping,
@@ -472,15 +475,15 @@ def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
     exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add (`hydrogen_count()`).
     An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n). An even
     count means the atom gives the ring a lone pair or nothing (e.g., pyrrole-type n, ring o/s, or a
-    c with an exocyclic =O). The exception is a neutral c with two electrons left, which is a sigma
+    c with an exocyclic =O). The exception is a neutral c or si with two electrons left, which is a sigma
     radical (e.g., [c]1ccccc1) and still gets a ring double bond.
     """
     element = atom_info[atom]["element"]
     hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
     electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
 
-    # A neutral c with two electrons left is a sigma radical. Only a carbanion like [cH-] gives the ring a lone pair.
-    if element == 'c' and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
+    # A neutral c or si with two electrons left is a sigma radical. Only an anion like [cH-] gives the ring a lone pair.
+    if element in ['c', 'si'] and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
         return True
     return electrons % 2 == 1
 

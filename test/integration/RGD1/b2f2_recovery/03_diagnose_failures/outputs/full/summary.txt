@@ -1,41 +1,36 @@
-run: /groups/bsavoie2/emille35/yarp_baselines/conjugated_lewis_da3a1ae/03_full
+run: /groups/bsavoie2/emille35/yarp_baselines/exhaust_enum_fedf73a/03_full
 shards: 50/50 done
-commit: ['5f2e8ef']
-branch: ['conjugated-lewis-moves']
+commit: ['fedf73a']
+branch: ['exhaust_enum']
 rdkit: ['2025.09.5']
-find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['64f234dced35']; args: ['{"k": 3, "timeout": 900}']
+find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['a2fe328d60ee']; args: ['{"k": 3, "timeout": 900}']
 
-== 4,104 reactants -> 4,604 step 02 clean failures (missed 4,349, species_only 255) ==
-  reactant keeps 1 BEM (straight to reordering):  3,496 / 4,604 ( 75.9%) rows
-  reactant keeps > 1 BEM (exhaustive bnfn first):  1,108 / 4,604 ( 24.1%) rows
+== 4,103 reactants -> 4,603 step 02 clean failures (missed 4,349, species_only 254) ==
+  reactant keeps 1 BEM (straight to reordering):  3,496 / 4,603 ( 76.0%) rows
+  reactant keeps > 1 BEM (exhaustive bnfn first):  1,107 / 4,603 ( 24.0%) rows
 
 == outcome ==
                                    all rows     1 kept BEM   > 1 kept BEM
-  exhaustive_pass      227 / 4,604 (  4.9%)              0            227
-  reorder_pass         543 / 4,604 ( 11.8%)            449             94
-  persist_fail       3,834 / 4,604 ( 83.3%)          3,047            787
-
-== exhaustive passes ==
-  found on bnfn's own BEM (fc_ind), so only the union of radicals changed:      1 / 227 (  0.4%)
-  found only on another kept BEM:    226 / 227 ( 99.6%)
-  a recovering BEM has formal charges (sum |fc| > 0):    225 / 227 ( 99.1%)
+  exhaustive_pass      226 / 4,603 (  4.9%)              0            226
+  reorder_pass         541 / 4,603 ( 11.8%)            448             93
+  persist_fail       3,836 / 4,603 ( 83.3%)          3,048            788
 
 == reorder passes ==
-  by relabelling k: k=1 456, k=2 67, k=3 20
-  relabelled reactant keeps a different number of BEMs:    530 / 543 ( 97.6%)
-  base reactant keeps 1 BEM:    449 / 543 ( 82.7%)
+  by relabelling k: k=1 454, k=2 67, k=3 20
+  relabelled reactant keeps a different number of BEMs:    528 / 541 ( 97.6%)
+  base reactant keeps 1 BEM:    448 / 541 ( 82.8%)
 
 == persisting failures ==
-  lp_insertion (an atom forms >= 2 new bonds from a lone pair):  1,647 / 3,834 ( 43.0%)
-  YARP b2f2 (fewest-change BEM pair), no lp_insertion:  1,729 / 3,834 ( 45.1%)
-  not YARP b2f2, no lp_insertion:    458 / 3,834 ( 11.9%)
+  lp_insertion (an atom forms >= 2 new bonds from a lone pair):  1,647 / 3,836 ( 42.9%)
+  YARP b2f2 (fewest-change BEM pair), no lp_insertion:  1,729 / 3,836 ( 45.1%)
+  not YARP b2f2, no lp_insertion:    460 / 3,836 ( 12.0%)
   adjacency (breaks, forms): (1, 2) 1,918, (1, 1) 838, (2, 1) 485, (2, 2) 175, (0, 1) 143, (0, 2) 117
 
-== reactants: 4,104 ==
-  t_total: sum 5.98 h, median 3.1 s, max 114 s
+== reactants: 4,103 ==
+  t_total: sum 5.14 h, median 2.8 s, max 82 s
   timeouts: none
 
 == exported to outputs/full ==
-  rxn_exhaustive_pass.csv     227 / 4,604 (  4.9%) rows
-  rxn_reorder_pass.csv        543 / 4,604 ( 11.8%) rows
-  rxn_persist_fail.csv      3,834 / 4,604 ( 83.3%) rows
+  rxn_exhaustive_pass.csv     226 / 4,603 (  4.9%) rows
+  rxn_reorder_pass.csv        541 / 4,603 ( 11.8%) rows
+  rxn_persist_fail.csv      3,836 / 4,603 ( 83.3%) rows

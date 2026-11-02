@@ -1,9 +1,9 @@
 run: /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/03_diagnose_failures/runs/pilot
 shards: 1/1 done
-commit: ['0b87143']
-branch: ['conjugated-lewis-moves']
+commit: ['fedf73a']
+branch: ['exhaust_enum']
 rdkit: ['2026.03.6']
-find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['64f234dced35']; args: ['{"k": 3, "timeout": 900}']
+find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['a2fe328d60ee']; args: ['{"k": 3, "timeout": 900}']
 
 == 2 reactants -> 3 step 02 clean failures (missed 3) ==
   reactant keeps 1 BEM (straight to reordering):      3 / 3 (100.0%) rows

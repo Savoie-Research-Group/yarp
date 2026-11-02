@@ -5,12 +5,14 @@ The rows are step 02 reactions that failed with clean parses on both sides
 and stops at the first that recovers its RGD1 reaction (exact reaction hash):
 
   1 exhaustive  Only if the reactant keeps more than one BEM:
-                bnfn_exhaustive(R, 2) (see bnfn_exhaustive.py) -> exhaustive_pass.
-                With one kept BEM, bnfn_exhaustive is exactly bnfn, which
-                already failed in step 02, so these rows go straight to stage 2.
+                bnfn(R, 2, exhaustive=True) -> exhaustive_pass. Its fc_ind
+                pass is exactly step 02's bnfn, so a pass here comes from
+                another kept BEM. With one kept BEM, exhaustive is exactly
+                bnfn, which already failed in step 02, so these rows go
+                straight to stage 2.
   2 reorder     K random relabellings of the atom maps (seeded per reactant),
-                each parsed again and run through bnfn_exhaustive; the RGD1
-                product is relabelled the same way -> reorder_pass (with k).
+                each parsed again and run through bnfn(exhaustive=True); the
+                RGD1 product is relabelled the same way -> reorder_pass (with k).
   3 none        -> persist_fail.
 
 Parsing, reaction hashes and the bnfn call (hashes=set(), hash_filter=False)
@@ -37,9 +39,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from bnfn_exhaustive import bnfn_exhaustive
+from yarp.yarpecule.yarpecule import yarpecule  # noqa: F401  (first: avoids a circular import)
+from yarp.reaction.enum import bnfn
 from yarp.reaction.reaction import reaction
-from yarp.yarpecule.lewis.bem_score import return_formals
 
 # Step 02's driver, loaded under its own name (this file is also run_shard.py)
 _spec = importlib.util.spec_from_file_location(
@@ -60,10 +62,6 @@ def radicals_of(b):
     return {i for i in range(len(b)) if b[i][i] % 2 == 1}
 
 
-def sum_fc(y, b):
-    return int(sum(abs(v) for v in return_formals(b, y.elements)))
-
-
 def structural(R, P_aligned):
     d = np.asarray(P_aligned.adj_mat) - np.asarray(R.adj_mat)
     gain, loss = (d > 0).sum(axis=1), (d < 0).sum(axis=1)
@@ -75,12 +73,9 @@ def structural(R, P_aligned):
 
 
 def exhaustive(R):
-    """{reaction hash: sorted source BEM indices} over bnfn_exhaustive(R, 2)."""
-    prods, _ = quiet(lambda: list(bnfn_exhaustive(R, 2, hashes=set(), hash_filter=False, verbose=False)))
-    found = {}
-    for p in prods:
-        found.setdefault(light_rxn_hash(R, p), set()).add(p.source_bem)
-    return {h: sorted(s) for h, s in found.items()}, len(prods)
+    """(reaction hashes, raw product count) of bnfn(R, 2, exhaustive=True)."""
+    prods, _ = quiet(lambda: list(bnfn(R, 2, hashes=set(), hash_filter=False, verbose=False, exhaustive=True)))
+    return {light_rxn_hash(R, p) for p in prods}, len(prods)
 
 
 def main():
@@ -89,7 +84,7 @@ def main():
     ap.add_argument("--shard", type=int, required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--k", type=int, default=3, help="number of atom-map relabellings")
-    ap.add_argument("--timeout", type=int, default=900, help="seconds per bnfn_exhaustive call")
+    ap.add_argument("--timeout", type=int, default=900, help="seconds per exhaustive bnfn call")
     ap.add_argument("--rerun", action="store_true", help="rerun a shard that already has DONE")
     a = ap.parse_args()
 
@@ -157,14 +152,10 @@ def main():
                 if res is not None:
                     found, rr["n_raw_exhaustive"] = res
                     for rid in open_rows():
-                        src = found.get(todo[rid])
-                        if src is not None:
-                            rec[rid].update(outcome="exhaustive_pass",
-                                            exhaustive_bems=" ".join(map(str, src)),
-                                            exhaustive_found_by_fc_bem=fci in src,
-                                            exhaustive_bem_sum_fc=" ".join(str(sum_fc(R, bems[j])) for j in src))
+                        if todo[rid] in found:
+                            rec[rid]["outcome"] = "exhaustive_pass"
 
-            # Stage 2: atom-map relabellings, each through bnfn_exhaustive
+            # Stage 2: atom-map relabellings, each through exhaustive bnfn
             maps = sorted(int(m) for m in MAP.findall(r_smi))
             for k in range(1, a.k + 1):
                 if not open_rows():
@@ -191,8 +182,7 @@ def main():
                     except Exception:  # noqa: BLE001
                         continue
                     if h in found_v:
-                        rec[rid].update(outcome="reorder_pass", reorder_k=k, reorder_n_bem=len(Rv.bond_mats),
-                                        reorder_bems=" ".join(map(str, found_v[h])))
+                        rec[rid].update(outcome="reorder_pass", reorder_k=k, reorder_n_bem=len(Rv.bond_mats))
             for rid in open_rows():
                 rec[rid]["outcome"] = "persist_fail"
 

@@ -174,6 +174,9 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
         elif token == ')':
             current_level -= 1
             close_flag = True
+        elif token == '.':
+            # A dot starts a new fragment, so a `)` before it closes nothing for the next atom
+            close_flag = False
         elif token in ['/', '\\']:
             pending_bond_stereo = token
         elif token in ['@', '@@']:
@@ -200,6 +203,9 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             sequential_atom_counter += 1
         elif smiles2adjmat.ring_pattern.match(token):
             atom_index = sequential_atom_counter - 1
+            # After a `)`, the digit belongs to the atom the branch hangs off, not to the branch's last atom
+            if close_flag:
+                atom_index = max(k for k in range(sequential_atom_counter) if branch_levels[k] == current_level)
             if token in ring_numbers:
                 if tokens[i - 1] == '-':
                     last_bond_type = 1
@@ -520,8 +526,7 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
     bonds = sum(adjmat[atom])
 
     if explicit_hydrogens is not None:
-        if any(atom_info[i]["element"] == 'h' and adjmat[atom, i] != 0 for i in range(len(atom_info))):
-            return 0
+        # The written count is in addition to any hydrogen atoms bonded to it, as in standard SMILES
         return explicit_hydrogens
 
     if not atom_parse_meta[atom]["should_infer_hydrogens"]:

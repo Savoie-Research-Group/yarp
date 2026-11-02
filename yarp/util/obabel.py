@@ -95,7 +95,8 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
     Returns
     -------
     geo : nd array (N x 3)
-        generated geometry, indexed to `elements`
+        generated geometry, indexed to `elements`. A RuntimeError is raised if the geometry
+        cannot be built or the force field cannot be set up for the molecule.
     '''
     payload = {"atomic_numbers": [el_to_an[_.lower()] for _ in elements],
                "bond_mat": np.asarray(bond_mat).tolist(),
@@ -141,8 +142,13 @@ def _obabel_embed_worker():
     if not ob.OBBuilder().Build(mol.OBMol):
         raise RuntimeError("Open Babel could not build a geometry.")
 
+    # Set up the force field here instead of with localopt(), which skips the optimization silently if setup fails.
     # A fresh process has no cached force field, so _ensure_setup_needed() is not needed here
-    mol.localopt(forcefield=payload["lot"], steps=payload["maxiter"])
+    ff = ob.OBForceField.FindForceField(payload["lot"])
+    if not ff.Setup(mol.OBMol):
+        raise RuntimeError(f"Open Babel could not set up {payload['lot']} for this molecule.")
+    ff.SteepestDescent(payload["maxiter"])
+    ff.GetCoordinates(mol.OBMol)
 
     print(json.dumps({"geo": [atom.coords for atom in mol.atoms]}))
 

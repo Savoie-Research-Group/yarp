@@ -623,7 +623,9 @@ def geo_via_obabel(mol, smiles):
     """
     Generate a geometry with Open Babel for an rdkit molecule that rdkit could not embed
     (e.g., strained rings with cumulated double bonds). The geometry follows the atom order
-    of `mol`. A warning is printed if the geometry does not reproduce the connectivity.
+    of `mol`. It is built with MMFF94 first and rebuilt with UFF if MMFF94 cannot be set up or its
+    geometry does not reproduce the connectivity. A warning is printed if neither does (the UFF
+    geometry is returned).
     """
     print(f"WARNING: RDKit could not embed a geometry for {smiles}; using Open Babel.")
     elements = [_.lower() for _ in el_from_rdmol(mol)]
@@ -636,9 +638,19 @@ def geo_via_obabel(mol, smiles):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         bond_mat[i, j] = bond_mat[j, i] = bond.GetBondTypeAsDouble()
 
-    geo = obabel_embed(elements, bond_mat, [atom.GetFormalCharge() for atom in mol.GetAtoms()])
-    if (table_generator(elements, geo) != adj_from_rdmol(mol)).any():
-        print(f"WARNING: the Open Babel geometry for {smiles} does not reproduce its connectivity.")
+    # MMFF94 keeps the bonds more often, but UFF can be set up for more molecules
+    fc = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    for lot in ["mmff94", "uff"]:
+        try:
+            geo = obabel_embed(elements, bond_mat, fc, lot=lot)
+        except RuntimeError:
+            # UFF is the last try, so its error is raised
+            if lot == "uff":
+                raise
+            continue
+        if (table_generator(elements, geo) == adj_from_rdmol(mol)).all():
+            return geo
+    print(f"WARNING: the Open Babel geometry for {smiles} does not reproduce its connectivity.")
     return geo
 
 

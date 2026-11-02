@@ -336,8 +336,9 @@ class lewis_struct:
                              w_def=w_def, w_exp=w_exp, w_formal=w_formal, w_aro=w_aro, w_rad=w_rad,
                              factor=factor, verbose=False) for _ in bond_mats]
 
-        # Sort by final scores
-        inds = np.argsort(scores)
+        # Sort by final scores. A stable sort keeps tied structures in discovery order; the default sort
+        # orders ties differently on CPUs with AVX-512, which changes the first structure (and the products).
+        inds = np.argsort(scores, kind="stable")
         bond_mats = [bond_mats[_] for _ in inds]
         scores = [scores[_] for _ in inds]
 

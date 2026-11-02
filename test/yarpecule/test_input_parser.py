@@ -651,12 +651,15 @@ class TestAtomMapIngestion:
 
 class TestGeoViaObabel:
     def test_fallback(self, geo_via_obabel_cases, capsys):
-        """An Open Babel geometry in the atom order of the rdkit molecule, with a warning."""
+        """An Open Babel geometry in the atom order of the rdkit molecule; the fallback is reported only with verbose."""
         for smiles in geo_via_obabel_cases:
             mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
             geo = geo_via_obabel(mol, smiles)
             assert geo.shape == (mol.GetNumAtoms(), 3) and np.isfinite(geo).all(), smiles
-            assert "using Open Babel" in capsys.readouterr().out, smiles
+            assert "using Open Babel" not in capsys.readouterr().out, smiles
+
+        geo_via_obabel(mol, smiles, verbose=True)
+        assert "using Open Babel" in capsys.readouterr().out
 
 
 class TestXyzFromSmilesRegressions:

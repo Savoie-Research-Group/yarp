@@ -5,7 +5,9 @@ Consider moving this to util if anything outside of yarpecule needs to access it
 from pathlib import Path
 
 import re
+from contextlib import nullcontext
 import numpy as np
+from rdkit import rdBase
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles, Kekulize
 from yarp.util.obabel import obabel_embed
 from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
@@ -477,7 +479,7 @@ def mol_parse(mol):
     return elements, geo, adj_mat, q, atom_info
 
 
-def xyz_from_smiles(smiles, mode="yarp", strict=True):
+def xyz_from_smiles(smiles, mode="yarp", strict=True, verbose=False):
     """
     A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
     Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
@@ -500,6 +502,9 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
            octet violations raise an `OctetError`. If False, aromatic SMILES that fail the octet check
            keep the in-house graph and take their geometry from rdkit (`geo_via_rdkit()`).
 
+    verbose : bool
+           If False (the default), rdkit's log is silenced while it embeds, and the Open Babel fallback
+           prints only when its geometry does not reproduce the bonds. If True, both print everything.
 
     Returns
     -------
@@ -560,7 +565,7 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
                     "WARNING: yarp aromatic SMILES geometry fallback used RDKit "
                     f"for {smiles} after octet validation failed at atoms {violations}."
                 )
-                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),)
+                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),verbose=verbose)
                 return elements, geo, adj_mat, q, atom_info
             raise OctetError(violations)
 
@@ -597,22 +602,15 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
         mol.UpdatePropertyCache()
 
         # get geometry
-        AllChem.EmbedMolecule(mol, randomSeed=0xf00d)  # create a 3D geometry
-        geo = geom_from_rdmol(mol)  # None if rdkit could not embed the molecule
-        if geo is None:
-            geo = geo_via_obabel(mol, smiles)
+        geo = geo_via_embed(mol, smiles, verbose=verbose)
 
         return elements, geo, adj_mat, q, atom_info
 
     # RDKit branch
     else:
         m = smiles_to_rdmol(smiles)
-        AllChem.EmbedMolecule(m, randomSeed=0xf00d)
-
+        geo = geo_via_embed(m, smiles, verbose=verbose)
         elements = el_from_rdmol(m)
-        geo = geom_from_rdmol(m)  # None if rdkit could not embed the molecule
-        if geo is None:
-            geo = geo_via_obabel(m, smiles)
         adj_mat = adj_from_rdmol(m)
         atom_info = atom_info_from_rdmol(m)
         q = int(sum(atom_info[i]["formal_charge"] for i in atom_info))
@@ -620,15 +618,30 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True):
     return elements, geo, adj_mat, q, atom_info
 
 
-def geo_via_obabel(mol, smiles):
+def geo_via_embed(mol, smiles, verbose=False):
+    """
+    Embed an rdkit molecule (seeded) and return its geometry, or the Open Babel geometry
+    (`geo_via_obabel()`) if rdkit cannot embed it. Unless `verbose`, rdkit's log is silenced
+    during the embedding (e.g., UFFTYPER errors for atoms it has no force-field type for).
+    """
+    with nullcontext() if verbose else rdBase.BlockLogs():
+        AllChem.EmbedMolecule(mol, randomSeed=0xf00d)
+    geo = geom_from_rdmol(mol)  # None if rdkit could not embed the molecule
+    if geo is None:
+        geo = geo_via_obabel(mol, smiles, verbose=verbose)
+    return geo
+
+
+def geo_via_obabel(mol, smiles, verbose=False):
     """
     Generate a geometry with Open Babel for an rdkit molecule that rdkit could not embed
     (e.g., strained rings with cumulated double bonds). The geometry follows the atom order
     of `mol`. It is built with MMFF94 first and rebuilt with UFF if MMFF94 cannot be set up or its
     geometry does not reproduce the connectivity. A warning is printed if neither does (the UFF
-    geometry is returned).
+    geometry is returned); with `verbose`, each step is printed too.
     """
-    print(f"WARNING: RDKit could not embed a geometry for {smiles}; using Open Babel.")
+    if verbose:
+        print(f"RDKit could not embed a geometry for {smiles}; using Open Babel.")
     elements = [_.lower() for _ in el_from_rdmol(mol)]
 
     # Take the bond orders from a kekulized copy, so aromatic bonds come out as 1 or 2
@@ -644,18 +657,24 @@ def geo_via_obabel(mol, smiles):
     for lot in ["mmff94", "uff"]:
         try:
             geo = obabel_embed(elements, bond_mat, fc, lot=lot)
-        except RuntimeError:
+        except RuntimeError as e:
             # UFF is the last try, so its error is raised
             if lot == "uff":
                 raise
+            if verbose:
+                print(f"Open Babel {lot} failed for {smiles} ({e}); trying UFF.")
             continue
         if (table_generator(elements, geo) == adj_from_rdmol(mol)).all():
+            if verbose:
+                print(f"Open Babel {lot} geometry used for {smiles}.")
             return geo
+        if verbose and lot != "uff":
+            print(f"The Open Babel {lot} geometry for {smiles} does not reproduce its connectivity; trying UFF.")
     print(f"WARNING: the Open Babel geometry for {smiles} does not reproduce its connectivity.")
     return geo
 
 
-def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
+def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False, verbose=False):
     """
     Generate a geometry with RDKit and align it to the atom ordering used by
     the in-house SMILES parser.
@@ -665,7 +684,7 @@ def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     geometry comes from rdkit (or from Open Babel, if rdkit cannot embed it).
     """
     m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
-    AllChem.EmbedMolecule(m, randomSeed=0xf00d)
+    rdkit_geo = geo_via_embed(m, smiles, verbose=verbose)
 
     rdkit_elements = [el.lower() for el in el_from_rdmol(m)]
     yarp_elements = [atom_info[i]["element"] for i in atom_info]
@@ -685,9 +704,6 @@ def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     else:
         raise ValueError("RDKit fallback atom order did not match the in-house parser ordering.")
 
-    rdkit_geo = geom_from_rdmol(m)  # None if rdkit could not embed the molecule
-    if rdkit_geo is None:
-        rdkit_geo = geo_via_obabel(m, smiles)
     geo = np.zeros((len(order), 3))
     for i, rdkit_idx in enumerate(order):
         geo[i] = rdkit_geo[rdkit_idx]

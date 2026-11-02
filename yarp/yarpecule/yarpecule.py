@@ -45,11 +45,14 @@ class yarpecule:
             Thoughts on renaming this to smi_mode? - ERM
 
     strict : bool, default=True
-            Only used when parsing SMILES in 'yarp' mode. If True, the in-house parser is the only
-            parser and any parsing error is raised. If False, an aromatic SMILES that fails the octet
-            check takes its geometry from rdkit, and other parsing errors (except ValueErrors, such as
-            OctetError) fall back to rdkit mode. Either way, rdkit generates the geometry, with Open
-            Babel as the fallback when rdkit cannot embed the molecule.
+            Only used when parsing SMILES in 'yarp' mode. A ValueError from the in-house parser (e.g., an
+            OctetError or an unknown element) is always raised as is. Any other parsing error is raised as
+            a TypeError if True, or the SMILES is parsed again in rdkit mode if False. With False, an
+            aromatic SMILES that fails the octet check also keeps the in-house graph and takes its geometry
+            from rdkit. Either way, rdkit generates the geometry, with Open Babel as the fallback when rdkit
+            cannot embed the molecule. A yarpecule takes one input; the reaction loaders
+            (`load_reactions_from_smiles_file()`, `load_reactions_from_xyz_directory()`) skip an input
+            that raises, print why, and continue with the rest.
 
     Attributes:
     -----------
@@ -262,8 +265,8 @@ class yarpecule:
                 Mode to control SMILES parsing.
 
         strict : bool
-                Whether a failed in-house SMILES parse is raised (True) or can fall back to rdkit
-                (False). See `strict` in the class docstring.
+                Whether a failed in-house SMILES parse is raised as a TypeError (True) or falls back to
+                rdkit (False). A ValueError is always raised as is. See `strict` in the class docstring.
 
         Updated Attributes:
         ------------------

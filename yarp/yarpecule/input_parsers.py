@@ -374,9 +374,10 @@ def load_reactions_from_smiles_file(source_path):
                         product_q,
                         product_atom_info,
                     ) = xyz_from_smiles(product_smiles, mode="yarp")
-                except Exception:
+                except Exception as exc:
                     raise RuntimeError(
-                        f"Line {line_number} in {source_path}: could not parse reaction SMILES."
+                        f"Line {line_number} in {source_path}: could not parse reaction SMILES "
+                        f"({type(exc).__name__}: {exc})"
                     )
 
                 for atom_info in (reactant_atom_info, product_atom_info):

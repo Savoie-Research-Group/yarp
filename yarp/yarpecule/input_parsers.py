@@ -637,8 +637,9 @@ def geo_via_obabel(mol, smiles, verbose=False):
     Generate a geometry with Open Babel for an rdkit molecule that rdkit could not embed
     (e.g., strained rings with cumulated double bonds). The geometry follows the atom order
     of `mol`. It is built with MMFF94 first and rebuilt with UFF if MMFF94 cannot be set up or its
-    geometry does not reproduce the connectivity. A warning is printed if neither does (the UFF
-    geometry is returned); with `verbose`, each step is printed too.
+    geometry does not reproduce the connectivity. A warning is printed if neither does, and the
+    MMFF94 geometry is returned if MMFF94 could be set up (otherwise UFF's); with `verbose`, each
+    step is printed too.
     """
     if verbose:
         print(f"RDKit could not embed a geometry for {smiles}; using Open Babel.")
@@ -654,24 +655,28 @@ def geo_via_obabel(mol, smiles, verbose=False):
 
     # MMFF94 keeps the bonds more often, but UFF can be set up for more molecules
     fc = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    geos = {}
     for lot in ["mmff94", "uff"]:
         try:
-            geo = obabel_embed(elements, bond_mat, fc, lot=lot)
+            geos[lot] = obabel_embed(elements, bond_mat, fc, lot=lot)
         except RuntimeError as e:
-            # UFF is the last try, so its error is raised
-            if lot == "uff":
+            # UFF is the last try, so its error is raised unless MMFF94 gave a geometry
+            if lot == "uff" and not geos:
                 raise
             if verbose:
-                print(f"Open Babel {lot} failed for {smiles} ({e}); trying UFF.")
+                print(f"Open Babel {lot} failed for {smiles} ({e}){'; trying UFF' if lot != 'uff' else ''}.")
             continue
-        if (table_generator(elements, geo) == adj_from_rdmol(mol)).all():
+        if (table_generator(elements, geos[lot]) == adj_from_rdmol(mol)).all():
             if verbose:
                 print(f"Open Babel {lot} geometry used for {smiles}.")
-            return geo
+            return geos[lot]
         if verbose and lot != "uff":
             print(f"The Open Babel {lot} geometry for {smiles} does not reproduce its connectivity; trying UFF.")
+
+    # Neither keeps the bonds. MMFF94's geometry is kept: in the RGD1 cases its wrong bonds sit just past
+    # the cutoff (e.g., 1.76 vs 1.70 A), where UFF's are far off (2.55 A)
     print(f"WARNING: the Open Babel geometry for {smiles} does not reproduce its connectivity.")
-    return geo
+    return geos.get("mmff94", geos.get("uff"))
 
 
 def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False, verbose=False):
@@ -682,6 +687,9 @@ def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False, verbose=False):
     Only used with strict=False, as the fallback for aromatic SMILES that fail the
     octet check in `xyz_from_smiles()`: the in-house graph is kept and only the
     geometry comes from rdkit (or from Open Babel, if rdkit cannot embed it).
+
+    Currently unused as of YARPv3.0.2 (01NOV2026): every RGD1 SMILES parses strictly, so
+    no input reaches this fallback. Kept for strict=False.
     """
     m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
     rdkit_geo = geo_via_embed(m, smiles, verbose=verbose)

@@ -421,8 +421,8 @@ class TestSmi2Adj:
         assert bemat.shape == (15, 15)
 
 
-class TestSmi2AdjRegressions:
-    def test_regressions(self, smiles2adjmat_cases):
+class TestSmi2AdjEdgeCases:
+    def test_elements_and_bond_orders(self, smiles2adjmat_cases):
         """
         Branch bookkeeping, element tokens and bracket atoms: the right elements, the named
         bond orders, and no radicals.

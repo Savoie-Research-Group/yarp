@@ -662,8 +662,8 @@ class TestGeoViaObabel:
         assert "using Open Babel" in capsys.readouterr().out
 
 
-class TestXyzFromSmilesRegressions:
-    def test_regressions(self, xyz_from_smiles_cases, monkeypatch):
+class TestXyzFromSmilesEdgeCases:
+    def test_geometry_or_error(self, xyz_from_smiles_cases, monkeypatch):
         """
         A geometry (never None) or the expected error. In yarp mode the RDKit molecule handed
         to the embedder carries no implicit hydrogens.

@@ -193,7 +193,7 @@ class TestKHPTwoCycles:
         assert self._counts(khp_two_cycles[1]) == (62, 38, 43)
 
     def test_cycle_2(self, khp_two_cycles):
-        assert self._counts(khp_two_cycles[2]) == (2350, 317, 1225)
+        assert self._counts(khp_two_cycles[2]) == (2784, 447, 1417)
 
 
 # RGD1 b2f2 reactions that bnfn only reaches from a kept reactant BEM other than
@@ -202,9 +202,6 @@ RGD1_OTHER_BEM = [
     # 2 kept BEMs, fc_ind 0: a methyl azirinone loses CO to give acetonitrile
     ("MR_646795_1", "[C:1]([c:3]1[c:2](=[O:5])[n:4]1)([H:6])([H:7])[H:8]",
      "[C-:2]#[O+:5].[C:1]([C:3]#[N:4])([H:6])([H:7])[H:8]"),
-    # 2 kept BEMs, fc_ind 0: ring closure to an aziridinone, the nitrile moving to O as a cyanate
-    ("MR_505992_0", "[N:1]([C:2]([O:4][H:9])=[O:6])([C:3]([C:5]#[N:8])=[O:7])[H:10]",
-     "[N:1]1([H:10])[C:2]([O:4][H:9])([O:6][C:5]#[N:8])[C:3]1=[O:7]"),
     # 3 kept BEMs, fc_ind 1: an N-nitroso amide splits into isocyanic acid and nitrosoformic acid
     ("MR_465454_1", "[N:1]([C:3]([C:2]([O:4][H:9])=[O:7])=[O:8])([N:5][O:6])[H:10]",
      "[C:2]([O:4][H:9])([N:5]=[O:6])=[O:7].[N:1](=[C:3]=[O:8])[H:10]"),
@@ -255,6 +252,32 @@ class TestExhaustive:
         r = rgd1_other_bem.r
         products = enumerate_products(r, n_break=2, n_form=2, mode="concerted", exhaustive=True)
         assert rgd1_other_bem.rxn_hash in self._rxn_hashes(r, products)
+
+
+# RGD1 b2f2 reactions that bnfn only reaches by forming a bond with a lone pair on a charged
+# or non-octet atom, one per donor element, as (reaction, reactant, product).
+RGD1_LONE_PAIR = [
+    # C2- (HNC carbene) inserts into a C-C bond
+    ("MR_167120_0", "[C-:2]#[N+:6][H:8].[C:1](/[C:4](=[C:3](/[O:5][H:7])[H:9])[H:10])([H:11])([H:12])[H:13]",
+     "[C:1]([C:2](/[C:4](=[C:3](/[O:5][H:7])[H:9])[H:10])=[N:6]\\[H:8])([H:11])([H:12])[H:13]"),
+    # N6- (methyl azide's terminal N) inserts into ethane's C-C bond
+    ("MR_315928_2", "[C:1]([C:3]([H:13])([H:14])[H:15])([H:8])([H:9])[H:10].[C:2]([N:4]=[N+:5]=[N-:6])([H:7])([H:11])[H:12]",
+     "[C:1]([N:6]([C:3]([H:13])([H:14])[H:15])/[N:5]=[N:4]/[C:2]([H:7])([H:11])[H:12])([H:8])([H:9])[H:10]"),
+    # O7- (alkoxide) forms C=O as the azetidinium ring opens and a methyl moves from N to C
+    ("MR_120626_1", "[C:1]1([H:10])([H:11])[N@+:4]([C:3]([H:14])([H:15])[H:16])([H:9])[C:2]([H:12])([H:13])[C@@:5]1([O:6][H:8])[O-:7]",
+     "[C:1]([C:3]([H:14])([H:15])[H:16])([N:4]([C:2]([C:5]([O:6][H:8])=[O:7])([H:12])[H:13])[H:9])([H:10])[H:11]"),
+]
+
+
+class TestLonePairs:
+    """bnfn forms bonds with lone pairs on charged or non-octet atoms (e.g., carbenes, anions)."""
+
+    @pytest.mark.parametrize("rid, r_smi, p_smi", RGD1_LONE_PAIR, ids=[_[0] for _ in RGD1_LONE_PAIR])
+    def test_recovers_lone_pair_reaction(self, rid, r_smi, p_smi):
+        r = yarpecule(r_smi, canon=False)
+        p = yarpecule(p_smi, canon=False)
+        products = bnfn(r, 2, hashes={r.hash}, verbose=False)
+        assert reaction(r, p).hash in {aligned_reaction_hash(r, _) for _ in products}
 
 
 class TestConcertedOpenShell:

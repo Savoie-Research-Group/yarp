@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 from yarp.yarpecule.yarpecule import yarpecule as ypcule
 import inspect
+import sys
 from collections import Counter
 
 
@@ -179,3 +180,16 @@ class TestStrictDefault:
             assert Counter(mol.elements) == elements, smiles
             assert mol.geo is not None, smiles
             assert "falling back to RDKit" not in printed and "geometry fallback used RDKit" not in printed, smiles
+
+    def test_parse_error_names_cause(self, monkeypatch):
+        """
+        With strict=True, a parse error that is not a ValueError becomes a TypeError that names
+        the SMILES and the original error, and keeps it as the cause.
+        """
+        def fail(*args, **kwargs):
+            raise RuntimeError("Open Babel could not build a geometry")
+        # Patch the module the constructor looks it up in (the package exports the class under the module's name)
+        monkeypatch.setattr(sys.modules[ypcule.__module__], "xyz_from_smiles", fail)
+        with pytest.raises(TypeError, match=r"'CCO'.*RuntimeError: Open Babel could not build a geometry") as err:
+            ypcule("CCO")
+        assert isinstance(err.value.__cause__, RuntimeError)

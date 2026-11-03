@@ -291,7 +291,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             if branch_levels[j] == current_branch_level:
                 intervening_tokens = []
                 for k in range(current_atom_index, 0, -1):
-                    if tokens[k] == ")":
+                    # A bond symbol before a ring digit belongs to the ring bond (e.g., the `=` in C(C)=1CC=1)
+                    if tokens[k] == ")" or smiles2adjmat.ring_pattern.match(tokens[k]):
                         break
                     intervening_tokens.append(tokens[k])
 
@@ -512,12 +513,13 @@ def can_promote_aromatic_edge(i, j, component_atoms, adjmat):
 def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
     """
     Return the number of hydrogens `add_hydrogens()` adds to `atom` (an element with a known
-    valence that is not a metal). Used by both `add_hydrogens()` and `needs_aromatic_double_bond()`,
-    so the two always agree.
+    valence). Used by both `add_hydrogens()` and `needs_aromatic_double_bond()`, so the two
+    always agree.
 
-    A bracket atom gets the count written in the SMILES, or none if hydrogen atoms are already
-    bonded to it. Otherwise the count is inferred: aromatic atoms are filled up to three neighbors
-    (c) or two (b, n, o, p, s), and everything else up to an octet, adjusted for formal charge.
+    A bracket atom gets the count written in the SMILES, in addition to any hydrogen atoms bonded
+    to it. A metal gets no other hydrogens. Otherwise the count is inferred: aromatic atoms are
+    filled up to three neighbors (c) or two (b, n, o, p, s), and everything else up to an octet,
+    adjusted for formal charge.
     """
     info = atom_info[atom]
     element = info["element"]
@@ -529,7 +531,8 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
         # The written count is in addition to any hydrogen atoms bonded to it, as in standard SMILES
         return explicit_hydrogens
 
-    if not atom_parse_meta[atom]["should_infer_hydrogens"]:
+    # Metals get only the hydrogens written in their bracket; none are inferred
+    if not atom_parse_meta[atom]["should_infer_hydrogens"] or element in el_metals:
         return 0
 
     if info["aromatic_input"]:
@@ -570,9 +573,6 @@ def add_hydrogens(adjmat, atom_info, atom_parse_meta):
 
         if el_valence.get(element, None) is None:
             print(f"Warning: Element '{element}' is not recognized or has an undefined valence.")
-            hydrogens_to_add.append(0)
-            continue
-        if element in el_metals:
             hydrogens_to_add.append(0)
             continue
 

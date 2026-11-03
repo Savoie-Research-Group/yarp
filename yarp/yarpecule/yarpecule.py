@@ -337,7 +337,8 @@ class yarpecule:
                         mol, mode="rdkit")
                 else:
                     raise TypeError(
-                        "The yarpecule constructor expects either an xyz file, mol file, or a smiles string.")
+                        "The yarpecule constructor expects either an xyz file, mol file, or a smiles string; "
+                        f"could not parse {mol!r} as SMILES ({type(e).__name__}: {e})") from e
 
         # Calculate elementary attributes
         # eventually all functions will expect lowercase element labels

@@ -709,6 +709,10 @@ def smiles2adjmat_cases():
         ("c1cc[siH]cc1", {"c": 5, "h": 6, "si": 1}, {}),
         # the H of He is part of the element symbol, not a hydrogen count
         ("[He]", {"he": 1}, {}),
+        # after a `)`, a bond symbol before a ring digit is the ring bond's order: C1=C4 double, C1-C3 single
+        ("[C:1]([CH3:2])=1[CH2:3][CH:4]=1", {"c": 4, "h": 6}, {(1, 4): 2, (1, 3): 1}),
+        # and one after the digit is the chain bond's order: C1=C3 double, C1-C4 single
+        ("[C:1]([CH3:2])1=[CH:3][CH2:4]1", {"c": 4, "h": 6}, {(1, 3): 2, (1, 4): 1}),
     ]
 
 
@@ -728,6 +732,9 @@ def hydrogen_count_cases():
         ("CCO", [3, 2, 1]),                                             # filled up to an octet
         ("C[NH3+]", [3, 3]),                                            # charge
         ("[C:1]([H:2])([H:3])([H:4])[H:5]", [4]),                      # explicit hydrogen atoms, none added
+        ("[ZnH2]", [2]),                                                # metal: bracket count as written
+        ("C[PdH]", [3, 1]),
+        ("C[Hg]C", [3, 0, 3]),                                          # metal: none inferred
     ]
 
 

@@ -713,7 +713,21 @@ def smiles2adjmat_cases():
         ("[C:1]([CH3:2])=1[CH2:3][CH:4]=1", {"c": 4, "h": 6}, {(1, 4): 2, (1, 3): 1}),
         # and one after the digit is the chain bond's order: C1=C3 double, C1-C4 single
         ("[C:1]([CH3:2])1=[CH:3][CH2:4]1", {"c": 4, "h": 6}, {(1, 3): 2, (1, 4): 1}),
+        # biphenylene: `-` between aromatic atoms stays single (chain and ring-closure bonds)
+        ("[cH:1]1[cH:2][cH:3][cH:4][c:5]2-[c:6]3[cH:7][cH:8][cH:9][cH:10][c:11]3-[c:12]12", {"c": 12, "h": 8},
+         {(5, 6): 1, (11, 12): 1}),
+        # as RDKit writes it: `-` after `)` and on a ring closure
+        ("[cH:1]1[cH:2][cH:3][c:4]2[c:5]([cH:6]1)-[c:7]1[cH:8][cH:9][cH:10][cH:11][c:12]1-2", {"c": 12, "h": 8},
+         {(5, 7): 1, (4, 12): 1}),
+        # whitespace around the SMILES is ignored
+        (" CCO\n", {"c": 2, "h": 6, "o": 1}, {}),
     ]
+
+
+@pytest.fixture
+def unknown_character_smiles():
+    """SMILES with characters the parser does not read; each raises a ValueError instead of being dropped."""
+    return ["CCO CC", "CC\tO", "CC>>CO", "C%(10)CC%(10)", "C$C", "C*"]
 
 
 @pytest.fixture
@@ -735,6 +749,9 @@ def hydrogen_count_cases():
         ("[ZnH2]", [2]),                                                # metal: bracket count as written
         ("C[PdH]", [3, 1]),
         ("C[Hg]C", [3, 0, 3]),                                          # metal: none inferred
+        ("CCOP(=O)OCC", [3, 2, 0, 1, 0, 0, 2, 3]),                      # P filled to valence 5: P-H
+        ("CS(=O)=O", [3, 1, 0, 0]),                                     # S filled to valence 6
+        ("CS(C)=O", [3, 0, 3, 0]),                                      # S at valence 4 takes none
     ]
 
 
@@ -760,6 +777,8 @@ def aromatic_double_bond_cases():
         ("[n:1]1([H:8])[c:2](=[O:7])[n:6][c:3]([N:4]([H:9])[H:10])[o:5]1",   # RGD1 species
          [False, False, True, True, False]),
         ("[cH-]1cccc1", [False, True, True, True, True]),              # cyclopentadienide
+        ("[n+]1ccccc1", [True] * 6),                                    # n+ with two neighbours: sigma radical, like [c]
+        ("[b-]1ccccc1", [True] * 6),                                    # b- likewise
     ]
 
 

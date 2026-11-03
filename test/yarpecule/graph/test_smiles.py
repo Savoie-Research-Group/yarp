@@ -435,6 +435,12 @@ class TestSmi2AdjEdgeCases:
                 assert bemat[index[i], index[j]] == order, smiles
             assert all(bemat[i, i] % 2 == 0 for i in atom_info), smiles
 
+    def test_unknown_characters(self, unknown_character_smiles):
+        """A character the parser does not read raises a ValueError instead of being dropped."""
+        for smiles in unknown_character_smiles:
+            with pytest.raises(ValueError, match="Unknown characters"):
+                smiles2adjmat(smiles)
+
 
 class TestNeedsAromaticDoubleBond:
     def test_lone_pair_donors(self, aromatic_double_bond_cases):

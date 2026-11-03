@@ -54,7 +54,13 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             'At', 'Rn', 'b', 'c', 'n', 'o', 'p', 's'
         }
 
+    # Every character must belong to a token. Anything else (e.g., a space before a name, `>>`, `$`, `*`)
+    # would be dropped and the atoms on either side bonded, so it is an error instead.
+    smiles = smiles.strip()
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
+    if "".join(preliminary_tokens) != smiles:
+        unknown = sorted(set(re.sub(smiles2adjmat.token_pattern, "", smiles)))
+        raise ValueError(f"Unknown characters {unknown} in SMILES '{smiles}'.")
     final_tokens = []
     for token in preliminary_tokens:
         # Split two-letter tokens that are not elements. Also split an organic-subset atom followed
@@ -163,6 +169,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     open_flag = False
     close_flag = False
     ring_numbers = {}
+    explicit_single = set()  # bonds written `-`; an explicit single bond between aromatic atoms stays single
     pending_bond_stereo = None
     pending_atom_stereo_owner = None
     sequential_atom_counter = 0
@@ -224,6 +231,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 if bond_type is None:
                     bond_type = 1
                 adjmat[atom_index, prev_atom_index] = adjmat[prev_atom_index, atom_index] = bond_type
+                if 1 in (last_bond_type, prev_bond_type):
+                    explicit_single.add(frozenset((atom_index, prev_atom_index)))
 
                 if pending_bond_stereo is not None:
                     atom_info[atom_index]["stereo"]["bonds"][prev_atom_index] = pending_bond_stereo
@@ -261,6 +270,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 adjmat[i, i + 1] = adjmat[i + 1, i] = 3
             else:
                 adjmat[i, i + 1] = adjmat[i + 1, i] = 1
+                if '-' in after_digits:
+                    explicit_single.add(frozenset((i, i + 1)))
 
     for i in branch_open_atom_indices:
         current_atom_index = atom_indices[i]
@@ -282,6 +293,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                     adjmat[i, j] = adjmat[j, i] = 3
                 else:
                     adjmat[i, j] = adjmat[j, i] = 1
+                    if '-' in intervening_tokens:
+                        explicit_single.add(frozenset((i, j)))
                 break
 
     for i in branch_close_atom_indices:
@@ -302,6 +315,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                     adjmat[i, j] = adjmat[j, i] = 3
                 else:
                     adjmat[i, j] = adjmat[j, i] = 1
+                    if '-' in intervening_tokens:
+                        explicit_single.add(frozenset((i, j)))
                 break
 
     ambiguous_aromatic_assignment = False
@@ -342,7 +357,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
                 component_edges = []
                 for count_i, i in enumerate(needs_double):
                     for j in needs_double[count_i + 1:]:
-                        if adjmat[i, j] == 1 and can_promote_aromatic_edge(i, j, component_set, adjmat):
+                        if adjmat[i, j] == 1 and frozenset((i, j)) not in explicit_single and \
+                                can_promote_aromatic_edge(i, j, component_set, adjmat):
                             component_edges.append((i, j))
 
                 target_size = len(needs_double) // 2
@@ -482,15 +498,16 @@ def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
     exocyclic multiple bonds), and the hydrogens that `add_hydrogens()` will add (`hydrogen_count()`).
     An odd count leaves one electron for a ring double bond (e.g., ring c, pyridine-type n). An even
     count means the atom gives the ring a lone pair or nothing (e.g., pyrrole-type n, ring o/s, or a
-    c with an exocyclic =O). The exception is a neutral c or si with two electrons left, which is a sigma
-    radical (e.g., [c]1ccccc1) and still gets a ring double bond.
+    c with an exocyclic =O). The exception is an atom with as many valence electrons as neutral carbon
+    (c, si, n+, p+, as+, b-) with two electrons left, which is a sigma radical (e.g., [c]1ccccc1 or the
+    pyridine radical cation [n+]1ccccc1) and still gets a ring double bond.
     """
     element = atom_info[atom]["element"]
     hydrogens = hydrogen_count(atom, adjmat, atom_info, atom_parse_meta)
     electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
 
-    # A neutral c or si with two electrons left is a sigma radical. Only an anion like [cH-] gives the ring a lone pair.
-    if element in ['c', 'si'] and atom_info[atom]["formal_charge"] == 0 and electrons == 2:
+    # A carbon-like atom with two electrons left is a sigma radical. Only an anion like [cH-] gives the ring a lone pair.
+    if el_valence[element] - atom_info[atom]["formal_charge"] == 4 and electrons == 2:
         return True
     return electrons % 2 == 1
 
@@ -518,8 +535,8 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
 
     A bracket atom gets the count written in the SMILES, in addition to any hydrogen atoms bonded
     to it. A metal gets no other hydrogens. Otherwise the count is inferred: aromatic atoms are
-    filled up to three neighbors (c) or two (b, n, o, p, s), and everything else up to an octet,
-    adjusted for formal charge.
+    filled up to three neighbors (c) or two (b, n, o, p, s), P and S up to their standard SMILES
+    valence, and everything else up to an octet, adjusted for formal charge.
     """
     info = atom_info[atom]
     element = info["element"]
@@ -540,6 +557,12 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
         bonded_neighbors = sum(1 for i in range(len(atom_info)) if adjmat[atom, i] > 0)
         target_neighbors = 2 if element in ['b', 'n', 'o', 'p', 's'] else 3
         return max(0, target_neighbors - bonded_neighbors)
+
+    # Unbracketed P and S take the standard SMILES valences (P 3 or 5, S 2, 4 or 6), filled up to the lowest
+    # one at or above their bonds, so e.g. CCOP(=O)OCC has a P-H instead of a P radical
+    if element in ['p', 's']:
+        valences = [3, 5] if element == 'p' else [2, 4, 6]
+        return next((v - int(bonds) for v in valences if v >= bonds), 0)
 
     desired_electrons = 8 if element not in ['h', 'he'] else 2
     current_electrons = int(el_valence[element] + bonds)

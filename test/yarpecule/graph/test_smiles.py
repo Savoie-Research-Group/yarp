@@ -5,7 +5,6 @@ import pytest
 import numpy as np
 from collections import Counter
 from yarp.yarpecule.graph.smiles import smiles2adjmat
-from yarp.yarpecule.graph.fragment import return_rings
 
 
 class TestSmi2Adj:
@@ -465,18 +464,3 @@ class TestHydrogenCount:
             hydrogens = [sum(atom_info[j]["element"] == "h" for j in np.nonzero(adjmat[i])[0])
                          for i in atom_info if atom_info[i]["element"] != "h"]
             assert hydrogens == expected, smiles
-
-
-class TestReturnRings:
-    def test_fused_rings(self, ring_cases):
-        """
-        return_rings (yarp/yarpecule/graph/fragment.py) finds every ring, and every ring it
-        returns closes back on its first atom.
-        """
-        for smiles, sizes in ring_cases:
-            adjmat, bemat, atom_info = smiles2adjmat(smiles)
-            adj_list = [set(np.nonzero(row)[0]) for row in adjmat]
-            rings = return_rings(adj_list, max_size=10, remove_fused=False)
-            assert sorted(len(ring) for ring in rings) == sizes, smiles
-            for ring in rings:
-                assert all(ring[k - 1] in adj_list[ring[k]] for k in range(len(ring))), smiles

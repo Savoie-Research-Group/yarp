@@ -5,9 +5,13 @@ Consider moving this to util if anything outside of yarpecule needs to access it
 from pathlib import Path
 
 import re
+from contextlib import nullcontext
 import numpy as np
-from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles
-from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
+from rdkit import rdBase
+from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles, Kekulize
+from yarp.util.obabel import obabel_embed
+from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass, el_metals
+from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
 from yarp.util.rdkit import (
     adj_from_rdmol,
@@ -20,6 +24,10 @@ from yarp.util.rdkit import (
 
 ATOM_MAP_PATTERN = re.compile(r":\d+(?=[^\]]*\])")
 EXPLICIT_H_PATTERN = re.compile(r"\[(?:\d+)?H[^\]]*\]")
+
+# The elements rdkit treats as metals for metal-ligand bonds (see the octet check in xyz_from_smiles): the d-block
+# metals in el_metals, the s-block metals, and Al, Ga, Ge, In, Sn, Tl, Pb and Bi
+RDKIT_METALS = el_metals | {"li", "na", "k", "rb", "cs", "be", "mg", "ca", "sr", "ba", "al", "ga", "ge", "in", "sn", "tl", "pb", "bi"}
 
 
 def strip_atom_maps(smiles):
@@ -372,9 +380,10 @@ def load_reactions_from_smiles_file(source_path):
                         product_q,
                         product_atom_info,
                     ) = xyz_from_smiles(product_smiles, mode="yarp")
-                except Exception:
+                except Exception as exc:
                     raise RuntimeError(
-                        f"Line {line_number} in {source_path}: could not parse reaction SMILES."
+                        f"Line {line_number} in {source_path}: could not parse reaction SMILES "
+                        f"({type(exc).__name__}: {exc})"
                     )
 
                 for atom_info in (reactant_atom_info, product_atom_info):
@@ -474,11 +483,13 @@ def mol_parse(mol):
     return elements, geo, adj_mat, q, atom_info
 
 
-def xyz_from_smiles(smiles, mode="yarp"):
+def xyz_from_smiles(smiles, mode="yarp", strict=True, verbose=False):
     """
     A simple wrapper to generate a 3D geometry, adj_mat, and elements from a SMILES string.
     Two modes for parsing SMILES strings are available: an in-house option [`smiles2adjmat()`]
-    and an rdkit option. In either case, the generation of 3D geometries is handled by rdkit.
+    and an rdkit option. In yarp mode, rdkit embeds the graph from `smiles2adjmat()`; in rdkit mode,
+    rdkit parses and embeds the SMILES. If rdkit cannot embed the molecule, Open Babel builds the
+    geometry instead (`geo_via_obabel()`).
 
     Parameters
     ----------
@@ -490,6 +501,14 @@ def xyz_from_smiles(smiles, mode="yarp"):
            The in-house `smiles2adjmat()` parser is used if 'yarp' is supplied to the argument.
            The default is to use the in-house SMILES parser.
 
+    strict : bool
+           Only used in 'yarp' mode. If True (the default), the in-house parser is the only parser and
+           octet violations raise an `OctetError`. If False, aromatic SMILES that fail the octet check
+           keep the in-house graph and take their geometry from rdkit (`geo_via_rdkit()`).
+
+    verbose : bool
+           If False (the default), rdkit's log is silenced while it embeds, and the Open Babel fallback
+           prints only when its geometry does not reproduce the bonds. If True, both print everything.
 
     Returns
     -------
@@ -540,17 +559,34 @@ def xyz_from_smiles(smiles, mode="yarp"):
         # electrons per atom
         e = np.sum(2*bemat, axis=1)-np.diag(bemat)
 
-        # Check that the octet rules have not been violated
+        # A single bond from a ligand atom to a metal is dative when the ligand atom would otherwise pass its octet, as
+        # rdkit reads it (Cl[Pt](Cl)([NH3])[NH3], [OH2][Cu+2], [Ni][C-]#[O+]): the ligand's lone pair forms the bond, so
+        # neither atom spends an electron of its own on it. Over-bonded atoms rdkit rejects still fail (C[N](C)(C)(C)[Pd]).
+        # Metal risk: only the metals in el_metals take dative bonds, since the Lewis-structure search (adjust_metals)
+        # handles dative ligands only on those; a ligand on Mg, Al, ... still fails here (C1CC[O]([Mg]Br)C1).
+        is_metal = [_ in RDKIT_METALS for _ in elements]
+        dative = set()
+        for i, element in enumerate(elements):
+            to_metals = [j for j in np.nonzero(adj_mat[i])[0] if elements[j] in el_metals and bemat[i, j] == 1]
+            if is_metal[i] or not to_metals or el_expand_octet[element] or e[i] <= e_exp[i]:
+                continue
+            for j in to_metals:
+                dative.add((i, j))
+                bemat[i, i] += 1
+                bemat[j, j] += 1
+            e[i] = 2 * (np.sum(bemat[i]) - bemat[i, i] - len(to_metals)) + bemat[i, i]
+
+        # Check that the octet rules have not been violated. Metals are not checked, as in rdkit (C[Mg]Br, [NaH]).
         violations = [count for count, _ in enumerate(
-            e) if not el_expand_octet[elements[count]] and _-e_exp[count] > 0]
+            e) if not el_expand_octet[elements[count]] and not is_metal[count] and _-e_exp[count] > 0]
         # Raise error if octet violations exist
         if violations:
-            if any(atom_info[i]["aromatic_input"] for i in atom_info):
+            if not strict and any(atom_info[i]["aromatic_input"] for i in atom_info):
                 print(
                     "WARNING: yarp aromatic SMILES geometry fallback used RDKit "
                     f"for {smiles} after octet validation failed at atoms {violations}."
                 )
-                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),)
+                geo = geo_via_rdkit(parse_smiles,atom_info,preserve_explicit_h=partial_mapped_input and has_explicit_hydrogen_atom(parse_smiles),verbose=verbose)
                 return elements, geo, adj_mat, q, atom_info
             raise OctetError(violations)
 
@@ -559,14 +595,21 @@ def xyz_from_smiles(smiles, mode="yarp"):
         mol = rdchem.RWMol(mol)
         mol.RemoveAtom(0)
 
-        # add atoms
-        [mol.AddAtom(Atom(el_to_an[_.lower()])) for _ in elements]
+        # Add atoms with implicit hydrogens turned off. The graph already has every hydrogen, and rdkit
+        # would otherwise add hydrogens to under-bonded atoms (e.g., carbenes) before embedding.
+        for _ in elements:
+            atom = Atom(el_to_an[_.lower()])
+            atom.SetNoImplicit(True)
+            mol.AddAtom(atom)
         # add bonds
         for count_j, j in enumerate(adj_mat):
             for count_k, k in enumerate(j):
                 if count_k < count_j:
                     if k == 0:
                         continue
+                    elif (count_j, count_k) in dative or (count_k, count_j) in dative:
+                        donor, metal = (count_j, count_k) if (count_j, count_k) in dative else (count_k, count_j)
+                        mol.AddBond(donor, metal, BondType.DATIVE)
                     else:
                         mol.AddBond(
                             count_j, count_k, xyz_from_smiles.bond_to_type[bemat[count_j, count_k]])
@@ -583,41 +626,102 @@ def xyz_from_smiles(smiles, mode="yarp"):
         mol.UpdatePropertyCache()
 
         # get geometry
-        AllChem.EmbedMolecule(mol, randomSeed=0xf00d)  # create a 3D geometry
-        N_atoms = len(mol.GetAtoms())  # find the number of atoms
-        geo = np.zeros((N_atoms, 3))  # initialize array to hold geometry
-        # loop over atoms, save their labels, positions, and total charge
-        for i in range(N_atoms):
-            atom = mol.GetAtomWithIdx(i)
-            coord = mol.GetConformer().GetAtomPosition(i)
-            geo[i] = np.array([coord.x, coord.y, coord.z])
+        geo = geo_via_embed(mol, smiles, verbose=verbose)
 
         return elements, geo, adj_mat, q, atom_info
 
     # RDKit branch
     else:
         m = smiles_to_rdmol(smiles)
-        AllChem.EmbedMolecule(m, randomSeed=0xf00d)
-
+        geo = geo_via_embed(m, smiles, verbose=verbose)
         elements = el_from_rdmol(m)
-        geo = geom_from_rdmol(m)
         adj_mat = adj_from_rdmol(m)
         atom_info = atom_info_from_rdmol(m)
         q = int(sum(atom_info[i]["formal_charge"] for i in atom_info))
 
     return elements, geo, adj_mat, q, atom_info
 
-def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
+
+def geo_via_embed(mol, smiles, verbose=False):
+    """
+    Embed an rdkit molecule (seeded) and return its geometry, or the Open Babel geometry
+    (`geo_via_obabel()`) if rdkit cannot embed it. Unless `verbose`, rdkit's log is silenced
+    during the embedding (e.g., UFFTYPER errors for atoms it has no force-field type for).
+    """
+    # Metal risk: rdkit embeds the fragments of a multi-fragment SMILES on top of each other ([Na+].[Cl-] puts both
+    # ions at one point; CCO.O puts water 0.4 A from ethanol), and PubChem writes most metal complexes as separate
+    # fragments (N.N.Cl[Pt]Cl). Such geometries do not reproduce the graph's bonds; nothing here checks them.
+    with nullcontext() if verbose else rdBase.BlockLogs():
+        AllChem.EmbedMolecule(mol, randomSeed=0xf00d)
+    geo = geom_from_rdmol(mol)  # None if rdkit could not embed the molecule
+    if geo is None:
+        geo = geo_via_obabel(mol, smiles, verbose=verbose)
+    return geo
+
+
+def geo_via_obabel(mol, smiles, verbose=False):
+    """
+    Generate a geometry with Open Babel for an rdkit molecule that rdkit could not embed
+    (e.g., strained rings with cumulated double bonds). The geometry follows the atom order
+    of `mol`. It is built with MMFF94 first and rebuilt with UFF if MMFF94 cannot be set up or its
+    geometry does not reproduce the connectivity. A warning is printed if neither does, and the
+    MMFF94 geometry is returned if MMFF94 could be set up (otherwise UFF's); with `verbose`, each
+    step is printed too.
+    """
+    if verbose:
+        print(f"RDKit could not embed a geometry for {smiles}; using Open Babel.")
+    elements = [_.lower() for _ in el_from_rdmol(mol)]
+
+    # Take the bond orders from a kekulized copy, so aromatic bonds come out as 1 or 2
+    kekule = rdchem.Mol(mol)
+    Kekulize(kekule, clearAromaticFlags=True)
+    bond_mat = np.zeros([len(elements), len(elements)])
+    for bond in kekule.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        bond_mat[i, j] = bond_mat[j, i] = bond.GetBondTypeAsDouble()
+
+    # MMFF94 keeps the bonds more often, but UFF can be set up for more molecules
+    # Metal risk: Open Babel cannot set up MMFF94 for transition metals (e.g., Cl[Pd]Cl, C[Zn]C), so their
+    # geometries come from UFF alone.
+    fc = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    geos = {}
+    for lot in ["mmff94", "uff"]:
+        try:
+            geos[lot] = obabel_embed(elements, bond_mat, fc, lot=lot)
+        except RuntimeError as e:
+            # UFF is the last try, so its error is raised unless MMFF94 gave a geometry
+            if lot == "uff" and not geos:
+                raise
+            if verbose:
+                print(f"Open Babel {lot} failed for {smiles} ({e}){'; trying UFF' if lot != 'uff' else ''}.")
+            continue
+        if (table_generator(elements, geos[lot]) == adj_from_rdmol(mol)).all():
+            if verbose:
+                print(f"Open Babel {lot} geometry used for {smiles}.")
+            return geos[lot]
+        if verbose and lot != "uff":
+            print(f"The Open Babel {lot} geometry for {smiles} does not reproduce its connectivity; trying UFF.")
+
+    # Neither keeps the bonds. MMFF94's geometry is kept: in the RGD1 cases its wrong bonds sit just past
+    # the cutoff (e.g., 1.76 vs 1.70 A), where UFF's are far off (2.55 A)
+    print(f"WARNING: the Open Babel geometry for {smiles} does not reproduce its connectivity.")
+    return geos.get("mmff94", geos.get("uff"))
+
+
+def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False, verbose=False):
     """
     Generate a geometry with RDKit and align it to the atom ordering used by
     the in-house SMILES parser.
 
-    This is used as a fallback for aromatic systems where the in-house parser
-    identifies the correct graph but its bond-electron matrix is too crude to
-    survive octet validation.
+    Only used with strict=False, as the fallback for aromatic SMILES that fail the
+    octet check in `xyz_from_smiles()`: the in-house graph is kept and only the
+    geometry comes from rdkit (or from Open Babel, if rdkit cannot embed it).
+
+    Currently unused as of YARPv3.0.2 (01NOV2026): every RGD1 SMILES parses strictly, so
+    no input reaches this fallback. Kept for strict=False.
     """
     m = smiles_to_rdmol(smiles, preserve_explicit_h=preserve_explicit_h)
-    AllChem.EmbedMolecule(m, randomSeed=0xf00d)
+    rdkit_geo = geo_via_embed(m, smiles, verbose=verbose)
 
     rdkit_elements = [el.lower() for el in el_from_rdmol(m)]
     yarp_elements = [atom_info[i]["element"] for i in atom_info]
@@ -637,7 +741,6 @@ def geo_via_rdkit(smiles, atom_info, preserve_explicit_h=False):
     else:
         raise ValueError("RDKit fallback atom order did not match the in-house parser ordering.")
 
-    rdkit_geo = geom_from_rdmol(m)
     geo = np.zeros((len(order), 3))
     for i, rdkit_idx in enumerate(order):
         geo[i] = rdkit_geo[rdkit_idx]

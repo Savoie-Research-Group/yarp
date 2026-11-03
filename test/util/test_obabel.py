@@ -1,3 +1,4 @@
+import sys
 from copy import deepcopy
 
 import numpy as np
@@ -10,7 +11,7 @@ from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.hashes import yarpecule_hash
 from yarp.util.write_files import mol_write_yp
 
-from yarp.util.obabel import obabel_joint_opt, _ensure_setup_needed
+from yarp.util.obabel import obabel_joint_opt, _ensure_setup_needed, obabel_embed
 
 class TestFFOpt:
     def test_haa_2_ring(self):
@@ -202,3 +203,63 @@ class TestVerdictStability:
                 f"({n_mismatch} mismatches); coordinates may vary run to run "
                 f"but the verdict may not"
             )
+
+
+class TestObabelEmbed:
+    def test_graphs(self, obabel_embed_cases):
+        """
+        A finite geometry in the order of the given atoms, with no two atoms on top of each
+        other, identical when built again (Open Babel's builder is random unless each build
+        is a fresh, seeded process), and sane bond lengths where UFF keeps the bonds.
+        """
+        for smiles, check_bonds in obabel_embed_cases:
+            mol = yp.yarpecule(smiles)
+            geo = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+            assert geo.shape == (len(mol.elements), 3) and np.isfinite(geo).all(), smiles
+            assert np.array_equal(geo, obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)), smiles
+
+            dist = np.linalg.norm(geo[:, None] - geo[None], axis=-1) + 10 * np.eye(len(geo))
+            assert dist.min() > 0.5, smiles
+            if check_bonds:
+                bonded = dist[mol.adj_mat == 1]
+                assert ((bonded > 0.9) & (bonded < 2.4)).all(), smiles
+
+    def test_isolated_worker(self, obabel_worker_shadows, tmp_path, monkeypatch):
+        """
+        The worker process imports nothing from the current directory, even when the caller's
+        sys.path has it (as in Jupyter or python -c), so each shadowing file there leaves the
+        build unchanged, as does a current directory that was deleted. A worker that dies without
+        a traceback raises RuntimeError.
+        """
+        mol = yp.yarpecule("CCO")
+        expected = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+        monkeypatch.setattr("sys.path", ["", *sys.path])
+        for shadow in obabel_worker_shadows:
+            folder = tmp_path / shadow.replace("/", "_")
+            (folder / shadow).parent.mkdir(parents=True)
+            (folder / shadow).write_text(f"raise ImportError('{shadow} was imported from the current directory')\n")
+            monkeypatch.chdir(folder)
+            assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), shadow
+
+        deleted = tmp_path / "deleted"
+        deleted.mkdir()
+        monkeypatch.chdir(deleted)
+        deleted.rmdir()
+        assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), "deleted cwd"
+
+        monkeypatch.setattr("sys.executable", "/bin/false")
+        with pytest.raises(RuntimeError):
+            obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+
+    def test_worker_uses_caller_path(self, tmp_path, monkeypatch):
+        """
+        The worker imports Open Babel from the caller's sys.path, which -I alone would cut down
+        (no PYTHONPATH, no user site-packages): an openbabel package placed first there is the
+        one the worker imports.
+        """
+        mol = yp.yarpecule("CCO")
+        (tmp_path / "openbabel").mkdir()
+        (tmp_path / "openbabel" / "__init__.py").write_text("raise ImportError('openbabel imported from the caller path')\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        with pytest.raises(RuntimeError, match="openbabel imported from the caller path"):
+            obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)

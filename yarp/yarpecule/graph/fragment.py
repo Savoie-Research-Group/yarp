@@ -130,8 +130,14 @@ def ring_path(adj_list, ring, path=None):
     """
 
     # Initialize the loop starting from the minimum index, with the traversal direction set by min bonded index.
+    # If that direction fails, try the other neighbors. In a fused ring the first bond can be the shared bond.
     if path is None:
-        path = [min(ring), min(adj_list[min(ring)].intersection(ring))]
+        for second in sorted(adj_list[min(ring)].intersection(ring)):
+            try:
+                return ring_path(adj_list, ring, path=[min(ring), second])
+            except Exception:
+                pass
+        raise Exception("wrong path, didn't recover ring")
 
     # This for recursive construction is needed to handle branching possibilities. All branches are followed and only the one yielding the full cycle is returned
     for i in [_ for _ in adj_list[path[-1]] if _ in ring and _ not in path]:
@@ -142,8 +148,8 @@ def ring_path(adj_list, ring, path=None):
             pass
 
     # Eventually the recursions will reach the end of a cycle (i.e., for i in []: for the above loop) and hit this.
-    # If the path is shorter than the full cycle then it is invalid (i.e., the wrong branch was followed somewhere)
-    if len(path) == len(ring):
+    # If the path is shorter than the full cycle, or its two ends are not bonded, then it is invalid (i.e., the wrong branch was followed somewhere)
+    if len(path) == len(ring) and path[0] in adj_list[path[-1]]:
         return path
     else:
         # This never gets printed, it is just used to trigger the except at a higher level of recursion.

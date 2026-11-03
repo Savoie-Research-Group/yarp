@@ -228,7 +228,8 @@ class TestObabelEmbed:
         """
         The worker process imports nothing from the current directory, even when the caller's
         sys.path has it (as in Jupyter or python -c), so each shadowing file there leaves the
-        build unchanged. A worker that dies without a traceback raises RuntimeError.
+        build unchanged, as does a current directory that was deleted. A worker that dies without
+        a traceback raises RuntimeError.
         """
         mol = yp.yarpecule("CCO")
         expected = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
@@ -239,6 +240,12 @@ class TestObabelEmbed:
             (folder / shadow).write_text(f"raise ImportError('{shadow} was imported from the current directory')\n")
             monkeypatch.chdir(folder)
             assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), shadow
+
+        deleted = tmp_path / "deleted"
+        deleted.mkdir()
+        monkeypatch.chdir(deleted)
+        deleted.rmdir()
+        assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), "deleted cwd"
 
         monkeypatch.setattr("sys.executable", "/bin/false")
         with pytest.raises(RuntimeError):

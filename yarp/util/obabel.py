@@ -102,8 +102,13 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
     # so every build gets its own process to come out the same each time. The worker runs from its
     # own source in isolated mode (-I), so files in the current directory can't shadow its imports.
     # -I also drops PYTHONPATH and user site-packages, so the worker is given this process's import
-    # path (without the current directory) to find Open Babel wherever it is installed.
-    sys_path = [p for p in sys.path if p and os.path.abspath(p) != os.getcwd()]
+    # path (without the current directory) to find Open Babel wherever it is installed. If the current
+    # directory was deleted, relative entries point nowhere and are left out.
+    try:
+        cwd = os.getcwd()
+    except FileNotFoundError:
+        cwd = None
+    sys_path = [p for p in sys.path if (os.path.isabs(p) or cwd) and os.path.abspath(p) != cwd]
     payload = {"atomic_numbers": [el_to_an[_.lower()] for _ in elements],
                "bond_mat": np.asarray(bond_mat).tolist(),
                "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter, "sys_path": sys_path}

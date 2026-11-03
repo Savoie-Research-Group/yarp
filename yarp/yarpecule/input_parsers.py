@@ -10,7 +10,7 @@ import numpy as np
 from rdkit import rdBase
 from rdkit.Chem import rdmolfiles, BondType, rdchem, Atom, MolFromSmiles, AddHs, AllChem, rdmolfiles, Kekulize
 from yarp.util.obabel import obabel_embed
-from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass
+from yarp.util.properties import el_to_an, el_n_expand_octet, el_expand_octet, el_mass, el_metals
 from yarp.yarpecule.graph.adjacency import table_generator
 from yarp.yarpecule.graph.smiles import smiles2adjmat, OctetError
 from yarp.util.rdkit import (
@@ -24,6 +24,10 @@ from yarp.util.rdkit import (
 
 ATOM_MAP_PATTERN = re.compile(r":\d+(?=[^\]]*\])")
 EXPLICIT_H_PATTERN = re.compile(r"\[(?:\d+)?H[^\]]*\]")
+
+# The elements rdkit treats as metals for metal-ligand bonds (see the octet check in xyz_from_smiles): the d-block
+# metals in el_metals, the s-block metals, and Al, Ga, Ge, In, Sn, Tl, Pb and Bi
+RDKIT_METALS = el_metals | {"li", "na", "k", "rb", "cs", "be", "mg", "ca", "sr", "ba", "al", "ga", "ge", "in", "sn", "tl", "pb", "bi"}
 
 
 def strip_atom_maps(smiles):
@@ -555,12 +559,26 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True, verbose=False):
         # electrons per atom
         e = np.sum(2*bemat, axis=1)-np.diag(bemat)
 
-        # Check that the octet rules have not been violated
-        # Metal risk: bonds to a metal count toward the ligand atom's octet, so a neutral ligand written with a plain
-        # bond to a metal ([NH3], [OH2], [C-]#[O+]) fails here although RDKit accepts it, e.g. Cl[Pt](Cl)([NH3])[NH3].
-        # Mg, Na and Be have an el_n_expand_octet of 0, so any bond to them fails too (C[Mg]Br).
+        # A single bond from a ligand atom to a metal is dative when the ligand atom would otherwise pass its octet, as
+        # rdkit reads it (Cl[Pt](Cl)([NH3])[NH3], [OH2][Cu+2], [Ni][C-]#[O+]): the ligand's lone pair forms the bond, so
+        # neither atom spends an electron of its own on it. Over-bonded atoms rdkit rejects still fail (C[N](C)(C)(C)[Pd]).
+        # Metal risk: only the metals in el_metals take dative bonds, since the Lewis-structure search (adjust_metals)
+        # handles dative ligands only on those; a ligand on Mg, Al, ... still fails here (C1CC[O]([Mg]Br)C1).
+        is_metal = [_ in RDKIT_METALS for _ in elements]
+        dative = set()
+        for i, element in enumerate(elements):
+            to_metals = [j for j in np.nonzero(adj_mat[i])[0] if elements[j] in el_metals and bemat[i, j] == 1]
+            if is_metal[i] or not to_metals or el_expand_octet[element] or e[i] <= e_exp[i]:
+                continue
+            for j in to_metals:
+                dative.add((i, j))
+                bemat[i, i] += 1
+                bemat[j, j] += 1
+            e[i] = 2 * (np.sum(bemat[i]) - bemat[i, i] - len(to_metals)) + bemat[i, i]
+
+        # Check that the octet rules have not been violated. Metals are not checked, as in rdkit (C[Mg]Br, [NaH]).
         violations = [count for count, _ in enumerate(
-            e) if not el_expand_octet[elements[count]] and _-e_exp[count] > 0]
+            e) if not el_expand_octet[elements[count]] and not is_metal[count] and _-e_exp[count] > 0]
         # Raise error if octet violations exist
         if violations:
             if not strict and any(atom_info[i]["aromatic_input"] for i in atom_info):
@@ -589,6 +607,9 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True, verbose=False):
                 if count_k < count_j:
                     if k == 0:
                         continue
+                    elif (count_j, count_k) in dative or (count_k, count_j) in dative:
+                        donor, metal = (count_j, count_k) if (count_j, count_k) in dative else (count_k, count_j)
+                        mol.AddBond(donor, metal, BondType.DATIVE)
                     else:
                         mol.AddBond(
                             count_j, count_k, xyz_from_smiles.bond_to_type[bemat[count_j, count_k]])

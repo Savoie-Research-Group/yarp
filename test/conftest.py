@@ -854,6 +854,13 @@ def xyz_from_smiles_cases():
         ("[C:1]=[O:4].[C:2](#[N:3])[H:5]", "yarp", "geometry"),         # CO is embedded without added hydrogens
         ("[C:1]([H:2])[H:3]", "yarp", "geometry"),                      # carbene stays CH2
         ("c1ccccc1[N](C)(C)C", "yarp", "OctetError"),                   # aromatic input still raises on an octet violation
+        ("Cl[Pt](Cl)([NH3])[NH3]", "yarp", "geometry"),                 # neutral ligands on a metal: dative, as in RDKit
+        ("[OH2][Cu+2]([OH2])([OH2])[OH2]", "yarp", "geometry"),
+        ("[Ni]([C-]#[O+])([C-]#[O+])([C-]#[O+])[C-]#[O+]", "yarp", "geometry"),
+        ("C[Mg]Br", "yarp", "geometry"),                                # metals are not octet-checked
+        ("[NaH]", "yarp", "geometry"),
+        ("C1CC[O]([Mg]Br)C1", "yarp", "OctetError"),                    # dative bonds only to the metals in el_metals
+        ("[NH3][NH3]", "yarp", "OctetError"),                           # no metal: still an octet violation
         ("CCO", "yarp", "geometry"),
         ("CCO", "rdkit", "geometry"),
     ]

@@ -289,6 +289,7 @@ class lewis_struct:
         seed_scores = sorted(seed_scores)
 
         # Initialize holders from best seed BEM
+        # Metal risk: a metal charged above its el_valence ([Sc+4], [Hf+5]) leaves no seed BEM, so this raises IndexError.
         bond_mats = [seed_bond_mats[0]]
         scores = [seed_scores[0]]
         hashes = set([bmat_hash(seed_bond_mats[0])])

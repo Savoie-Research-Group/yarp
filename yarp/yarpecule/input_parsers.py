@@ -556,6 +556,9 @@ def xyz_from_smiles(smiles, mode="yarp", strict=True, verbose=False):
         e = np.sum(2*bemat, axis=1)-np.diag(bemat)
 
         # Check that the octet rules have not been violated
+        # Metal risk: bonds to a metal count toward the ligand atom's octet, so a neutral ligand written with a plain
+        # bond to a metal ([NH3], [OH2], [C-]#[O+]) fails here although RDKit accepts it, e.g. Cl[Pt](Cl)([NH3])[NH3].
+        # Mg, Na and Be have an el_n_expand_octet of 0, so any bond to them fails too (C[Mg]Br).
         violations = [count for count, _ in enumerate(
             e) if not el_expand_octet[elements[count]] and _-e_exp[count] > 0]
         # Raise error if octet violations exist
@@ -624,6 +627,9 @@ def geo_via_embed(mol, smiles, verbose=False):
     (`geo_via_obabel()`) if rdkit cannot embed it. Unless `verbose`, rdkit's log is silenced
     during the embedding (e.g., UFFTYPER errors for atoms it has no force-field type for).
     """
+    # Metal risk: rdkit embeds the fragments of a multi-fragment SMILES on top of each other ([Na+].[Cl-] puts both
+    # ions at one point; CCO.O puts water 0.4 A from ethanol), and PubChem writes most metal complexes as separate
+    # fragments (N.N.Cl[Pt]Cl). Such geometries do not reproduce the graph's bonds; nothing here checks them.
     with nullcontext() if verbose else rdBase.BlockLogs():
         AllChem.EmbedMolecule(mol, randomSeed=0xf00d)
     geo = geom_from_rdmol(mol)  # None if rdkit could not embed the molecule
@@ -654,6 +660,8 @@ def geo_via_obabel(mol, smiles, verbose=False):
         bond_mat[i, j] = bond_mat[j, i] = bond.GetBondTypeAsDouble()
 
     # MMFF94 keeps the bonds more often, but UFF can be set up for more molecules
+    # Metal risk: Open Babel cannot set up MMFF94 for transition metals (e.g., Cl[Pd]Cl, C[Zn]C), so their
+    # geometries come from UFF alone.
     fc = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
     geos = {}
     for lot in ["mmff94", "uff"]:

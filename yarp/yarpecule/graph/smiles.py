@@ -43,6 +43,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
         smiles2adjmat.hydrogen_pattern = re.compile(r'(H\d+|H+)')
         smiles2adjmat.element_label_pattern = re.compile(r'([A-Z][a-z]?|[a-z][a-z]?)')
         smiles2adjmat.mapping_pattern = re.compile(r':(\d+)')
+        # Metal risk: lanthanides (other than La) and actinides are not listed here or in yarp.util.properties,
+        # so e.g. [Ce+3] raises a KeyError downstream; La is listed but missing from el_to_an.
         smiles2adjmat.valid_elements = {
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
             'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
@@ -56,6 +58,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
 
     # Every character must belong to a token. Anything else (e.g., a space before a name, `>>`, `$`, `*`)
     # would be dropped and the atoms on either side bonded, so it is an error instead.
+    # Metal risk: RDKit's dative-bond syntax for metal-ligand bonds (`N->[Pt]`, `[Ni]<-C=O`) is not supported
+    # and raises here.
     smiles = smiles.strip()
     preliminary_tokens = re.findall(smiles2adjmat.token_pattern, smiles)
     if "".join(preliminary_tokens) != smiles:
@@ -65,6 +69,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     for token in preliminary_tokens:
         # Split two-letter tokens that are not elements. Also split an organic-subset atom followed
         # by an aromatic atom, so the `Sc` in CSc1ccccc1 is read as S and c, not scandium.
+        # Metal risk: metals must be bracketed, as in standard SMILES. An unbracketed Co, Sn, Os, Pb, Nb, Sb, Cs
+        # or In is split the same way and read without an error (CCo is ethanol; RDKit rejects it).
         if len(token) == 2 and not token.startswith("%") and (
                 token not in smiles2adjmat.valid_elements or (token[0] in "BCNOPSFI" and token[1] in smiles2adjmat.aromatics)):
             final_tokens.extend(list(token))
@@ -119,6 +125,7 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
             if element_label_match:
                 element_label = element_label_match.group(1)
                 # Only the aromatic set may be lowercase, so e.g. [sn] is not read as sulfur
+                # Metal risk: no metal is aromatic here (as in RDKit), so a metallacycle must be written in Kekule form.
                 if element_label.islower() and element_label not in smiles2adjmat.aromatics:
                     raise ValueError(f"Unknown aromatic element '{element_label}' in {token}; write it in Kekule form.")
                 stereo_atom = '@@' if '@@' in token else '@' if '@' in token else None
@@ -399,6 +406,8 @@ def smiles2adjmat(smiles, verbose=False, reorder_mapped=True):
     if reorder_mapped:
         adjmat, atom_info = reorder_by_mappings(adjmat, atom_info)
 
+    # Metal risk: a metal's electrons here are its el_valence (group number) minus charge and bonds, so an odd
+    # count marks the metal as a radical (e.g., Cl[Fe](Cl)Cl, Cl[Co]Cl), where RDKit reports none.
     bond_electron_mat = adjmat.copy()
     for i in atom_info:
         bond_electron_mat[i, i] = el_valence[atom_info[i]["element"]] - atom_info[i]["formal_charge"] - sum(adjmat[i])
@@ -507,6 +516,9 @@ def needs_aromatic_double_bond(atom, adjmat, atom_info, atom_parse_meta):
     electrons = el_valence[element] - atom_info[atom]["formal_charge"] - int(sum(adjmat[atom])) - hydrogens
 
     # A carbon-like atom with two electrons left is a sigma radical. Only an anion like [cH-] gives the ring a lone pair.
+    # Metal risk: a bond to a metal counts like any other bond, so an aromatic n bonded to a metal (a pyridine
+    # ligand, Cl[Pd](Cl)(n1ccccc1)n1ccccc1) gets no ring double bond and the ring is read with radicals (RDKit
+    # rejects these SMILES).
     if el_valence[element] - atom_info[atom]["formal_charge"] == 4 and electrons == 2:
         return True
     return electrons % 2 == 1
@@ -549,6 +561,10 @@ def hydrogen_count(atom, adjmat, atom_info, atom_parse_meta):
         return explicit_hydrogens
 
     # Metals get only the hydrogens written in their bracket; none are inferred
+    # Metal risk: hydrogens are filled the same way next to a metal, so a neutral donor ligand written with a plain
+    # bond to it gains H (P and S below; e.g., Cl[Pd](Cl)(P(C)(C)C)P(C)(C)C gets PH, as in RDKit). A bracketed
+    # donor ([P]) keeps the H count but is read as a radical; writing the ligand as a separate fragment
+    # (PubChem's form, Cl[Pd]Cl.CP(C)C.CP(C)C) avoids both.
     if not atom_parse_meta[atom]["should_infer_hydrogens"] or element in el_metals:
         return 0
 

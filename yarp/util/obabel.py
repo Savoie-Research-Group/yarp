@@ -98,13 +98,16 @@ def obabel_embed(elements, bond_mat, fc, lot="uff", maxiter=500, seed=0xf00d):
         generated geometry, indexed to `elements`. A RuntimeError is raised if the geometry
         cannot be built or the force field cannot be set up for the molecule.
     '''
-    payload = {"atomic_numbers": [el_to_an[_.lower()] for _ in elements],
-               "bond_mat": np.asarray(bond_mat).tolist(),
-               "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter}
-
     # Open Babel's builder seeds its random number generator once per process (from OB_RANDOM_SEED),
     # so every build gets its own process to come out the same each time. The worker runs from its
     # own source in isolated mode (-I), so files in the current directory can't shadow its imports.
+    # -I also drops PYTHONPATH and user site-packages, so the worker is given this process's import
+    # path (without the current directory) to find Open Babel wherever it is installed.
+    sys_path = [p for p in sys.path if p and os.path.abspath(p) != os.getcwd()]
+    payload = {"atomic_numbers": [el_to_an[_.lower()] for _ in elements],
+               "bond_mat": np.asarray(bond_mat).tolist(),
+               "fc": [int(_) for _ in fc], "lot": lot, "maxiter": maxiter, "sys_path": sys_path}
+
     worker = inspect.getsource(_obabel_embed_worker) + "\n_obabel_embed_worker()\n"
     proc = subprocess.run([sys.executable, "-I", "-c", worker],
                           input=json.dumps(payload), capture_output=True, text=True,
@@ -122,12 +125,14 @@ def _obabel_embed_worker():
     Run one Open Babel build for `obabel_embed()` in its own process. Reads the graph as JSON
     from stdin and prints the geometry as JSON on the last line of stdout. It does all of its
     own imports (and imports nothing from yarp), since `obabel_embed()` runs it from its source.
+    Open Babel is imported from the caller's import path, which comes in with the graph.
     '''
     import json
     import sys
-    from openbabel import openbabel as ob, pybel
 
     payload = json.loads(sys.stdin.read())
+    sys.path[:] = payload["sys_path"]
+    from openbabel import openbabel as ob, pybel
 
     mol = pybel.Molecule(ob.OBMol())
     for count_i, i in enumerate(payload["atomic_numbers"]):

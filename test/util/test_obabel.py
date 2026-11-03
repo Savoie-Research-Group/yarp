@@ -1,3 +1,4 @@
+import sys
 from copy import deepcopy
 
 import numpy as np
@@ -225,11 +226,13 @@ class TestObabelEmbed:
 
     def test_isolated_worker(self, obabel_worker_shadows, tmp_path, monkeypatch):
         """
-        The worker process imports nothing from the current directory, so each shadowing file
-        there leaves the build unchanged. A worker that dies without a traceback raises RuntimeError.
+        The worker process imports nothing from the current directory, even when the caller's
+        sys.path has it (as in Jupyter or python -c), so each shadowing file there leaves the
+        build unchanged. A worker that dies without a traceback raises RuntimeError.
         """
         mol = yp.yarpecule("CCO")
         expected = obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+        monkeypatch.setattr("sys.path", ["", *sys.path])
         for shadow in obabel_worker_shadows:
             folder = tmp_path / shadow.replace("/", "_")
             (folder / shadow).parent.mkdir(parents=True)
@@ -239,4 +242,17 @@ class TestObabelEmbed:
 
         monkeypatch.setattr("sys.executable", "/bin/false")
         with pytest.raises(RuntimeError):
+            obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
+
+    def test_worker_uses_caller_path(self, tmp_path, monkeypatch):
+        """
+        The worker imports Open Babel from the caller's sys.path, which -I alone would cut down
+        (no PYTHONPATH, no user site-packages): an openbabel package placed first there is the
+        one the worker imports.
+        """
+        mol = yp.yarpecule("CCO")
+        (tmp_path / "openbabel").mkdir()
+        (tmp_path / "openbabel" / "__init__.py").write_text("raise ImportError('openbabel imported from the caller path')\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        with pytest.raises(RuntimeError, match="openbabel imported from the caller path"):
             obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)

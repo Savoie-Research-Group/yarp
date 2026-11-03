@@ -803,9 +803,10 @@ def obabel_embed_cases():
 def obabel_worker_shadows():
     """
     Files in the current directory that would shadow the imports of obabel_embed's worker
-    process if it ran without isolation (an old yarp checkout, a local json.py or numpy.py).
+    process if it ran without isolation (an old yarp checkout, a local json.py or numpy.py, or a
+    folder named openbabel, which the worker imports from the caller's path).
     """
-    return ["yarp/__init__.py", "json.py", "numpy.py"]
+    return ["yarp/__init__.py", "json.py", "numpy.py", "openbabel/__init__.py"]
 
 
 @pytest.fixture

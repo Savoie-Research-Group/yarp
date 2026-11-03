@@ -168,6 +168,8 @@ for _ in list(el_max_valence.keys()):
 # 5d transition metals (La, Hf, Ta, W, Re, Os, Pt, Hg) added 2026-05-21 ZL —
 # without them adjust_metals() never dative-izes Cp on 5d centers, which
 # inflates the +6 oxidation-state bin in dial plots for Hf/W/Re/Os/Ir/Pt.
+# Metal risk: lanthanides other than La and all actinides are missing from el_metals and from the element tables
+# above (el_valence, el_n_expand_octet, ...), so SMILES with them raise KeyError; La itself is missing from el_to_an.
 el_metals = {'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
              'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
              'La', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'}

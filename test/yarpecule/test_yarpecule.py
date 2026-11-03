@@ -4,6 +4,9 @@ Testing suite for the yarpecule class
 import pytest
 import numpy as np
 from yarp.yarpecule.yarpecule import yarpecule as ypcule
+import inspect
+import sys
+from collections import Counter
 
 
 class TestYarpeculeFromSMILES:
@@ -162,3 +165,31 @@ class TestSeparateYarpecules:
 
         assert sep_mols[0].adj_mat.shape == (6, 6)
         assert sep_mols[1].adj_mat.shape == (3, 3)
+
+
+class TestStrictDefault:
+    def test_strict_default(self, yarpecule_cases, capsys):
+        """
+        strict=True by default, and each case builds in yarp mode with a geometry and no
+        RDKit fallback.
+        """
+        assert inspect.signature(ypcule.__init__).parameters["strict"].default is True
+        for smiles, elements in yarpecule_cases:
+            mol = ypcule(smiles)
+            printed = capsys.readouterr().out
+            assert Counter(mol.elements) == elements, smiles
+            assert mol.geo is not None, smiles
+            assert "falling back to RDKit" not in printed and "geometry fallback used RDKit" not in printed, smiles
+
+    def test_parse_error_names_cause(self, monkeypatch):
+        """
+        With strict=True, a parse error that is not a ValueError becomes a TypeError that names
+        the SMILES and the original error, and keeps it as the cause.
+        """
+        def fail(*args, **kwargs):
+            raise RuntimeError("Open Babel could not build a geometry")
+        # Patch the module the constructor looks it up in (the package exports the class under the module's name)
+        monkeypatch.setattr(sys.modules[ypcule.__module__], "xyz_from_smiles", fail)
+        with pytest.raises(TypeError, match=r"'CCO'.*RuntimeError: Open Babel could not build a geometry") as err:
+            ypcule("CCO")
+        assert isinstance(err.value.__cause__, RuntimeError)

@@ -1,3 +1,4 @@
+import shutil
 import sys
 from copy import deepcopy
 
@@ -247,7 +248,7 @@ class TestObabelEmbed:
         deleted.rmdir()
         assert np.array_equal(obabel_embed(mol.elements, mol.bond_mats[0], mol.fc), expected), "deleted cwd"
 
-        monkeypatch.setattr("sys.executable", "/bin/false")
+        monkeypatch.setattr("sys.executable", shutil.which("false"))  # /bin/false on Linux, /usr/bin/false on macOS
         with pytest.raises(RuntimeError):
             obabel_embed(mol.elements, mol.bond_mats[0], mol.fc)
 

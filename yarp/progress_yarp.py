@@ -2,6 +2,7 @@
 Directed acyclic graph workflow manager for YARP jobs
 """
 import argparse
+import dataclasses
 import json
 import pickle
 from pathlib import Path
@@ -11,6 +12,7 @@ from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.job_manager import get_job_manager
 from yarp.reaction.external.calc_factory import get_calculator
 from yarp.reaction.external.min_opt import adopt_reactant_preopt_geometry
+from yarp.util.run_lock import run_lock, RunLockedError
 
 # Tasks that operate on a single species rather than on the reaction path.
 # These are the ones the redundancy blocker can deduplicate.
@@ -106,6 +108,15 @@ def _matches_lot(key: str, desired_key: str) -> bool:
     return key == desired_key or key.endswith(f"_{desired_key}")
 
 
+def is_failed(rxn_meta: dict) -> bool:
+    """
+    True if a reaction's STATUS entry is marked failed. A failed reaction keeps
+    its task history in STATUS.json for a later restart, but its data object is
+    in failed_rxns.pkl, not the active pickle, and no pass may act on it.
+    """
+    return bool(rxn_meta.get("failed"))
+
+
 def load_state(work_dir: Path):
     """
     Load in status tracker and reaction objects from working directory
@@ -175,12 +186,15 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
         with open(fail_json_file, "w") as f:
             json.dump(existing_fail_status, f, indent=4)
 
-        # C. CLEANUP: Now that errors are extracted, delete from the active pool!
+        # C. Take failed reactions out of the active pool. The reaction object
+        # leaves the active pickle (it is in failed_rxns.pkl), but its STATUS
+        # entry stays, marked failed, so its full task history is kept for a
+        # later restart. Every pass skips reactions marked failed.
         for failed_hash in failed_rxns.keys():
             if failed_hash in reactions:
                 del reactions[failed_hash]
             if "reactions" in status_tracker and failed_hash in status_tracker["reactions"]:
-                del status_tracker["reactions"][failed_hash]
+                status_tracker["reactions"][failed_hash]["failed"] = True
 
     # ====================================================================
     # 2. SAVE ACTIVE STATE (Dump cleanly purged boards to disk)
@@ -194,6 +208,21 @@ def save_state(work_dir: Path, status_tracker: dict, reactions: dict, failed_rxn
         pickle.dump(reactions, f)
 
 def progress_yarp(work_dir: Path):
+    """
+    One progress pass over the run in `work_dir`, holding the run lock.
+
+    If another YARP process holds the lock (e.g. yarp-restart editing the run),
+    this pass is skipped and returns normally, so the loop simply tries again
+    on its next tick instead of exiting.
+    """
+    try:
+        with run_lock(work_dir, "yarp-progress"):
+            _progress_pass(work_dir)
+    except RunLockedError as e:
+        print(f"Skipping this progress pass: {e}")
+
+
+def _progress_pass(work_dir: Path):
     """
     Primary logic flow for managing
     """
@@ -244,6 +273,7 @@ def progress_yarp(work_dir: Path):
 
     # 0.2.A. Fast-Forward Pipeline Tasks (Local)
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        if is_failed(rxn_meta): continue
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
 
@@ -320,13 +350,14 @@ def progress_yarp(work_dir: Path):
 
             if model:
                 all_completed = True
-                for rxn_hash in status_tracker["reactions"].keys():
+                for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+                    if is_failed(rxn_meta): continue
                     rxn_obj = reactions.get(rxn_hash)
                     if not rxn_obj or not hasattr(rxn_obj, 'barrier') or model not in rxn_obj.barrier:
                         all_completed = False
                         break
 
-                if all_completed and len(status_tracker["reactions"]) > 0:
+                if all_completed and any(not is_failed(m) for m in status_tracker["reactions"].values()):
                      g_meta["status"] = "terminated_normally"
                      print(f" * Global Task '{g_task_id}' (Model: {model}) already completed for all reactions. Fast-forwarding...")
 
@@ -341,6 +372,7 @@ def progress_yarp(work_dir: Path):
 
     # Pre-populate registry with jobs that are ALREADY running from previous loops
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        if is_failed(rxn_meta): continue
         rxn_obj = reactions.get(rxn_hash)
         for task_id, meta in rxn_meta["tasks"].items():
             if meta["status"] in ["submitted", "running"]:
@@ -380,6 +412,7 @@ def progress_yarp(work_dir: Path):
     # PASS 1.2: Check Status of Submitted PIPELINE Jobs
     # =================================================================
     for rxn_hash, rxn_meta in status_tracker["reactions"].items():
+        if is_failed(rxn_meta): continue
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
 
@@ -439,6 +472,7 @@ def progress_yarp(work_dir: Path):
     # PASS 2: Update Pending Tasks to Ready
     # =================================================================
     for rxn_hash, rxn_data in status_tracker["reactions"].items():
+        if is_failed(rxn_data): continue
         tasks_status = rxn_data["tasks"]
         for task_id, meta in tasks_status.items():
             if meta["status"] == "pending":
@@ -504,6 +538,7 @@ def progress_yarp(work_dir: Path):
     # Check for idle state: no active jobs and no remaining pending/ready tasks
     pending_or_ready = False
     for rxn_data in status_tracker["reactions"].values():
+        if is_failed(rxn_data): continue
         if any(meta["status"] in ["pending", "ready"] for meta in rxn_data["tasks"].values()):
             pending_or_ready = True
             break
@@ -569,6 +604,7 @@ def progress_yarp(work_dir: Path):
             print(f"Max active jobs ({max_active_jobs}) reached. Holding off on further submissions.")
             break
 
+        if is_failed(rxn_meta): continue
         rxn_obj = reactions.get(rxn_hash)
         if not rxn_obj: continue
 
@@ -597,6 +633,12 @@ def progress_yarp(work_dir: Path):
                     else:
                         # We are the "leader"! Claim this species/task combo.
                         active_species_tasks.add(registry_key)
+
+                # A conformer task restarted with yarp-restart --new-seed carries its
+                # own seed; the stage's shared config keeps the original.
+                if meta.get("seed") is not None:
+                    task_def = dataclasses.replace(
+                        task_def, config=dataclasses.replace(task_def.config, seed=meta["seed"]))
 
                 calc = get_calculator(task_def, rxn_obj, config.job_manager)
 

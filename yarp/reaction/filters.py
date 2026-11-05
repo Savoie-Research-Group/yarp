@@ -70,7 +70,6 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
         print(" - No product separation will be performed prior to enumeration")
 
     candidates = []
-    source2cand = dict()
     p_set = set()
     for rxn in clean_rxns.values():
         mol = rxn.product.graph
@@ -78,7 +77,6 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
             prod = separate_molecules(mol)
         else:
             prod = [mol]
-        source2cand[rxn.hash] = prod
         for p in prod:
             if p.hash in p_set: continue # Throw away all duplicate candidates
             if p.hash in r_set:
@@ -97,16 +95,6 @@ def filter_enum_candidates(rxns, separate_prods=False, prop_filter=None, netconf
                 k_nodes=netconfig.n_nodes, tolerance=netconfig.tie_window,
                 verbose=verbose
             )
-
-            # Mark which rxns were selected via product blinders
-            final_cand_set = set()
-            for mol in candidates:
-                final_cand_set.add(mol.hash)
-            
-            for rxn_hash, cand_list in source2cand.items():
-                for cand in cand_list:
-                    if cand.hash in final_cand_set:
-                        rxns[str(rxn_hash)].network_meta["prod_blind_selected"] = True
 
     if verbose:
         print(f" - {len(candidates)} unique products identified for enumeration") 

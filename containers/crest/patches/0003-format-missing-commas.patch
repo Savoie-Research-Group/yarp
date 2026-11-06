@@ -1,0 +1,70 @@
+CREST 3.0.2: add the commas libgfortran >= 15 requires between an edit descriptor and a
+following string literal ("Missing comma between descriptors" at run time). 7 format strings:
+the ANCOPT and RFO progress lines and one thermo printout. Apply in the CREST root with patch -p1.
+
+diff -ru a/src/optimize/ancopt.f90 b/src/optimize/ancopt.f90
+--- a/src/optimize/ancopt.f90	2026-11-05 12:22:29.181155901 -0500
++++ b/src/optimize/ancopt.f90	2026-11-05 12:22:50.999622177 -0500
+@@ -184,7 +184,7 @@
+       write (*,'(5x,"change ΔE",e18.7,1x,"Eh")') 0.0_wp
+       write (*,'(3x,"gradient norm :",f14.7,1x,"Eh/a0")',advance='no') gnorm
+       write (*,'(2x,"predicted",e18.7)',advance='no') 0.0_wp
+-      write (*,'(1x,"("f7.2"%)")')-0.0_wp
++      write (*,'(1x,"(",f7.2,"%)")')-0.0_wp
+     end if
+ 
+ !>======================================================================
+@@ -446,12 +446,12 @@
+         if (ii > 1) then
+           dummy = (depred-echng)/echng*100.0_wp
+           if (abs(dummy) < 1000.0_wp) then
+-            write (*,'(1x,"("f7.2"%)")') dummy
++            write (*,'(1x,"(",f7.2,"%)")') dummy
+           else
+             write (*,'(1x,"(*******%)")')
+           end if
+         else
+-          write (*,'(1x,"("f7.2"%)")')-100.0_wp
++          write (*,'(1x,"(",f7.2,"%)")')-100.0_wp
+         end if
+       end if
+ 
+diff -ru a/src/optimize/rfo.f90 b/src/optimize/rfo.f90
+--- a/src/optimize/rfo.f90	2026-11-05 12:22:29.246156345 -0500
++++ b/src/optimize/rfo.f90	2026-11-05 12:22:51.018622257 -0500
+@@ -221,7 +221,7 @@
+       write (*,'(5x,"change ΔE",e18.7,1x,"Eh")') 0.0_wp
+       write (*,'(3x,"gradient norm :",f14.7,1x,"Eh/a0")',advance='no') gnorm
+       write (*,'(2x,"predicted",e18.7)',advance='no') 0.0_wp
+-      write (*,'(1x,"("f7.2"%)")')-0.0_wp
++      write (*,'(1x,"(",f7.2,"%)")')-0.0_wp
+     end if
+ 
+ !>======================================================================
+@@ -288,12 +288,12 @@
+         if (iter > 1) then
+           dummy = (depred-echng)/echng*100.0_wp
+           if (abs(dummy) < 1000.0_wp) then
+-            write (*,'(1x,"("f7.2"%)")') dummy
++            write (*,'(1x,"(",f7.2,"%)")') dummy
+           else
+             write (*,'(1x,"(*******%)")')
+           end if
+         else
+-          write (*,'(1x,"("f7.2"%)")')-100.0_wp
++          write (*,'(1x,"(",f7.2,"%)")')-100.0_wp
+         end if
+       end if
+ 
+diff -ru a/src/printouts.f90 b/src/printouts.f90
+--- a/src/printouts.f90	2026-11-05 12:22:29.793354390 -0500
++++ b/src/printouts.f90	2026-11-05 12:22:51.036622294 -0500
+@@ -1119,7 +1119,7 @@
+   real(wp),intent(in)       :: G(srange)
+   write (*,*)
+   write (*,'(2x,"==================================================")')
+-  write (*,'(2x,"|  Gsolv with SCALED RRHO contributions: ",f4.2,4x"|")') scal
++  write (*,'(2x,"|  Gsolv with SCALED RRHO contributions: ",f4.2,4x,"|")') scal
+   write (*,'(2x,"|  [1 bar gas/ 1 M solution]                     |")')
+   write (*,'(2x,"|                                                |")')
+   write (*,'(2x,"|  G_solv (incl.RRHO)+dV(T)=",F8.2," kcal/mol    |")') G(freqscal)

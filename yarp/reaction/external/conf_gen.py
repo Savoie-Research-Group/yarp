@@ -31,6 +31,28 @@ PREOPT_PREFIX = "preopt"
 # nothing else. Evidence: debug/.../implementation_checks/08_crest_h2/.
 DIATOMIC_MD_TIMESTEP_FS = 1.0
 
+# OpenMP thread stack size for CREST, overriding the CREST image's 1G.
+#
+# Every OpenMP worker thread reserves OMP_STACKSIZE of virtual memory, and on
+# SGE the job's h_vmem becomes a per-process virtual-memory limit (ulimit -v).
+# With the image's 1G, a CREST process reserves 4-6 GB just in stacks, and a
+# thread that would push it past the limit cannot be created: CREST dies with
+# "libgomp: Thread creation failed: Resource temporarily unavailable" and the
+# reaction is lost. Measured: 256M (and 64M) cut the per-process peak from
+# ~4.1 to ~1.8 GB and stop that failure at the same limit, with the same lowest
+# conformer energies as 1G on molecules of 12-42 atoms. 256M rather than 64M
+# keeps headroom for larger systems. Evidence: debug/261104_crest_crash/.
+CREST_OMP_STACKSIZE = "256M"
+
+# CREST images. Apptainer/Singularity use a local build of CREST 3.0.2 with two
+# fixes (recipe: containers/crest/crest_3.0.2_patched.def): the GFN-FF it
+# bundles segfaulted on a free CO or NO next to an H-bond donor (e.g. the KHP
+# product CCOO.[C-]#[O+]), and libgfortran 15 rejected 7 of its format strings.
+# Docker still uses the Docker Hub image, which has neither fix.
+# Evidence: debug/261104_crest_crash/.
+CREST_DOCKER_IMAGE = "erm42/yarp:crest"
+CREST_PATCHED_SIF = "crest_3.0.2_patched.sif"
+
 # Elements each Auto3D potential is trained on (lowercase, as yarpecule.elements).
 # AIMNet2 and its spin-aware variant: the elements with a trained per-element
 # energy shift in the weights the auto3d_conf image ships (both models, the same
@@ -90,7 +112,10 @@ class CrestConfCalculator(ConfTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.image_name = "erm42/yarp:crest"
+        if self.job_manager.container in ("apptainer", "singularity"):
+            self.image_name = CREST_PATCHED_SIF
+        else:
+            self.image_name = CREST_DOCKER_IMAGE
         self.xyz_file = "input.xyz"
 
     def generate_input(self):
@@ -136,14 +161,14 @@ class CrestConfCalculator(ConfTask):
         """Write the bash script that the JobManager will execute."""
         script_path = self.scratch_dir / "run_crest_cmd.sh"
 
-        # When a seed is set, pin OMP/MKL threads inside the container so xTB's
-        # geometry optimizations use the same thread count as CREST's -T setting.
-        env_vars = None
-        if self.config.seed is not None:
-            env_vars = {
-                "OMP_NUM_THREADS": self.config.n_cpus,
-                "MKL_NUM_THREADS": self.config.n_cpus,
-            }
+        # Pin OMP/MKL threads inside the container to CREST's -T setting, and
+        # cap each thread's stack (see CREST_OMP_STACKSIZE). Set on every job:
+        # neither depends on whether a seed is configured.
+        env_vars = {
+            "OMP_NUM_THREADS": self.config.n_cpus,
+            "MKL_NUM_THREADS": self.config.n_cpus,
+            "OMP_STACKSIZE": CREST_OMP_STACKSIZE,
+        }
 
         prefix = self.get_container_prefix(self.image_name, self.scratch_dir, env_vars=env_vars)
         crest_cmd = self._get_crest_command()
@@ -252,7 +277,7 @@ class CrestConfCalculator(ConfTask):
 
         # No --seed: CREST has no seed option (CREST 3.0.2 silently ignored the
         # flag), so a CREST search is never reproducible run to run whatever the
-        # config's `seed` says. That setting still pins the thread count above.
+        # config's `seed` says.
 
         # conformer generation thresholds (ERM: expand this later, if needed)
         # ERM: no current way to cap CREST outputs at a set number of generated conformers!

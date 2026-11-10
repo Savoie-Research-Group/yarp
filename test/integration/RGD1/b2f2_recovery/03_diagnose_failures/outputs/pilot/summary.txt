@@ -1,9 +1,9 @@
-run: /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/03_diagnose_failures/runs/pilot
+run: /users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/03_diagnose_failures/runs/pilot
 shards: 1/1 done
-commit: ['fedf73a']
-branch: ['exhaust_enum']
-rdkit: ['2026.03.6']
-find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['a2fe328d60ee']; args: ['{"k": 3, "timeout": 900}']
+commit: ['4978617']
+branch: ['lp_enum']
+rdkit: ['2025.09.5']
+find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['1b0721f81166']; args: ['{"k": 3, "timeout": 900}']
 
 == 2 reactants -> 3 step 02 clean failures (missed 3) ==
   reactant keeps 1 BEM (straight to reordering):      3 / 3 (100.0%) rows
@@ -16,16 +16,16 @@ find_lewis.py sha256: ['f00b27ec9849']; enum.py: ['a2fe328d60ee']; args: ['{"k":
   persist_fail               3 / 3 (100.0%)              3              0
 
 == persisting failures ==
-  lp_insertion (an atom forms >= 2 new bonds from a lone pair):      3 / 3 (100.0%)
+  lp_insertion (an atom forms >= 2 new bonds from a lone pair):      0 / 3 (  0.0%)
   YARP b2f2 (fewest-change BEM pair), no lp_insertion:      0 / 3 (  0.0%)
-  not YARP b2f2, no lp_insertion:      0 / 3 (  0.0%)
-  adjacency (breaks, forms): (1, 2) 3
+  not YARP b2f2, no lp_insertion:      3 / 3 (100.0%)
+  adjacency (breaks, forms): (0, 2) 2, (0, 1) 1
 
 == reactants: 2 ==
-  t_total: sum 0.00 h, median 1.5 s, max 2 s
+  t_total: sum 0.01 h, median 12.6 s, max 18 s
   timeouts: none
 
-== exported to /Users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/03_diagnose_failures/outputs/pilot ==
+== exported to /users/emille35/dev/yarp/test/integration/RGD1/b2f2_recovery/03_diagnose_failures/outputs/pilot ==
   rxn_exhaustive_pass.csv       0 / 3 (  0.0%) rows
   rxn_reorder_pass.csv          0 / 3 (  0.0%) rows
   rxn_persist_fail.csv          3 / 3 (100.0%) rows

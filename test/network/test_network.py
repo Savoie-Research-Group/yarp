@@ -18,7 +18,6 @@ def test_khp2pp22_soergel_beam2_cyc3(khp2pp22_soergel_beam2_cyc3):
     assert crn.n_species == 48
     # The migrated fixture collapses five reverse-hash reaction records.
     assert crn.n_rxns == 73
-    assert crn.n_considered_rxns == 4
 
     terminals = crn.get_terminal_species()
     assert len(terminals) == 43

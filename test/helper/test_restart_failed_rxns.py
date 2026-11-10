@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import helper.restart_failed_rxns as restart_mod
 from helper.restart_failed_rxns import restart_failed, clear_task_results
 from yarp.util.run_lock import run_lock, RunLockedError
 
@@ -108,25 +109,6 @@ class TestRestartRestoresTheFailedStep:
         assert {k: v["status"] for k, v in entry["tasks"].items()} == {
             "ll_path.ts_guess": "terminated_normally", "ll_refine.ts_opt": "pending", "ll_refine.irc": "pending"}
 
-    def test_failed_attempt_is_recorded_and_its_scratch_folder_kept_aside(self, tmp_path, khp_reaction):
-        """
-        The failed attempt's folder is renamed to `.attempt1` with its contents
-        intact (here a read-only script, as container jobs can leave behind),
-        so the retry gets a fresh folder and nothing has to be overwritten. The
-        task records the attempt: its job id, error and where its folder went.
-        """
-        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
-
-        restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
-
-        kept = scratch.with_name(scratch.name + ".attempt1")
-        assert not scratch.exists() and (kept / "run_pysis.sh").exists()
-        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
-        assert meta["attempt"] == 2 and meta["job_id"] is None and meta["scratch_dir"] is None
-        assert "error_log" not in meta
-        assert meta["attempts"] == [{"attempt": 1, "status": "finished_with_error", "job_id": "2",
-                                     "error_log": "Output validation failed.", "scratch_dir": str(kept)}]
-
     def test_partial_results_of_the_failed_step_are_cleared_others_kept(self, tmp_path, khp_reaction):
         """
         The failed TS-opt's scrape left one optimized TS behind; the progress
@@ -149,6 +131,121 @@ class TestRestartRestoresTheFailedStep:
 
         (backup,) = (tmp_path / "restart_backups").iterdir()
         assert {f: (backup / f).read_bytes() for f in before} == before
+
+
+def _fail_again(tmp_path, scratch, job_id="3"):
+    """The retry failed too: progress marks it failed in a new folder at the original path."""
+    scratch.mkdir(parents=True)
+    (scratch / "tsopt.log").write_text("failed again\n")
+    status, active, failed, failed_status = _load(tmp_path)
+    entry = status["reactions"]["rxn_1"]
+    entry["failed"] = True
+    entry["tasks"]["ll_refine.ts_opt"].update(status="finished_with_error", job_id=job_id,
+                                              scratch_dir=str(scratch), error_log="Output validation failed.")
+    failed["rxn_1"] = active.pop("rxn_1")
+    (tmp_path / "STATUS.json").write_text(json.dumps(status, indent=4))
+    (tmp_path / "rxns.pkl").write_bytes(pickle.dumps(active))
+    (tmp_path / "failed_rxns.pkl").write_bytes(pickle.dumps(failed))
+
+
+class TestFailedAttemptFolder:
+    """
+    By default the failed attempt's scratch folder is deleted, so the retry
+    starts in a fresh one; --keep-failed renames it to `.attempt<N>` instead.
+    Either way the attempt (job id, error) is recorded in the task's `attempts`.
+    """
+
+    def test_failed_attempt_folder_is_deleted_by_default(self, tmp_path, khp_reaction):
+        """Deleted even with a read-only file inside, as container jobs leave behind; no `.attempt1` appears."""
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+
+        result = restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
+
+        assert not scratch.exists()
+        assert not scratch.with_name(scratch.name + ".attempt1").exists()
+        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
+        assert meta["attempt"] == 2 and meta["job_id"] is None and meta["scratch_dir"] is None
+        assert "error_log" not in meta
+        assert meta["attempts"] == [{"attempt": 1, "status": "finished_with_error", "job_id": "2",
+                                     "error_log": "Output validation failed.", "scratch_dir": None,
+                                     "scratch_deleted": True}]
+        assert result["restarted"][0]["tasks"][0]["scratch_deleted"] == str(scratch)
+
+    def test_read_only_directories_inside_are_deleted_too(self, tmp_path, khp_reaction):
+        """A read-only subfolder (its files cannot be unlinked until it is made writable) is still deleted."""
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+        sub = scratch / "tsopt_run1" / "qm_calcs"
+        sub.mkdir(parents=True)
+        (sub / "image_000.xtb.out").write_text("x")
+        sub.chmod(0o555)
+        (scratch / "tsopt_run1").chmod(0o555)
+
+        result = restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
+
+        assert not scratch.exists() and not scratch.with_name(scratch.name + ".attempt1").exists()
+        assert result["restarted"][0]["tasks"][0]["delete_failed"] is False
+
+    def test_keep_failed_renames_the_folder_with_its_contents(self, tmp_path, khp_reaction):
+        """--keep-failed: the folder becomes `.attempt1`, untouched, and the attempt records where it went."""
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+
+        restart_failed(tmp_path, all_failed=True, keep_failed=True, config=CONFIG, job_manager=_jm())
+
+        kept = scratch.with_name(scratch.name + ".attempt1")
+        assert not scratch.exists() and (kept / "run_pysis.sh").exists()
+        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
+        assert meta["attempt"] == 2 and meta["scratch_dir"] is None
+        assert meta["attempts"] == [{"attempt": 1, "status": "finished_with_error", "job_id": "2",
+                                     "error_log": "Output validation failed.", "scratch_dir": str(kept)}]
+
+    def test_folder_that_cannot_be_deleted_is_set_aside_with_a_warning(self, tmp_path, khp_reaction, monkeypatch, capsys):
+        """If the delete is incomplete, the rest is renamed to `.attempt1` so the retry still starts clean."""
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+        monkeypatch.setattr(restart_mod, "_delete_folder", lambda path: False)
+
+        result = restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
+        restart_mod._print_report(result)
+
+        kept = scratch.with_name(scratch.name + ".attempt1")
+        assert not scratch.exists() and kept.exists()
+        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
+        assert meta["attempts"][0]["scratch_dir"] == str(kept) and "scratch_deleted" not in meta["attempts"][0]
+        assert "WARNING: old scratch could not be fully deleted" in capsys.readouterr().out
+
+    def test_second_restart_deletes_the_second_failure_and_keeps_both_records(self, tmp_path, khp_reaction):
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+        restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
+        _fail_again(tmp_path, scratch)
+
+        restart_failed(tmp_path, all_failed=True, config=CONFIG, job_manager=_jm())
+
+        assert not scratch.exists() and not list(scratch.parent.glob(scratch.name + ".attempt*"))
+        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
+        assert meta["attempt"] == 3
+        assert [(a["attempt"], a["job_id"], a.get("scratch_deleted")) for a in meta["attempts"]] == [
+            (1, "2", True), (2, "3", True)]
+
+    def test_second_restart_with_keep_failed_keeps_attempt2(self, tmp_path, khp_reaction):
+        scratch = _tsopt_failed_run(tmp_path, khp_reaction)
+        restart_failed(tmp_path, all_failed=True, keep_failed=True, config=CONFIG, job_manager=_jm())
+        _fail_again(tmp_path, scratch)
+
+        restart_failed(tmp_path, all_failed=True, keep_failed=True, config=CONFIG, job_manager=_jm())
+
+        a1, a2 = (scratch.with_name(f"{scratch.name}.attempt{n}") for n in (1, 2))
+        assert not scratch.exists() and (a1 / "run_pysis.sh").exists() and (a2 / "tsopt.log").exists()
+        meta = _load(tmp_path)[0]["reactions"]["rxn_1"]["tasks"]["ll_refine.ts_opt"]
+        assert [a["scratch_dir"] for a in meta["attempts"]] == [str(a1), str(a2)]
+
+    def test_cli_passes_keep_failed(self, tmp_path, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(restart_mod, "restart_failed",
+                            lambda *a, **kw: seen.update(kw) or {"restarted": [], "skipped": {}, "dry_run": False})
+        for argv, expected in ((["yarp-restart", str(tmp_path), "--all"], False),
+                               (["yarp-restart", str(tmp_path), "--all", "--keep-failed"], True)):
+            monkeypatch.setattr("sys.argv", argv)
+            restart_mod.cli()
+            assert seen["keep_failed"] is expected
 
 
 class TestWhatIsNotRestarted:
@@ -203,6 +300,7 @@ class TestWhatIsNotRestarted:
         result = restart_failed(tmp_path, all_failed=True, dry_run=True, config=CONFIG, job_manager=_jm())
 
         assert result["restarted"][0]["tasks"][0]["removed_results"] == ["ts_geom:1_tsopt_xtb_pysisyphus"]
+        assert result["restarted"][0]["tasks"][0]["scratch_deleted"] == str(scratch)
         assert {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()} == before
         assert scratch.exists() and not (tmp_path / "restart_backups").exists()
 

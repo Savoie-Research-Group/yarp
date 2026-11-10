@@ -8,6 +8,7 @@ Usage (installed as `yarp-restart`):
     yarp-restart <work_dir> --all --dry-run       # show what would be done, change nothing
     yarp-restart <work_dir> --all --new-seed      # seeded conformer retries use a new seed
     yarp-restart <work_dir> --all --include-filtered   # also reactions removed by a filter
+    yarp-restart <work_dir> --all --keep-failed   # keep failed attempts' folders as <folder>.attempt<N>
 
 Then start (or keep running) yarp-loop as usual.
 
@@ -17,9 +18,12 @@ finished keeps its results and is fast-forwarded by the next progress pass:
     and its entries in failed_status.json and its `failed` mark in STATUS.json go;
   - each failed task's partial results (if its scrape stopped part-way) are
     removed, so the fast-forward cannot mistake them for a finished task;
-  - the failed attempt's scratch folder is renamed to `<folder>.attempt<N>`
-    (never overwritten -- files inside may not be writable), and the attempt's
-    job id, error and folder are recorded in the task's `attempts` list;
+  - the failed attempt's scratch folder is deleted, so the retry starts in a
+    fresh one. With --keep-failed it is renamed to `<folder>.attempt<N>` instead
+    and kept as the job left it. A folder that cannot be fully deleted (e.g. a
+    read-only directory inside) is renamed the same way, with a warning;
+  - the attempt's job id and error are recorded in the task's `attempts` list,
+    with its folder (or `scratch_deleted: true` if the folder was deleted);
   - the task is set back to pending, and the next pass submits it.
 
 A reaction with a task whose job is still in the scheduler's queue is left
@@ -41,6 +45,7 @@ import json
 import os
 import pickle
 import shutil
+import stat
 import sys
 import time
 from pathlib import Path
@@ -95,6 +100,35 @@ def clear_task_results(rxn, task_type, task_config) -> list:
     return removed
 
 
+def _delete_folder(path: Path) -> bool:
+    """
+    Delete a failed attempt's folder. Files a container job left read-only are
+    made writable and retried. Returns False if anything could not be deleted
+    (the rest is deleted; the caller sets the remainder aside).
+    """
+    def make_writable_and_retry(func, target, _exc_info):
+        try:
+            os.chmod(os.path.dirname(target) or ".", stat.S_IRWXU)
+            if os.path.isdir(target) and not os.path.islink(target):
+                os.chmod(target, stat.S_IRWXU)
+            func(target)
+        except OSError:
+            pass   # checked below: whatever is left makes the delete incomplete
+
+    shutil.rmtree(path, onerror=make_writable_and_retry)
+    if path.exists():
+        # A directory that could not be listed stops rmtree before its contents:
+        # make the whole remaining tree writable, then try once more.
+        for root, dirs, _files in os.walk(path):
+            for d in [root] + [os.path.join(root, d) for d in dirs]:
+                try:
+                    os.chmod(d, stat.S_IRWXU)
+                except OSError:
+                    pass
+        shutil.rmtree(path, onerror=make_writable_and_retry)
+    return not path.exists()
+
+
 def _atomic_write(path: Path, write):
     """Write via a temporary file and rename, so a crash never leaves half a file."""
     tmp = path.with_name(path.name + ".restart_tmp")
@@ -103,7 +137,7 @@ def _atomic_write(path: Path, write):
 
 
 def restart_failed(work_dir, hashes=None, all_failed=False, include_filtered=False,
-                   new_seed=False, dry_run=False, config=None, job_manager=None) -> dict:
+                   new_seed=False, dry_run=False, keep_failed=False, config=None, job_manager=None) -> dict:
     """
     Restart failed reactions in `work_dir` (see the module docstring).
     Returns {"restarted": [...], "skipped": {hash: reason}}.
@@ -190,17 +224,26 @@ def restart_failed(work_dir, hashes=None, all_failed=False, include_filtered=Fal
                 # In a dry run, report what would be cleared using a copy of the reaction.
                 removed = clear_task_results(copy.deepcopy(rxn) if dry_run else rxn,
                                              task_def.task_type, task_def.config)
-                report["tasks"].append({"task": tid, "attempt": attempt + 1, "error": meta.get("error_log"),
-                                        "scratch_kept_as": str(kept_dir) if kept_dir and old_dir.exists() else None,
-                                        "seed": seed, "removed_results": removed})
+                has_dir = old_dir is not None and old_dir.exists()
+                task_report = {"task": tid, "attempt": attempt + 1, "error": meta.get("error_log"),
+                               "scratch_kept_as": str(kept_dir) if has_dir and keep_failed else None,
+                               "scratch_deleted": str(old_dir) if has_dir and not keep_failed else None,
+                               "delete_failed": False, "seed": seed, "removed_results": removed}
+                report["tasks"].append(task_report)
                 if dry_run:
                     continue
+                record = {"attempt": attempt, "status": meta["status"], "job_id": meta.get("job_id"),
+                          "error_log": meta.get("error_log"), "scratch_dir": meta.get("scratch_dir")}
+                if has_dir and not keep_failed:
+                    if _delete_folder(old_dir):
+                        record.update(scratch_dir=None, scratch_deleted=True)
+                    else:
+                        # Could not delete everything: set the rest aside so the retry starts clean.
+                        task_report.update(scratch_deleted=None, scratch_kept_as=str(kept_dir), delete_failed=True)
                 if old_dir is not None and old_dir.exists():
                     old_dir.rename(kept_dir)
-                meta.setdefault("attempts", []).append({
-                    "attempt": attempt, "status": meta["status"], "job_id": meta.get("job_id"),
-                    "error_log": meta.get("error_log"),
-                    "scratch_dir": str(kept_dir) if kept_dir and kept_dir.exists() else meta.get("scratch_dir")})
+                    record["scratch_dir"] = str(kept_dir)
+                meta.setdefault("attempts", []).append(record)
                 meta.update(status="pending", job_id=None, scratch_dir=None, attempt=attempt + 1)
                 meta.pop("error_log", None)
                 if seed is not None:
@@ -229,8 +272,13 @@ def _print_report(result):
     for r in result["restarted"]:
         for t in r["tasks"]:
             extra = []
-            if t["scratch_kept_as"]:
+            if t["delete_failed"]:
+                extra.append(f"WARNING: old scratch could not be fully deleted; the rest is kept as "
+                             f"{t['scratch_kept_as']}")
+            elif t["scratch_kept_as"]:
                 extra.append(f"old scratch -> {t['scratch_kept_as']}")
+            elif t["scratch_deleted"]:
+                extra.append(f"old scratch {'would be ' if result['dry_run'] else ''}deleted: {t['scratch_deleted']}")
             if t["seed"] is not None:
                 extra.append(f"seed {t['seed']}")
             if t["removed_results"]:
@@ -255,12 +303,14 @@ def cli():
                         help="also restart reactions removed by a filter (IRC outcome, stage threshold)")
     parser.add_argument("--new-seed", action="store_true",
                         help="seeded conformer steps (rdkit, auto3d) retry with seed + attempt number")
+    parser.add_argument("--keep-failed", action="store_true",
+                        help="keep each failed attempt's scratch folder as <folder>.attempt<N> instead of deleting it")
     parser.add_argument("--dry-run", action="store_true", help="show what would be done; change nothing")
     args = parser.parse_args()
     try:
         result = restart_failed(args.work_dir, hashes=args.hash, all_failed=args.all,
                                 include_filtered=args.include_filtered, new_seed=args.new_seed,
-                                dry_run=args.dry_run)
+                                dry_run=args.dry_run, keep_failed=args.keep_failed)
     except RunLockedError as e:
         sys.exit(f"Not restarting: {e}")
     _print_report(result)

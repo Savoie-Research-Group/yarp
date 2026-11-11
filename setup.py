@@ -13,6 +13,7 @@ setup(
             'yarp-progress=yarp.progress_yarp:main',
             'yarp-read=helper.read_pkl:cli',
             'yarp-out=helper.export_rxn_smi:cli',
+            'yarp-restart=helper.restart_failed_rxns:cli',
         ],
     }
 )

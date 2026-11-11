@@ -127,9 +127,9 @@ class AsyncYarpCalculator:
                         f"Local Apptainer image not found: {sif_path}\n"
                         f"(image_name={image_name!r}). This name is treated as a filename under "
                         f"`job_manager.sif_location`, not a Docker Hub image.\n"
-                        "Build the .sif from your definition file, for example:\n"
-                        f"  apptainer build {sif_path} /path/to/orca_6.0.1.def\n"
-                        "Place the ORCA installer tarball next to the .def as documented in that file."
+                        "Build the .sif from its definition file in the YARP repo's containers/, for example:\n"
+                        f"  apptainer build {sif_path} /path/to/{sif_path.stem}.def\n"
+                        "Comments in that .def list any other steps (ORCA needs its installer tarball)."
                     )
                 print(f"Apptainer image not found at {sif_path}. Pulling from Docker Hub...")
                 # Ensure the target directory actually exists before pulling
@@ -180,9 +180,9 @@ class AsyncYarpCalculator:
                         f"Local Singularity image not found: {sif_path}\n"
                         f"(image_name={image_name!r}). This name is treated as a filename under "
                         f"`job_manager.sif_location`, not a Docker Hub image.\n"
-                        "Build the .sif from your definition file, for example:\n"
-                        f"  singularity build {sif_path} /path/to/orca_6.0.1.def\n"
-                        "Place the ORCA installer tarball next to the .def as documented in that file."
+                        "Build the .sif from its definition file in the YARP repo's containers/, for example:\n"
+                        f"  singularity build {sif_path} /path/to/{sif_path.stem}.def\n"
+                        "Comments in that .def list any other steps (ORCA needs its installer tarball)."
                     )
                 print(f"Singularity image not found at {sif_path}. Pulling from Docker Hub...")
                 # Ensure the target directory actually exists before pulling

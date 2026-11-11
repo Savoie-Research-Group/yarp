@@ -1,0 +1,89 @@
+Bootstrap: docker
+From: erm42/yarp@sha256:50033841e284243af4ea63957a405e1b1b3fbe712ba75eb5af3ca3fddeb2773f
+
+# YARP's CREST image (erm42/yarp:crest, pinned to the digest that tag had on 2026-11-05; Apptainer
+# does not accept a tag and a digest together) with its
+# crest binary rebuilt from the CREST 3.0.2 sources and build settings conda-forge uses
+# (crest-feedstock: sources + checksums in crest_3.0.2_sources.txt, patches/0001, cmake
+# RelWithDebInfo, -ffree-line-length-none), plus two fixes:
+#   patches/0002: GFN-FF no longer treats a free CO or NO as a carbonyl/nitro H-bond acceptor, which
+#     segfaulted CREST's NCI flexibility step (e.g. CCOO.[C-]#[O+]). Same guard as xtb >= 6.6.
+#   patches/0003: commas libgfortran >= 15 requires in 7 format strings; without them standalone
+#     ancopt/rfo optimizations abort with "Missing comma between descriptors".
+# Compiler: conda-forge gcc/gfortran 14.3.0, the one that built the image's original crest (gcc 15
+# fails: C23 makes `true` a keyword in symmetry_i.c). Runtime libraries stay the image's
+# (libgfortran 15.2.0, OpenBLAS 0.3.30); xtb 6.7.1 and everything else are unchanged. The original
+# binary stays at /opt/conda/envs/yarp_crest/bin/crest.conda-forge-3.0.2.
+#
+# Build from this folder (the %files paths are relative to it); ~5 min, no root needed:
+#   cd containers/crest
+#   apptainer build --fakeroot ../crest_3.0.2_patched.sif crest_3.0.2_patched.def
+# YARP's CREST step looks for crest_3.0.2_patched.sif in job_manager.sif_location.
+
+%files
+    crest_3.0.2_sources.txt /opt/crest_build/sources.txt
+    patches/0001-double-allocation.patch /opt/crest_build/0001-double-allocation.patch
+    patches/0002-gfnff-free-co-no-hbond-guard.patch /opt/crest_build/0002-gfnff-free-co-no-hbond-guard.patch
+    patches/0003-format-missing-commas.patch /opt/crest_build/0003-format-missing-commas.patch
+
+%post
+    set -eux
+    export PATH=/opt/conda/bin:$PATH
+    B=/opt/crest_build
+    RT=/opt/conda/envs/yarp_crest
+
+    # Build environment: compilers and the same runtime library versions as the image.
+    conda create -y -p $B/env --override-channels -c conda-forge \
+        "gfortran=14.3.0" "gcc=14.3.0" "gxx=14.3.0" cmake ninja patch patchelf \
+        "libgfortran5=15.2.0" "libblas=3.11.0=*openblas" "liblapack=3.11.0=*openblas" \
+        "libopenblas=0.3.30" wget
+    export PATH=$B/env/bin:$PATH
+
+    # Sources, checksum-verified, laid out as in the conda-forge recipe.
+    mkdir -p $B/src && cd $B/src
+    while read -r folder url sha; do
+        wget -q -O /tmp/src.tgz "$url"
+        echo "$sha  /tmp/src.tgz" | sha256sum -c -
+        mkdir -p "$folder"
+        tar -xzf /tmp/src.tgz -C "$folder" --strip-components=1
+        rm /tmp/src.tgz
+    done < $B/sources.txt
+
+    patch -p1 < $B/0001-double-allocation.patch
+    (cd subprojects/gfnff && patch -p1 < $B/0002-gfnff-free-co-no-hbond-guard.patch)
+    grep -q "nbnbk .gt. 1" subprojects/gfnff/src/gfnff_engrad.f90
+    patch -p1 < $B/0003-format-missing-commas.patch
+    if grep -n '"("f7.2"%)"' src/optimize/ancopt.f90 src/optimize/rfo.f90; then exit 1; fi
+
+    # conda-forge build steps (recipe meta.yaml, build: script)
+    cp -r subprojects/test-drive subprojects/toml-f/subprojects/test-drive
+    export FC=$B/env/bin/gfortran CC=$B/env/bin/gcc
+    # conda-forge's default linux-64 FFLAGS, plus the recipe's -ffree-line-length-none
+    export CFLAGS="-march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -ffunction-sections -pipe"
+    export FFLAGS="-march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -ffunction-sections -pipe -ffree-line-length-none"
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TESTS=OFF \
+          -DCMAKE_PREFIX_PATH=$B/env -DCMAKE_INSTALL_PREFIX=$B/install \
+          -B build_dir -GNinja
+    cmake --build build_dir -j ${CREST_BUILD_JOBS:-3}
+    cmake --install build_dir
+
+    # Swap the binary into the image's environment; resolve libraries from that environment.
+    mv $RT/bin/crest $RT/bin/crest.conda-forge-3.0.2
+    cp $B/install/bin/crest $RT/bin/crest
+    patchelf --set-rpath '$ORIGIN/../lib' $RT/bin/crest
+    mkdir -p $RT/share/crest-patches
+    cp $B/000[123]-*.patch $RT/share/crest-patches/
+
+    cd / && rm -rf $B/env $B/src $B/install
+    conda clean -afy
+
+%labels
+    org.opencontainers.image.title yarp_crest_patched
+    org.opencontainers.image.description CREST 3.0.2 rebuilt (conda-forge recipe) + GFN-FF free-CO/NO H-bond guard + libgfortran-15 format fix
+
+%help
+    YARP CREST image with CREST 3.0.2 rebuilt from conda-forge's sources plus two patches: a GFN-FF
+    guard so a free CO or NO near an H-bond donor no longer crashes the NCI flexibility step, and
+    the commas libgfortran >= 15 needs in ANCOPT/RFO format strings.
+    Patches: /opt/conda/envs/yarp_crest/share/crest-patches/
+    Original binary: /opt/conda/envs/yarp_crest/bin/crest.conda-forge-3.0.2

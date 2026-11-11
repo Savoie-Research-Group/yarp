@@ -9,6 +9,7 @@ how the RDKit calculator hands its graph to the container and filters what
 comes back.
 """
 import numpy as np
+from pathlib import Path
 import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -19,7 +20,7 @@ from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.calc_factory import get_calculator
 from yarp.reaction.external.conf_gen import (
     CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
-    check_auto3d_compatibility,
+    CREST_OMP_STACKSIZE, CREST_DOCKER_IMAGE, CREST_PATCHED_SIF, check_auto3d_compatibility,
 )
 from yarp.reaction.state import state
 import yarp as yp
@@ -182,6 +183,105 @@ class TestCrestHasNoSeed:
         cmd = CrestConfCalculator(task_def, khp_reaction, MagicMock())._get_crest_command()
 
         assert "--seed" not in cmd
+
+
+class TestCrestThreadEnvironment:
+    """
+    The CREST image sets OMP_STACKSIZE=1G, so every OpenMP worker thread
+    reserves 1 GB of virtual memory, and on SGE h_vmem is a per-process
+    virtual-memory limit. Past it, CREST died with "libgomp: Thread creation
+    failed: Resource temporarily unavailable". The job script must cap the stack
+    and pin the thread counts on every CREST job; they used to be set only when
+    a seed was configured, and the stack never.
+    """
+
+    def _script(self, rxn, tmp_path, seed):
+        """Write the real job script for an Apptainer job, with a stub image on disk."""
+        config = SimpleNamespace(lot="gfn2", n_cpus=4, charge=0, n_unpaired_electrons=0,
+                                 seed=seed, solvent=None, use_local_scratch=False)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config,
+                                   task_id="s.reactant_conformer")
+        job_manager = SimpleNamespace(container="apptainer", sif_location=str(tmp_path),
+                                      scheduler="sge")
+        (tmp_path / CREST_PATCHED_SIF).touch()
+        calc = CrestConfCalculator(task_def, rxn, job_manager)
+        calc.set_scratch_dir(tmp_path)
+        calc.write_scheduler_headers = MagicMock()
+        return calc.write_submission_script().read_text()
+
+    @pytest.mark.parametrize("seed", [None, 42])
+    def test_stack_size_is_capped_with_or_without_a_seed(self, khp_reaction, tmp_path, seed):
+        script = self._script(khp_reaction, tmp_path, seed)
+
+        assert f"--env OMP_STACKSIZE={CREST_OMP_STACKSIZE}" in script
+
+    @pytest.mark.parametrize("seed", [None, 42])
+    def test_thread_counts_match_crest_T_with_or_without_a_seed(self, khp_reaction, tmp_path, seed):
+        script = self._script(khp_reaction, tmp_path, seed)
+
+        assert "--env OMP_NUM_THREADS=4" in script
+        assert "--env MKL_NUM_THREADS=4" in script
+        assert "-T 4" in script
+
+    def test_stack_is_well_below_the_image_default(self):
+        """
+        256M was measured safe and cuts the per-process peak from ~4.1 to ~1.8
+        GB; going back to 1G or more would bring the failure back.
+        """
+        size = CREST_OMP_STACKSIZE
+        assert size.endswith("M") and int(size[:-1]) <= 256
+
+
+class TestCrestImage:
+    """
+    The Docker Hub CREST image bundles a GFN-FF that segfaults when a free CO
+    sits near an H-bond donor (the KHP product CCOO.[C-]#[O+] lost its reaction
+    that way), and its ANCOPT/RFO printouts abort under libgfortran 15. On
+    Apptainer/Singularity the CREST step must use the local patched build,
+    which is never pulled, so an unpatched image cannot sneak back in.
+    """
+
+    def _calc(self, rxn, container, sif_location):
+        config = SimpleNamespace(lot="gfn2", n_cpus=4, charge=0, n_unpaired_electrons=0,
+                                 seed=None, solvent=None, use_local_scratch=False)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config,
+                                   task_id="s.reactant_conformer")
+        job_manager = SimpleNamespace(container=container, sif_location=str(sif_location),
+                                      scheduler="sge")
+        return CrestConfCalculator(task_def, rxn, job_manager)
+
+    @pytest.mark.parametrize("container", ["apptainer", "singularity"])
+    def test_sif_runners_use_the_patched_local_image(self, khp_reaction, tmp_path, container):
+        assert self._calc(khp_reaction, container, tmp_path).image_name == CREST_PATCHED_SIF
+
+    def test_docker_keeps_the_hub_image(self, khp_reaction, tmp_path):
+        assert self._calc(khp_reaction, "docker", tmp_path).image_name == CREST_DOCKER_IMAGE
+
+    def test_job_script_runs_the_patched_sif(self, khp_reaction, tmp_path):
+        (tmp_path / CREST_PATCHED_SIF).touch()
+        (tmp_path / "erm42_yarp_crest.sif").touch()
+        calc = self._calc(khp_reaction, "apptainer", tmp_path)
+        calc.set_scratch_dir(tmp_path)
+        calc.write_scheduler_headers = MagicMock()
+
+        script = calc.write_submission_script().read_text()
+
+        assert f"/work {tmp_path / CREST_PATCHED_SIF}" in script
+        assert "erm42_yarp_crest.sif" not in script
+
+    def test_missing_patched_image_is_an_error_naming_its_recipe(self, khp_reaction, tmp_path):
+        """A missing patched image must stop the job, never pull the unpatched Hub image."""
+        calc = self._calc(khp_reaction, "apptainer", tmp_path)
+
+        with pytest.raises(FileNotFoundError, match="crest_3.0.2_patched.def"):
+            calc.get_container_prefix(calc.image_name, "/work")
+
+    def test_recipe_for_the_patched_image_is_in_the_repo(self):
+        """The .def that builds CREST_PATCHED_SIF ships next to the CREST Dockerfile."""
+        repo = Path(__file__).resolve().parents[3]
+        recipe = repo / "containers" / "crest" / CREST_PATCHED_SIF.replace(".sif", ".def")
+
+        assert recipe.is_file()
 
 
 

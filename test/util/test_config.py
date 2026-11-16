@@ -85,19 +85,25 @@ class TestUseLocalScratch:
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'use_local_scratch'"):
             TASK_CONFIGS[block](use_local_scratch=value)
 
+# Only tasks with multiple runs per task have keep_crash_logs
+MULTI_TASK_CONFIGS = {
+    "ts_guess": partial(TSGuessConfig, software="pysisyphus", gsm_lot="xtb", charge=0, multiplicity=1),
+    "ts_opt": partial(TSOptConfig, software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1),
+    "irc_val": partial(IRCValConfig, software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1),
+}
 
-@pytest.mark.parametrize("block", TASK_CONFIGS)
+@pytest.mark.parametrize("block", MULTI_TASK_CONFIGS)
 class TestKeepCrashLogs:
     def test_defaults_to_false(self, block):
-        assert TASK_CONFIGS[block]().keep_crash_logs is False
+        assert MULTI_TASK_CONFIGS[block]().keep_crash_logs is False
 
     def test_true_is_kept(self, block):
-        assert TASK_CONFIGS[block](keep_crash_logs=True).keep_crash_logs is True
+        assert MULTI_TASK_CONFIGS[block](keep_crash_logs=True).keep_crash_logs is True
 
     @pytest.mark.parametrize("value", ["yes", 1, "true"])
     def test_non_boolean_is_rejected(self, block, value):
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'keep_crash_logs'"):
-            TASK_CONFIGS[block](keep_crash_logs=value)
+            MULTI_TASK_CONFIGS[block](keep_crash_logs=value)
 
 
 class TestRPOptHessianRecalc:

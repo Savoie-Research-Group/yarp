@@ -9,21 +9,22 @@ hypotheses:
    zwitterion over a neutral carbene.
 2. Many atom-order failures go away if `bnfn` enumerates off every kept BEM.
 
-`scripts/bnfn_exhaustive.py` is a copy of `yarp.reaction.enum.bnfn` with two
-changes, marked `STEP 03 CHANGE`:
-- radical sites come from every kept BEM (`return_radicals(y, all_bmats=True)`);
-- the break and form loop runs once per kept BEM.
+The exhaustive enumeration is yarp's own `bnfn(R, 2, exhaustive=True)`: the
+break and form loop runs once per kept BEM, and every BEM uses the radical
+sites of BEM 0, as plain `bnfn` does. So its pass on bnfn's BEM (`fc_ind`) is
+exactly step 02's `bnfn`, and with one kept BEM the two are identical.
 
-The yarp source is not changed. With one kept BEM, `bnfn_exhaustive` yields
-exactly what `bnfn` yields.
+Before yarp had `exhaustive`, this step used a patched copy of `bnfn`
+(`scripts/bnfn_exhaustive.py`, now removed) that took the radical sites of
+every kept BEM (their union) instead of BEM 0's.
 
 Each reaction goes through these stages and stops at the first that recovers
 its exact RGD1 reaction hash:
 
 | Stage | Applies to | Test | Outcome |
 |---|---|---|---|
-| 1 | reactants with more than one kept BEM | `bnfn_exhaustive` | `exhaustive_pass` |
-| 2 | everything still failing, including all single-BEM reactants | `bnfn_exhaustive` after each of k = 3 seeded atom-map relabellings | `reorder_pass` |
+| 1 | reactants with more than one kept BEM | `bnfn(exhaustive=True)` | `exhaustive_pass` |
+| 2 | everything still failing, including all single-BEM reactants | `bnfn(exhaustive=True)` after each of k = 3 seeded atom-map relabellings | `reorder_pass` |
 | 3 | the rest | | `persist_fail` |
 
 Run everything from this folder (`03_diagnose_failures`) with the yarp env's
@@ -31,7 +32,6 @@ python. Parsing and hashing are step 02's.
 
 | Path | What it is |
 |---|---|
-| `scripts/bnfn_exhaustive.py` | The patched `bnfn` copy |
 | `scripts/make_run.py` | Builds `RUN_DIR/rows.csv` from a step 02 run's `rxn_clean_fail.csv`, split into shards |
 | `scripts/run_shard.py` | Runs the three stages on one shard |
 | `scripts/merge.py` | Merges the shards and writes `outputs/<run>/` |

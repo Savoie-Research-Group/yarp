@@ -33,7 +33,7 @@ class yarpecule:
           The input that supplies the molecular graph information. This can either be a smiles string, a tuple holding
           (adj_mat, geo, elements, charge, atom_info),  or one or more filenames. (<-- ERM: CAN it handle multiple files?)
           For strings the extension is used to determine which parser to use (e.g., .xyz etc),
-          otherwise the constructor will attempt to parse the input as a smiles string using rdkit.
+          otherwise the constructor will attempt to parse the input as a smiles string (see `mode`).
 
     canon : bool, default=True
             Controls whether the atoms are indexed based on a canonicalization routine. Default is `True`. 
@@ -43,6 +43,16 @@ class yarpecule:
             the in-house parser is used. This variable is unused if the molecular info
             is passed through another method besides SMILES.
             Thoughts on renaming this to smi_mode? - ERM
+
+    strict : bool, default=True
+            Only used when parsing SMILES in 'yarp' mode. A ValueError from the in-house parser (e.g., an
+            OctetError or an unknown element) is always raised as is. Any other parsing error is raised as
+            a TypeError if True, or the SMILES is parsed again in rdkit mode if False. With False, an
+            aromatic SMILES that fails the octet check also keeps the in-house graph and takes its geometry
+            from rdkit. Either way, rdkit generates the geometry, with Open Babel as the fallback when rdkit
+            cannot embed the molecule. A yarpecule takes one input; the reaction loaders
+            (`load_reactions_from_smiles_file()`, `load_reactions_from_xyz_directory()`) skip an input
+            that raises, print why, and continue with the rest.
 
     Attributes:
     -----------
@@ -88,7 +98,7 @@ class yarpecule:
     # Constructor #
     ###############
 
-    def __init__(self, mol, mode='yarp', canon=True, strict=False):
+    def __init__(self, mol, mode='yarp', canon=True, strict=True):
         self._geo = None
         self._elements = None
         self._q = 0
@@ -241,7 +251,7 @@ class yarpecule:
     # Internal Functions #
     ######################
 
-    def _read_structure(self, mol, mode, strict=False):
+    def _read_structure(self, mol, mode, strict=True):
         """
         Read in an externally provided molecular structure and update
         core attributes of the yarpecule object.
@@ -253,6 +263,10 @@ class yarpecule:
 
         mode : str
                 Mode to control SMILES parsing.
+
+        strict : bool
+                Whether a failed in-house SMILES parse is raised as a TypeError (True) or falls back to
+                rdkit (False). A ValueError is always raised as is. See `strict` in the class docstring.
 
         Updated Attributes:
         ------------------
@@ -313,7 +327,7 @@ class yarpecule:
         else:
             try:
                 self._elements, self._geo, self._adj_mat, self._q, self._atom_info = xyz_from_smiles(
-                    mol, mode=mode)
+                    mol, mode=mode, strict=strict)
             except ValueError:
                 raise
             except Exception as e:
@@ -323,7 +337,8 @@ class yarpecule:
                         mol, mode="rdkit")
                 else:
                     raise TypeError(
-                        "The yarpecule constructor expects either an xyz file, mol file, or a smiles string.")
+                        "The yarpecule constructor expects either an xyz file, mol file, or a smiles string; "
+                        f"could not parse {mol!r} as SMILES ({type(e).__name__}: {e})") from e
 
         # Calculate elementary attributes
         # eventually all functions will expect lowercase element labels

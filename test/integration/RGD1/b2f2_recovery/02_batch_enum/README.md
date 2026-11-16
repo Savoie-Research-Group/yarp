@@ -57,16 +57,19 @@ way. `merge.py` writes to `outputs/<run folder name>/` unless given
 
 ## Reference results
 
-From `debug/261020_rgd1_baseline` (CRC, 2026-10-21). Scored rows are those
-where both endpoints parse and `reaction()` builds.
+The first two rows are from `debug/261020_rgd1_baseline` (CRC, 2026-10-21),
+the last from `debug/261028_exhaust_enum` (CRC, 2026-10-28). Scored rows are
+those where both endpoints parse and `reaction()` builds.
 
 | yarp version | Pilot recovered | Full recovered | Full CPU time |
 |---|---|---|---|
 | master d042ee2 + #67 hashes | 88/92 | 116,310/122,870 (94.66%) | 17.4 h |
 | conjugated-lewis-moves da3a1ae | 89/92 | 117,764/122,870 (95.84%) | 24.2 h |
+| exhaust_enum fedf73a | 89/92 | 117,766/122,870 (95.85%) | 29.0 h |
 
 On the full runs, the split is 116,310 / 6,013 / 8,926 (match / clean fail /
-parse fail) on master and 117,764 / 4,605 / 8,880 on the branch.
+parse fail) on master d042ee2, 117,764 / 4,605 / 8,880 on
+conjugated-lewis-moves, and 117,766 / 4,603 / 8,880 on exhaust_enum.
 
 Compare two versions with
 `python scripts/compare_runs.py --a02 outputs/RUN_A --b02 outputs/RUN_B`, which

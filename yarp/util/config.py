@@ -171,6 +171,7 @@ class EnumerationConfig:
     mode: str = "concerted"
     n_break: int = 2
     n_form: int = 2
+    exhaustive: bool = False  # concerted only: enumerate off every kept BEM (see bnfn)
     pre_enum_filters: PreEnumFilters = field(default_factory=PreEnumFilters)
     post_enum_filters: PostEnumFilters = field(default_factory=PostEnumFilters)
     react_atoms: List[set] = field(default_factory=list)
@@ -189,6 +190,10 @@ class EnumerationConfig:
             raise ValueError("Please provide an integer value to 'n_break'")
         if not isinstance(self.n_form, int):
             raise ValueError("Please provide an integer value to 'n_form'")
+        if not isinstance(self.exhaustive, bool):
+            raise ValueError("Please provide a boolean value (true/false) to 'exhaustive'")
+        if self.exhaustive and self.mode != "concerted":
+            raise ValueError(f"'exhaustive' is only available for concerted enumeration, not '{self.mode}'! Set 'mode: concerted' or remove 'exhaustive'")
         # TO-DO: Put in sanity checks related to reactive atoms!
 
         # User warnings

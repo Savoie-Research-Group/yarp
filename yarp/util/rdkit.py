@@ -127,7 +127,7 @@ def yarpecule_to_rdmol(elements, adj, bond_orders, atom_info=None, geo=None, san
         raise ValueError(f"bond_orders shape {bond_orders.shape} does not match ({N}, {N})")
 
     element_lower = [el.lower() for el in elements]
-    elements = [el.upper() for el in element_lower]
+    elements = [el.capitalize() for el in element_lower]  # RDKit wants e.g. "Se", not "SE"
     is_radical = np.diag(bond_orders) % 2 == 1
 
     # Use Lewis-derived formal charges so that charged atoms get the correct

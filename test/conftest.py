@@ -673,3 +673,211 @@ def ec_xyz():
 def ester_xyz():
     """Returns a string object of the absolute path to ester XYZ file."""
     return str(Path(__file__).parent / "molecules" / "find_lewis_structures" / "standard" / "ester.xyz")
+
+
+# yarpecule initialization: edge cases for the SMILES parser, ring finder and geometry
+# fallback. Each fixture holds the cases of one test; each comment says what its case checks.
+CYCLIC_CUMULENE = "[C:1]([C:2]1=[N:5][C:3]([H:8])=[C:6]=[C:7]=[C:4]1[H:9])([H:10])([H:11])[H:12]"
+
+
+@pytest.fixture
+def smiles2adjmat_cases():
+    """
+    (smiles, element counts, {(map_i, map_j): bond order}) for smiles2adjmat. Branch bookkeeping
+    after `)(`, element tokens, two-letter bracket aromatics, and element symbols that start with H.
+    """
+    return [
+        # after `)(`, =N4 bonds to C1 and N4-H5 is single
+        ("[C:1]([H:2])([H:3])(=[N:4][H:5])", {"c": 1, "h": 3, "n": 1}, {(1, 4): 2, (4, 5): 1}),
+        # RGD1 MR_20770_1 reactant fragment: after `)(`, C14=N16 and C12=C15; N16-H19 is single
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2},
+         {(14, 16): 2, (16, 19): 1, (12, 15): 2}),
+        # RGD1 species: C5#C6 stays a triple bond inside the branch after `)(`
+        ("[C:1](\\[C:2]([H:10])([H:11])[H:12])(=[C:3](\\[N:4]([C:5]#[C:6][H:13])[H:8])[H:9])[H:7]", {"c": 5, "h": 7, "n": 1},
+         {(5, 6): 3}),
+        # unmapped: after `)(`, =N bonds to C2, which leaves 9 H
+        ("CC(C)(=NC)", {"c": 4, "h": 9, "n": 1}, {}),
+        # `Cl` and `Br` before an aromatic atom are halogens
+        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}, {}),
+        ("Brc1ccc(Br)cc1", {"br": 2, "c": 6, "h": 4}, {}),
+        # unbracketed `Sc` and `In` are S + c and I + n
+        ("CSc1ccccc1", {"c": 7, "h": 8, "s": 1}, {}),
+        ("In1cccc1", {"c": 4, "h": 4, "i": 1, "n": 1}, {}),
+        # `[se]` is selenium
+        ("c1cc[se]c1", {"c": 4, "h": 4, "se": 1}, {}),
+        # `[siH]` is silicon (RDKit writes silabenzene this way)
+        ("c1cc[siH]cc1", {"c": 5, "h": 6, "si": 1}, {}),
+        # the H of He is part of the element symbol, not a hydrogen count
+        ("[He]", {"he": 1}, {}),
+        # after a `)`, a bond symbol before a ring digit is the ring bond's order: C1=C4 double, C1-C3 single
+        ("[C:1]([CH3:2])=1[CH2:3][CH:4]=1", {"c": 4, "h": 6}, {(1, 4): 2, (1, 3): 1}),
+        # and one after the digit is the chain bond's order: C1=C3 double, C1-C4 single
+        ("[C:1]([CH3:2])1=[CH:3][CH2:4]1", {"c": 4, "h": 6}, {(1, 3): 2, (1, 4): 1}),
+        # biphenylene: `-` between aromatic atoms stays single (chain and ring-closure bonds)
+        ("[cH:1]1[cH:2][cH:3][cH:4][c:5]2-[c:6]3[cH:7][cH:8][cH:9][cH:10][c:11]3-[c:12]12", {"c": 12, "h": 8},
+         {(5, 6): 1, (11, 12): 1}),
+        # as RDKit writes it: `-` after `)` and on a ring closure
+        ("[cH:1]1[cH:2][cH:3][c:4]2[c:5]([cH:6]1)-[c:7]1[cH:8][cH:9][cH:10][cH:11][c:12]1-2", {"c": 12, "h": 8},
+         {(5, 7): 1, (4, 12): 1}),
+        # whitespace around the SMILES is ignored
+        (" CCO\n", {"c": 2, "h": 6, "o": 1}, {}),
+    ]
+
+
+@pytest.fixture
+def unknown_character_smiles():
+    """SMILES with characters the parser does not read; each raises a ValueError instead of being dropped."""
+    return ["CCO CC", "CC\tO", "CC>>CO", "C%(10)CC%(10)", "C$C", "C*"]
+
+
+@pytest.fixture
+def hydrogen_count_cases():
+    """
+    (smiles, hydrogens on each heavy atom in input order) for hydrogen_count, read from the
+    parsed graph. Aromatic b and p take two ring neighbors, like n.
+    """
+    return [
+        ("c1ccbcc1", [1, 1, 1, 0, 1, 1]),                               # borabenzene: ring b takes no H
+        ("c1ccpcc1", [1, 1, 1, 0, 1, 1]),                               # phosphinine: ring p takes no H
+        ("Cc1ccpcc1", [3, 0, 1, 1, 0, 1, 1]),
+        ("b1nbnbn1", [0] * 6),
+        ("[bH]1[nH][bH][nH][bH][nH]1", [1] * 6),                        # bracket counts as written
+        ("c1cc[nH]c1", [1] * 5),
+        ("CCO", [3, 2, 1]),                                             # filled up to an octet
+        ("C[NH3+]", [3, 3]),                                            # charge
+        ("[C:1]([H:2])([H:3])([H:4])[H:5]", [4]),                      # explicit hydrogen atoms, none added
+        ("[ZnH2]", [2]),                                                # metal: bracket count as written
+        ("C[PdH]", [3, 1]),
+        ("C[Hg]C", [3, 0, 3]),                                          # metal: none inferred
+        ("CCOP(=O)OCC", [3, 2, 0, 1, 0, 0, 2, 3]),                      # P filled to valence 5: P-H
+        ("CS(=O)=O", [3, 1, 0, 0]),                                     # S filled to valence 6
+        ("CS(C)=O", [3, 0, 3, 0]),                                      # S at valence 4 takes none
+    ]
+
+
+@pytest.fixture
+def aromatic_double_bond_cases():
+    """
+    (smiles, ring double bond?) for needs_aromatic_double_bond, one bool per aromatic atom
+    in input order. Lone-pair donors (pyrrole-type n, ring o/s, c-) and atoms with an
+    exocyclic double bond get none; a neutral sigma-radical c gets one.
+    """
+    return [
+        ("[c]1ccccc1", [True] * 6),                                     # phenyl radical: the radical c too
+        ("[c:1]1[c:2]([H:7])[c:3]([H:8])[c:4]([H:9])[c:5]([H:10])[c:6]1[H:11]", [True] * 6),
+        ("c1ccbcc1", [True] * 6),                                       # ring b and p: one ring double bond
+        ("c1ccpcc1", [True] * 6),
+        ("c1ccccc1", [True] * 6),                                       # benzene
+        ("c1ccncc1", [True] * 6),                                       # pyridine n
+        ("c1cc[nH]c1", [True, True, True, False, True]),               # pyrrole
+        ("c1ccoc1", [True, True, True, False, True]),                  # furan
+        ("c1ccsc1", [True, True, True, False, True]),                  # thiophene
+        ("C[n+]1ccccc1", [True] * 6),                                   # pyridinium: n+ with 3 neighbours
+        ("O=c1cc[nH]cc1", [False, True, True, False, True, True]),     # 4-pyridone: exocyclic =O and [nH]
+        ("[n:1]1([H:8])[c:2](=[O:7])[n:6][c:3]([N:4]([H:9])[H:10])[o:5]1",   # RGD1 species
+         [False, False, True, True, False]),
+        ("[cH-]1cccc1", [False, True, True, True, True]),              # cyclopentadienide
+        ("[n+]1ccccc1", [True] * 6),                                    # n+ with two neighbours: sigma radical, like [c]
+        ("[b-]1ccccc1", [True] * 6),                                    # b- likewise
+    ]
+
+
+@pytest.fixture
+def ring_cases():
+    """
+    (smiles, ring sizes) for return_rings(remove_fused=False): every ring is found and closes.
+    The fused cases start at a fusion atom whose lowest ring neighbour is across the shared bond.
+    """
+    return [
+        ("c12c(occ1)cccc2", [5, 6, 9]),                                 # benzofuran
+        ("c12c([nH]cc1)cccc2", [5, 6, 9]),                              # indole
+        ("[n:1]12[n:2]([n:3]1[H:6])[c:4]2=[O:5]", [3, 3, 4]),           # RGD1 species
+        ("c1cccc2sc(cc12)O", [5, 6, 9]),                                # the 9-atom perimeter closes
+        ("c1ccc2ccccc2c1", [6, 6, 10]),                                 # naphthalene
+        ("C1CC2CCC1C2", [5, 5, 6]),                                     # norbornane
+        ("C1CCC2(C1)CC2", [3, 5]),                                      # spiro
+    ]
+
+
+@pytest.fixture
+def obabel_embed_cases():
+    """
+    (smiles, bond lengths checked?) for obabel_embed, built from the yarpecule's graph.
+    The strained ones are RDKit embedding failures from RGD1; UFF does not always keep
+    their bonds, so only the geometry itself is checked there.
+    """
+    return [
+        ("CCO", True),
+        ("c1ccccc1", True),
+        ("[NH4+]", True),                       # charge
+        ("[CH3]", True),                        # radical
+        ("C[Sc](C)C", True),                    # metal
+        ("O=C=C=C=O", True),                    # cumulene chain
+        ("C1=NC=C=C=C1", False),                # cyclic cumulene (RDKit cannot embed)
+        ("[C-]1=[N+]=C(C)CO1", False),          # nitrile-ylide ring (RDKit cannot embed)
+    ]
+
+
+@pytest.fixture
+def obabel_worker_shadows():
+    """
+    Files in the current directory that would shadow the imports of obabel_embed's worker
+    process if it ran without isolation (an old yarp checkout, a local json.py or numpy.py, or a
+    folder named openbabel, which the worker imports from the caller's path).
+    """
+    return ["yarp/__init__.py", "json.py", "numpy.py", "openbabel/__init__.py"]
+
+
+@pytest.fixture
+def geo_via_obabel_cases():
+    """SMILES whose rdkit molecule (explicit H) rdkit cannot embed, plus two it can."""
+    return [
+        "C1=NC=C=C=C1",                         # RGD1-type cyclic cumulene
+        "CC1=NC=C=C=C1",
+        "[C-]1=[N+]=C(C)CO1",                   # nitrile-ylide ring
+        "C1=C=C=NN1C",
+        "c1ccccc1",                             # aromatic bonds are kekulized for Open Babel
+        "CCO",
+    ]
+
+
+@pytest.fixture
+def xyz_from_smiles_cases():
+    """
+    (smiles, mode, expected) for xyz_from_smiles with its default strict=True: "geometry"
+    (a finite geometry, never None) or the exception raised.
+    """
+    return [
+        (CYCLIC_CUMULENE, "yarp", "geometry"),                          # RDKit cannot embed: Open Babel geometry
+        (CYCLIC_CUMULENE, "rdkit", "geometry"),                         # same, in rdkit mode
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", "yarp", "geometry"),  # fused n3 ring
+        ("[C:1]=[O:4].[C:2](#[N:3])[H:5]", "yarp", "geometry"),         # CO is embedded without added hydrogens
+        ("[C:1]([H:2])[H:3]", "yarp", "geometry"),                      # carbene stays CH2
+        ("c1ccccc1[N](C)(C)C", "yarp", "OctetError"),                   # aromatic input still raises on an octet violation
+        ("Cl[Pt](Cl)([NH3])[NH3]", "yarp", "geometry"),                 # neutral ligands on a metal: dative, as in RDKit
+        ("[OH2][Cu+2]([OH2])([OH2])[OH2]", "yarp", "geometry"),
+        ("[Ni]([C-]#[O+])([C-]#[O+])([C-]#[O+])[C-]#[O+]", "yarp", "geometry"),
+        ("C[Mg]Br", "yarp", "geometry"),                                # metals are not octet-checked
+        ("[NaH]", "yarp", "geometry"),
+        ("C1CC[O]([Mg]Br)C1", "yarp", "OctetError"),                    # dative bonds only to the metals in el_metals
+        ("[NH3][NH3]", "yarp", "OctetError"),                           # no metal: still an octet violation
+        ("CCO", "yarp", "geometry"),
+        ("CCO", "rdkit", "geometry"),
+    ]
+
+
+@pytest.fixture
+def yarpecule_cases():
+    """
+    (smiles, element counts) that the default yarpecule() must build in yarp mode, with a
+    geometry and without any RDKit fallback.
+    """
+    return [
+        ("Clc1ccccc1", {"c": 6, "cl": 1, "h": 5}),                      # Cl before an aromatic atom
+        ("c1ccoc1", {"c": 4, "h": 4, "o": 1}),                          # aromatic o
+        ("c12c(occ1)cccc2", {"c": 8, "h": 6, "o": 1}),                  # fused aromatic rings
+        ("[C:12]([N:13]([H:17])[H:18])(/[C:14](=[N:16]/[H:19])[H:20])=[C:15]([H:21])[H:22]", {"c": 3, "h": 6, "n": 2}),  # branches after `)(`
+        ("[C:1]1([H:6])([H:7])[C:2]2([H:8])[n:3]3[n:4]1[n:5]32", {"c": 2, "h": 3, "n": 3}),  # fused n3 ring
+        (CYCLIC_CUMULENE, {"c": 6, "h": 5, "n": 1}),                    # RDKit cannot embed: Open Babel geometry
+        ("CCO", {"c": 2, "h": 6, "o": 1}),
+    ]

@@ -26,6 +26,11 @@ def main():
 
     # Open the output file, and record initial message
     output_file = work_dir / "yarp_loop.out"
+    # Only this loop's own output counts when looking for the stop marker: a run
+    # that finished before and was restarted (yarp-restart) still has the old
+    # marker earlier in the file, which would otherwise end this loop after
+    # its first pass.
+    log_start = output_file.stat().st_size if output_file.exists() else 0
     with open(output_file, "a") as out_f:
         out_f.write(f"Starting YARP loop. Running progress_yarp.py every {args.interval} mins until {end_time}\n")
 
@@ -50,7 +55,10 @@ def main():
 
         # Stop if the log contains a shutdown marker
         stop_marker = "No active or pending tasks remain; YARP has reached a quiescent state."
-        if stop_marker in output_file.read_text():
+        with open(output_file, "r") as f:
+            f.seek(log_start)
+            this_loop_output = f.read()
+        if stop_marker in this_loop_output:
             with open(output_file, "a") as out_f:
                 out_f.write("Shutdown marker found in output file; exiting loop.\n")
             break

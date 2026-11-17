@@ -7,7 +7,7 @@ import numpy as np
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.reaction.conformer import conformer
+from yarp.reaction.conformer import conformer, unique_ts
 from yarp.util.constants import Constants
 
 
@@ -19,17 +19,18 @@ class TSOptTask(AsyncYarpCalculator):
 
         'ts_guess': every TS guess from GSM.
         'ts_opt': every converged TS optimization from the source level that is
-        a valid saddle point (exactly one imaginary frequency) -- not just the
+        a valid saddle point (exactly one mode below -min_imag_freq) -- not just the
         single TS that IRC validated. IRC labels at a low level of theory are
         poor predictors of high-level IRC outcomes, so all candidates go on.
+        Duplicates are dropped (conformer.unique_ts).
         """
         source = self.config.initial_geom.transition_state
         if source.label == "ts_guess":
             return [conf for k, conf in self.rxn.ts_geom.items() if "ts_guess" in k]
         elif source.label == "ts_opt":
             expected_key = f"tsopt_{source.lot}_{source.software}"
-            return [conf for k, conf in self.rxn.ts_geom.items()
-                    if expected_key in k and conf.is_valid_ts()]
+            return unique_ts([(k, conf) for k, conf in self.rxn.ts_geom.items()
+                              if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)])
         else:
             raise ValueError(f"Unknown initial geom label for TSOpt: {source.label}")
 
@@ -162,6 +163,8 @@ class PysisyphusTSOptCalculator(TSOptTask):
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"tsopt_{i}_input.yaml", f"tsopt_{i}.log", "ts_final_geometry.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -204,6 +207,11 @@ class PysisyphusTSOptCalculator(TSOptTask):
             log_text = f.read()
 
         if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
+            return False
+
+        # 3. Convergence check: pysisyphus also writes the final geometry and
+        #    Hessian after hitting max_cycles ("Number of cycles exceeded!").
+        if "Converged!" not in log_text:
             return False
 
         return True
@@ -365,6 +373,8 @@ class OrcaTSOptCalculator(TSOptTask):
             run_dir = self.scratch_dir / f"tsopt_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"tsopt_{i}.inp", f"tsopt_{i}.out", f"tsopt_{i}.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -380,8 +390,10 @@ class OrcaTSOptCalculator(TSOptTask):
             # set keywords for level of theory
             f.write(f'! {self.config.lot}\n\n')
 
-            # set keywords to specify saddle point optimization
-            f.write(f'! OptTS\n\n')
+            # set keywords to specify saddle point optimization; Freq adds a
+            # Hessian at the final geometry, so the .hess and the last
+            # thermochemistry block aren't from the last Recalc_Hess cycle
+            f.write(f'! OptTS Freq\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")
@@ -506,6 +518,10 @@ class OrcaTSOptCalculator(TSOptTask):
         """
         Parses enthalpy, entropy correction, and Gibbs free energy 
         by searching for key phrases and capturing the first float.
+
+        An optimization prints a thermochemistry block for every exact
+        Hessian, the starting geometry's first. The last block is the one
+        returned: with `Freq`, the final geometry's.
         """
         enthalpy = None
         entropy = None
@@ -539,7 +555,5 @@ class OrcaTSOptCalculator(TSOptTask):
                         match = re.search(r"(-?\d+\.\d+)", line)
                         if match:
                             gibbs = float(match.group(1)) * Constants.ha_to_kcalmol
-                            # Once we have the final value, we can stop
-                            break
 
         return enthalpy, entropy, gibbs

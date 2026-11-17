@@ -101,8 +101,9 @@ def test_failure_scenario_1_global_task_failed(tmp_path, mocker):
 def test_failure_scenario_2_pipeline_task_failed(tmp_path, mocker):
     """
     Scenario 2: A reaction-specific pipeline task fails output validation.
-    Validates that the reaction is purged from active pools, and human-readable
-    logs are cleanly extracted into failed_status.json.
+    Validates that the reaction leaves the active pickle but keeps its STATUS
+    history (marked failed), and human-readable logs are extracted into
+    failed_status.json.
     """
     status_tracker = {
         "input_config": {},
@@ -152,9 +153,11 @@ def test_failure_scenario_2_pipeline_task_failed(tmp_path, mocker):
     # --- Run the execution tick ---
     progress_yarp(tmp_path)
 
-    # Verify active state was successfully cleaned and purged of the failed reaction
-    assert "rxn_1" not in status_tracker["reactions"]
+    # The reaction object leaves the active pool; its STATUS entry stays, marked
+    # failed, with the failed task's history, so it can be restarted later.
     assert "rxn_1" not in reactions
+    assert status_tracker["reactions"]["rxn_1"]["failed"] is True
+    assert status_tracker["reactions"]["rxn_1"]["tasks"]["ll_path.reactant_conformer"]["status"] == "finished_with_error"
 
     # Verify that human-readable error reasons were successfully written out
     fail_json_file = tmp_path / "failed_status.json"
@@ -218,8 +221,8 @@ def test_failure_scenario_3_irc_unintended(tmp_path, mocker):
 
     progress_yarp(tmp_path)
 
-    assert "rxn_unintended" not in status_tracker["reactions"]
     assert "rxn_unintended" not in reactions
+    assert status_tracker["reactions"]["rxn_unintended"]["failed"] is True
 
     assert "rxn_intended" in status_tracker["reactions"]
     assert "rxn_intended" in reactions
@@ -322,7 +325,7 @@ class TestIRCDivertFlag:
         status_tracker, reactions = self._run(tmp_path, mocker, outcome, divert_unintended=True)
 
         assert "rxn_1" not in reactions
-        assert "rxn_1" not in status_tracker["reactions"]
+        assert status_tracker["reactions"]["rxn_1"]["failed"] is True
         assert (tmp_path / "failed_rxns.pkl").exists()
 
     @pytest.mark.parametrize("outcome", ["intended", "inverse_intended"])
@@ -836,3 +839,212 @@ class TestSynchronizeWritesReactantGeometry:
         synchronize_conformers({"a": a, "b": b})
 
         assert np.array_equal(a.product.graph.geo, before)
+
+
+# =====================================================================
+# FAILED REACTIONS KEEP THEIR HISTORY IN STATUS.json
+# =====================================================================
+
+class TestFailedReactionsKeepHistory:
+    """
+    A failed reaction's data object still leaves the active pickle (it goes to
+    failed_rxns.pkl), but its STATUS.json entry now stays, marked
+    `"failed": true`, with every task's status, so a later restart can rebuild
+    it. Every pass must then skip it: a failed reaction's leftover pending or
+    submitted tasks must not hold up or crash the rest of the run.
+    """
+
+    @staticmethod
+    def _task(task_type, depends_on=(), parent_stage="ll_path"):
+        return MagicMock(task_type=task_type, depends_on=list(depends_on), parent_stage=parent_stage)
+
+    @staticmethod
+    def _run(tmp_path, mocker, status_tracker, reactions, pipeline_tasks,
+             global_tasks=None, stage_filters=None, check_output=True):
+        """One progress pass, with the scheduler, calculators and pickles mocked."""
+        mocker.patch('yarp.progress_yarp.load_state', return_value=(status_tracker, reactions))
+        inp = MagicMock()
+        inp.job_manager.scheduler = "sge"
+        inp.job_manager.container = "apptainer"
+        inp.job_manager.max_active_jobs = 10
+        inp.pipeline_tasks = pipeline_tasks
+        inp.global_tasks = global_tasks or {}
+        inp.stage_filters = stage_filters or {}
+        mocker.patch('yarp.progress_yarp.InputParser', return_value=inp)
+        jm = MagicMock()
+        jm.is_running.return_value = False
+        jm.submit.return_value = "job_new"
+        mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm)
+        calc = MagicMock()
+        calc.check_output.return_value = check_output
+        calc.scrape_data.return_value = True
+        calc.has_prerequisites.return_value = True
+        mocker.patch('yarp.progress_yarp.get_calculator', return_value=calc)
+        mocker.patch('yarp.progress_yarp.pickle.dump')
+        mocker.patch('yarp.progress_yarp.pickle.load', return_value={})
+        progress_yarp(tmp_path)
+        return jm
+
+    @staticmethod
+    def _status(reactions, global_tasks=None):
+        return {"input_config": {}, "status_output_file": "STATUS.json",
+                "reaction_output_file": "YARP_RXNS.pkl",
+                "global_tasks": global_tasks or {}, "reactions": reactions}
+
+    @staticmethod
+    def _t(status, job_id=None, scratch_dir=None):
+        return {"status": status, "job_id": job_id, "scratch_dir": scratch_dir}
+
+    def test_full_task_history_is_kept_when_a_task_fails(self, tmp_path, mocker):
+        """
+        A reaction whose TS optimization fails: its earlier finished tasks, the
+        failed task (with error and scratch dir) and its still-pending IRC all
+        stay in STATUS.json, and the entry is marked failed.
+        """
+        st = self._status({"rxn_1": {"tasks": {
+            "ll_path.ts_guess": self._t("terminated_normally", "1", "/s/tsg"),
+            "ll_refine.ts_opt": self._t("submitted", "2", "/s/tsopt"),
+            "ll_refine.irc": self._t("pending"),
+        }}})
+        reactions = {"rxn_1": MagicMock()}
+        tasks = {"ll_path.ts_guess": self._task("ts_guess"),
+                 "ll_refine.ts_opt": self._task("transition_state_optimization", ["ll_path.ts_guess"], "ll_refine"),
+                 "ll_refine.irc": self._task("irc_validation", ["ll_refine.ts_opt"], "ll_refine")}
+        self._run(tmp_path, mocker, st, reactions, tasks, check_output=False)
+
+        entry = st["reactions"]["rxn_1"]
+        assert entry["failed"] is True
+        assert "rxn_1" not in reactions
+        assert {k: v["status"] for k, v in entry["tasks"].items()} == {
+            "ll_path.ts_guess": "terminated_normally",
+            "ll_refine.ts_opt": "finished_with_error",
+            "ll_refine.irc": "pending"}
+        assert entry["tasks"]["ll_refine.ts_opt"]["scratch_dir"] == "/s/tsopt"
+
+    def test_failed_reaction_does_not_block_the_quiescent_state(self, tmp_path, mocker, capsys):
+        """
+        The loop exits when no task is active, pending or ready. A failed
+        reaction keeps its pending tasks, but they will never run, so they must
+        not count -- otherwise the loop would never finish on its own.
+        """
+        st = self._status({"rxn_1": {"failed": True, "tasks": {
+            "ll_path.reactant_conformer": self._t("finished_with_error"),
+            "ll_path.ts_guess": self._t("pending")}}})
+        tasks = {"ll_path.reactant_conformer": self._task("reactant_conformer"),
+                 "ll_path.ts_guess": self._task("ts_guess", ["ll_path.reactant_conformer"])}
+        self._run(tmp_path, mocker, st, {}, tasks)
+
+        assert "YARP has reached a quiescent state" in capsys.readouterr().out
+
+    def test_failed_reactions_pending_tasks_are_not_promoted(self, tmp_path, mocker):
+        """
+        A failed reaction's pending task whose dependency did finish (the
+        product side of a reaction whose reactant side failed) must stay
+        pending, not be marked ready. With a stage filter set, promoting it
+        would also look the reaction object up in the active pickle, where it
+        no longer is (KeyError, crashing the whole pass).
+        """
+        st = self._status({"rxn_1": {"failed": True, "tasks": {
+            "ll_path.reactant_conformer": self._t("finished_with_error"),
+            "ll_path.product_pre_opt": self._t("terminated_normally"),
+            "ll_path.product_conformer": self._t("pending")}}})
+        tasks = {"ll_path.reactant_conformer": self._task("reactant_conformer"),
+                 "ll_path.product_pre_opt": self._task("product_pre_opt"),
+                 "ll_path.product_conformer": self._task("product_conformer", ["ll_path.product_pre_opt"])}
+        stage_filter = MagicMock(type="barrier", source="egat", threshold=50.0)
+        self._run(tmp_path, mocker, st, {}, tasks, stage_filters={"ll_path": stage_filter})
+
+        assert st["reactions"]["rxn_1"]["tasks"]["ll_path.product_conformer"]["status"] == "pending"
+
+    def test_leftover_submitted_task_does_not_block_an_identical_species(self, tmp_path, mocker):
+        """
+        A reaction can fail while another of its tasks is still "submitted".
+        That task is never checked again, so it must not count as the active
+        calculation for its species, or every other reaction needing the same
+        species would wait on it forever.
+        """
+        mocker.patch('yarp.progress_yarp.species_registry_key', return_value=("same", "species"))
+        st = self._status({
+            "rxn_failed": {"failed": True, "tasks": {"ll_path.product_conformer": self._t("submitted", "9", "/s/x")}},
+            "rxn_live": {"tasks": {"ll_path.product_conformer": self._t("ready")}},
+        })
+        reactions = {"rxn_live": MagicMock()}
+        tasks = {"ll_path.product_conformer": self._task("product_conformer")}
+        jm = self._run(tmp_path, mocker, st, reactions, tasks)
+
+        assert st["reactions"]["rxn_live"]["tasks"]["ll_path.product_conformer"]["status"] == "submitted"
+        assert jm.submit.called
+
+    def test_global_task_still_fast_forwards_with_a_failed_reaction(self, tmp_path, mocker):
+        """
+        An ML global task is fast-forwarded when every reaction already has its
+        prediction. A failed reaction has no data object in the active pickle,
+        so it must not count, or the global task could never be skipped.
+        """
+        live = MagicMock()
+        live.barrier = {"egat_rgd1": 30.0}
+        st = self._status(
+            {"rxn_failed": {"failed": True, "tasks": {}}, "rxn_live": {"tasks": {}}},
+            global_tasks={"egat.ml_predict": self._t("ready")})
+        g_task = MagicMock()
+        g_task.config.model = "egat_rgd1"
+        self._run(tmp_path, mocker, st, {"rxn_live": live}, {}, global_tasks={"egat.ml_predict": g_task})
+
+        assert st["global_tasks"]["egat.ml_predict"]["status"] == "terminated_normally"
+
+
+class TestRestartSupport:
+    """The two places a progress pass cooperates with yarp-restart."""
+
+    def test_pass_is_skipped_while_another_process_holds_the_run_lock(self, tmp_path, mocker, capsys):
+        """
+        yarp-restart holds the run lock while it edits STATUS.json. A pass that
+        starts meanwhile must not load and rewrite the run; it skips and returns
+        normally (a non-zero exit would end yarp-loop), to try again next tick.
+        """
+        from yarp.util.run_lock import run_lock
+        load = mocker.patch('yarp.progress_yarp.load_state')
+
+        with run_lock(tmp_path, "yarp-restart"):
+            progress_yarp(tmp_path)
+
+        assert not load.called
+        assert "Skipping this progress pass" in capsys.readouterr().out
+        assert not (tmp_path / ".yarp_run.lock").exists()
+
+    def test_restarted_task_seed_reaches_the_calculator(self, tmp_path, mocker):
+        """
+        yarp-restart --new-seed stores the retry's seed on the task (43); the
+        stage's shared config still says 42. The calculator built for that task
+        must get 43, and the shared config must stay 42 for every other reaction.
+        """
+        from yarp.util.config import ConformerConfig
+        from yarp.util.input import TaskDef
+        shared = ConformerConfig(software="rdkit", lot="uff", charge=0, seed=42)
+        task = TaskDef(task_id="ll_path.reactant_conformer", task_type="reactant_conformer",
+                       parent_stage="ll_path", depends_on=[], config=shared)
+        st = TestFailedReactionsKeepHistory._status({"rxn_1": {"tasks": {
+            "ll_path.reactant_conformer": {"status": "ready", "job_id": None, "scratch_dir": None, "seed": 43}}}})
+        mocker.patch('yarp.progress_yarp.load_state', return_value=(st, {"rxn_1": MagicMock()}))
+        inp = MagicMock()
+        inp.job_manager.max_active_jobs = 10
+        inp.pipeline_tasks = {"ll_path.reactant_conformer": task}
+        inp.global_tasks = {}
+        inp.stage_filters = {}
+        mocker.patch('yarp.progress_yarp.InputParser', return_value=inp)
+        jm = MagicMock()
+        jm.submit.return_value = "job_new"
+        mocker.patch('yarp.progress_yarp.get_job_manager', return_value=jm)
+        mocker.patch('yarp.progress_yarp.species_registry_key', return_value=None)
+        mocker.patch('yarp.progress_yarp.pickle.dump')
+        seen = []
+
+        def spy(task_def, rxn, job_config):
+            seen.append(task_def.config.seed)
+            return MagicMock()
+
+        mocker.patch('yarp.progress_yarp.get_calculator', side_effect=spy)
+        progress_yarp(tmp_path)
+
+        assert seen == [43]
+        assert shared.seed == 42

@@ -3,6 +3,7 @@ import shutil
 import re
 import numpy as np
 
+from yarp.reaction.conformer import unique_ts
 from yarp.reaction.external.calc_base import AsyncYarpCalculator
 from yarp.reaction.external.pysis import pysis_image, pysis_xtb_calc_lines
 from yarp.yarpecule.input_parsers import xyz_parse
@@ -19,7 +20,7 @@ class IRCValTask(AsyncYarpCalculator):
         ts_keys = self.rxn.ts_geom.keys()
         expected_ts = f"tsopt_{self.config.lot}_{self.config.software}"
         for k in ts_keys:
-            if expected_ts in k and self.rxn.ts_geom[k].is_valid_ts():
+            if expected_ts in k and self.rxn.ts_geom[k].is_valid_ts(tolerance=-self.config.min_imag_freq):
                 found_ts = True
 
         found_r = False
@@ -45,8 +46,10 @@ class IRCValTask(AsyncYarpCalculator):
     def _initial_guesses(self) -> list:
         """
         The TS-opt conformers to validate, in the order they are written to
-        irc_run1..N: only valid first-order saddle points, so a structure that
-        isn't a TS can't be run through IRC or chosen as the validated TS.
+        irc_run1..N: only valid first-order saddle points (exactly one mode below
+        -min_imag_freq), so a structure that isn't a TS can't be run through IRC
+        or chosen as the validated TS. Duplicates are dropped
+        (conformer.unique_ts).
 
         Both `generate_input` and `scrape_data` must use this, so that irc_run{i}
         maps back to the conformer it was started from. The conformer keys
@@ -54,8 +57,8 @@ class IRCValTask(AsyncYarpCalculator):
         run index, which has gaps wherever a TS optimization failed.
         """
         expected_key = f"tsopt_{self.config.lot}_{self.config.software}"
-        return [conf for k, conf in self.rxn.ts_geom.items()
-                if expected_key in k and conf.is_valid_ts()]
+        return unique_ts([(k, conf) for k, conf in self.rxn.ts_geom.items()
+                          if expected_key in k and conf.is_valid_ts(tolerance=-self.config.min_imag_freq)])
 
     def _get_rxn_label(self, forward, backward):
         """
@@ -195,6 +198,11 @@ class IRCValTask(AsyncYarpCalculator):
 
 
 class PysisyphusIRCValCalculator(IRCValTask):
+    # Messages pysisyphus prints when an IRC direction stops converged
+    # (irc/IRC.py). The other stops -- "Energy increased!", "rms(grad) below
+    # hard threshold." and "IRC steps exceeded. Stopping." -- are not.
+    IRC_CONVERGED_MSGS = ("Integrator indicated convergence!", "rms(grad) converged!", "Energy converged!")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image_name = pysis_image(self.config.lot)
@@ -282,6 +290,14 @@ class PysisyphusIRCValCalculator(IRCValTask):
         if "Wrote optimized end-geometries and TS to" not in log_text or "pysisyphus run took" not in log_text:
             return False
 
+        # 3. Convergence check: pysisyphus also writes both end geometries when
+        #    an IRC direction or an end optimization stopped unconverged. Both
+        #    directions must stop on a converged message, and both end
+        #    optimizations must print "Converged!".
+        n_irc_converged = sum(log_text.count(msg) for msg in self.IRC_CONVERGED_MSGS)
+        if n_irc_converged < 2 or log_text.count("Converged!") < 2:
+            return False
+
         return True
 
     def check_output(self) -> bool:
@@ -350,6 +366,8 @@ class PysisyphusIRCValCalculator(IRCValTask):
             run_dir = self.scratch_dir / f"irc_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"irc_{i}_input.yaml", f"irc_{i}.log", "forward_end_opt.xyz", "backward_end_opt.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -373,8 +391,9 @@ class PysisyphusIRCValCalculator(IRCValTask):
             for line in pysis_xtb_calc_lines(lot, self.config):
                 f.write(line)
 
-            # set irc block
-            f.write(f'irc:\n type: eulerpc\n forward: True\n backward: True\n downhill: False\n')
+            # set irc block; max_cycles caps the IRC steps here and the end
+            # optimizations below (pysisyphus' own IRC default is 125)
+            f.write(f'irc:\n type: eulerpc\n forward: True\n backward: True\n downhill: False\n max_cycles: {self.config.max_cycles}\n')
 
             # set endopt block
             f.write(f'endopt:\n fragments: False\n do_hess: False\n thresh: {self.config.conv_thresh}\n max_cycles: {self.config.max_cycles}\n')
@@ -496,7 +515,9 @@ class OrcaIRCValCalculator(IRCValTask):
         with open(log_file, "r") as f:
             log_text = f.read()
 
-        if "THE IRC HAS CONVERGED" not in log_text or "ORCA TERMINATED NORMALLY" not in log_text:
+        # ORCA prints the message once per direction, and a direction stopped
+        # at MaxIter still terminates normally, so both must be there
+        if log_text.count("THE IRC HAS CONVERGED") < 2 or "ORCA TERMINATED NORMALLY" not in log_text:
             return False
 
         return True
@@ -572,6 +593,8 @@ class OrcaIRCValCalculator(IRCValTask):
             run_dir = self.scratch_dir / f"irc_run{i}"
             if not run_dir.exists():
                 continue
+            if self.config.keep_crash_logs and not self._is_run_successful(i):
+                continue
             keep = {f"irc_{i}.inp", f"irc_{i}.out", f"irc_{i}_IRC_F.xyz", f"irc_{i}_IRC_B.xyz"}
             for item in run_dir.iterdir():
                 if item.name not in keep:
@@ -588,7 +611,7 @@ class OrcaIRCValCalculator(IRCValTask):
             f.write(f'! {self.config.lot}\n\n')
 
             # set keywords to specify IRC calculation
-            f.write(f'! Freq IRC\n\n')
+            f.write(f'! IRC\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")

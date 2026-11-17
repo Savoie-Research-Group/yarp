@@ -180,6 +180,17 @@ class MinOptTask(AsyncYarpCalculator):
 
         return patched
 
+    def _warn_if_not_minimum(self, conf):
+        """
+        Warn if an R/P optimization stopped at a structure with imaginary modes
+        (below -0.01 cm^-1). Warning only: the conformer is still kept.
+        """
+        if conf.vibrational_freqs is None or conf.is_valid_minimum():
+            return
+        imag = np.sort(conf.vibrational_freqs[conf.vibrational_freqs < -1e-2])
+        print(f"     ! {self.side.capitalize()} optimization is not a minimum: {len(imag)} imaginary "
+              f"mode(s), lowest {imag[0]:.1f} cm^-1. Keeping it anyway.")
+
     def _check_preopt_adjacency(self, elements, geo) -> bool:
         """
         Compare a finished pre-optimization against the graph it should have.
@@ -294,6 +305,11 @@ class PysisyphusMinOptCalculator(MinOptTask):
         if "Wrote final, hopefully optimized, geometry to" not in log_text or "pysisyphus run took" not in log_text:
             print(f"     * Run failed: Did not find successful termination message in log.")
             success = False
+        # Pysisyphus also writes the final geometry after hitting max_cycles
+        # ("Number of cycles exceeded!").
+        elif "Converged!" not in log_text:
+            print(f"     * Run failed: Optimization did not converge within max_cycles.")
+            success = False
 
         # 3. Did the pre-optimization keep the graph it was given?
         #    Gates the reactant leg, warns on the product leg.
@@ -321,6 +337,7 @@ class PysisyphusMinOptCalculator(MinOptTask):
             hess, freq = self._parse_hessian_freq()
             conf.vibrational_freqs = freq
             conf.hessian = hess
+            self._warn_if_not_minimum(conf)
 
         self.node.conformers[conf.type] = conf
 
@@ -478,6 +495,7 @@ class OrcaMinOptCalculator(MinOptTask):
         hess, freq = self._parse_hessian_freq(hess_file)
         conf.vibrational_freqs = freq
         conf.hessian = hess
+        self._warn_if_not_minimum(conf)
 
         self.node.conformers[conf.type] = conf
 
@@ -500,8 +518,10 @@ class OrcaMinOptCalculator(MinOptTask):
             # set keywords for level of theory
             f.write(f'! {self.config.lot}\n\n')
 
-            # set keywords to specify local minimum optimization
-            f.write(f'! OPT\n\n')
+            # set keywords to specify local minimum optimization; Freq adds a
+            # Hessian at the final geometry, so the .hess and the last
+            # thermochemistry block aren't from the last Recalc_Hess cycle
+            f.write(f'! OPT Freq\n\n')
 
             # set parallelization and memory blocks
             f.write(f"%pal\n  nproc {self.config.n_cpus}\nend\n\n")
@@ -513,7 +533,9 @@ class OrcaMinOptCalculator(MinOptTask):
             # set geom opt block
             f.write('%geom\n')
             f.write(f'  MaxIter {self.config.max_cycles}\n')
-            f.write(f'  Calc_Hess true\n  Recalc_Hess {self.config.hessian_recalc}\n')
+            # Exact Hessians during the opt only if rp_opt.hessian_recalc is set
+            if self.config.hessian_recalc is not None:
+                f.write(f'  Calc_Hess true\n  Recalc_Hess {self.config.hessian_recalc}\n')
             f.write('end\n\n')
 
             # set XYZ input file
@@ -608,6 +630,10 @@ class OrcaMinOptCalculator(MinOptTask):
         """
         Parses enthalpy, entropy correction, and Gibbs free energy 
         by searching for key phrases and capturing the first float.
+
+        An optimization prints a thermochemistry block for every exact
+        Hessian, the starting geometry's first. The last block is the one
+        returned: with `Freq`, the final geometry's.
         """
         enthalpy = None
         entropy = None
@@ -641,7 +667,5 @@ class OrcaMinOptCalculator(MinOptTask):
                         match = re.search(r"(-?\d+\.\d+)", line)
                         if match:
                             gibbs = float(match.group(1)) * Constants.ha_to_kcalmol
-                            # Once we have the final value, we can stop
-                            break
 
         return enthalpy, entropy, gibbs

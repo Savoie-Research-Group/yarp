@@ -362,6 +362,10 @@ class TSGuessConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -392,6 +396,8 @@ class TSGuessConfig:
             raise ValueError("Please provide ts_guess: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_guess: 'keep_crash_logs'")
 
 
 @dataclass
@@ -457,7 +463,10 @@ class RPOptConfig:
     lot: str = None
     charge: int = None
     multiplicity: int = None
-    hessian_recalc: int = 3
+    # Exact Hessian every N opt cycles. Unset, pysisyphus uses 3 and ORCA none:
+    # ORCA then uses its model Hessian, with one exact Hessian from Freq at the
+    # end (the ts_handoff E3 benchmark: same minima in about half the time).
+    hessian_recalc: Optional[int] = None
     max_cycles: int = 300
     # Was hardcoded to 'rfo' in the pysisyphus input writer. Exposed so the
     # refine stage can also escape the free-diatomic problem; default unchanged.
@@ -483,7 +492,9 @@ class RPOptConfig:
         if self.opt_type not in ['rfo', 'lbfgs']:
             raise ValueError(f"Invalid rp_opt.'opt_type': '{self.opt_type}'. Valid options are 'rfo', 'lbfgs'")
 
-        if not isinstance(self.hessian_recalc, int):
+        if self.hessian_recalc is None and self.software == 'pysisyphus':
+            self.hessian_recalc = 3
+        if self.hessian_recalc is not None and not isinstance(self.hessian_recalc, int):
             raise ValueError("Please provide an integer value to rp_opt: 'hessian_recalc'")
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to rp_opt: 'max_cycles'")
@@ -507,12 +518,21 @@ class TSOptConfig:
     hessian_recalc: int = 3
     max_cycles: int = 300
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
+    # A TS counts as valid only if exactly one of its modes is below
+    # -min_imag_freq (cm^-1); smaller imaginary modes are ignored as noise.
+    # Picks the source level's TSs that this TS opt starts from. The default,
+    # 0.01, keeps the old behavior.
+    min_imag_freq: float = 0.01
     initial_geom: Optional[InitialGeomConfig] = None
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -530,6 +550,9 @@ class TSOptConfig:
             raise ValueError("Please provide an integer value to ts_opt: 'hessian_recalc'")
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to ts_opt: 'max_cycles'")
+        if isinstance(self.min_imag_freq, bool) or not isinstance(self.min_imag_freq, (int, float)) \
+                or self.min_imag_freq <= 0:
+            raise ValueError("Please provide a positive number (cm^-1) to ts_opt: 'min_imag_freq'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to ts_opt: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
@@ -538,6 +561,8 @@ class TSOptConfig:
             raise ValueError("Please provide ts_opt: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to ts_opt: 'keep_crash_logs'")
 
 
 @dataclass
@@ -549,6 +574,11 @@ class IRCValConfig:
     multiplicity: int = None
     max_cycles: int = 300
     conv_thresh: str = 'gau' # ERM: only used for xTB right now...
+    # A TS counts as valid only if exactly one of its modes is below
+    # -min_imag_freq (cm^-1); smaller imaginary modes are ignored as noise.
+    # Picks the TSs this IRC validates. The default, 0.01, keeps the old
+    # behavior.
+    min_imag_freq: float = 0.01
     # Route reactions whose IRC outcome is anything but intended/inverse_intended
     # to failed_rxns. Off by default: xTB IRC labels are poor predictors of DFT
     # IRC outcomes, so an unintended label is not a reason to drop a reaction.
@@ -558,6 +588,10 @@ class IRCValConfig:
     mem_per_cpu: int = 4000
     max_runtime: str = "01:00:00"
     use_local_scratch: bool = False
+    # Leave a failed run's files in place instead of cleaning them up. Only
+    # tasks with several runs clean up after a partial failure; a task that
+    # fails outright is never cleaned up.
+    keep_crash_logs: bool = False
 
     def __post_init__(self):
         if self.charge == None:
@@ -575,6 +609,9 @@ class IRCValConfig:
 
         if not isinstance(self.max_cycles, int):
             raise ValueError("Please provide an integer value to irc_val: 'max_cycles'")
+        if isinstance(self.min_imag_freq, bool) or not isinstance(self.min_imag_freq, (int, float)) \
+                or self.min_imag_freq <= 0:
+            raise ValueError("Please provide a positive number (cm^-1) to irc_val: 'min_imag_freq'")
         if not isinstance(self.n_cpus, int):
             raise ValueError("Please provide an integer value to irc_val: 'n_cpus'")
         if not isinstance(self.mem_per_cpu, int):
@@ -583,3 +620,5 @@ class IRCValConfig:
             raise ValueError("Please provide irc_val: 'max_runtime' time in HH:MM:SS!")
         if not isinstance(self.use_local_scratch, bool):
             raise ValueError("Please provide a boolean value (true/false) to irc_val: 'use_local_scratch'")
+        if not isinstance(self.keep_crash_logs, bool):
+            raise ValueError("Please provide a boolean value (true/false) to irc_val: 'keep_crash_logs'")

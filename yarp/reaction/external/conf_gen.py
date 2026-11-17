@@ -44,14 +44,19 @@ DIATOMIC_MD_TIMESTEP_FS = 1.0
 # keeps headroom for larger systems. Evidence: debug/261104_crest_crash/.
 CREST_OMP_STACKSIZE = "256M"
 
-# CREST images. Apptainer/Singularity use a local build of CREST 3.0.2 with two
-# fixes (recipe: containers/crest/crest_3.0.2_patched.def): the GFN-FF it
-# bundles segfaulted on a free CO or NO next to an H-bond donor (e.g. the KHP
-# product CCOO.[C-]#[O+]), and libgfortran 15 rejected 7 of its format strings.
-# Docker still uses the Docker Hub image, which has neither fix.
+# The CREST image: erm42/yarp:crest, pinned by digest, for every runner. It
+# carries CREST 3.0.2 rebuilt with two fixes (recipe:
+# containers/crest/Dockerfile.patched): the GFN-FF it bundles segfaulted on a
+# free CO or NO next to an H-bond donor (e.g. the KHP product CCOO.[C-]#[O+]),
+# and libgfortran 15 rejected 7 of its format strings.
+# Pinned by digest, not by tag: YARP never re-checks a tag (Apptainer keeps
+# reusing its <name>.sif, Docker its local copy), so a republished tag would not
+# reach users who already have the old image. A new digest gives a new .sif
+# name, so Apptainer pulls the new image. When erm42/yarp:crest is
+# republished, put its new digest here. Apptainer does not accept a tag and a
+# digest together, so the name carries the digest only.
 # Evidence: debug/261104_crest_crash/.
-CREST_DOCKER_IMAGE = "erm42/yarp:crest"
-CREST_PATCHED_SIF = "crest_3.0.2_patched.sif"
+CREST_IMAGE = "erm42/yarp@sha256:f9246e37cb6c343571df12e64fa5b22bc14a3e90728536cd294e13303c6bf4f8"
 
 # Elements each Auto3D potential is trained on (lowercase, as yarpecule.elements).
 # AIMNet2 and its spin-aware variant: the elements with a trained per-element
@@ -112,10 +117,7 @@ class CrestConfCalculator(ConfTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.job_manager.container in ("apptainer", "singularity"):
-            self.image_name = CREST_PATCHED_SIF
-        else:
-            self.image_name = CREST_DOCKER_IMAGE
+        self.image_name = CREST_IMAGE
         self.xyz_file = "input.xyz"
 
     def generate_input(self):

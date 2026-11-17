@@ -1,9 +1,9 @@
 # ============================================================================
 # YARP CREST image with CREST 3.0.2 patched (to be published as erm42/yarp:crest)
 # ============================================================================
-# Docker version of crest_3.0.2_patched.def, step for step. It starts from the
-# image erm42/yarp:crest had on 2026-11-05 (pinned by digest) and rebuilds its
-# crest binary from the CREST 3.0.2 sources and build settings conda-forge uses
+# Starts from the image erm42/yarp:crest had on 2026-11-05 (pinned by digest)
+# and rebuilds its crest binary from the CREST 3.0.2 sources and build settings
+# conda-forge uses
 # (crest-feedstock: sources + checksums in crest_3.0.2_sources.txt,
 # patches/0001, cmake RelWithDebInfo, -ffree-line-length-none), plus two fixes:
 #   patches/0002: GFN-FF no longer treats a free CO or NO as a carbonyl/nitro

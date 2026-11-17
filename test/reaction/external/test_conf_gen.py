@@ -9,6 +9,7 @@ how the RDKit calculator hands its graph to the container and filters what
 comes back.
 """
 import numpy as np
+import re
 from pathlib import Path
 import pytest
 from types import SimpleNamespace
@@ -20,7 +21,7 @@ from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.calc_factory import get_calculator
 from yarp.reaction.external.conf_gen import (
     CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
-    CREST_OMP_STACKSIZE, CREST_DOCKER_IMAGE, CREST_PATCHED_SIF, check_auto3d_compatibility,
+    CREST_OMP_STACKSIZE, CREST_IMAGE, check_auto3d_compatibility,
 )
 from yarp.reaction.state import state
 import yarp as yp
@@ -203,7 +204,7 @@ class TestCrestThreadEnvironment:
                                    task_id="s.reactant_conformer")
         job_manager = SimpleNamespace(container="apptainer", sif_location=str(tmp_path),
                                       scheduler="sge")
-        (tmp_path / CREST_PATCHED_SIF).touch()
+        (tmp_path / (CREST_IMAGE.replace("/", "_").replace(":", "_") + ".sif")).touch()
         calc = CrestConfCalculator(task_def, rxn, job_manager)
         calc.set_scratch_dir(tmp_path)
         calc.write_scheduler_headers = MagicMock()
@@ -234,11 +235,12 @@ class TestCrestThreadEnvironment:
 
 class TestCrestImage:
     """
-    The Docker Hub CREST image bundles a GFN-FF that segfaults when a free CO
-    sits near an H-bond donor (the KHP product CCOO.[C-]#[O+] lost its reaction
-    that way), and its ANCOPT/RFO printouts abort under libgfortran 15. On
-    Apptainer/Singularity the CREST step must use the local patched build,
-    which is never pulled, so an unpatched image cannot sneak back in.
+    The CREST image used to bundle a GFN-FF that segfaults when a free CO sits
+    near an H-bond donor (the KHP product CCOO.[C-]#[O+] lost its reaction that
+    way), and its ANCOPT/RFO printouts abort under libgfortran 15. The fixed
+    image is published as erm42/yarp:crest, and every runner names it by
+    digest: YARP never re-checks a tag, so an image named by tag would keep
+    running whatever copy a user already has.
     """
 
     def _calc(self, rxn, container, sif_location):
@@ -250,15 +252,37 @@ class TestCrestImage:
                                       scheduler="sge")
         return CrestConfCalculator(task_def, rxn, job_manager)
 
-    @pytest.mark.parametrize("container", ["apptainer", "singularity"])
-    def test_sif_runners_use_the_patched_local_image(self, khp_reaction, tmp_path, container):
-        assert self._calc(khp_reaction, container, tmp_path).image_name == CREST_PATCHED_SIF
+    @staticmethod
+    def _sif_name():
+        return CREST_IMAGE.replace("/", "_").replace(":", "_") + ".sif"
 
-    def test_docker_keeps_the_hub_image(self, khp_reaction, tmp_path):
-        assert self._calc(khp_reaction, "docker", tmp_path).image_name == CREST_DOCKER_IMAGE
+    def test_image_is_erm42_yarp_pinned_by_digest(self):
+        assert re.fullmatch(r"erm42/yarp@sha256:[0-9a-f]{64}", CREST_IMAGE)
 
-    def test_job_script_runs_the_patched_sif(self, khp_reaction, tmp_path):
-        (tmp_path / CREST_PATCHED_SIF).touch()
+    @pytest.mark.parametrize("container", ["docker", "apptainer", "singularity"])
+    def test_every_runner_uses_the_pinned_image(self, khp_reaction, tmp_path, container):
+        assert self._calc(khp_reaction, container, tmp_path).image_name == CREST_IMAGE
+
+    @pytest.mark.parametrize("runner", ["apptainer", "singularity"])
+    def test_sif_runners_pull_by_digest_into_a_digest_named_sif(self, khp_reaction, tmp_path,
+                                                                 runner, monkeypatch):
+        """
+        A user with an old cached erm42_yarp_crest.sif (the tag's file) still
+        gets the pinned image: it lands in its own digest-named .sif.
+        """
+        (tmp_path / "erm42_yarp_crest.sif").touch()
+        pulls = []
+        monkeypatch.setattr("yarp.reaction.external.calc_base.subprocess.run",
+                            lambda cmd, **kw: pulls.append(cmd) or SimpleNamespace(returncode=0, stdout=""))
+        calc = self._calc(khp_reaction, runner, tmp_path)
+
+        prefix = calc.get_container_prefix(calc.image_name, "/work")
+
+        assert pulls == [[runner, "pull", str(tmp_path / self._sif_name()), f"docker://{CREST_IMAGE}"]]
+        assert prefix.endswith(str(tmp_path / self._sif_name()))
+
+    def test_job_script_runs_the_digest_sif_not_a_cached_tag_image(self, khp_reaction, tmp_path):
+        (tmp_path / self._sif_name()).touch()
         (tmp_path / "erm42_yarp_crest.sif").touch()
         calc = self._calc(khp_reaction, "apptainer", tmp_path)
         calc.set_scratch_dir(tmp_path)
@@ -266,22 +290,24 @@ class TestCrestImage:
 
         script = calc.write_submission_script().read_text()
 
-        assert f"/work {tmp_path / CREST_PATCHED_SIF}" in script
+        assert f"/work {tmp_path / self._sif_name()}" in script
         assert "erm42_yarp_crest.sif" not in script
 
-    def test_missing_patched_image_is_an_error_naming_its_recipe(self, khp_reaction, tmp_path):
-        """A missing patched image must stop the job, never pull the unpatched Hub image."""
-        calc = self._calc(khp_reaction, "apptainer", tmp_path)
+    def test_docker_runs_the_image_by_digest(self, khp_reaction, tmp_path, monkeypatch):
+        calls = []
+        monkeypatch.setattr("yarp.reaction.external.calc_base.subprocess.run",
+                            lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0, stdout="abc123\n"))
+        calc = self._calc(khp_reaction, "docker", tmp_path)
 
-        with pytest.raises(FileNotFoundError, match="crest_3.0.2_patched.def"):
-            calc.get_container_prefix(calc.image_name, "/work")
+        prefix = calc.get_container_prefix(calc.image_name, "/work")
 
-    def test_recipe_for_the_patched_image_is_in_the_repo(self):
-        """The .def that builds CREST_PATCHED_SIF ships next to the CREST Dockerfile."""
+        assert calls == [["docker", "images", "-q", CREST_IMAGE]]
+        assert prefix.endswith(f"-w /work {CREST_IMAGE}")
+
+    def test_recipe_for_the_image_is_in_the_repo(self):
+        """The Dockerfile that builds the published image ships with the CREST Dockerfile."""
         repo = Path(__file__).resolve().parents[3]
-        recipe = repo / "containers" / "crest" / CREST_PATCHED_SIF.replace(".sif", ".def")
-
-        assert recipe.is_file()
+        assert (repo / "containers" / "crest" / "Dockerfile.patched").is_file()
 
 
 

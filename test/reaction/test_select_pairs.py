@@ -317,3 +317,41 @@ class TestHardCutoffs:
             self._run(patchable_reaction, monkeypatch, {
                 ("R", False): (0.9, False), ("R", True): (0.8, False),
                 ("P", False): (0.2, False), ("P", True): (0.1, False)})
+
+
+class TestEveryConformerIsScored:
+    """
+    The paper scores all M + N pairs. The code used to keep only the first
+    5 * n_conf conformers of each side, in list order, before scoring, so a
+    better pair further down the list was never seen.
+    """
+
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=1, verbose=False)
+
+    def test_the_best_pair_is_found_past_the_old_per_side_limit(self, patchable_reaction, monkeypatch):
+        import yarp.reaction.conf_sampling.select_pairs as sp
+
+        rxn = patchable_reaction
+        r_geo, p_geo = _on_graph_geometry(rxn, "reactant"), _on_graph_geometry(rxn, "product")
+        # 7 reactant conformers (old limit 5 * n_conf = 5); the best is the last.
+        r_scores = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.9]
+        score = {}
+        for state, scores, geo in ((rxn.reactant, r_scores, r_geo), (rxn.product, [0.05], p_geo)):
+            for key in [k for k in state.conformers if "conf_gen" in k]:
+                del state.conformers[key]
+            for rank, p in enumerate(scores):
+                g = geo.copy()
+                score[id(g)] = p
+                state.conformers[f"conf_gen_rank{rank}_gfn2_crest"] = _conf(g, state.graph.elements, f"rank{rank}")
+
+        monkeypatch.setattr(sp, "joint_optimize", lambda conf, bem, lot="uff": _conf(conf.geo, conf.elements, "biased"))
+        monkeypatch.setattr(sp, "align_conformers", lambda conf, biased: biased)
+        # p travels in max_Hdis (no cutoff), so the model stub can read it back
+        monkeypatch.setattr(sp, "return_indicator", lambda E, RG, PG: _indicators(max_Hdis=score[id(RG)]))
+        monkeypatch.setattr(sp.pickle, "load", lambda f: SimpleNamespace(
+            predict_proba=lambda ind: [[1 - ind["max_Hdis"].iloc[0], ind["max_Hdis"].iloc[0]]]))
+
+        pairs = select_gsm_pairs(rxn, self.CONFIG)
+
+        assert [p["r_conf"].type for p in pairs] == ["rank6"]
+        assert pairs[0]["score"] == pytest.approx(0.9)

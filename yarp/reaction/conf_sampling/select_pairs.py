@@ -126,16 +126,6 @@ def select_gsm_pairs(rxn, config):
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
 
-    # Truncate both the original and biased lists when the conformer pool is too large compared to the number of rxn conformers requested
-    limit = n_conf * 5
-    if len(r_confs) > limit:
-        r_confs = r_confs[:limit]    
-        biased_p = biased_p[:limit]
-    if len(p_confs) > limit:
-        p_confs = p_confs[:limit]    
-        biased_r = biased_r[:limit]
-
-
     # --- STEP B: Reactant-Product Pair Evaluation & Tournament ---
     approved_pairs = []
     approved_indicators = []

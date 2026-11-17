@@ -127,8 +127,7 @@ def select_gsm_pairs(rxn, config):
         model = pickle.load(f)
 
     # --- STEP B: Reactant-Product Pair Evaluation & Tournament ---
-    approved_pairs = []
-    approved_indicators = []
+    scored_pairs = []   # (pair, indicators) for every tournament winner with p > 0
     dropped_pairs = 0
     n_cut = 0   # conformers whose aligned and unaligned geometries both fail the hard cutoffs
 
@@ -157,14 +156,13 @@ def select_gsm_pairs(rxn, config):
                 best_ind = ind_unaligned
                 best_prob = prob_unaligned
 
-            # 4. Quality Control & Deduplication
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
-                approved_indicators.append(best_ind)
-                approved_pairs.append({
+            # 4. Quality Control (deduplication runs after the sort, below)
+            if best_prob[0][1] > 0.0:
+                scored_pairs.append(({
                     "r_conf": r_c,
                     "p_conf": best_p,
                     "score": best_prob[0][1]
-                })
+                }, best_ind))
             else:
                 dropped_pairs += 1
 ####################################################################
@@ -193,14 +191,13 @@ def select_gsm_pairs(rxn, config):
                 best_ind = ind_unaligned
                 best_prob = prob_unaligned
 
-            # 4. Quality Control & Deduplication
-            if best_prob[0][1] > 0.0 and check_uniqueness(best_ind, approved_indicators):
-                approved_indicators.append(best_ind)
-                approved_pairs.append({
+            # 4. Quality Control (deduplication runs after the sort, below)
+            if best_prob[0][1] > 0.0:
+                scored_pairs.append(({
                     "r_conf": best_r,
                     "p_conf": p_c,
                     "score": best_prob[0][1]
-                })
+                }, best_ind))
             else:
                 dropped_pairs += 1
 
@@ -210,17 +207,27 @@ def select_gsm_pairs(rxn, config):
             f"Every conformer pair failed the hard cutoffs ({n_cut} conformers)."
         )
 
-    # --- STEP C: Sort and Select Top N ---
-    # Sort descending by probability of success
-    approved_pairs.sort(key=lambda x: x["score"], reverse=True)
+    # --- STEP C: Sort, Deduplicate, and Select Top N ---
+    # Sort descending by probability of success, then walk down the list keeping
+    # each pair that is not a near-duplicate of one already kept, so that of two
+    # similar pairs the higher-scoring one survives. Stop at n_conf.
+    scored_pairs.sort(key=lambda x: x[0]["score"], reverse=True)
+    approved_pairs = []
+    approved_indicators = []
+    for pair, ind in scored_pairs:
+        if len(approved_pairs) == n_conf:
+            break
+        if check_uniqueness(ind, approved_indicators):
+            approved_indicators.append(ind)
+            approved_pairs.append(pair)
+        else:
+            dropped_pairs += 1
 
     if verbose:
         print("Number of approved pairs = ", len(approved_pairs))
         print("Number of dropped pairs = ", dropped_pairs)
         print("Number of conformers failing the hard cutoffs = ", n_cut)
-##############################################################################
-    # Truncate to the number requested by the user
-    return approved_pairs[:n_conf]
+    return approved_pairs
 
 
 def drop_collapsed_conformers(confs, other_adj):

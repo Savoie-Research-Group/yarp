@@ -355,3 +355,48 @@ class TestEveryConformerIsScored:
 
         assert [p["r_conf"].type for p in pairs] == ["rank6"]
         assert pairs[0]["score"] == pytest.approx(0.9)
+
+
+class TestDeduplicationAfterSort:
+    """
+    Near-duplicate pairs (indicator vectors closer than check_uniqueness's
+    threshold) are reduced to one. The check used to run in scoring order,
+    reactant conformers first, so the first-seen of two duplicates survived
+    even when the later one scored higher. It now runs on the sorted list.
+    """
+
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False)
+
+    def test_the_higher_scoring_near_duplicate_is_kept(self, patchable_reaction, monkeypatch):
+        import yarp.reaction.conf_sampling.select_pairs as sp
+
+        rxn = patchable_reaction
+        r_geo, p_geo = _on_graph_geometry(rxn, "reactant"), _on_graph_geometry(rxn, "product")
+        # rank0 and rank1 give identical indicators; rank0 is scored first but lower.
+        confs = {"reactant": [("rank0", 0.3), ("rank1", 0.8)], "product": [("prod", 0.1)]}
+        score, ind = {}, {}
+        for state, side, geo in ((rxn.reactant, "reactant", r_geo), (rxn.product, "product", p_geo)):
+            for key in [k for k in state.conformers if "conf_gen" in k]:
+                del state.conformers[key]
+            for rank, (label, p) in enumerate(confs[side]):
+                g = geo.copy()
+                score[id(g)] = p
+                ind[id(g)] = _indicators(RMSD=1.5) if side == "product" else _indicators()
+                state.conformers[f"conf_gen_rank{rank}_gfn2_crest"] = _conf(g, state.graph.elements, label)
+
+        last = {}
+
+        def indicators(E, RG, PG):
+            last["p"] = score[id(RG)]
+            return ind[id(RG)]
+
+        monkeypatch.setattr(sp, "joint_optimize", lambda conf, bem, lot="uff": _conf(conf.geo, conf.elements, "biased"))
+        monkeypatch.setattr(sp, "align_conformers", lambda conf, biased: biased)
+        monkeypatch.setattr(sp, "return_indicator", indicators)
+        monkeypatch.setattr(sp.pickle, "load", lambda f: SimpleNamespace(
+            predict_proba=lambda X: [[1 - last["p"], last["p"]]]))
+
+        pairs = select_gsm_pairs(rxn, self.CONFIG)
+
+        assert [(p["r_conf"].type, p["score"]) for p in pairs] == [("rank1", pytest.approx(0.8)),
+                                                                    ("biased", pytest.approx(0.1))]

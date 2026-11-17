@@ -39,8 +39,9 @@ def select_gsm_pairs(rxn, config):
     Orchestrates Collapse Check -> Biasing -> Alignment -> Hard Cutoffs -> ML Tournament -> QC -> Pairing.
 
     Raises `CalculatorInputError` if every reactant or every product conformer
-    has collapsed onto the other side's graph, or if every conformer pair fails
-    the hard cutoffs (HARD_CUTOFFS); either discards the reaction.
+    has collapsed onto the other side's graph, if every conformer pair fails
+    the hard cutoffs (HARD_CUTOFFS), or, with config.pair_selection "intended",
+    if no pair scores at least config.pair_threshold; each discards the reaction.
     """
     # Select the conformer-generation output explicitly, rather than taking
     # "everything that is not initial_geom". The states also carry the xTB
@@ -212,6 +213,15 @@ def select_gsm_pairs(rxn, config):
     # each pair that is not a near-duplicate of one already kept, so that of two
     # similar pairs the higher-scoring one survives. Stop at n_conf.
     scored_pairs.sort(key=lambda x: x[0]["score"], reverse=True)
+
+    # "intended" mode keeps only pairs at or above pair_threshold; with none,
+    # no geometry is fit for GSM. "top_n" keeps the best pairs whatever their p.
+    if config.pair_selection == "intended":
+        scored_pairs = [x for x in scored_pairs if x[0]["score"] >= config.pair_threshold]
+        if not scored_pairs:
+            raise CalculatorInputError(
+                f"No conformer pair reached pair_threshold (p >= {config.pair_threshold})."
+            )
     approved_pairs = []
     approved_indicators = []
     for pair, ind in scored_pairs:

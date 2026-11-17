@@ -115,7 +115,7 @@ class TestGsmPoolExcludesNonConformers:
         seen = []
         _stub_gsm_pairing(monkeypatch, seen)
 
-        config = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=1, verbose=False)
+        config = SimpleNamespace(bias_lot="uff", joint_opt="dual", pair_selection="top_n", n_conf=1, verbose=False)
         select_gsm_pairs(patchable_reaction, config)
 
         # One reactant conformer and one product conformer, both from CREST.
@@ -143,7 +143,7 @@ class TestCollapsedConformersAreDropped:
     aligned with this one, rather than a hand-edited adjacency matrix.
     """
 
-    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False,
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", pair_selection="top_n", n_conf=5, verbose=False,
                              gsm_lot="xtb")  # the GSM calculator picks its image from gsm_lot
 
     def _set(self, state, geos):
@@ -247,7 +247,7 @@ class TestHardCutoffs:
     dropped, the reaction is discarded.
     """
 
-    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False)
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", pair_selection="top_n", n_conf=5, verbose=False)
 
     def test_thresholds_are_table_1(self):
         assert HARD_CUTOFFS == (("RMSD", "max", 1.8), ("max_dis", "max", 4.8),
@@ -326,7 +326,7 @@ class TestEveryConformerIsScored:
     better pair further down the list was never seen.
     """
 
-    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=1, verbose=False)
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", pair_selection="top_n", n_conf=1, verbose=False)
 
     def test_the_best_pair_is_found_past_the_old_per_side_limit(self, patchable_reaction, monkeypatch):
         import yarp.reaction.conf_sampling.select_pairs as sp
@@ -365,7 +365,7 @@ class TestDeduplicationAfterSort:
     even when the later one scored higher. It now runs on the sorted list.
     """
 
-    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False)
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", pair_selection="top_n", n_conf=5, verbose=False)
 
     def test_the_higher_scoring_near_duplicate_is_kept(self, patchable_reaction, monkeypatch):
         import yarp.reaction.conf_sampling.select_pairs as sp
@@ -400,3 +400,61 @@ class TestDeduplicationAfterSort:
 
         assert [(p["r_conf"].type, p["score"]) for p in pairs] == [("rank1", pytest.approx(0.8)),
                                                                     ("biased", pytest.approx(0.1))]
+
+
+class TestPairSelection:
+    """
+    ts_guess.pair_selection (ERM, 2026-11-17). "intended" (the default): up to
+    n_conf pairs with p >= pair_threshold, and the reaction is discarded if
+    there are none -- the paper keeps only pairs the RF classifies as intended.
+    "top_n": the n_conf best pairs whatever their p.
+    """
+
+    # at least 0.025 apart, so check_uniqueness never merges two of them
+    R_SCORES = [0.9, 0.6, 0.5, 0.45, 0.2]
+    P_SCORES = [0.1]
+
+    def _run(self, rxn, monkeypatch, r_scores=R_SCORES, p_scores=P_SCORES, **cfg):
+        """Reactant/product conformers scored with the given p (distinct, non-duplicate indicators)."""
+        import yarp.reaction.conf_sampling.select_pairs as sp
+
+        r_geo, p_geo = _on_graph_geometry(rxn, "reactant"), _on_graph_geometry(rxn, "product")
+        score = {}
+        for state, scores, geo in ((rxn.reactant, r_scores, r_geo), (rxn.product, p_scores, p_geo)):
+            for key in [k for k in state.conformers if "conf_gen" in k]:
+                del state.conformers[key]
+            for rank, p in enumerate(scores):
+                g = geo.copy()
+                score[id(g)] = p
+                state.conformers[f"conf_gen_rank{rank}_gfn2_crest"] = _conf(g, state.graph.elements, f"rank{rank}")
+
+        monkeypatch.setattr(sp, "joint_optimize", lambda conf, bem, lot="uff": _conf(conf.geo, conf.elements, "biased"))
+        monkeypatch.setattr(sp, "align_conformers", lambda conf, biased: biased)
+        # p travels in max_Hdis (no cutoff), so the model stub can read it back
+        monkeypatch.setattr(sp, "return_indicator", lambda E, RG, PG: _indicators(max_Hdis=score[id(RG)]))
+        monkeypatch.setattr(sp.pickle, "load", lambda f: SimpleNamespace(
+            predict_proba=lambda ind: [[1 - ind["max_Hdis"].iloc[0], ind["max_Hdis"].iloc[0]]]))
+        config = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False,
+                                 pair_selection="intended", pair_threshold=0.5)
+        for k, v in cfg.items():
+            setattr(config, k, v)
+        return [p["score"] for p in select_gsm_pairs(rxn, config)]
+
+    def test_intended_keeps_only_pairs_at_or_above_the_threshold(self, patchable_reaction, monkeypatch):
+        assert self._run(patchable_reaction, monkeypatch) == pytest.approx([0.9, 0.6, 0.5])
+
+    def test_intended_uses_the_configured_threshold(self, patchable_reaction, monkeypatch):
+        assert self._run(patchable_reaction, monkeypatch, pair_threshold=0.3) == pytest.approx([0.9, 0.6, 0.5, 0.45])
+
+    def test_intended_still_stops_at_n_conf(self, patchable_reaction, monkeypatch):
+        """A guard, not a regression test: both modes stop at n_conf."""
+        assert self._run(patchable_reaction, monkeypatch, n_conf=2) == pytest.approx([0.9, 0.6])
+
+    def test_intended_with_no_pair_at_the_threshold_discards_the_reaction(self, patchable_reaction, monkeypatch):
+        with pytest.raises(CalculatorInputError, match="pair_threshold"):
+            self._run(patchable_reaction, monkeypatch, r_scores=[0.45, 0.3])
+
+    def test_top_n_keeps_the_best_pairs_whatever_their_p(self, patchable_reaction, monkeypatch):
+        assert self._run(patchable_reaction, monkeypatch, pair_selection="top_n") == pytest.approx([0.9, 0.6, 0.5, 0.45, 0.2])
+        assert self._run(patchable_reaction, monkeypatch, pair_selection="top_n",
+                         r_scores=[0.45, 0.3]) == pytest.approx([0.45, 0.3, 0.1])

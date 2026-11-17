@@ -357,6 +357,13 @@ class TSGuessConfig:
     max_gsm_nodes: int = 30
     bias_lot: str = "uff"
     joint_opt: str = "dual"
+    # Conformer pair selection for GSM (select_pairs.py). "intended": up to
+    # n_conf pairs whose RF probability is >= pair_threshold; if there are
+    # none, the reaction is discarded. "top_n": the n_conf highest-scoring
+    # pairs, whatever their probability (pair_threshold must not be given).
+    # pair_threshold defaults to 0.5 for "intended"; None means "not given".
+    pair_selection: str = "intended"
+    pair_threshold: float = None
 
     n_cpus: int = 1
     mem_per_cpu: int = 4000
@@ -383,6 +390,17 @@ class TSGuessConfig:
             raise ValueError(f"Invalid force field selected for 'bias_lot': '{self.bias_lot}' Valid options are: 'uff', 'Ghemical', 'MMFF94'")
         if self.joint_opt not in ['dual', 'r_only', 'p_only', 'off']:
             raise ValueError(f"Invalid 'joint_opt' entry: '{self.joint_opt}' Valid options are: 'dual', 'r_only', 'p_only', 'off'")
+        if self.pair_selection not in ['intended', 'top_n']:
+            raise ValueError(f"Invalid 'pair_selection' entry: '{self.pair_selection}' Valid options are: 'intended', 'top_n'")
+        if self.pair_selection == 'top_n' and self.pair_threshold is not None:
+            raise ValueError("ts_guess: 'pair_threshold' is only used with pair_selection 'intended'; "
+                             "remove it, or set pair_selection: intended")
+        if self.pair_selection == 'intended':
+            if self.pair_threshold is None:
+                self.pair_threshold = 0.5
+            if isinstance(self.pair_threshold, bool) or not isinstance(self.pair_threshold, (int, float)) \
+                    or not 0 <= self.pair_threshold <= 1:
+                raise ValueError("Please provide a number between 0 and 1 to ts_guess: 'pair_threshold'")
 
         if not isinstance(self.n_conf, int):
             raise ValueError("Please provide an integer value to ts_guess: 'n_conf'")

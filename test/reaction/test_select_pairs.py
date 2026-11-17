@@ -2,15 +2,20 @@
 Tests for GSM conformer-pair selection.
 
 `select_gsm_pairs` builds the pool GSM is seeded from. These tests pin which
-structures may enter that pool (CREST conformers only) and that conformers which
-have collapsed onto the other side of the reaction are dropped before pairing.
+structures may enter that pool (CREST conformers only), that conformers which
+have collapsed onto the other side of the reaction are dropped before pairing,
+and that geometries beyond the paper's hard cutoffs are discarded before the RF
+model scores them.
 """
+import pandas as pd
 import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from yarp.reaction.conf_sampling.joint_opt import joint_optimize
-from yarp.reaction.conf_sampling.select_pairs import select_gsm_pairs
+from yarp.reaction.conf_sampling.select_pairs import (
+    select_gsm_pairs, passes_hard_cutoffs, HARD_CUTOFFS,
+)
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.ts_guess import PysisyphusTSGuessCalculator
 from yarp.reaction.reaction import reaction
@@ -54,6 +59,17 @@ def _on_graph_geometry(rxn, side):
     return geo
 
 
+FEATURES = ["RMSD", "max_dis", "max_Hdis", "min_cross_dis", "min_Hcross_dis", "path_cross"]
+
+
+def _indicators(**values):
+    """A one-row indicator frame, as return_indicator builds it, within every hard cutoff by default."""
+    row = {"RMSD": 1.0, "max_dis": 2.0, "max_Hdis": 2.0, "min_cross_dis": 1.0,
+           "min_Hcross_dis": 1.0, "path_cross": 1.0}
+    row.update(values)
+    return pd.DataFrame([[row[f] for f in FEATURES]], columns=FEATURES)
+
+
 def _stub_gsm_pairing(monkeypatch, seen):
     """
     Neutralize everything downstream of the conformer selection, so a test
@@ -67,7 +83,7 @@ def _stub_gsm_pairing(monkeypatch, seen):
         return conf
 
     monkeypatch.setattr(sp, "joint_optimize", record)
-    monkeypatch.setattr(sp, "return_indicator", lambda E, RG, PG: [[0.0]])
+    monkeypatch.setattr(sp, "return_indicator", lambda E, RG, PG: _indicators())
     monkeypatch.setattr(sp, "align_conformers", lambda conf, biased: biased)
     monkeypatch.setattr(
         sp.pickle, "load",
@@ -219,3 +235,85 @@ class TestCollapsedConformersAreDropped:
         with pytest.raises(CalculatorInputError, match="No usable product conformers"):
             calc.generate_input()
 
+
+class TestHardCutoffs:
+    """
+    Zhao, Hsu & Savoie (JCTC 2022, Table 1) discard reaction geometries whose
+    indicators exceed RMSD 1.8, Dis_max 4.8, Cross_min 0.03 or Path_min 0.20 A
+    before applying the RF model. Each sampled conformer has two candidate
+    geometries, unaligned and aligned; each is checked on its own, the
+    tournament runs between those that pass, and a conformer whose two
+    geometries both fail is dropped (ERM, 2026-11-17). If every conformer is
+    dropped, the reaction is discarded.
+    """
+
+    CONFIG = SimpleNamespace(bias_lot="uff", joint_opt="dual", n_conf=5, verbose=False)
+
+    def test_thresholds_are_table_1(self):
+        assert HARD_CUTOFFS == (("RMSD", "max", 1.8), ("max_dis", "max", 4.8),
+                                ("min_cross_dis", "min", 0.03), ("path_cross", "min", 0.20))
+
+    @pytest.mark.parametrize("name,at,beyond", [("RMSD", 1.8, 1.81), ("max_dis", 4.8, 4.81),
+                                                ("min_cross_dis", 0.03, 0.029), ("path_cross", 0.20, 0.19)])
+    def test_a_value_at_the_threshold_passes_and_beyond_it_fails(self, name, at, beyond):
+        assert passes_hard_cutoffs(_indicators(**{name: at}))
+        assert not passes_hard_cutoffs(_indicators(**{name: beyond}))
+
+    def test_the_hydrogen_indicators_have_no_cutoff(self):
+        assert passes_hard_cutoffs(_indicators(max_Hdis=50.0, min_Hcross_dis=0.0))
+
+    def _run(self, rxn, monkeypatch, verdicts):
+        """
+        One reactant and one product conformer, each on its own graph. The
+        stubs score each geometry with the p in `verdicts[(side, aligned)]` and
+        give it indicators that pass or fail the cutoffs as that entry says:
+        verdicts maps (side, aligned) -> (p, passes). Returns the selected pairs.
+        """
+        import yarp.reaction.conf_sampling.select_pairs as sp
+
+        r_geo, p_geo = _on_graph_geometry(rxn, "reactant"), _on_graph_geometry(rxn, "product")
+        for state, geo in ((rxn.reactant, r_geo), (rxn.product, p_geo)):
+            for key in [k for k in state.conformers if "conf_gen" in k]:
+                del state.conformers[key]
+            state.conformers["conf_gen_rank0_gfn2_crest"] = _conf(geo, state.graph.elements, "sampled")
+
+        def indicators(E, RG, PG):
+            side = "R" if RG is r_geo else "P"
+            p, ok = verdicts[(side, isinstance(PG, str))]
+            # p travels in max_Hdis, which has no cutoff, so the model stub can read it back
+            return _indicators(max_Hdis=p, **({} if ok else {"RMSD": 2.5}))
+
+        monkeypatch.setattr(sp, "joint_optimize", lambda conf, bem, lot="uff": _conf(conf.geo, conf.elements, "biased"))
+        monkeypatch.setattr(sp, "align_conformers", lambda conf, biased: _conf("ALIGNED", conf.elements, "aligned"))
+        monkeypatch.setattr(sp, "return_indicator", indicators)
+        monkeypatch.setattr(sp.pickle, "load", lambda f: SimpleNamespace(
+            predict_proba=lambda ind: [[1 - ind["max_Hdis"].iloc[0], ind["max_Hdis"].iloc[0]]]))
+        return select_gsm_pairs(rxn, self.CONFIG)
+
+    def test_a_geometry_beyond_the_cutoffs_cannot_win_the_tournament(self, patchable_reaction, monkeypatch):
+        """
+        The unaligned geometry scores higher (0.9) but fails the cutoffs; the
+        aligned one (0.3) passes. The pair keeps the aligned geometry, at 0.3.
+        """
+        pairs = self._run(patchable_reaction, monkeypatch, {
+            ("R", False): (0.9, False), ("R", True): (0.3, True),
+            ("P", False): (0.2, True), ("P", True): (0.1, True)})
+
+        r_side = [p for p in pairs if p["r_conf"].type == "sampled"]
+        assert len(r_side) == 1
+        assert r_side[0]["p_conf"].type == "aligned"
+        assert r_side[0]["score"] == pytest.approx(0.3)
+
+    def test_a_conformer_with_both_geometries_beyond_the_cutoffs_is_dropped(self, patchable_reaction, monkeypatch):
+        pairs = self._run(patchable_reaction, monkeypatch, {
+            ("R", False): (0.9, False), ("R", True): (0.8, False),
+            ("P", False): (0.2, True), ("P", True): (0.1, True)})
+
+        assert [p["p_conf"].type for p in pairs] == ["sampled"]   # only the product conformer's pair
+        assert pairs[0]["score"] == pytest.approx(0.2)
+
+    def test_every_conformer_beyond_the_cutoffs_discards_the_reaction(self, patchable_reaction, monkeypatch):
+        with pytest.raises(CalculatorInputError, match="hard cutoffs"):
+            self._run(patchable_reaction, monkeypatch, {
+                ("R", False): (0.9, False), ("R", True): (0.8, False),
+                ("P", False): (0.2, False), ("P", True): (0.1, False)})

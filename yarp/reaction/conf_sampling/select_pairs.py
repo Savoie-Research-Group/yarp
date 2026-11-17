@@ -14,13 +14,33 @@ from yarp.reaction.conf_sampling.indicator import return_indicator
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.yarpecule.graph.adjacency import compare_adjacency
 
+# Hard cutoffs (Zhao, Hsu & Savoie, JCTC 2022, 18, 3006, Table 1): a reaction
+# geometry with any indicator beyond its threshold is discarded before the RF
+# model is applied. (indicator, "max" or "min", threshold in Angstrom); a value
+# equal to the threshold passes. The hydrogen variants (max_Hdis,
+# min_Hcross_dis) have no cutoff.
+HARD_CUTOFFS = (
+    ("RMSD", "max", 1.8),
+    ("max_dis", "max", 4.8),
+    ("min_cross_dis", "min", 0.03),
+    ("path_cross", "min", 0.20),
+)
+
+
+def passes_hard_cutoffs(indicators):
+    """True if a one-row indicator DataFrame (return_indicator) is within every HARD_CUTOFFS threshold."""
+    row = indicators.iloc[0]
+    return all(row[name] <= thr if kind == "max" else row[name] >= thr
+               for name, kind, thr in HARD_CUTOFFS)
+
 
 def select_gsm_pairs(rxn, config):
     """
-    Orchestrates Collapse Check -> Biasing -> Alignment -> ML Tournament -> QC -> Pairing.
+    Orchestrates Collapse Check -> Biasing -> Alignment -> Hard Cutoffs -> ML Tournament -> QC -> Pairing.
 
     Raises `CalculatorInputError` if every reactant or every product conformer
-    has collapsed onto the other side's graph, which discards the reaction.
+    has collapsed onto the other side's graph, or if every conformer pair fails
+    the hard cutoffs (HARD_CUTOFFS); either discards the reaction.
     """
     # Select the conformer-generation output explicitly, rather than taking
     # "everything that is not initial_geom". The states also carry the xTB
@@ -120,20 +140,25 @@ def select_gsm_pairs(rxn, config):
     approved_pairs = []
     approved_indicators = []
     dropped_pairs = 0
+    n_cut = 0   # conformers whose aligned and unaligned geometries both fail the hard cutoffs
 
     for ind, r_c in enumerate(r_confs):
          
             # 1. Unaligned Evaluation
             ind_unaligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=biased_p[ind].geo)
-            prob_unaligned = model.predict_proba(ind_unaligned)
+            prob_unaligned = model.predict_proba(ind_unaligned) if passes_hard_cutoffs(ind_unaligned) else None
 
             # 2. Aligned Evaluation
             aligned_biased_p = align_conformers(r_c, biased_p[ind])
             ind_aligned = return_indicator(E=r_c.elements, RG=r_c.geo, PG=aligned_biased_p.geo)
-            prob_aligned = model.predict_proba(ind_aligned)
+            prob_aligned = model.predict_proba(ind_aligned) if passes_hard_cutoffs(ind_aligned) else None
 
-            # 3. The Tournament (keep the higher probability setup)
-            if prob_aligned[0][1] > prob_unaligned[0][1]:
+            # 3. The Tournament (keep the higher probability setup), between the
+            # geometries within the hard cutoffs. If neither is, the conformer is dropped.
+            if prob_unaligned is None and prob_aligned is None:
+                n_cut += 1
+                continue
+            if prob_unaligned is None or (prob_aligned is not None and prob_aligned[0][1] > prob_unaligned[0][1]):
                 best_p = aligned_biased_p
                 best_ind = ind_aligned
                 best_prob = prob_aligned
@@ -157,15 +182,19 @@ def select_gsm_pairs(rxn, config):
 
             # 1. Unaligned Evaluation
             ind_unaligned = return_indicator(E=p_c.elements, RG=p_c.geo, PG=biased_r[ind].geo)
-            prob_unaligned = model.predict_proba(ind_unaligned)
+            prob_unaligned = model.predict_proba(ind_unaligned) if passes_hard_cutoffs(ind_unaligned) else None
 
             # 2. Aligned Evaluation
             aligned_biased_r = align_conformers(p_c, biased_r[ind])
             ind_aligned = return_indicator(E=p_c.elements, RG=p_c.geo, PG=aligned_biased_r.geo)
-            prob_aligned = model.predict_proba(ind_aligned)
+            prob_aligned = model.predict_proba(ind_aligned) if passes_hard_cutoffs(ind_aligned) else None
 
-            # 3. The Tournament (keep the higher probability setup)
-            if prob_aligned[0][1] > prob_unaligned[0][1]:
+            # 3. The Tournament (keep the higher probability setup), between the
+            # geometries within the hard cutoffs. If neither is, the conformer is dropped.
+            if prob_unaligned is None and prob_aligned is None:
+                n_cut += 1
+                continue
+            if prob_unaligned is None or (prob_aligned is not None and prob_aligned[0][1] > prob_unaligned[0][1]):
                 best_r = aligned_biased_r
                 best_ind = ind_aligned
                 best_prob = prob_aligned
@@ -185,6 +214,12 @@ def select_gsm_pairs(rxn, config):
             else:
                 dropped_pairs += 1
 
+    # Every conformer failed the hard cutoffs: no geometry is fit for GSM.
+    if n_cut and n_cut == len(r_confs) + len(p_confs):
+        raise CalculatorInputError(
+            f"Every conformer pair failed the hard cutoffs ({n_cut} conformers)."
+        )
+
     # --- STEP C: Sort and Select Top N ---
     # Sort descending by probability of success
     approved_pairs.sort(key=lambda x: x["score"], reverse=True)
@@ -192,6 +227,7 @@ def select_gsm_pairs(rxn, config):
     if verbose:
         print("Number of approved pairs = ", len(approved_pairs))
         print("Number of dropped pairs = ", dropped_pairs)
+        print("Number of conformers failing the hard cutoffs = ", n_cut)
 ##############################################################################
     # Truncate to the number requested by the user
     return approved_pairs[:n_conf]

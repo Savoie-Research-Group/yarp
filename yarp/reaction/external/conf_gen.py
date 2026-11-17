@@ -55,7 +55,7 @@ CREST_OMP_STACKSIZE = "256M"
 # republished, put its new digest here. Apptainer does not accept a tag and a
 # digest together, so the name carries the digest only.
 # Evidence: debug/261104_crest_crash/.
-CREST_IMAGE = "erm42/yarp@sha256:f9246e37cb6c343571df12e64fa5b22bc14a3e90728536cd294e13303c6bf4f8"
+CREST_IMAGE = "erm42/yarp@sha256:33ded9518d0452662828f692186b6e0e05ada34e3b4491e1cd6087f620bb1c8f"
 
 # Elements each Auto3D potential is trained on (lowercase, as yarpecule.elements).
 # AIMNet2 and its spin-aware variant: the elements with a trained per-element

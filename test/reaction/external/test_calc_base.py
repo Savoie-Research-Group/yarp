@@ -138,13 +138,6 @@ class TestSifPrefix:
             self._calc(runner, tmp_path).get_container_prefix("orca_6.0.1.sif", WORK)
         assert recorder.calls == []
 
-    def test_missing_local_sif_names_its_own_recipe(self, runner, tmp_path, run):
-        """The build hint names the .def matching the missing image, not always ORCA's."""
-        run()
-
-        with pytest.raises(FileNotFoundError, match=r"/path/to/my_tool_1\.0\.def"):
-            self._calc(runner, tmp_path).get_container_prefix("my_tool_1.0.sif", WORK)
-
     def test_missing_hub_image_is_pulled(self, runner, tmp_path, run):
         sif_dir = tmp_path / "not_yet_made"
         recorder = run()

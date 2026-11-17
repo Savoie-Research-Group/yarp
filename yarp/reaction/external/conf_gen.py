@@ -1,12 +1,14 @@
 import shutil
+from itertools import combinations
 from pathlib import Path
 
+import numpy as np
 from rdkit import Chem
 
 from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.reaction.enum_support import return_radicals
 from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.yarpecule.graph.adjacency import compare_adjacency
+from yarp.yarpecule.graph.adjacency import compare_adjacency, graph_seps
 from yarp.reaction.conformer import conformer
 from yarp.util.rdkit import yarpecule_to_rdmol
 
@@ -42,6 +44,38 @@ AUTO3D_ELEMENTS = {
     "aimnet2-nse": _AIMNET2_ELEMENTS,
     "ani2x": frozenset({"h", "c", "n", "o", "f", "s", "cl"}),
 }
+
+# Centroid filter for states with more than one molecule (Zhao, Hsu & Savoie,
+# JCTC 2022, 18, 3006, sec. 2.1): a conformer is discarded when the centroids
+# of any two of its fragments are more than CENTROID_FACTOR times the sum of
+# the two fragments' radii apart. The paper does not define the radius; as in
+# YARP 2.0's check_bimolecule, it is the largest centroid-atom distance, with
+# the centroid and radius taken over all atoms (H included).
+CENTROID_FACTOR = 2.0
+
+
+def fragment_atoms(adj_mat):
+    """Atom indices of each fragment (connected component) of a graph."""
+    seps = graph_seps(np.asarray(adj_mat))
+    fragments, seen = [], np.zeros(len(seps), dtype=bool)
+    for i in range(len(seps)):
+        if not seen[i]:
+            atoms = np.flatnonzero(seps[i] >= 0)
+            seen[atoms] = True
+            fragments.append(atoms)
+    return fragments
+
+
+def passes_centroid_filter(geo, fragments, factor=CENTROID_FACTOR):
+    """
+    True unless two fragments' centroids are more than factor * (r_i + r_j)
+    apart (see CENTROID_FACTOR). A single fragment always passes.
+    """
+    geo = np.asarray(geo)
+    centroids = [geo[f].mean(axis=0) for f in fragments]
+    radii = [np.linalg.norm(geo[f] - c, axis=1).max() for f, c in zip(fragments, centroids)]
+    return all(np.linalg.norm(centroids[i] - centroids[j]) <= factor * (radii[i] + radii[j])
+               for i, j in combinations(range(len(fragments)), 2))
 
 
 class ConfTask(AsyncYarpCalculator):
@@ -216,13 +250,31 @@ class CrestConfCalculator(ConfTask):
         return True
 
     def scrape_data(self) -> bool:
-        """Parse the XYZ and update self.target_species."""
-        confs = self._get_all_conformers()
-        for conf in confs:
+        """
+        Parse the XYZ and update self.target_species.
+
+        Conformers whose fragments have drifted apart (centroid filter, see
+        CENTROID_FACTOR) are dropped, and the rest renumbered in CREST's energy
+        order, so rank0 is still the lowest-energy conformer kept (rp_opt reads
+        conf_gen_rank0).
+        """
+        fragments = fragment_atoms(self.target_species.graph.adj_mat)
+        all_confs = self._get_all_conformers()
+        confs = [c for c in all_confs if passes_centroid_filter(c['geometry'], fragments)]
+        for rank, conf in enumerate(confs):
+            conf['conf_rank'] = rank
             conf['lot'] = self.config.lot
             conf['software'] = 'crest'
             conf_obj = conformer(calc_type='conf_gen', calc_data=conf)
             self.target_species.conformers[conf_obj.type] = conf_obj
+
+        n_dropped = len(all_confs) - len(confs)
+        if n_dropped:
+            print(f"     [CREST] Dropped {n_dropped} of {len(all_confs)} conformers whose "
+                  f"fragments are too far apart (centroid filter).")
+        if not confs:
+            print("     [CREST] No conformer passed the centroid filter.")
+            return False
 
         return True
 
@@ -430,16 +482,21 @@ class RdkitConfCalculator(ConfTask):
         Keep the conformers that reproduce the state's bonding, ranked by energy.
 
         classy_yarp's connectivity filter: perceive bonds from each geometry and
-        drop any conformer that differs from the yarpecule graph. The container
-        already wrote them lowest energy first, so survivors are ranked in file
-        order.
+        drop any conformer that differs from the yarpecule graph. Conformers
+        whose fragments have drifted apart are dropped too (centroid filter,
+        see CENTROID_FACTOR). The container already wrote them lowest energy
+        first, so survivors are ranked in file order.
         """
         graph = self.target_species.graph
+        fragments = fragment_atoms(graph.adj_mat)
         elements, geometries = xyz_parse(self.scratch_dir / self.xyz_file, multiple=True)
 
-        rank = 0
+        rank = n_separated = 0
         for conf_elements, geo in zip(elements, geometries):
             if not compare_adjacency(graph.elements, geo, graph.adj_mat)[0]:
+                continue
+            if not passes_centroid_filter(geo, fragments):
+                n_separated += 1
                 continue
             conf_obj = conformer(calc_type='conf_gen', calc_data={
                 'conf_rank': rank,
@@ -451,12 +508,16 @@ class RdkitConfCalculator(ConfTask):
             self.target_species.conformers[conf_obj.type] = conf_obj
             rank += 1
 
-        n_dropped = len(geometries) - rank
+        n_dropped = len(geometries) - rank - n_separated
         if n_dropped:
             print(f"     [{self.LABEL}] Dropped {n_dropped} of {len(geometries)} conformers that "
                   f"did not reproduce the {'reactant' if 'reactant' in self.task_def.task_type else 'product'} bonding.")
+        if n_separated:
+            print(f"     [{self.LABEL}] Dropped {n_separated} of {len(geometries)} conformers whose "
+                  f"fragments are too far apart (centroid filter).")
         if rank == 0:
-            print(f"     [{self.LABEL}] No conformer reproduced the state's bonding.")
+            print(f"     [{self.LABEL}] No conformer reproduced the state's bonding "
+                  f"and passed the centroid filter.")
             return False
 
         return True

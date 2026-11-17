@@ -17,9 +17,10 @@ from rdkit import Chem
 
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.calc_factory import get_calculator
+import yarp.reaction.external.conf_gen as conf_gen
 from yarp.reaction.external.conf_gen import (
     CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
-    check_auto3d_compatibility,
+    check_auto3d_compatibility, CENTROID_FACTOR, fragment_atoms, passes_centroid_filter,
 )
 from yarp.reaction.state import state
 import yarp as yp
@@ -401,6 +402,142 @@ class TestRdkitScrapeData:
 
         assert not calc.scrape_data()
         assert not any(k.startswith("conf_gen") for k in khp_reaction.reactant.conformers)
+
+    def test_drops_conformers_whose_fragments_drifted_apart(self, khp_parent, khp_products,
+                                                            tmp_path, monkeypatch):
+        """
+        Two frames of the two-molecule product C=O.O=CCO: the fragments in
+        contact, then pulled apart past the centroid filter. Only the first is
+        stored. The graph geometry of a product does not keep its own bonding
+        (it is the parent's coordinates), so the connectivity filter is
+        switched off here; TestRdkitScrapeData's other tests cover it.
+        """
+        rxn = reaction(khp_parent, khp_products["C=O.O=CCO"])
+        graph = rxn.product.graph
+        monkeypatch.setattr(conf_gen, "compare_adjacency", lambda *a, **k: (True,))
+        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements,
+                   [_place_second_fragment(graph, 1.0), _place_second_fragment(graph, 3.0)])
+
+        calc = _rdkit_calc(rxn, "product_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert calc.scrape_data()
+        kept = {k: c for k, c in rxn.product.conformers.items() if k.startswith("conf_gen")}
+        assert list(kept) == ["conf_gen_rank0_uff_rdkit"]
+        assert np.allclose(kept["conf_gen_rank0_uff_rdkit"].geo, _place_second_fragment(graph, 1.0))
+
+
+
+# =====================================================================
+# Centroid filter for multi-molecule states
+# =====================================================================
+
+def _place_second_fragment(graph, scale):
+    """
+    The graph geometry with its second fragment translated so the two
+    fragment centroids are `scale` * (r_1 + r_2) apart, where r is a
+    fragment's largest centroid-atom distance. Translation leaves both radii
+    unchanged, so `scale` is exactly the ratio the centroid filter tests
+    against CENTROID_FACTOR.
+    """
+    geo = np.array(graph.geo, dtype=float)
+    a, b = fragment_atoms(graph.adj_mat)
+    ca, cb = geo[a].mean(axis=0), geo[b].mean(axis=0)
+    ra = np.linalg.norm(geo[a] - ca, axis=1).max()
+    rb = np.linalg.norm(geo[b] - cb, axis=1).max()
+    direction = (cb - ca) / np.linalg.norm(cb - ca)
+    geo[b] += ca + scale * (ra + rb) * direction - cb
+    return geo
+
+
+class TestCentroidFilter:
+    """
+    Zhao, Hsu & Savoie (JCTC 2022, sec. 2.1) discard a conformer of a
+    multi-molecule state when two fragments' centroids are more than twice
+    the sum of the fragments' radii apart. CREST samples such states as one
+    system and its fragments drift: on KHP, 97% of the conformers of
+    two-molecule products fail this test.
+    """
+
+    def test_fragments_are_the_molecules_of_the_state(self, khp_products):
+        """C=O.O=CCO splits into its 4-atom and 8-atom molecules, covering every atom once."""
+        product = khp_products["C=O.O=CCO"]
+        fragments = fragment_atoms(product.adj_mat)
+
+        assert sorted(len(f) for f in fragments) == [4, 8]
+        assert sorted(np.concatenate(fragments)) == list(range(len(product.elements)))
+
+    def test_a_single_molecule_always_passes(self, khp_parent):
+        fragments = fragment_atoms(khp_parent.adj_mat)
+
+        assert len(fragments) == 1
+        assert passes_centroid_filter(np.array(khp_parent.geo) * 10.0, fragments)
+
+    def test_cutoff_is_twice_the_sum_of_the_radii(self, khp_products):
+        graph = khp_products["C=O.O=CCO"]
+        fragments = fragment_atoms(graph.adj_mat)
+
+        assert CENTROID_FACTOR == 2.0
+        assert passes_centroid_filter(_place_second_fragment(graph, 1.99), fragments)
+        assert not passes_centroid_filter(_place_second_fragment(graph, 2.01), fragments)
+
+
+class TestCrestScrapeData:
+    """
+    CREST's scrape stores every frame of crest_conformers.xyz, lowest energy
+    first, except those failing the centroid filter. Survivors are renumbered
+    so that conf_gen_rank0 is always the lowest-energy conformer kept: rp_opt
+    reads conf_gen_rank0, and it must not vanish when that frame is dropped.
+    """
+
+    def _calc(self, rxn, task_type):
+        config = SimpleNamespace(lot="gfn2")
+        task_def = SimpleNamespace(task_type=task_type, config=config, task_id=f"s.{task_type}")
+        return CrestConfCalculator(task_def, rxn, MagicMock())
+
+    def test_drops_separated_conformers_and_renumbers_the_rest(self, khp_parent, khp_products, tmp_path):
+        """
+        Frames: separated (lowest energy), in contact, in contact. Expected:
+        two conformers, rank0 = second frame and rank1 = third frame.
+        """
+        rxn = reaction(khp_parent, khp_products["C=O.O=CCO"])
+        graph = rxn.product.graph
+        frames = [_place_second_fragment(graph, 3.0), _place_second_fragment(graph, 1.0),
+                  _place_second_fragment(graph, 1.5)]
+        _write_xyz(tmp_path / "crest_conformers.xyz", graph.elements, frames)
+
+        calc = self._calc(rxn, "product_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert calc.scrape_data()
+        kept = {k: c for k, c in rxn.product.conformers.items() if k.startswith("conf_gen")}
+        assert set(kept) == {"conf_gen_rank0_gfn2_crest", "conf_gen_rank1_gfn2_crest"}
+        assert np.allclose(kept["conf_gen_rank0_gfn2_crest"].geo, frames[1])
+        assert np.allclose(kept["conf_gen_rank1_gfn2_crest"].geo, frames[2])
+
+    def test_fails_when_every_conformer_is_separated(self, khp_parent, khp_products, tmp_path):
+        """No conformer left: the task fails and the reaction is discarded (ERM, 2026-11-17)."""
+        rxn = reaction(khp_parent, khp_products["C=O.O=CCO"])
+        graph = rxn.product.graph
+        _write_xyz(tmp_path / "crest_conformers.xyz", graph.elements,
+                   [_place_second_fragment(graph, 3.0)])
+
+        calc = self._calc(rxn, "product_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert not calc.scrape_data()
+        assert not any(k.startswith("conf_gen") for k in rxn.product.conformers)
+
+    def test_a_single_molecule_keeps_every_frame(self, khp_reaction, tmp_path):
+        graph = khp_reaction.reactant.graph
+        _write_xyz(tmp_path / "crest_conformers.xyz", graph.elements, [graph.geo, graph.geo + 5.0])
+
+        calc = self._calc(khp_reaction, "reactant_conformer")
+        calc.set_scratch_dir(tmp_path)
+
+        assert calc.scrape_data()
+        assert {k for k in khp_reaction.reactant.conformers if k.startswith("conf_gen")} == {
+            "conf_gen_rank0_gfn2_crest", "conf_gen_rank1_gfn2_crest"}
 
 
 

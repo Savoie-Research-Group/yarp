@@ -5,13 +5,10 @@
 # and rebuilds its crest binary from the CREST 3.0.2 sources and build settings
 # conda-forge uses
 # (crest-feedstock: sources + checksums in crest_3.0.2_sources.txt,
-# patches/0001, cmake RelWithDebInfo, -ffree-line-length-none), plus two fixes:
+# patches/0001, cmake RelWithDebInfo, -ffree-line-length-none), plus one fix:
 #   patches/0002: GFN-FF no longer treats a free CO or NO as a carbonyl/nitro
 #     H-bond acceptor, which segfaulted CREST's NCI flexibility step
 #     (e.g. CCOO.[C-]#[O+]). Same guard as xtb >= 6.6.
-#   patches/0003: commas libgfortran >= 15 requires in 7 format strings; without
-#     them standalone ancopt/rfo optimizations abort with
-#     "Missing comma between descriptors".
 # Compiler: conda-forge gcc/gfortran 14.3.0, the one that built the image's
 # original crest (gcc 15 fails: C23 makes `true` a keyword in symmetry_i.c).
 # Runtime libraries stay the image's (libgfortran 15.2.0, OpenBLAS 0.3.30);
@@ -33,7 +30,6 @@ ARG CREST_BUILD_JOBS=3
 COPY crest_3.0.2_sources.txt /opt/crest_build/sources.txt
 COPY patches/0001-double-allocation.patch \
      patches/0002-gfnff-free-co-no-hbond-guard.patch \
-     patches/0003-format-missing-commas.patch \
      /opt/crest_build/
 
 RUN set -eux; \
@@ -61,8 +57,6 @@ RUN set -eux; \
     patch -p1 < $B/0001-double-allocation.patch; \
     (cd subprojects/gfnff && patch -p1 < $B/0002-gfnff-free-co-no-hbond-guard.patch); \
     grep -q "nbnbk .gt. 1" subprojects/gfnff/src/gfnff_engrad.f90; \
-    patch -p1 < $B/0003-format-missing-commas.patch; \
-    if grep -n '"("f7.2"%)"' src/optimize/ancopt.f90 src/optimize/rfo.f90; then exit 1; fi; \
     \
     # conda-forge build steps (recipe meta.yaml, build: script)
     cp -r subprojects/test-drive subprojects/toml-f/subprojects/test-drive; \
@@ -81,7 +75,7 @@ RUN set -eux; \
     cp $B/install/bin/crest $RT/bin/crest; \
     patchelf --set-rpath '$ORIGIN/../lib' $RT/bin/crest; \
     mkdir -p $RT/share/crest-patches; \
-    cp $B/000[123]-*.patch $RT/share/crest-patches/; \
+    cp $B/000[12]-*.patch $RT/share/crest-patches/; \
     \
     cd / && rm -rf $B; \
     conda clean -afy
@@ -93,4 +87,4 @@ RUN set -eux; \
 ENV OMP_STACKSIZE=256M
 
 LABEL org.opencontainers.image.title="yarp_crest_patched" \
-      org.opencontainers.image.description="CREST 3.0.2 rebuilt (conda-forge recipe) + GFN-FF free-CO/NO H-bond guard + libgfortran-15 format fix"
+      org.opencontainers.image.description="CREST 3.0.2 rebuilt (conda-forge recipe) + GFN-FF free-CO/NO H-bond guard"

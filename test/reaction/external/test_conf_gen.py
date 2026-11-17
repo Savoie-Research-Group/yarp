@@ -237,10 +237,9 @@ class TestCrestImage:
     """
     The CREST image used to bundle a GFN-FF that segfaults when a free CO sits
     near an H-bond donor (the KHP product CCOO.[C-]#[O+] lost its reaction that
-    way), and its ANCOPT/RFO printouts abort under libgfortran 15. The fixed
-    image is published as erm42/yarp:crest, and every runner names it by
-    digest: YARP never re-checks a tag, so an image named by tag would keep
-    running whatever copy a user already has.
+    way). The fixed image is published as erm42/yarp:crest, and every runner
+    names it by digest: YARP never re-checks a tag, so an image named by tag
+    would keep running whatever copy a user already has.
     """
 
     def _calc(self, rxn, container, sif_location):

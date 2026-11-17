@@ -8,7 +8,7 @@ from rdkit import Chem
 from yarp.reaction.external.calc_base import AsyncYarpCalculator, CalculatorInputError
 from yarp.reaction.enum_support import return_radicals
 from yarp.yarpecule.input_parsers import xyz_parse
-from yarp.yarpecule.graph.adjacency import compare_adjacency, graph_seps
+from yarp.yarpecule.graph.adjacency import graph_seps
 from yarp.reaction.conformer import conformer
 from yarp.util.rdkit import yarpecule_to_rdmol
 
@@ -361,8 +361,9 @@ class RdkitConfCalculator(ConfTask):
 
     The embedding and force-field optimization run in the rdkit_conf container
     (containers/rdkit_conf/run_conf_gen.py), which writes every conformer
-    lowest energy first. The connectivity filter classy_yarp applied runs here,
-    on the host, in scrape_data.
+    lowest energy first. scrape_data applies the centroid filter, as CREST's
+    does; neither checks the conformers' bonding against the graph, so that
+    conformer generation can relax strained or unphysical starting geometries.
 
     Auto3dConfCalculator runs the same lifecycle on another image; the class
     attributes below are what it changes.
@@ -479,22 +480,18 @@ class RdkitConfCalculator(ConfTask):
 
     def scrape_data(self) -> bool:
         """
-        Keep the conformers that reproduce the state's bonding, ranked by energy.
+        Store the container's conformers, ranked by energy.
 
-        classy_yarp's connectivity filter: perceive bonds from each geometry and
-        drop any conformer that differs from the yarpecule graph. Conformers
-        whose fragments have drifted apart are dropped too (centroid filter,
-        see CENTROID_FACTOR). The container already wrote them lowest energy
-        first, so survivors are ranked in file order.
+        Conformers whose fragments have drifted apart are dropped (centroid
+        filter, see CENTROID_FACTOR). As in CREST's scrape, the bonding is not
+        checked against the graph. The container already wrote them lowest
+        energy first, so survivors are ranked in file order.
         """
-        graph = self.target_species.graph
-        fragments = fragment_atoms(graph.adj_mat)
+        fragments = fragment_atoms(self.target_species.graph.adj_mat)
         elements, geometries = xyz_parse(self.scratch_dir / self.xyz_file, multiple=True)
 
         rank = n_separated = 0
         for conf_elements, geo in zip(elements, geometries):
-            if not compare_adjacency(graph.elements, geo, graph.adj_mat)[0]:
-                continue
             if not passes_centroid_filter(geo, fragments):
                 n_separated += 1
                 continue
@@ -508,16 +505,11 @@ class RdkitConfCalculator(ConfTask):
             self.target_species.conformers[conf_obj.type] = conf_obj
             rank += 1
 
-        n_dropped = len(geometries) - rank - n_separated
-        if n_dropped:
-            print(f"     [{self.LABEL}] Dropped {n_dropped} of {len(geometries)} conformers that "
-                  f"did not reproduce the {'reactant' if 'reactant' in self.task_def.task_type else 'product'} bonding.")
         if n_separated:
             print(f"     [{self.LABEL}] Dropped {n_separated} of {len(geometries)} conformers whose "
                   f"fragments are too far apart (centroid filter).")
         if rank == 0:
-            print(f"     [{self.LABEL}] No conformer reproduced the state's bonding "
-                  f"and passed the centroid filter.")
+            print(f"     [{self.LABEL}] No conformer passed the centroid filter.")
             return False
 
         return True
@@ -542,7 +534,7 @@ class Auto3dConfCalculator(RdkitConfCalculator):
     The container (containers/auto3d_conf/run_conf_gen.py, Auto3D 3.2.2) embeds
     and places fragments exactly as the rdkit_conf one does, then optimizes and
     ranks with Auto3D. So the lifecycle is RdkitConfCalculator's: the same MOL
-    handoff in, the same connectivity filter on what comes back. The one
+    handoff in, the same centroid filter on what comes back. The one
     addition is the spin multiplicity, passed explicitly so the conformers are
     made in the spin state the rest of the run uses, rather than one Auto3D
     infers from the Lewis structure (which draws O2 as closed-shell O=O).

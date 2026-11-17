@@ -17,7 +17,6 @@ from rdkit import Chem
 
 from yarp.reaction.external.calc_base import CalculatorInputError
 from yarp.reaction.external.calc_factory import get_calculator
-import yarp.reaction.external.conf_gen as conf_gen
 from yarp.reaction.external.conf_gen import (
     CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
     check_auto3d_compatibility, CENTROID_FACTOR, fragment_atoms, passes_centroid_filter,
@@ -350,11 +349,10 @@ class TestRdkitScrapeData:
     sorted lowest energy first by the container) and stores the conformers on
     the state as conf_gen_rank0_uff_rdkit, conf_gen_rank1_uff_rdkit, ...
 
-    The force-field optimization can break or form bonds. So, as classy_yarp
-    did, each frame's bonding is re-perceived from its coordinates and
-    compared with the yarpecule graph; a frame that does not match is
-    dropped. Otherwise GSM would be given an endpoint that is a different
-    molecule from the reaction it is meant to characterize.
+    The bonding is not checked against the graph here, as in CREST's scrape:
+    conformer generation is allowed to relax strained or unphysical starting
+    geometries (ERM, 2026-11-17). The only filter is the centroid filter for
+    states with more than one molecule.
     """
 
     def _squashed(self, geo):
@@ -362,20 +360,16 @@ class TestRdkitScrapeData:
         centroid = geo.mean(axis=0)
         return centroid + 0.3 * (geo - centroid)
 
-    def test_drops_broken_conformers_and_ranks_the_rest_in_order(self, khp_reaction, tmp_path):
+    def test_keeps_every_frame_in_energy_order_whatever_its_bonding(self, khp_reaction, tmp_path):
         """
-        Three frames: the graph geometry (good), a squashed copy whose
-        bonding no longer matches (broken), and the graph geometry shifted
-        by 2 A (good; bonding does not depend on position). Expected:
-          - scrape_data reports success;
-          - exactly two conformers are stored, rank0 and rank1;
-          - rank1 is the third frame, so dropping a frame renumbers the
-            survivors with no gap, keeping their energy order;
-          - they are tagged software 'rdkit'.
+        Three frames: the graph geometry, a squashed copy whose perceived
+        bonding differs from the graph, and the graph geometry shifted by 2 A.
+        All three are stored, as rank0..rank2 in file (energy) order, tagged
+        software 'rdkit' -- the squashed frame included.
         """
         graph = khp_reaction.reactant.graph
-        good, broken = graph.geo, self._squashed(graph.geo)
-        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements, [good, broken, good + 2.0])
+        frames = [graph.geo, self._squashed(graph.geo), graph.geo + 2.0]
+        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements, frames)
 
         calc = _rdkit_calc(khp_reaction, "reactant_conformer")
         calc.set_scratch_dir(tmp_path)
@@ -383,38 +377,35 @@ class TestRdkitScrapeData:
         assert calc.scrape_data()
         confs = khp_reaction.reactant.conformers
         assert {k for k in confs if k.startswith("conf_gen")} == {
-            "conf_gen_rank0_uff_rdkit", "conf_gen_rank1_uff_rdkit"}
-        # Rank 1 is the third frame -- the broken second frame left no gap.
-        assert np.allclose(confs["conf_gen_rank1_uff_rdkit"].geo, good + 2.0)
+            "conf_gen_rank0_uff_rdkit", "conf_gen_rank1_uff_rdkit", "conf_gen_rank2_uff_rdkit"}
+        assert np.allclose(confs["conf_gen_rank1_uff_rdkit"].geo, frames[1])
         assert confs["conf_gen_rank0_uff_rdkit"].software == "rdkit"
 
-    def test_fails_when_no_conformer_keeps_the_bonding(self, khp_reaction, tmp_path):
+    def test_fails_when_no_conformer_passes_the_centroid_filter(self, khp_parent, khp_products, tmp_path):
         """
-        If every frame is broken, scrape_data returns False, so the task is
+        If every frame is removed, scrape_data returns False, so the task is
         marked failed, and nothing is stored. A state with no conformers
         must not look like a finished conformer search.
         """
-        graph = khp_reaction.reactant.graph
-        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements, [self._squashed(graph.geo)])
+        rxn = reaction(khp_parent, khp_products["C=O.O=CCO"])
+        graph = rxn.product.graph
+        _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements,
+                   [_place_second_fragment(graph, 3.0)])
 
-        calc = _rdkit_calc(khp_reaction, "reactant_conformer")
+        calc = _rdkit_calc(rxn, "product_conformer")
         calc.set_scratch_dir(tmp_path)
 
         assert not calc.scrape_data()
-        assert not any(k.startswith("conf_gen") for k in khp_reaction.reactant.conformers)
+        assert not any(k.startswith("conf_gen") for k in rxn.product.conformers)
 
-    def test_drops_conformers_whose_fragments_drifted_apart(self, khp_parent, khp_products,
-                                                            tmp_path, monkeypatch):
+    def test_drops_conformers_whose_fragments_drifted_apart(self, khp_parent, khp_products, tmp_path):
         """
         Two frames of the two-molecule product C=O.O=CCO: the fragments in
         contact, then pulled apart past the centroid filter. Only the first is
-        stored. The graph geometry of a product does not keep its own bonding
-        (it is the parent's coordinates), so the connectivity filter is
-        switched off here; TestRdkitScrapeData's other tests cover it.
+        stored.
         """
         rxn = reaction(khp_parent, khp_products["C=O.O=CCO"])
         graph = rxn.product.graph
-        monkeypatch.setattr(conf_gen, "compare_adjacency", lambda *a, **k: (True,))
         _write_xyz(tmp_path / "rdkit_conformers.xyz", graph.elements,
                    [_place_second_fragment(graph, 1.0), _place_second_fragment(graph, 3.0)])
 
@@ -600,7 +591,7 @@ def _auto3d_calc(rxn, task_type, lot="aimnet2", multiplicity=1):
 class TestAuto3dCalculator:
     """
     Auto3dConfCalculator reuses RdkitConfCalculator's lifecycle (MOL handoff,
-    output check, connectivity filter), which TestRdkit* covers. These tests
+    output check, centroid filter), which TestRdkit* covers. These tests
     pin what is different: the routing, the image and the command it runs,
     and the files and names its conformers come back under.
     """
@@ -648,11 +639,11 @@ class TestAuto3dCalculator:
         (tmp_path / "auto3d_run.log").write_text("Auto3D conformer generation terminated normally.\n")
         assert calc.check_output()
 
-    def test_scrape_keeps_bonded_conformers_under_auto3d_names(self, khp_reaction, tmp_path):
+    def test_scrape_stores_conformers_under_auto3d_names(self, khp_reaction, tmp_path):
         """
-        The same connectivity filter as RDKit's, on auto3d_conformers.xyz: a
-        broken frame is dropped, the survivors are renumbered in order, and
-        they are stored as conf_gen_rank<i>_<lot>_auto3d -- the key that
+        RDKit's scrape on auto3d_conformers.xyz: every frame is kept in order,
+        whatever its bonding (a squashed frame first, then the graph
+        geometry), and stored as conf_gen_rank<i>_<lot>_auto3d -- the key that
         ll_refine's initial_geom (lot: aimnet2-nse, software: auto3d) looks up.
         """
         graph = khp_reaction.reactant.graph
@@ -665,9 +656,10 @@ class TestAuto3dCalculator:
 
         assert calc.scrape_data()
         confs = {k: c for k, c in khp_reaction.reactant.conformers.items() if k.startswith("conf_gen")}
-        assert list(confs) == ["conf_gen_rank0_aimnet2-nse_auto3d"]
+        assert list(confs) == ["conf_gen_rank0_aimnet2-nse_auto3d", "conf_gen_rank1_aimnet2-nse_auto3d"]
         assert confs["conf_gen_rank0_aimnet2-nse_auto3d"].software == "auto3d"
-        assert np.allclose(confs["conf_gen_rank0_aimnet2-nse_auto3d"].geo, graph.geo)
+        assert np.allclose(confs["conf_gen_rank0_aimnet2-nse_auto3d"].geo, broken)
+        assert np.allclose(confs["conf_gen_rank1_aimnet2-nse_auto3d"].geo, graph.geo)
 
 
 def _conf_tasks(software="auto3d", lot="aimnet2", multiplicity=1):

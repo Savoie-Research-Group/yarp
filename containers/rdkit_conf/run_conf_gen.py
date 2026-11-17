@@ -4,8 +4,9 @@ RDKit conformer generation, run inside the rdkit_conf container.
 Reads a MOL file written by RdkitConfCalculator (built from the state's
 yarpecule via yarpecule_to_rdmol), embeds conformers with the ETKDG settings
 classy_yarp used, force-field optimizes them, removes the duplicates that
-optimization creates, and writes them out sorted by energy. The connectivity
-check against the yarpecule graph is done afterwards on the host, in
+optimization creates, and writes them out sorted by energy. The bonding is not
+checked against the yarpecule graph, here or on the host. The centroid filter
+for multi-species states runs afterwards on the host, in
 RdkitConfCalculator.scrape_data, so this script stays free of YARP imports.
 
 Outputs (in the working directory):
@@ -42,8 +43,8 @@ DEDUP_RMSD_TOL = 0.1      # Angstrom; same value as classy_yarp's pruneRmsThresh
 # (closest contacts ~0.5 A). With interfragment interactions on, the optimizer
 # then blows them apart: the fragments end up tens of Angstrom away from each
 # other, and on the way UFF's trigonal angle term -- which also has a minimum at
-# 0 degrees -- folds substituents onto each other, so the connectivity check
-# rejects most conformers. Placing the fragments at this contact first leaves
+# 0 degrees -- folds substituents onto each other, changing the bonding of most
+# conformers. Placing the fragments at this contact first leaves
 # the optimizer only a gentle relaxation. 3.0 A is where every bimolecular GSM
 # endpoint succeeded in the KHP test runs (2.2-3.3 A).
 # Evidence: debug/.../checks/11_bimolecular_fix_options/.
@@ -96,7 +97,7 @@ def main():
 
     # Interfragment interactions stay on, as in yarp.util.rdkit.rdkit_ff_opt:
     # with them off, the fragments of a multi-species state can drift into
-    # each other, and the host-side connectivity check would then reject them.
+    # each other and form bonds between them.
     if args.lot == "uff":
         if not AllChem.UFFHasAllMoleculeParams(mol):
             sys.exit("UFF has no parameters for at least one atom in this molecule.")

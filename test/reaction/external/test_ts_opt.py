@@ -17,6 +17,7 @@ import pytest
 from yarp.reaction.conformer import conformer
 from yarp.reaction.external.ts_opt import OrcaTSOptCalculator, PysisyphusTSOptCalculator
 from yarp.util.config import TSOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
+from yarp.util.constants import Constants
 
 ELEMENTS = ["H", "H", "H"]
 HL_LOT = "PBE D3BJ def2-SVP"
@@ -98,6 +99,72 @@ class TestTSOptSource:
         }
 
         assert not make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT).has_prerequisites()
+
+
+# A soft saddle (ts_handoff check 18: KHP 16610336 TS2, -35.5 cm-1, became a
+# -25 cm-1 DFT "TS"), and a stiff TS with a small extra imaginary mode (KHP
+# 17011678 TS3: -628 and -17.5 cm-1).
+SOFT_IMAG = np.array([-35.0, 100.0, 200.0])
+STIFF_PLUS_NOISE = np.array([-628.0, -17.5, 200.0])
+
+
+class TestMinImagFreq:
+    """
+    ts_opt.min_imag_freq (cm-1) sets which source-level TSs a TS optimization
+    starts from: exactly one mode below -min_imag_freq. Smaller imaginary modes
+    are ignored as noise. The default, 0.01, is the old rule.
+    """
+
+    def _calc(self, min_imag_freq=None):
+        ts_geom = {c.type: c for c in (ts_conf(1, "1_tsopt_xtb_pysisyphus", ONE_IMAG),
+                                       ts_conf(2, "2_tsopt_xtb_pysisyphus", SOFT_IMAG),
+                                       ts_conf(3, "3_tsopt_xtb_pysisyphus", STIFF_PLUS_NOISE))}
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT)
+        if min_imag_freq is not None:
+            calc.config.min_imag_freq = min_imag_freq
+        return calc
+
+    def test_default_keeps_the_old_rule(self, tmp_path):
+        assert written_tags(self._calc(), tmp_path) == [1, 2]
+
+    def test_cutoff_drops_the_soft_ts_and_ignores_a_small_extra_mode(self, tmp_path):
+        assert written_tags(self._calc(50.0), tmp_path) == [1, 3]
+
+    def test_not_ready_when_every_source_ts_is_soft(self):
+        ts_geom = {"1_tsopt_xtb_pysisyphus": ts_conf(1, "1_tsopt_xtb_pysisyphus", SOFT_IMAG)}
+        calc = make_calc(OrcaTSOptCalculator, ts_geom, XTB_TS_OPT)
+        calc.config.min_imag_freq = 50.0
+
+        assert not calc.has_prerequisites()
+
+
+class TestDuplicateSourceTSs:
+    """
+    Source TSs that are the same structure (conformer.is_duplicate_of) start
+    one TS optimization, from the lowest-energy copy; the others are marked
+    duplicate_of. GSM guesses are never deduplicated.
+    """
+
+    def test_ts_opt_source_runs_one_copy(self, tmp_path):
+        # TS 3 is TS 1 again (same geometry, tag 1), 1e-6 Eh lower; TS 2 is distinct.
+        confs = [ts_conf(1, "1_tsopt_xtb_pysisyphus", ONE_IMAG),
+                 ts_conf(2, "2_tsopt_xtb_pysisyphus", ONE_IMAG),
+                 ts_conf(1, "3_tsopt_xtb_pysisyphus", ONE_IMAG)]
+        for conf, energy in zip(confs, (-1.0, -2.0, -1.0 - 1e-6)):
+            conf.properties["internal_energy_Eh"] = energy
+        calc = make_calc(OrcaTSOptCalculator, {c.type: c for c in confs}, XTB_TS_OPT)
+
+        assert written_tags(calc, tmp_path) == [2, 1]
+        assert confs[0].properties["duplicate_of"] == "3_tsopt_xtb_pysisyphus"
+
+    def test_ts_guess_source_keeps_every_guess(self, tmp_path):
+        guesses = [ts_conf(91, f"ts_guess_{i}_xtb_pysisyphus", None) for i in (1, 2)]
+        for guess in guesses:
+            guess.properties["internal_energy_Eh"] = -1.0
+        calc = make_calc(PysisyphusTSOptCalculator, {g.type: g for g in guesses}, XTB_TS_GUESS,
+                         lot="xtb", software="pysisyphus")
+
+        assert written_tags(calc, tmp_path) == [91, 91]
 
 
 class TestTSGuessSourceUnchanged:
@@ -240,6 +307,168 @@ class TestPysisInnerScriptLogs:
         for i in (1, 2):
             log = f"/nfs/tsopt_run{i}/" if staged else ""
             assert f"pysis tsopt_{i}_input.yaml > {log}tsopt_{i}.log 2> {log}tsopt_{i}.err" in lines
+
+
+def pysis_opt_log(outcome):
+    """
+    The lines of a pysisyphus TS-opt log that YARP reads, in order. `outcome`
+    is the optimizer's last word: "Converged!" or "Number of cycles exceeded!".
+    Pysisyphus writes the final geometry and its Hessian either way.
+    """
+    return (f"        {outcome}\n"
+            "        \tenergy: -21.61755730 hartree\n"
+            "        Wrote final, hopefully optimized, geometry to 'ts_final_geometry.xyz'\n"
+            "pysisyphus run took 0:00:30 h.\n")
+
+
+class TestPysisRunConvergence:
+    """
+    A pysisyphus TS optimization that hit max_cycles used to count as a
+    finished run. It was scraped as a TS, and a single imaginary mode made it
+    "valid" for the IRC and the next level (17413990 TS2 in the ts_handoff
+    step 0.3 xtb run: -86 cm-1, below both minima). Only converged runs count.
+    """
+
+    def _calc(self, tmp_path, outcomes):
+        calc = make_calc(PysisyphusTSOptCalculator, {}, XTB_TS_GUESS, lot="xtb", software="pysisyphus")
+        calc.set_scratch_dir(tmp_path)
+        for i, outcome in enumerate(outcomes, start=1):
+            run_dir = tmp_path / f"tsopt_run{i}"
+            run_dir.mkdir()
+            (run_dir / "ts_final_geometry.xyz").write_text("3\n\nH 0 0 0\nH 1.5 0 0\nH 2.5 0 0\n")
+            (run_dir / "ts_final_hessian.h5").touch()
+            (run_dir / f"tsopt_{i}.log").write_text(pysis_opt_log(outcome))
+        return calc
+
+    def test_converged_run_succeeds(self, tmp_path):
+        assert self._calc(tmp_path, ["Converged!"])._is_run_successful(1)
+
+    def test_run_at_max_cycles_fails(self, tmp_path):
+        assert not self._calc(tmp_path, ["Number of cycles exceeded!"])._is_run_successful(1)
+
+    def test_unconverged_run_is_not_scraped(self, tmp_path, monkeypatch):
+        calc = self._calc(tmp_path, ["Converged!", "Number of cycles exceeded!"])
+        monkeypatch.setattr(calc, "_parse_hessian_freq", lambda hess_file: (None, ONE_IMAG.copy()))
+
+        assert calc.check_output()
+        calc.scrape_data()
+
+        assert list(calc.rxn.ts_geom) == ["1_tsopt_xtb_pysisyphus"]
+
+
+# Per software: a finished tsopt_run1 and a failed tsopt_run2, as {name: text}
+# (a name ending in "/" is a dir), and what cleanup leaves in a run dir it cleans.
+TSOPT_RUNS = {
+    "pysisyphus": dict(
+        cls=PysisyphusTSOptCalculator, lot="xtb",
+        ok={"tsopt_1.log": pysis_opt_log("Converged!"), "ts_final_geometry.xyz": "", "ts_final_hessian.h5": "",
+            "tsopt_1.err": "", "calculator_000.out": ""},
+        failed={"tsopt_2.log": "Crashed input:\n", "tsopt_2.err": "Traceback ...\n",
+                "crashed_calculator_000/": "", "crashed_calculator_000/xtb.out": "SCF not converged\n"},
+        cleaned={1: ["ts_final_geometry.xyz", "tsopt_1.log"], 2: ["tsopt_2.log"]},
+    ),
+    "orca": dict(
+        cls=OrcaTSOptCalculator, lot=HL_LOT,
+        ok={"tsopt_1.out": "THE OPTIMIZATION HAS CONVERGED\nORCA TERMINATED NORMALLY\n",
+            "tsopt_1.xyz": "", "tsopt_1.hess": "", "tsopt_1.gbw": "", "tsopt_1.err": ""},
+        failed={"tsopt_2.out": "ORCA finished by error termination in SCF\n", "tsopt_2.err": "",
+                "tsopt_2.gbw": ""},
+        cleaned={1: ["tsopt_1.out", "tsopt_1.xyz"], 2: ["tsopt_2.out"]},
+    ),
+}
+
+
+def write_files(run_dir, files):
+    for name, text in files.items():
+        if name.endswith("/"):
+            (run_dir / name).mkdir(parents=True, exist_ok=True)
+        else:
+            (run_dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / name).write_text(text)
+
+
+def listing(run_dir):
+    return sorted(str(p.relative_to(run_dir)) for p in run_dir.rglob("*"))
+
+
+@pytest.mark.parametrize("software", TSOPT_RUNS)
+class TestKeepCrashLogs:
+    """
+    A TS optimization is cleaned up when at least one run succeeded, which
+    used to delete the failed runs' stderr and crash dirs too. With
+    keep_crash_logs on, a failed run's dir is left whole; the successful runs
+    are cleaned as before.
+    """
+
+    def _cleanup(self, tmp_path, software, keep_crash_logs):
+        spec = TSOPT_RUNS[software]
+        calc = make_calc(spec["cls"], {}, XTB_TS_OPT, lot=spec["lot"], software=software)
+        calc.config.keep_crash_logs = keep_crash_logs
+        calc.set_scratch_dir(tmp_path)
+        write_files(tmp_path / "tsopt_run1", spec["ok"])
+        write_files(tmp_path / "tsopt_run2", spec["failed"])
+        before = listing(tmp_path / "tsopt_run2")
+        calc.cleanup()
+        return spec, before
+
+    def test_on_keeps_the_failed_run_whole(self, tmp_path, software):
+        spec, before = self._cleanup(tmp_path, software, keep_crash_logs=True)
+
+        assert listing(tmp_path / "tsopt_run2") == before
+        assert listing(tmp_path / "tsopt_run1") == spec["cleaned"][1]
+
+    def test_off_cleans_every_run(self, tmp_path, software):
+        spec, _ = self._cleanup(tmp_path, software, keep_crash_logs=False)
+
+        assert listing(tmp_path / "tsopt_run2") == spec["cleaned"][2]
+        assert listing(tmp_path / "tsopt_run1") == spec["cleaned"][1]
+
+
+def orca_thermo_block(h, s, g):
+    """One ORCA thermochemistry block's GIBBS FREE ENERGY section, in Eh, as ORCA prints it."""
+    return ("GIBBS FREE ENERGY\n-------------------\n\nThe Gibbs free energy is G = H - T*S\n\n"
+            f"Total enthalpy                    ...   {h:.8f} Eh \n"
+            f"Total entropy correction          ...     {s:.8f} Eh    -21.63 kcal/mol\n"
+            "-----------------------------------------------------------------------\n"
+            f"Final Gibbs free energy         ...   {g:.8f} Eh\n")
+
+
+# An ORCA opt with Calc_Hess + Recalc_Hess prints one thermochemistry block per
+# exact Hessian, the starting geometry's first; with Freq, the final geometry's
+# last. (H, -T*S, G) per block, from checks/12 of ts_handoff (PBE/def2-SVP TS
+# opt with Freq: Hessians at cycles 1, 4, 7, then the final geometry).
+OPT_THERMO_BLOCKS = [(-342.67569344, -0.03447304, -342.71016648),
+                     (-342.68076681, -0.03853593, -342.71930274),
+                     (-342.68085923, -0.03841772, -342.71927695),
+                     (-342.68092217, -0.03841495, -342.71933711)]
+
+
+class TestOrcaFinalHessian:
+    """
+    The ORCA TS opt used to read the Hessian and Gibbs energy of the wrong
+    geometry. Its .hess held the last Recalc_Hess Hessian (up to N - 1
+    cycles stale), and _parse_orca_thermo returned the first thermochemistry
+    block, the starting geometry's: +5.7 kcal/mol in the ts_handoff check
+    (PBE/def2-SVP, 17311254 TS1). Freq adds a Hessian at the final geometry,
+    and the parser returns the last block.
+    """
+
+    def test_input_requests_a_final_hessian(self, tmp_path):
+        calc = make_calc(OrcaTSOptCalculator, {}, XTB_TS_OPT)
+        calc._write_orca_ts_opt_input(tmp_path / "tsopt_1.inp", "ts_guess_1.xyz")
+
+        assert "! OptTS Freq" in (tmp_path / "tsopt_1.inp").read_text().splitlines()
+
+    def test_gibbs_is_the_last_thermochemistry_block(self, tmp_path):
+        out = tmp_path / "tsopt_1.out"
+        out.write_text("".join(orca_thermo_block(*b) + "\n...\n" for b in OPT_THERMO_BLOCKS))
+        calc = make_calc(OrcaTSOptCalculator, {}, XTB_TS_OPT)
+
+        enthalpy, entropy, gibbs = calc._parse_orca_thermo(out)
+
+        h, s, g = OPT_THERMO_BLOCKS[-1]
+        assert (enthalpy, entropy, gibbs) == pytest.approx(
+            (h * Constants.ha_to_kcalmol, s * Constants.ha_to_kcalmol, g * Constants.ha_to_kcalmol), abs=1e-6)
 
 
 ORCA_INNER_SCRIPT = (

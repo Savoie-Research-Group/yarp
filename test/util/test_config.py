@@ -85,6 +85,60 @@ class TestUseLocalScratch:
         with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'use_local_scratch'"):
             TASK_CONFIGS[block](use_local_scratch=value)
 
+# Only tasks with multiple runs per task have keep_crash_logs
+MULTI_TASK_CONFIGS = {
+    "ts_guess": partial(TSGuessConfig, software="pysisyphus", gsm_lot="xtb", charge=0, multiplicity=1),
+    "ts_opt": partial(TSOptConfig, software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1),
+    "irc_val": partial(IRCValConfig, software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1),
+}
+
+@pytest.mark.parametrize("block", MULTI_TASK_CONFIGS)
+class TestKeepCrashLogs:
+    def test_defaults_to_false(self, block):
+        assert MULTI_TASK_CONFIGS[block]().keep_crash_logs is False
+
+    def test_true_is_kept(self, block):
+        assert MULTI_TASK_CONFIGS[block](keep_crash_logs=True).keep_crash_logs is True
+
+    @pytest.mark.parametrize("value", ["yes", 1, "true"])
+    def test_non_boolean_is_rejected(self, block, value):
+        with pytest.raises(ValueError, match=f"boolean value .* to {block}.*'keep_crash_logs'"):
+            MULTI_TASK_CONFIGS[block](keep_crash_logs=value)
+
+
+class TestRPOptHessianRecalc:
+    """Unset, pysisyphus keeps its old 3; ORCA runs no Hessian recalcs (min_opt.py)."""
+
+    @pytest.mark.parametrize("software, lot, expected", [
+        ("pysisyphus", "xtb", 3),
+        ("orca", "B3LYP def2-SVP", None),
+    ])
+    def test_default_per_software(self, software, lot, expected):
+        assert RPOptConfig(software=software, lot=lot, charge=0, multiplicity=1).hessian_recalc == expected
+
+    @pytest.mark.parametrize("software, lot", [("pysisyphus", "xtb"), ("orca", "B3LYP def2-SVP")])
+    def test_set_value_is_kept(self, software, lot):
+        assert RPOptConfig(software=software, lot=lot, charge=0, multiplicity=1,
+                           hessian_recalc=5).hessian_recalc == 5
+
+    def test_non_integer_is_rejected(self):
+        with pytest.raises(ValueError, match="integer value to rp_opt: 'hessian_recalc'"):
+            TASK_CONFIGS["rp_opt"](hessian_recalc="3")
+
+
+@pytest.mark.parametrize("block", ["ts_opt", "irc_val"])
+class TestMinImagFreq:
+    def test_defaults_to_the_old_tolerance(self, block):
+        assert TASK_CONFIGS[block]().min_imag_freq == 0.01
+
+    @pytest.mark.parametrize("value", [50, 50.0, 0.01])
+    def test_positive_number_is_kept(self, block, value):
+        assert TASK_CONFIGS[block](min_imag_freq=value).min_imag_freq == value
+
+    @pytest.mark.parametrize("value", [0, -50.0, "50", True, None])
+    def test_non_positive_or_non_number_is_rejected(self, block, value):
+        with pytest.raises(ValueError, match=f"positive number .* to {block}: 'min_imag_freq'"):
+            TASK_CONFIGS[block](min_imag_freq=value)
 
 class TestEnumerationExhaustive:
     """`exhaustive` is a boolean, and only concerted enumeration accepts it."""

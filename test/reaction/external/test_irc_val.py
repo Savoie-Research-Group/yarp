@@ -65,10 +65,13 @@ def tag_of(geo):
     return int(round(geo[0][0] / 10.0))
 
 
-def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None):
+def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None, setup=None):
     """generate_input -> fabricated successful outputs -> scrape_data.
-    Returns the reaction and, per IRC run, the TS-opt index it was fed."""
+    Returns the reaction and, per IRC run, the TS-opt index it was fed.
+    `setup(rxn)`, if given, edits the stub reaction first."""
     rxn = make_rxn(lot, software, tsopt_runs, freqs)
+    if setup is not None:
+        setup(rxn)
     cfg = IRCValConfig(software=software, lot=lot, charge=0, multiplicity=1)
     calc = cls(SimpleNamespace(config=cfg), rxn, MagicMock(container="docker"))
     calc.set_scratch_dir(tmp_path)
@@ -84,21 +87,43 @@ def run_irc(cls, lot, software, tsopt_runs, write_outputs, tmp_path, freqs=None)
     return rxn, fed
 
 
+def pysis_irc_log(i, forward="rms(grad) converged!", backward="Integrator indicated convergence!",
+                  end_opts=("Converged!", "Converged!")):
+    """
+    The lines of a pysisyphus IRC log that YARP reads, in order: how each IRC
+    direction stopped, how each end optimization ended, the barriers (Left 0,
+    TS 10*i, Right 5 kJ/mol) and the closing lines. Pysisyphus writes the end
+    geometries and these closing lines whether or not anything converged.
+    """
+    fwd_end, bwd_end = end_opts
+    return (f"        {forward}\n"
+            f"        {backward}\n"
+            f"        {fwd_end}\n"
+            f"        {bwd_end}\n"
+            "Minimum energy of 0.0 at 'Left'.\n"
+            f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
+            "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+
+
 def pysis_outputs(run_dir, i):
     """Every run intended; forward barrier 10*i kJ/mol, so irc_run1 is the lowest."""
     write_xyz(run_dir / "forward_end_opt.xyz", P_GEO)
     write_xyz(run_dir / "backward_end_opt.xyz", R_GEO)
-    (run_dir / f"irc_{i}.log").write_text(
-        "Minimum energy of 0.0 at 'Left'.\n"
-        f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
-        "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+    (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i))
+
+
+# ORCA prints the first line once per IRC direction; a direction stopped at
+# MaxIter prints the second instead, and the run still terminates normally.
+ORCA_IRC_CONVERGED = "THE IRC HAS CONVERGED\n"
+ORCA_IRC_MAXITER = "MAXIMUM NUMBER OF ITERATIONS REACHED - STOPPING IRC RUN\n"
+ORCA_IRC_LOG = 2 * ORCA_IRC_CONVERGED + "ORCA TERMINATED NORMALLY\n"
 
 
 def orca_outputs(run_dir, i):
     """Every run intended; barrier is G(TS) - G(R) = TS-opt index of the conformer."""
     write_xyz(run_dir / f"irc_{i}_IRC_F.xyz", P_GEO)
     write_xyz(run_dir / f"irc_{i}_IRC_B.xyz", R_GEO)
-    (run_dir / f"irc_{i}.out").write_text("THE IRC HAS CONVERGED\nORCA TERMINATED NORMALLY\n")
+    (run_dir / f"irc_{i}.out").write_text(ORCA_IRC_LOG)
 
 
 TSOPT_RUN_PATTERNS = [
@@ -174,6 +199,38 @@ class TestIRCSkipsNonSaddles:
         assert rxn.ts_geom["2_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
 
 
+# A soft saddle (ts_handoff check 18: KHP 16610336 TS2, -35.5 cm-1), and a
+# stiff TS with a small extra imaginary mode (KHP 17011678 TS3: -628, -17.5).
+SOFT_IMAG = np.array([-35.0, 100.0, 200.0])
+STIFF_PLUS_NOISE = np.array([-628.0, -17.5, 200.0])
+
+
+class TestMinImagFreq:
+    """
+    irc_val.min_imag_freq (cm-1) sets which TSs an IRC validates: exactly one
+    mode below -min_imag_freq. Smaller imaginary modes are ignored as noise.
+    The default, 0.01, is the old rule.
+    """
+
+    def _calc(self, freqs, min_imag_freq=None):
+        extra = {} if min_imag_freq is None else {"min_imag_freq": min_imag_freq}
+        cfg = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1, **extra)
+        rxn = make_rxn("xtb", "pysisyphus", list(freqs), freqs)
+        return PysisyphusIRCValCalculator(SimpleNamespace(config=cfg), rxn, MagicMock())
+
+    FREQS = {1: ONE_IMAG, 2: SOFT_IMAG, 3: STIFF_PLUS_NOISE}
+
+    def test_default_keeps_the_old_rule(self):
+        assert [tag_of(c.geo) for c in self._calc(self.FREQS)._initial_guesses()] == [1, 2]
+
+    def test_cutoff_drops_the_soft_ts_and_ignores_a_small_extra_mode(self):
+        assert [tag_of(c.geo) for c in self._calc(self.FREQS, 50.0)._initial_guesses()] == [1, 3]
+
+    def test_not_ready_when_every_ts_is_soft(self):
+        assert self._calc({1: SOFT_IMAG}).has_prerequisites()
+        assert not self._calc({1: SOFT_IMAG}, 50.0).has_prerequisites()
+
+
 # Endpoints for an IRC that reproduces neither side: forward has an H0-H2 bond,
 # backward has no bonds at all.
 U_FWD_GEO = np.array([[0.0, 0, 0], [3.0, 0, 0], [0.74, 0.0, 0]])
@@ -192,10 +249,7 @@ def pysis_outputs_by_label(labels):
                     "unintended": (U_FWD_GEO, U_BWD_GEO)}[labels[i]]
         write_xyz(run_dir / "forward_end_opt.xyz", fwd)
         write_xyz(run_dir / "backward_end_opt.xyz", bwd)
-        (run_dir / f"irc_{i}.log").write_text(
-            "Minimum energy of 0.0 at 'Left'.\n"
-            f"    Left: 0.0 kJ mol\n    TS: {10.0 * i} kJ mol\n    Right: 5.0 kJ mol\n"
-            "Wrote optimized end-geometries and TS to x\npysisyphus run took 1 s\n")
+        (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i))
     return write
 
 
@@ -250,6 +304,227 @@ class TestPerTSResults:
         rxn, _ = self._run(tmp_path, {1: "intended", 2: "unintended"})
 
         assert not any("validated_ts" in k for k in rxn.ts_geom)
+
+
+class TestIRCSkipsDuplicates:
+    """
+    TSs that are the same structure (conformer.is_duplicate_of) get one IRC,
+    run from the lowest-energy copy; the others are marked duplicate_of and get
+    no IRC result. Each run's result still lands on the TS it started from.
+    """
+
+    @staticmethod
+    def _duplicates(rxn):
+        # TS 3 is TS 1 again (same geometry, tag 1), 1e-6 Eh lower; TS 2 is distinct.
+        ts1, ts2, ts3 = (rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"] for k in (1, 2, 3))
+        ts3.geo = ts1.geo.copy()
+        for conf, energy in ((ts1, -1.0), (ts2, -2.0), (ts3, -1.0 - 1e-6)):
+            conf.properties["internal_energy_Eh"] = energy
+
+    def test_one_irc_per_structure_from_the_lowest_copy(self, tmp_path):
+        rxn, fed = run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2, 3],
+                           pysis_outputs, tmp_path, setup=self._duplicates)
+        ts1, ts2, ts3 = (rxn.ts_geom[f"{k}_tsopt_xtb_pysisyphus"].properties for k in (1, 2, 3))
+
+        assert fed == {1: 2, 2: 1}
+        assert ts1["duplicate_of"] == "3_tsopt_xtb_pysisyphus"
+        assert "irc_outcome" not in ts1
+        # irc_run{i} has a forward barrier of 10*i kJ/mol.
+        assert ts2["forward_barrier_kcal_per_mol"] == kcal(10.0)
+        assert ts3["forward_barrier_kcal_per_mol"] == kcal(20.0)
+
+
+class TestPysisRunConvergence:
+    """
+    Pysisyphus writes both end geometries even when an IRC direction or an end
+    optimization stopped unconverged, and those runs used to be labeled and
+    given barriers. In the ts_handoff step 0.3 runs, 12 of 37 end opts hit
+    max_cycles; one gave a -268 kcal/mol barrier. Now a run counts only if both
+    directions stop on a converged message and both end opts converge.
+    """
+
+    def _run(self, tmp_path, **log_kwargs):
+        """irc_run1 is the run under test; irc_run2 is a converged control."""
+        def write(run_dir, i):
+            write_xyz(run_dir / "forward_end_opt.xyz", P_GEO)
+            write_xyz(run_dir / "backward_end_opt.xyz", R_GEO)
+            (run_dir / f"irc_{i}.log").write_text(pysis_irc_log(i, **(log_kwargs if i == 1 else {})))
+        return run_irc(PysisyphusIRCValCalculator, "xtb", "pysisyphus", [1, 2], write, tmp_path)
+
+    @pytest.mark.parametrize("forward, backward", [
+        ("rms(grad) converged!", "Integrator indicated convergence!"),
+        ("Energy converged!", "rms(grad) converged!"),
+    ])
+    def test_converged_run_counts(self, tmp_path, forward, backward):
+        rxn, _ = self._run(tmp_path, forward=forward, backward=backward)
+
+        assert rxn.ts_geom["1_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
+
+    @pytest.mark.parametrize("log_kwargs", [
+        pytest.param(dict(end_opts=("Converged!", "Number of cycles exceeded!")), id="end_opt_at_max_cycles"),
+        pytest.param(dict(end_opts=("Number of cycles exceeded!",) * 2), id="both_end_opts_at_max_cycles"),
+        pytest.param(dict(forward="Energy increased!"), id="irc_energy_increased"),
+        pytest.param(dict(backward="IRC steps exceeded. Stopping."), id="irc_steps_exceeded"),
+        pytest.param(dict(forward="rms(grad) below hard threshold."), id="irc_below_hard_threshold"),
+    ])
+    def test_unconverged_run_is_dropped(self, tmp_path, log_kwargs):
+        rxn, _ = self._run(tmp_path, **log_kwargs)
+
+        # The dropped run's TS gets no IRC result; irc_run2's TS (barrier 20
+        # kJ/mol) becomes the reaction's, not irc_run1's lower 10.
+        assert "irc_outcome" not in rxn.ts_geom["1_tsopt_xtb_pysisyphus"].properties
+        assert rxn.ts_geom["2_tsopt_xtb_pysisyphus"].properties["irc_outcome"] == "intended"
+        assert rxn.barrier["xtb_pysisyphus"] == kcal(20.0)
+
+
+class TestOrcaRunConvergence:
+    """
+    The ORCA IRC counted as converged once "THE IRC HAS CONVERGED" appeared,
+    but ORCA prints it once per direction. In the ts_handoff E3 trial
+    (13453614 TS2) the backward direction stopped at MaxIter 200 while still
+    falling (max|G| 0.049), and the run was labeled and given barriers. Now
+    both directions must converge.
+    """
+    LOT = "PBE D3BJ def2-SVP"
+
+    def _run(self, tmp_path, log):
+        """irc_run1 is the run under test; irc_run2 is a converged control."""
+        def write(run_dir, i):
+            orca_outputs(run_dir, i)
+            if i == 1:
+                (run_dir / "irc_1.out").write_text(log)
+        return run_irc(OrcaIRCValCalculator, self.LOT, "orca", [1, 2], write, tmp_path)
+
+    def test_converged_run_counts(self, tmp_path):
+        rxn, _ = self._run(tmp_path, ORCA_IRC_LOG)
+
+        assert rxn.ts_geom[f"1_tsopt_{self.LOT}_orca"].properties["irc_outcome"] == "intended"
+
+    @pytest.mark.parametrize("log", [
+        pytest.param(ORCA_IRC_CONVERGED + ORCA_IRC_MAXITER + "ORCA TERMINATED NORMALLY\n", id="backward_at_max_iter"),
+        pytest.param(ORCA_IRC_MAXITER + ORCA_IRC_CONVERGED + "ORCA TERMINATED NORMALLY\n", id="forward_at_max_iter"),
+    ])
+    def test_half_converged_run_is_dropped(self, tmp_path, log):
+        rxn, _ = self._run(tmp_path, log)
+
+        # The dropped run's TS gets no IRC result; irc_run2's TS (barrier 2)
+        # becomes the reaction's, not irc_run1's lower 1.
+        assert "irc_outcome" not in rxn.ts_geom[f"1_tsopt_{self.LOT}_orca"].properties
+        assert rxn.ts_geom[f"2_tsopt_{self.LOT}_orca"].properties["irc_outcome"] == "intended"
+        assert rxn.barrier[f"{self.LOT}_orca"] == pytest.approx(2.0)
+
+
+class TestPysisMaxCycles:
+    """
+    Check that irc.max_cycles is used in all parts of IRC calculation setup
+    """
+
+    @pytest.mark.parametrize("max_cycles", [None, 100])
+    def test_caps_irc_steps_and_end_opts(self, tmp_path, max_cycles):
+        extra = {} if max_cycles is None else {"max_cycles": max_cycles}
+        cfg = IRCValConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1, **extra)
+        calc = PysisyphusIRCValCalculator(SimpleNamespace(config=cfg), make_rxn("xtb", "pysisyphus", [1]), MagicMock())
+        path = tmp_path / "irc_1_input.yaml"
+        calc._write_pysis_irc_input(path, "ts_opt_1.xyz")
+        text = path.read_text()
+
+        expected = cfg.max_cycles
+        irc_block = text.split("irc:\n")[1].split("endopt:\n")[0]
+        endopt_block = text.split("endopt:\n")[1]
+        assert f" max_cycles: {expected}\n" in irc_block
+        assert f" max_cycles: {expected}\n" in endopt_block
+        assert expected == (300 if max_cycles is None else max_cycles)
+
+
+class TestOrcaIRCHessian:
+    """
+    The ORCA IRC computed two analytic Hessians at the TS: one for `! Freq`,
+    which nothing reads, and the IRC's own (`InitHess calc_anfreq`). Without
+    Freq, the ts_handoff check (PBE/def2-SVP, 17311254 TS1) gave the same
+    endpoints with one Hessian.
+    """
+
+    def test_input_requests_one_hessian(self, tmp_path):
+        lot = "PBE D3BJ def2-SVP"
+        cfg = IRCValConfig(software="orca", lot=lot, charge=0, multiplicity=1)
+        calc = OrcaIRCValCalculator(SimpleNamespace(config=cfg), make_rxn(lot, "orca", [1]), MagicMock())
+        path = tmp_path / "irc_1.inp"
+        calc._write_orca_irc_input(path, "ts_opt_1.xyz")
+        text = path.read_text()
+
+        assert "! IRC\n" in text
+        assert "Freq" not in text
+        assert "  InitHess calc_anfreq\n" in text
+
+
+# Per software: a finished irc_run1 and a failed irc_run2, as {name: text}
+# (a name ending in "/" is a dir), and what cleanup leaves in a run dir it cleans.
+IRC_RUNS = {
+    "pysisyphus": dict(
+        cls=PysisyphusIRCValCalculator, lot="xtb",
+        ok={"irc_1_input.yaml": "", "irc_1.log": pysis_irc_log(1), "forward_end_opt.xyz": "",
+            "backward_end_opt.xyz": "", "irc_1.err": "", "ts_opt_1.xyz": ""},
+        failed={"irc_2_input.yaml": "", "irc_2.log": "Crashed input:\n", "irc_2.err": "Traceback ...\n",
+                "crashed_calculator_000/": "", "crashed_calculator_000/xtb.out": "SCF not converged\n"},
+        cleaned={1: ["backward_end_opt.xyz", "forward_end_opt.xyz", "irc_1.log", "irc_1_input.yaml"],
+                 2: ["irc_2.log", "irc_2_input.yaml"]},
+    ),
+    "orca": dict(
+        cls=OrcaIRCValCalculator, lot="B3LYP def2-SVP",
+        ok={"irc_1.inp": "", "irc_1.out": ORCA_IRC_LOG,
+            "irc_1_IRC_F.xyz": "", "irc_1_IRC_B.xyz": "", "irc_1.gbw": "", "irc_1.err": ""},
+        failed={"irc_2.inp": "", "irc_2.out": "ORCA finished by error termination in SCF\n",
+                "irc_2.err": "", "irc_2.gbw": ""},
+        cleaned={1: ["irc_1.inp", "irc_1.out", "irc_1_IRC_B.xyz", "irc_1_IRC_F.xyz"],
+                 2: ["irc_2.inp", "irc_2.out"]},
+    ),
+}
+
+
+def write_files(run_dir, files):
+    for name, text in files.items():
+        if name.endswith("/"):
+            (run_dir / name).mkdir(parents=True, exist_ok=True)
+        else:
+            (run_dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / name).write_text(text)
+
+
+def listing(run_dir):
+    return sorted(str(p.relative_to(run_dir)) for p in run_dir.rglob("*"))
+
+
+@pytest.mark.parametrize("software", IRC_RUNS)
+class TestKeepCrashLogs:
+    """
+    IRC validation is cleaned up when at least one run succeeded, which used to
+    delete the failed runs' stderr and crash dirs too. With keep_crash_logs on,
+    a failed run's dir is left whole; the successful runs are cleaned as before.
+    """
+
+    def _cleanup(self, tmp_path, software, keep_crash_logs):
+        spec = IRC_RUNS[software]
+        cfg = IRCValConfig(software=software, lot=spec["lot"], charge=0, multiplicity=1,
+                           keep_crash_logs=keep_crash_logs)
+        calc = spec["cls"](SimpleNamespace(config=cfg), make_rxn(spec["lot"], software, [1, 2]), MagicMock())
+        calc.set_scratch_dir(tmp_path)
+        write_files(tmp_path / "irc_run1", spec["ok"])
+        write_files(tmp_path / "irc_run2", spec["failed"])
+        before = listing(tmp_path / "irc_run2")
+        calc.cleanup()
+        return spec, before
+
+    def test_on_keeps_the_failed_run_whole(self, tmp_path, software):
+        spec, before = self._cleanup(tmp_path, software, keep_crash_logs=True)
+
+        assert listing(tmp_path / "irc_run2") == before
+        assert listing(tmp_path / "irc_run1") == spec["cleaned"][1]
+
+    def test_off_cleans_every_run(self, tmp_path, software):
+        spec, _ = self._cleanup(tmp_path, software, keep_crash_logs=False)
+
+        assert listing(tmp_path / "irc_run2") == spec["cleaned"][2]
+        assert listing(tmp_path / "irc_run1") == spec["cleaned"][1]
 
 
 IRC_INNER_SCRIPTS = [

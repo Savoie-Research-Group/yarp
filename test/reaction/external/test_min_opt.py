@@ -20,6 +20,7 @@ from yarp.reaction.external.min_opt import (
     MinOptTask, OrcaMinOptCalculator, PysisyphusMinOptCalculator, adopt_reactant_preopt_geometry,
 )
 from yarp.util.config import PreOptConfig, RPOptConfig, InitialGeomConfig, GeomSourceConfig, JobManagerConfig
+from yarp.util.constants import Constants
 from yarp.util.write_files import xyz_generate_string
 from yarp.yarpecule.graph.adjacency import compare_adjacency
 
@@ -244,6 +245,7 @@ class TestPysisInputBlock:
 
         assert "type: rfo" in text
         assert "do_hess: True" in text
+        assert " hessian_recalc: 3\n" in text
 
     def test_optimizer_is_configurable(self, tmp_path, khp_reaction):
         calc = make_calc(khp_reaction, "reactant_pre_opt", PreOptConfig(opt_type="rfo"),
@@ -341,6 +343,93 @@ class TestPreOptGraphGeometryWriteback:
         assert np.array_equal(patchable_reaction.reactant.graph.geo, before)
 
 
+def pysis_min_opt_log(outcome):
+    """
+    The lines of a pysisyphus min_opt.log that YARP reads, in order. `outcome`
+    is the optimizer's last word: "Converged!" or "Number of cycles exceeded!".
+    Pysisyphus writes the final geometry either way.
+    """
+    return (f"        {outcome}\n"
+            "        \tenergy: -20.5 hartree\n"
+            "        Wrote final, hopefully optimized, geometry to 'final_geometry.xyz'\n"
+            "pysisyphus run took 0:00:03 h.\n")
+
+
+class TestPysisRunConvergence:
+    """
+    A pysisyphus R/P opt or pre-opt that hit max_cycles used to count as
+    finished: its final geometry was stored as the minimum. Only a converged
+    run counts, as for ORCA, and an unconverged one fails the task.
+    """
+
+    def _check(self, tmp_path, rxn, task_type, config, outcome):
+        graph = rxn.reactant.graph
+        _write_finished_job(tmp_path, graph.elements, graph.geo)
+        (tmp_path / "min_opt.log").write_text(pysis_min_opt_log(outcome))
+        (tmp_path / "final_hessian.h5").touch()
+        calc = make_calc(rxn, task_type, config, cls=PysisyphusMinOptCalculator)
+        calc.set_scratch_dir(tmp_path)
+        return calc.check_output()
+
+    @pytest.mark.parametrize("task_type", ["reactant_optimization", "reactant_pre_opt"])
+    def test_converged_run_succeeds(self, tmp_path, patchable_reaction, rpopt_config, task_type):
+        config = rpopt_config if task_type == "reactant_optimization" else PreOptConfig()
+
+        assert self._check(tmp_path, patchable_reaction, task_type, config, "Converged!")
+
+    @pytest.mark.parametrize("task_type", ["reactant_optimization", "reactant_pre_opt"])
+    def test_run_at_max_cycles_fails(self, tmp_path, patchable_reaction, rpopt_config, task_type, capsys):
+        config = rpopt_config if task_type == "reactant_optimization" else PreOptConfig()
+
+        assert not self._check(tmp_path, patchable_reaction, task_type, config, "Number of cycles exceeded!")
+        assert "did not converge" in capsys.readouterr().out
+
+
+class TestMinimumWarning:
+    """
+    An R/P optimization whose final Hessian has imaginary modes (below -0.01
+    cm-1) is not a minimum. 7 of 70 KHP DFT minima were (ts_handoff check 10,
+    from stale Hessians). For now this only warns; the conformer is kept.
+    """
+
+    def _scrape(self, tmp_path, monkeypatch, rxn, software, freqs):
+        graph = rxn.reactant.graph
+        if software == "pysisyphus":
+            source = GeomSourceConfig(label="conf_gen", lot="gfn2", software="crest")
+            config = RPOptConfig(software="pysisyphus", lot="xtb", charge=0, multiplicity=1)
+            config.initial_geom = InitialGeomConfig(reactant=source, product=source, transition_state=
+                                                    GeomSourceConfig(label="ts_guess", lot="xtb", software="pysisyphus"))
+            calc = make_calc(rxn, "reactant_optimization", config, cls=PysisyphusMinOptCalculator)
+            _write_finished_job(tmp_path, graph.elements, graph.geo)
+            monkeypatch.setattr(calc, "_parse_hessian_freq", lambda: (None, freqs))
+        else:
+            config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
+            calc = make_calc(rxn, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+            monkeypatch.setattr(calc, "_parse_opt_geo", lambda f: (graph.elements, graph.geo))
+            monkeypatch.setattr(calc, "_parse_energy", lambda f: -1.0)
+            monkeypatch.setattr(calc, "_parse_orca_thermo", lambda f: (None, None, None))
+            monkeypatch.setattr(calc, "_parse_hessian_freq", lambda f: (None, freqs))
+        calc.set_scratch_dir(tmp_path)
+        calc.scrape_data()
+        return calc
+
+    @pytest.mark.parametrize("software", ["pysisyphus", "orca"])
+    def test_imaginary_modes_warn_and_keep_the_conformer(self, tmp_path, monkeypatch, capsys,
+                                                         patchable_reaction, software):
+        freqs = np.array([-355.0, -123.0, 52.0, 100.0])
+        calc = self._scrape(tmp_path, monkeypatch, patchable_reaction, software, freqs)
+
+        out = capsys.readouterr().out
+        assert "Reactant optimization is not a minimum: 2 imaginary mode(s), lowest -355.0 cm^-1" in out
+        assert calc.output_key() in patchable_reaction.reactant.conformers
+
+    @pytest.mark.parametrize("software", ["pysisyphus", "orca"])
+    def test_a_minimum_is_quiet(self, tmp_path, monkeypatch, capsys, patchable_reaction, software):
+        self._scrape(tmp_path, monkeypatch, patchable_reaction, software, np.array([52.0, 100.0]))
+
+        assert "not a minimum" not in capsys.readouterr().out
+
+
 class TestAdoptReactantPreoptGeometry:
     def test_no_pre_opt_leaves_the_graph_alone(self, khp_reaction):
         before = khp_reaction.reactant.graph.geo.copy()
@@ -359,6 +448,84 @@ class TestAdoptReactantPreoptGeometry:
 
         assert adopt_reactant_preopt_geometry(reactant)
         assert np.allclose(reactant.graph.geo, reactant.conformers["preopt_b"].geo)
+
+
+def orca_thermo_block(h, s, g):
+    """One ORCA thermochemistry block's GIBBS FREE ENERGY section, in Eh, as ORCA prints it."""
+    return ("GIBBS FREE ENERGY\n-------------------\n\nThe Gibbs free energy is G = H - T*S\n\n"
+            f"Total enthalpy                    ...   {h:.8f} Eh \n"
+            f"Total entropy correction          ...     {s:.8f} Eh    -21.63 kcal/mol\n"
+            "-----------------------------------------------------------------------\n"
+            f"Final Gibbs free energy         ...   {g:.8f} Eh\n")
+
+
+# An ORCA opt with Calc_Hess + Recalc_Hess prints one thermochemistry block per
+# exact Hessian, the starting geometry's first; with Freq, the final geometry's
+# last. (H, -T*S, G) per block, from checks/12 of ts_handoff (PBE/def2-SVP
+# R/P opt with Freq, Recalc_Hess 10: Hessians at cycles 1, 11, 21, then the
+# final geometry).
+OPT_THERMO_BLOCKS = [(-342.79708685, -0.03779990, -342.83488676),
+                     (-342.79980324, -0.04084205, -342.84064529),
+                     (-342.80106678, -0.04061653, -342.84168331),
+                     (-342.80106500, -0.04061586, -342.84168086)]
+
+
+class TestOrcaFinalHessian:
+    """
+    The ORCA R/P opt used to read the Hessian and Gibbs energy of the wrong
+    geometry. Its .hess held the last Recalc_Hess Hessian (up to N - 1
+    cycles stale), and _parse_orca_thermo returned the first thermochemistry
+    block, the starting geometry's: +4.2 kcal/mol in the ts_handoff check
+    (PBE/def2-SVP, 17413990 product). Freq adds a Hessian at the final
+    geometry, and the parser returns the last block.
+    """
+
+    def _calc(self, rxn):
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1)
+        return make_calc(rxn, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+
+    def test_input_requests_a_final_hessian(self, tmp_path, khp_reaction):
+        self._calc(khp_reaction)._write_orca_rp_opt_input(tmp_path / "min_opt.inp", "initial_geom.xyz")
+
+        assert "! OPT Freq" in (tmp_path / "min_opt.inp").read_text().splitlines()
+
+    def test_gibbs_is_the_last_thermochemistry_block(self, tmp_path, khp_reaction):
+        out = tmp_path / "min_opt.out"
+        out.write_text("".join(orca_thermo_block(*b) + "\n...\n" for b in OPT_THERMO_BLOCKS))
+
+        enthalpy, entropy, gibbs = self._calc(khp_reaction)._parse_orca_thermo(out)
+
+        h, s, g = OPT_THERMO_BLOCKS[-1]
+        assert (enthalpy, entropy, gibbs) == pytest.approx(
+            (h * Constants.ha_to_kcalmol, s * Constants.ha_to_kcalmol, g * Constants.ha_to_kcalmol), abs=1e-6)
+
+
+class TestOrcaHessianRecalc:
+    """
+    The ORCA R/P opt always ran Calc_Hess + Recalc_Hess. In the ts_handoff E3
+    benchmark (B3LYP/6-31+G*, 4 structures) dropping them gave the same minima
+    in 52% of the time, with 4 instead of 24 exact Hessians. Exact Hessians
+    during the opt are now off unless rp_opt.hessian_recalc is set; Freq still
+    gives one at the final geometry.
+    """
+
+    def _input(self, tmp_path, khp_reaction, **extra):
+        config = RPOptConfig(software="orca", lot="B3LYP def2-SVP", charge=0, multiplicity=1, **extra)
+        calc = make_calc(khp_reaction, "reactant_optimization", config, cls=OrcaMinOptCalculator)
+        calc._write_orca_rp_opt_input(tmp_path / "min_opt.inp", "initial_geom.xyz")
+        return (tmp_path / "min_opt.inp").read_text()
+
+    def test_off_by_default(self, tmp_path, khp_reaction):
+        text = self._input(tmp_path, khp_reaction)
+
+        assert "Calc_Hess" not in text
+        assert "Recalc_Hess" not in text
+        assert "! OPT Freq" in text.splitlines()
+
+    def test_on_when_set(self, tmp_path, khp_reaction):
+        text = self._input(tmp_path, khp_reaction, hessian_recalc=3)
+
+        assert "%geom\n  MaxIter 300\n  Calc_Hess true\n  Recalc_Hess 3\nend\n" in text
 
 
 class TestOrcaJobScript:

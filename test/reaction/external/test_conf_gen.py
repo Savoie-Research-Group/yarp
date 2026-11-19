@@ -304,9 +304,23 @@ class TestCrestImage:
         assert prefix.endswith(f"-w /work {CREST_IMAGE}")
 
     def test_recipe_for_the_image_is_in_the_repo(self):
-        """The Dockerfile that builds the published image ships with the CREST Dockerfile."""
-        repo = Path(__file__).resolve().parents[3]
-        assert (repo / "containers" / "crest" / "Dockerfile.patched").is_file()
+        """
+        The published image can be rebuilt from the repo: the Dockerfile installs
+        the pinned environment from the lock file and applies the CO fix.
+        """
+        crest_dir = Path(__file__).resolve().parents[3] / "containers" / "crest"
+        for name in ("Dockerfile", "conda-linux-64.lock", "crest_3.0.2_sources.txt",
+                     "patches/0001-double-allocation.patch",
+                     "patches/0002-gfnff-free-co-no-hbond-guard.patch"):
+            assert (crest_dir / name).is_file(), name
+
+        dockerfile = (crest_dir / "Dockerfile").read_text()
+        assert "--file /tmp/conda-linux-64.lock" in dockerfile
+        assert "0002-gfnff-free-co-no-hbond-guard.patch" in dockerfile
+
+        lock = (crest_dir / "conda-linux-64.lock").read_text()
+        assert "@EXPLICIT" in lock
+        assert "/crest-3.0.2-" in lock and "/libgfortran5-15.2.0-" in lock
 
 
 

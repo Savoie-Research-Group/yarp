@@ -45,9 +45,10 @@ DIATOMIC_MD_TIMESTEP_FS = 1.0
 CREST_OMP_STACKSIZE = "256M"
 
 # The CREST image: erm42/yarp:crest, pinned by digest, for every runner. It
-# carries CREST 3.0.2 rebuilt with one fix (recipe:
-# containers/crest/Dockerfile.patched): the GFN-FF it bundles segfaulted on a
-# free CO or NO next to an H-bond donor (e.g. the KHP product CCOO.[C-]#[O+]).
+# carries CREST 3.0.2 rebuilt with one fix (recipe: containers/crest/Dockerfile,
+# environment pinned by containers/crest/conda-linux-64.lock): the GFN-FF it
+# bundles segfaulted on a free CO or NO next to an H-bond donor (e.g. the KHP
+# product CCOO.[C-]#[O+]).
 # Pinned by digest, not by tag: YARP never re-checks a tag (Apptainer keeps
 # reusing its <name>.sif, Docker its local copy), so a republished tag would not
 # reach users who already have the old image. A new digest gives a new .sif

@@ -1,0 +1,12 @@
+. https://github.com/crest-lab/crest/archive/v3.0.2.tar.gz f5d00d41c18a6f999ec8c890aa56d4b7ac8b1bf52a8c6d48c1d151c0126f7793
+subprojects/toml-f https://github.com/toml-f/toml-f/archive/v0.4.2.tar.gz e66d0e355a8a2e65fd5fc7cd4f00078dfbdbf1b3cc47b60f028c19467df4c337
+subprojects/gfnff https://github.com/pprcht/gfnff/archive/v0.0.1.tar.gz b69d7b2b34778c3e732bb41d91b934628ccd9c6e15002092888df7778c8a501f
+subprojects/gfn0 https://github.com/pprcht/gfn0/archive/v0.1.tar.gz d0f1fb0302a689a726632e2d2dcd740059e94882c70ca63a1c34c3e769a51ad4
+subprojects/lwoniom https://github.com/crest-lab/lwoniom/archive/v0.0.1.tar.gz cf76a8aa72aeba1ec8d8f0fe9f5cb4ce24c989e05ee6f3a775f7f17b8079f61c
+subprojects/test-drive https://github.com/fortran-lang/test-drive/archive/482fc754e5573466962b9c887126829eb78f9f1a.tar.gz 46aa66cb3761eb7bb46563325c2a5b5f561f654cd9d8151487cd19be1f813370
+subprojects/tblite https://github.com/pprcht/tblite/archive/v0.3.0-fork.tar.gz c65623e933581a05d781b91a50d92586f54cbb094f90646222f143952694f996
+subprojects/tblite/subprojects/mctc-lib https://github.com/grimme-lab/mctc-lib/archive/v0.3.1.tar.gz 03dc8ccba37413da70e55a07cef8e8de53bce33f5bb52c1f8db5fec326abe083
+subprojects/tblite/subprojects/dftd4 https://github.com/dftd4/dftd4/archive/v3.6.0.tar.gz 0e3e8d5f9e9e5414b9979967c074c953706053832e551d922c27599e7324bace
+subprojects/tblite/subprojects/dftd4/subprojects/mstore https://github.com/grimme-lab/mstore/archive/v0.3.0.tar.gz 56b3d778629eb74b8a515cd53c727d04609f858a07f8d3555fd5fd392a206dcc
+subprojects/tblite/subprojects/dftd4/subprojects/multicharge https://github.com/grimme-lab/multicharge/archive/v0.2.0.tar.gz 953e2ace2f4035b1fa8ecf680f90b5ce6ad5caae17c8d8ccbc2578b92b69d3e7
+subprojects/tblite/subprojects/s-dftd3 https://github.com/awvwgk/simple-dftd3/archive/v0.6.0.tar.gz 4bef311f8e5a2c32141eddeea65615c3c8480f917cd884488ede059fb0962a50

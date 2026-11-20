@@ -9,6 +9,8 @@ how the RDKit calculator hands its graph to the container and filters what
 comes back.
 """
 import numpy as np
+import re
+from pathlib import Path
 import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -20,6 +22,7 @@ from yarp.reaction.external.calc_factory import get_calculator
 from yarp.reaction.external.conf_gen import (
     CrestConfCalculator, RdkitConfCalculator, Auto3dConfCalculator, DIATOMIC_MD_TIMESTEP_FS,
     check_auto3d_compatibility, CENTROID_FACTOR, fragment_atoms, passes_centroid_filter,
+    CREST_OMP_STACKSIZE, CREST_IMAGE
 )
 from yarp.reaction.state import state
 import yarp as yp
@@ -182,6 +185,143 @@ class TestCrestHasNoSeed:
         cmd = CrestConfCalculator(task_def, khp_reaction, MagicMock())._get_crest_command()
 
         assert "--seed" not in cmd
+
+
+class TestCrestThreadEnvironment:
+    """
+    The CREST image sets OMP_STACKSIZE=1G, so every OpenMP worker thread
+    reserves 1 GB of virtual memory, and on SGE h_vmem is a per-process
+    virtual-memory limit. Past it, CREST died with "libgomp: Thread creation
+    failed: Resource temporarily unavailable". The job script must cap the stack
+    and pin the thread counts on every CREST job; they used to be set only when
+    a seed was configured, and the stack never.
+    """
+
+    def _script(self, rxn, tmp_path, seed):
+        """Write the real job script for an Apptainer job, with a stub image on disk."""
+        config = SimpleNamespace(lot="gfn2", n_cpus=4, charge=0, n_unpaired_electrons=0,
+                                 seed=seed, solvent=None, use_local_scratch=False)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config,
+                                   task_id="s.reactant_conformer")
+        job_manager = SimpleNamespace(container="apptainer", sif_location=str(tmp_path),
+                                      scheduler="sge")
+        (tmp_path / (CREST_IMAGE.replace("/", "_").replace(":", "_") + ".sif")).touch()
+        calc = CrestConfCalculator(task_def, rxn, job_manager)
+        calc.set_scratch_dir(tmp_path)
+        calc.write_scheduler_headers = MagicMock()
+        return calc.write_submission_script().read_text()
+
+    @pytest.mark.parametrize("seed", [None, 42])
+    def test_stack_size_is_capped_with_or_without_a_seed(self, khp_reaction, tmp_path, seed):
+        script = self._script(khp_reaction, tmp_path, seed)
+
+        assert f"--env OMP_STACKSIZE={CREST_OMP_STACKSIZE}" in script
+
+    @pytest.mark.parametrize("seed", [None, 42])
+    def test_thread_counts_match_crest_T_with_or_without_a_seed(self, khp_reaction, tmp_path, seed):
+        script = self._script(khp_reaction, tmp_path, seed)
+
+        assert "--env OMP_NUM_THREADS=4" in script
+        assert "--env MKL_NUM_THREADS=4" in script
+        assert "-T 4" in script
+
+    def test_stack_is_well_below_the_image_default(self):
+        """
+        256M was measured safe and cuts the per-process peak from ~4.1 to ~1.8
+        GB; going back to 1G or more would bring the failure back.
+        """
+        size = CREST_OMP_STACKSIZE
+        assert size.endswith("M") and int(size[:-1]) <= 256
+
+
+class TestCrestImage:
+    """
+    The CREST image used to bundle a GFN-FF that segfaults when a free CO sits
+    near an H-bond donor (the KHP product CCOO.[C-]#[O+] lost its reaction that
+    way). The fixed image is published as erm42/yarp:crest, and every runner
+    names it by digest: YARP never re-checks a tag, so an image named by tag
+    would keep running whatever copy a user already has.
+    """
+
+    def _calc(self, rxn, container, sif_location):
+        config = SimpleNamespace(lot="gfn2", n_cpus=4, charge=0, n_unpaired_electrons=0,
+                                 seed=None, solvent=None, use_local_scratch=False)
+        task_def = SimpleNamespace(task_type="reactant_conformer", config=config,
+                                   task_id="s.reactant_conformer")
+        job_manager = SimpleNamespace(container=container, sif_location=str(sif_location),
+                                      scheduler="sge")
+        return CrestConfCalculator(task_def, rxn, job_manager)
+
+    @staticmethod
+    def _sif_name():
+        return CREST_IMAGE.replace("/", "_").replace(":", "_") + ".sif"
+
+    def test_image_is_erm42_yarp_pinned_by_digest(self):
+        assert re.fullmatch(r"erm42/yarp@sha256:[0-9a-f]{64}", CREST_IMAGE)
+
+    @pytest.mark.parametrize("container", ["docker", "apptainer", "singularity"])
+    def test_every_runner_uses_the_pinned_image(self, khp_reaction, tmp_path, container):
+        assert self._calc(khp_reaction, container, tmp_path).image_name == CREST_IMAGE
+
+    @pytest.mark.parametrize("runner", ["apptainer", "singularity"])
+    def test_sif_runners_pull_by_digest_into_a_digest_named_sif(self, khp_reaction, tmp_path,
+                                                                 runner, monkeypatch):
+        """
+        A user with an old cached erm42_yarp_crest.sif (the tag's file) still
+        gets the pinned image: it lands in its own digest-named .sif.
+        """
+        (tmp_path / "erm42_yarp_crest.sif").touch()
+        pulls = []
+        monkeypatch.setattr("yarp.reaction.external.calc_base.subprocess.run",
+                            lambda cmd, **kw: pulls.append(cmd) or SimpleNamespace(returncode=0, stdout=""))
+        calc = self._calc(khp_reaction, runner, tmp_path)
+
+        prefix = calc.get_container_prefix(calc.image_name, "/work")
+
+        assert pulls == [[runner, "pull", str(tmp_path / self._sif_name()), f"docker://{CREST_IMAGE}"]]
+        assert prefix.endswith(str(tmp_path / self._sif_name()))
+
+    def test_job_script_runs_the_digest_sif_not_a_cached_tag_image(self, khp_reaction, tmp_path):
+        (tmp_path / self._sif_name()).touch()
+        (tmp_path / "erm42_yarp_crest.sif").touch()
+        calc = self._calc(khp_reaction, "apptainer", tmp_path)
+        calc.set_scratch_dir(tmp_path)
+        calc.write_scheduler_headers = MagicMock()
+
+        script = calc.write_submission_script().read_text()
+
+        assert f"/work {tmp_path / self._sif_name()}" in script
+        assert "erm42_yarp_crest.sif" not in script
+
+    def test_docker_runs_the_image_by_digest(self, khp_reaction, tmp_path, monkeypatch):
+        calls = []
+        monkeypatch.setattr("yarp.reaction.external.calc_base.subprocess.run",
+                            lambda cmd, **kw: calls.append(cmd) or SimpleNamespace(returncode=0, stdout="abc123\n"))
+        calc = self._calc(khp_reaction, "docker", tmp_path)
+
+        prefix = calc.get_container_prefix(calc.image_name, "/work")
+
+        assert calls == [["docker", "images", "-q", CREST_IMAGE]]
+        assert prefix.endswith(f"-w /work {CREST_IMAGE}")
+
+    def test_recipe_for_the_image_is_in_the_repo(self):
+        """
+        The published image can be rebuilt from the repo: the Dockerfile installs
+        the pinned environment from the lock file and applies the CO fix.
+        """
+        crest_dir = Path(__file__).resolve().parents[3] / "containers" / "crest"
+        for name in ("Dockerfile", "conda-linux-64.lock", "crest_3.0.2_sources.txt",
+                     "patches/0001-double-allocation.patch",
+                     "patches/0002-gfnff-free-co-no-hbond-guard.patch"):
+            assert (crest_dir / name).is_file(), name
+
+        dockerfile = (crest_dir / "Dockerfile").read_text()
+        assert "--file /tmp/conda-linux-64.lock" in dockerfile
+        assert "0002-gfnff-free-co-no-hbond-guard.patch" in dockerfile
+
+        lock = (crest_dir / "conda-linux-64.lock").read_text()
+        assert "@EXPLICIT" in lock
+        assert "/crest-3.0.2-" in lock and "/libgfortran5-15.2.0-" in lock
 
 
 

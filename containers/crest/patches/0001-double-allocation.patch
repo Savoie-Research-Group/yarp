@@ -1,0 +1,24 @@
+From 5ca82feb2ec4df30a0129db957163c934f085952 Mon Sep 17 00:00:00 2001
+From: Philipp Pracht <research@philipp-pracht.de>
+Date: Thu, 29 Aug 2024 22:54:43 +0200
+Subject: [PATCH] Remove double-allocation that may lead to crash in some GNU
+ builds
+
+---
+ src/parsing/parse_xtbinput.f90 | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/parsing/parse_xtbinput.f90 b/src/parsing/parse_xtbinput.f90
+index 270682a..7aa39d9 100644
+--- a/src/parsing/parse_xtbinput.f90
++++ b/src/parsing/parse_xtbinput.f90
+@@ -715,9 +715,6 @@ contains  !> MODULE PROCEDURES START HERE
+       call get_xtb_keyvalue(kvdum,rawline,io)
+       if (io == 0) then
+         call blk%addkv(kvdum)
+-        if(.not.allocated(blk%kv_list(blk%nkv)%value_rawa))then
+-           allocate(blk%kv_list(blk%nkv)%value_rawa, source=kvdum%value_rawa)  
+-        endif
+       end if
+     end do
+ 

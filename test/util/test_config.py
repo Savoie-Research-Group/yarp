@@ -160,3 +160,38 @@ class TestEnumerationExhaustive:
 
     def test_false_is_accepted_for_sequential(self):
         assert EnumerationConfig(mode="sequential", exhaustive=False).exhaustive is False
+
+
+class TestPairSelection:
+    """ts_guess.pair_selection ('intended' | 'top_n') and pair_threshold (0..1)."""
+
+    def test_defaults_are_intended_at_0_5(self):
+        cfg = MULTI_TASK_CONFIGS["ts_guess"]()
+        assert (cfg.pair_selection, cfg.pair_threshold) == ("intended", 0.5)
+
+    @pytest.mark.parametrize("mode", ["intended", "top_n"])
+    def test_valid_modes_are_kept(self, mode):
+        assert MULTI_TASK_CONFIGS["ts_guess"](pair_selection=mode).pair_selection == mode
+
+    @pytest.mark.parametrize("mode", ["top-n", "Intended", "all", None])
+    def test_invalid_mode_is_rejected(self, mode):
+        with pytest.raises(ValueError, match="Invalid 'pair_selection'"):
+            MULTI_TASK_CONFIGS["ts_guess"](pair_selection=mode)
+
+    @pytest.mark.parametrize("value", [0, 0.0, 0.4, 1, 1.0])
+    def test_number_between_0_and_1_is_kept(self, value):
+        assert MULTI_TASK_CONFIGS["ts_guess"](pair_threshold=value).pair_threshold == value
+
+    @pytest.mark.parametrize("value", [-0.1, 1.5, "0.5", True])
+    def test_out_of_range_or_non_number_is_rejected(self, value):
+        with pytest.raises(ValueError, match="between 0 and 1 to ts_guess: 'pair_threshold'"):
+            MULTI_TASK_CONFIGS["ts_guess"](pair_threshold=value)
+
+    def test_top_n_without_a_threshold_is_accepted(self):
+        assert MULTI_TASK_CONFIGS["ts_guess"](pair_selection="top_n").pair_threshold is None
+
+    @pytest.mark.parametrize("value", [0.5, 0.0, 0.4])
+    def test_a_threshold_with_top_n_is_rejected(self, value):
+        """top_n ignores the threshold, so a user who sets one has misconfigured the block."""
+        with pytest.raises(ValueError, match="'pair_threshold' is only used with pair_selection 'intended'"):
+            MULTI_TASK_CONFIGS["ts_guess"](pair_selection="top_n", pair_threshold=value)

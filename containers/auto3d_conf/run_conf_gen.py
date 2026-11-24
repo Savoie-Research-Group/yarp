@@ -21,8 +21,9 @@ which loses every conformer (measured with Auto3D 2.3.1 and 3.2.2).
 Optimization and ranking use Auto3D's own pipeline defaults
 (Auto3D.foundation.constants), so they behave as in `main`.
 
-The connectivity check against the yarpecule graph is done afterwards on the
-host, in the calculator's scrape_data, so this script stays free of YARP imports.
+The bonding is not checked against the yarpecule graph, here or on the host.
+The centroid filter for multi-species states runs afterwards on the host, in
+the calculator's scrape_data, so this script stays free of YARP imports.
 
 Outputs (in the working directory):
     auto3d_conformers.xyz  every kept conformer, lowest energy first
